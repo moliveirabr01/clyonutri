@@ -1,0 +1,243 @@
+CLYONUTRIProduct & Technology Blueprint
+PRD • TRD • Fluxos • UI/UX • Backend • Implantação • ÉpicosVersão consolidada — 07/10/2026
+Decisão estrutural: ClyoNutri é um SaaS independente, com aplicação, banco, autenticação, domínio, identidade, infraestrutura e roadmap próprios. O banco restaurado do ClyoMed é tratado como baseline de migração/inventário — não como autorização para carregar domínios Med, Psi ou Fit para o produto.
+1. Visão Executiva
+Proposta de valor: ser o sistema operacional do nutricionista para captar, avaliar, prescrever, acompanhar e reter pacientes em uma jornada clínica simples, segura e mensurável.
+Usuários primários: nutricionista autônomo, nutricionista de clínica/equipe e paciente.
+Core do produto: pacientes + prontuário nutricional + anamnese + antropometria + plano alimentar + agenda + acompanhamento/evolução + portal/app do paciente + financeiro essencial.
+Fora do domínio: prescrição de treino do Personal, prontuário médico generalista, psicoterapia/instrumentos psicológicos e funcionalidades clínicas sem vínculo com Nutrição.
+2. PRD — Product Requirements Document
+2.1 Objetivos
+Reduzir o tempo entre cadastro do paciente e primeira prescrição.
+Centralizar histórico, avaliações, medidas, plano alimentar e evolução.
+Transformar o plano alimentar em experiência utilizável pelo paciente, não apenas PDF.
+Aumentar adesão por check-ins, hidratação, lembretes e acompanhamento.
+Dar ao nutricionista visão operacional e financeira suficiente para administrar sua carteira.
+2.2 MVP funcional
+Módulo
+Escopo
+Conta e acesso
+Cadastro, login, recuperação de senha, sessão segura, RBAC e onboarding do nutricionista.
+Dashboard
+Agenda do dia, pacientes que exigem atenção, consultas, check-ins e atalhos.
+Pacientes
+Cadastro, busca, perfil 360, histórico e status.
+Anamnese
+Objetivos, rotina, preferências, restrições, alergias, sintomas, hábitos e histórico relevante.
+Antropometria
+Peso, altura, IMC, circunferências, RCQ, composição corporal quando informada e evolução temporal.
+Plano alimentar
+Editor por refeições/horários, alimentos, quantidades, substituições, macros/energia e publicação.
+Base alimentar
+Integração/importação estruturada de referência nutricional, inicialmente compatível com TACO e cadastro próprio.
+Agenda
+Consultas, estados da consulta, observações e vínculo com paciente.
+Paciente
+Portal/app para plano alimentar, orientações, hidratação, check-ins e evolução compartilhada.
+Financeiro essencial
+Recebíveis ligados a atendimentos, pagamento parcial/total, PIX/dinheiro/cartão/transferência, estorno, recibos, relatórios e CSV.
+Configurações
+Perfil profissional, clínica/equipe quando aplicável, preferências, privacidade e conta.
+2.3 Requisitos não funcionais
+Isolamento multi-tenant por clinic_id/tenant_id em toda leitura e escrita.
+LGPD by design: minimização, consentimento quando necessário, trilha de auditoria, exportação e tratamento de exclusão/anonimização.
+Responsivo e acessível; fluxos críticos utilizáveis em mobile web.
+Sem dados sensíveis em logs; uploads privados; proteção CSRF/XSS; queries parametrizadas.
+Observabilidade mínima: erros, auditoria, métricas de saúde e rastreabilidade de deploy.
+2.4 KPIs sugeridos
+Activation: % de nutricionistas que cadastram 1º paciente e publicam 1º plano alimentar.
+Time-to-Value: tempo cadastro → primeira prescrição publicada.
+WAU/MAU profissional; pacientes ativos; consultas realizadas.
+Adesão do paciente: visualização do plano, check-ins e registros de hidratação.
+Retenção de nutricionistas em 30/90 dias e churn.
+3. TRD — Technical Requirements Document
+3.1 Arquitetura alvo
+Monólito modular em PHP 8.1+ com MVC próprio/PSR-4, MySQL 8+, frontend server-rendered responsivo e API versionada para o app. App do paciente em React Native + Expo + TypeScript. A arquitetura privilegia simplicidade operacional compatível com hospedagem atual, sem introduzir microserviços antes de necessidade real.
+3.2 Módulos de domínio
+Identity & Access • Tenancy/Clinic • Professionals • Patients • Nutrition Records • Anamnesis • Anthropometry • Food Catalog • Meal Plans • Appointments • Engagement • Finance • Notifications • Audit & Privacy
+3.3 Estrutura técnica
+public/            front controller + assetssrc/  Core/              HTTP, Router, DB, Auth, Validation, Security  Domain/            módulos de negócio  Application/       casos de uso/services  Infrastructure/    repositories, mail, storage, integrationsviews/               páginas/componentesconfig/              configuração sem segredos versionadosdatabase/  migrations/  seeds/storage/             logs e arquivos privados fora do webrootbin/                 scripts de build, migração e verificaçãomobile/              React Native/Expo/TypeScript
+3.4 Segurança obrigatória
+PDO/prepared statements; nenhuma concatenação de entrada em SQL.
+CSRF em mutações web; escaping contextual contra XSS; cookies Secure/HttpOnly/SameSite.
+Rate limit em autenticação e ações sensíveis; rotação/invalidação de sessão.
+Autorização server-side por recurso + tenant; testes explícitos contra IDOR/cross-tenant.
+Segredos somente em ambiente; .env, logs, backups, vendor e storage bloqueados no webroot.
+Uploads com allowlist MIME/extensão, nomes gerados e armazenamento privado.
+4. Fluxo do APP
+Fluxo profissional principal:
+Cadastro → Verificação/Login → Onboarding profissional → Dashboard → Pacientes → Novo paciente → Perfil 360 → Anamnese → Antropometria/Avaliação → Plano alimentar → Revisão → Publicar → Agenda/Consulta → Evolução → Check-in → Ajuste do plano → Histórico.
+Fluxo do paciente:
+Convite/Conta → Consentimentos → Home → Plano de hoje → Refeição → Substituições/Orientações → Hidratação → Check-in → Evolução → Próxima consulta → Perfil/Privacidade.
+Fluxos auxiliares: Financeiro → Recebíveis → Registrar pagamento → Recibo/Relatório; Configurações → Perfil/Clínica/Equipe → Preferências → Privacidade → Conta → Logout.
+5. UI/UX Design
+5.1 Design System oficial — Clinical Botanical
+Token
+Valor
+Uso
+Forest
+#0F3E17
+texto forte, navegação, marca institucional
+Clyo Green
+#39734A
+ação primária e estados positivos de marca
+Sage
+#BFD8C2 / #E5F0E5
+superfícies, destaques suaves e contexto
+Cream
+#FAF9F4
+background principal
+Tipografia
+Inter
+interface e conteúdo
+5.2 Princípios de experiência
+Clinical, mas não hospitalar: confiança profissional com sensação acolhedora e alimentar/natural.
+Uma ação primária por tela; reduzir densidade administrativa.
+Professional UI mais operacional; Patient UI mais simples, motivadora e orientada ao dia.
+Brand Colors não devem substituir cores semânticas de erro, alerta, sucesso e visualização de dados.
+Desktop-first para trabalho clínico complexo, mobile-first para paciente e jornadas rápidas.
+Estados vazios devem ensinar o próximo passo; erros devem indicar recuperação.
+5.3 Navegação profissional
+Dashboard | Agenda | Pacientes | Planos alimentares | Biblioteca de alimentos | Financeiro | Relatórios | Configurações
+5.4 Telas críticas
+Login/Cadastro; Onboarding; Dashboard; Lista de pacientes; Perfil 360; Anamnese; Avaliação/Antropometria; Editor de plano alimentar; Preview/Publicação; Agenda; Consulta; Evolução; Financeiro; Configurações; Home do paciente; Plano do dia; Hidratação; Check-in.
+6. Esquema do Backend
+Entidade
+Responsabilidade
+users
+identidade/autenticação
+clinics / tenants
+fronteira multi-tenant
+clinic_members
+papéis e vínculo profissional
+professionals
+perfil do nutricionista
+patients
+cadastro do paciente
+patient_consents
+consentimentos e base legal
+nutrition_records
+registro/prontuário nutricional
+anamneses
+anamnese versionada
+anthropometric_assessments
+medidas e indicadores
+foods
+catálogo alimentar
+food_nutrients
+nutrientes por alimento/porção
+meal_plans
+cabeçalho/versionamento do plano
+meal_plan_meals
+refeições/horários
+meal_plan_items
+alimentos/quantidades
+meal_plan_substitutions
+substituições
+appointments
+agenda/consulta
+checkins
+acompanhamento do paciente
+hydration_logs
+hidratação
+receivables / payments
+financeiro essencial
+audit_logs
+trilha de auditoria
+notifications
+eventos e entregas
+Regra estrutural: tabelas clínicas/operacionais pertencentes ao tenant carregam clinic_id/tenant_id e índices compostos adequados. O baseline restaurado do ClyoMed deve ser inventariado como KEEP / ADAPT / MIGRATE / DROP-LATER; não executar DROP destrutivo até migração, validação e rollback estarem comprovados.
+7. Plano de Implantação
+Fase
+Entrega
+0 — Baseline & inventário
+Congelar backup, mapear schema real, classificar legado, reconciliar código/banco/Jira.
+1 — Fundação independente
+Domínio, envs, CI/build, auth, tenancy, RBAC, logging, migrations e hardening.
+2 — Design System & Shell
+Clinical Botanical, componentes, navegação, responsividade e estados.
+3 — Golden Path profissional
+Onboarding → paciente → anamnese → avaliação → plano → publicação.
+4 — Agenda & acompanhamento
+Consultas, evolução, check-ins, hidratação e notificações.
+5 — Paciente
+Portal/app React Native, plano diário, orientações, check-ins e privacidade.
+6 — Financeiro
+Recebíveis/pagamentos/recibos/relatórios; manter despesas e conciliação bancária fora do MVP.
+7 — Hardening
+LGPD, IDOR/cross-tenant, pentest, performance, backup/restore, observabilidade e E2E.
+8 — Go-live
+Staging congelado, UAT, migration rehearsal, artifact versionado, rollback, smoke test e monitoramento.
+8. Critérios de Go-Live
+Zero P0 aberto; nenhum Critical/High de segurança sem mitigação aceita.
+Golden Path profissional e paciente passando E2E.
+Testes de isolamento tenant/IDOR passando.
+Backup e restore testados; migração ensaiada em cópia representativa.
+Artefato de deploy rastreável por versão/commit e rollback documentado.
+Design System sem drift crítico nas jornadas principais.
+Política/Termos/Privacidade e mecanismos LGPD operacionais.
+9. Lista de Épicos
+Épico
+Nome
+Prioridade
+Objetivo
+CLYONUTRI-1
+Segregação e autonomia do ClyoNutri
+P0
+Separar produto, runtime, banco, domínio e dependências legadas.
+CLYONUTRI-2
+Identidade, autenticação e tenancy
+P0
+Conta, sessão, RBAC, clinic_id e isolamento.
+CLYONUTRI-3
+Onboarding e perfil profissional
+P0
+Ativação do nutricionista e configuração inicial.
+CLYONUTRI-4
+Pacientes e Perfil 360
+P0
+Cadastro, busca, perfil e histórico.
+CLYONUTRI-5
+Prontuário e anamnese nutricional
+P0
+Registro longitudinal e avaliação inicial.
+CLYONUTRI-6
+Antropometria e evolução
+P0
+Medidas, indicadores, gráficos e histórico.
+CLYONUTRI-7
+Base de alimentos e nutrientes
+P0
+Catálogo próprio/referência TACO e porções.
+CLYONUTRI-8
+Plano alimentar e prescrição nutricional
+P0
+Editor, refeições, substituições, cálculo e publicação.
+CLYONUTRI-9
+Agenda e jornada de consulta
+P1
+Agendamento, estados e execução da consulta.
+CLYONUTRI-10
+Portal/App do paciente
+P1
+Plano diário, orientações e evolução compartilhada.
+CLYONUTRI-11
+Engajamento, hidratação e check-ins
+P1
+Acompanhamento e adesão.
+CLYONUTRI-12
+Financeiro e monetização
+P1
+Recebíveis, pagamentos, recibos e relatórios.
+CLYONUTRI-13
+Segurança, LGPD, qualidade e Go-Live
+P0
+Hardening, testes, auditoria e release gate.
+CLYONUTRI-45
+Design System Clinical Botanical
+P0
+Tokens, componentes, shells Professional/Patient e governança visual.
+10. Sequência recomendada
+CLYONUTRI-1 → 2 → 45 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13. O épico de segregação continua sendo gate dos demais. Design System entra cedo para impedir que o produto nasça visualmente como uma cópia residual do ClyoMed.
+11. Definição de produto
+ClyoNutri não deve ser apenas um prontuário com campo de dieta. O núcleo competitivo precisa ser a conexão Avaliar → Prescrever → Acompanhar → Entender evolução → Ajustar → Reter. O diferencial deve aparecer na velocidade de montagem do plano, qualidade da experiência do paciente e clareza da evolução clínica.

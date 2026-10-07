@@ -1,0 +1,10 @@
+.DS_Store
+.env
+storage/logs/*.log
+storage/uploads/*
+storage/*.sqlite
+storage/backups/*
+vendor/
+!storage/logs/.gitkeep
+!storage/uploads/.gitkeep
+!storage/backups/.gitkeep
