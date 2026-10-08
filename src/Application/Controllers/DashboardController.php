@@ -123,19 +123,53 @@ class DashboardController
           <!-- Coluna 2: Prontuário, Avaliações e Planos -->
           <div>
             <div class="card">
-              <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Planos Alimentares</h3>
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-plan-p360').style.display='flex'" style="font-size: 0.8rem; padding: 3px 8px;">
+                  + Novo Plano
+                </button>
+              </div>
               <?php if (empty($profile['meal_plans'])): ?>
-                <p style="color: var(--neutral-gray-500);">Nenhum plano alimentar prescrito ainda.</p>
+                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhum plano alimentar prescrito ainda para este paciente.</p>
               <?php else: ?>
-                <ul style="padding-left: 20px; color: var(--brand-navy-900);">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
                   <?php foreach ($profile['meal_plans'] as $mp): ?>
-                    <li style="margin-bottom: 8px;">
-                      <strong><?= htmlspecialchars($mp['title']) ?></strong> (V<?= $mp['version'] ?>) — 
-                      <span class="badge badge-<?= $mp['status'] === 'published' ? 'success' : 'warning' ?>"><?= $mp['status'] ?></span>
-                    </li>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
+                      <div>
+                        <strong style="color: var(--brand-navy-900); font-size: 0.95rem;"><?= htmlspecialchars($mp['title']) ?></strong>
+                        <span style="font-size: 0.75rem; color: #64748b; margin-left: 6px;">v<?= $mp['version'] ?></span>
+                        <span class="badge badge-<?= $mp['status'] === 'published' ? 'success' : 'warning' ?>" style="font-size: 0.75rem; margin-left: 6px;"><?= $mp['status'] ?></span>
+                      </div>
+                      <a href="/planos/<?= $mp['id'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
+                        Abrir Editor ➔
+                      </a>
+                    </div>
                   <?php endforeach; ?>
-                </ul>
+                </div>
               <?php endif; ?>
+            </div>
+
+            <!-- Modal Novo Plano para Paciente -->
+            <div id="modal-new-plan-p360" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+              <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Nova Prescrição Alimentar</h3>
+                <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;">Paciente: <strong><?= htmlspecialchars($p['name']) ?></strong></p>
+                <form method="POST" action="/planos/novo">
+                  <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
+                  <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título do Plano *</label>
+                    <input type="text" name="title" required placeholder="Ex: Plano Alimentar Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  </div>
+                  <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Iniciais (Opcional)</label>
+                    <textarea name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-plan-p360').style.display='none'">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Abrir Editor</button>
+                  </div>
+                </form>
+              </div>
             </div>
 
             <!-- Card de Avaliações Antropométricas com Indicadores OMS (NI2-65, NI2-66, NI2-69) -->
@@ -1097,16 +1131,20 @@ class DashboardController
 
             <!-- Último Plano Alimentar -->
             <div class="card">
-              <div class="card__header">
-                <h3>Plano Ativo</h3>
-                <a href="/planos" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Ver Planos</a>
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0;">Prescrição Alimentar</h3>
+                <a href="/planos" target="_blank" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Todos os Planos</a>
               </div>
               <?php if (empty($profile['meal_plans'])): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.875rem;">Nenhum plano ativo. Prescreva um novo plano durante a consulta.</p>
+                <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin-bottom: 12px;">Nenhum plano prescrito ainda. Inicie a prescrição desta consulta.</p>
+                <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-sm btn-primary" style="font-size: 0.8rem; text-decoration: none; display: inline-block;">+ Prescrever Plano no Perfil ↗</a>
               <?php else: ?>
                 <?php $plan = $profile['meal_plans'][0]; ?>
-                <p style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($plan['title']) ?> (V<?= $plan['version'] ?>)</p>
-                <span class="badge badge-<?= $plan['status'] === 'published' ? 'success' : 'info' ?>"><?= $plan['status'] ?></span>
+                <div style="margin-bottom: 8px;">
+                  <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($plan['title']) ?> (v<?= $plan['version'] ?>)</strong>
+                  <span class="badge badge-<?= $plan['status'] === 'published' ? 'success' : 'warning' ?>" style="font-size: 0.75rem; margin-left: 6px;"><?= $plan['status'] ?></span>
+                </div>
+                <a href="/planos/<?= $plan['id'] ?>" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Abrir Editor da Prescrição ↗</a>
               <?php endif; ?>
             </div>
           </div>
