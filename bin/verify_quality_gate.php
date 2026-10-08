@@ -216,6 +216,13 @@ if (str_contains($portalE2eOutput, 'SUCESSO') || str_contains($portalE2eOutput, 
     recordCheck('E2E_JOURNEYS', 'Jornada E2E do Paciente (Portal e Prescrição)', 'FAIL', 'Falha na jornada E2E do paciente');
 }
 
+$ni26Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/ni2_6_prontuario_e_anamnese_nutricional_test.php') . " 2>&1");
+if (str_contains($ni26Output, 'TODOS OS CRITÉRIOS DE ACEITE DO ÉPICO NI2-6 FORAM ATENDIDOS')) {
+    recordCheck('E2E_JOURNEYS', 'Prontuário & Anamnese Nutricional E2E (NI2-6: NI2-60 a NI2-64)', 'PASS', 'Prontuário append-only, SHA-256 chain, anamnese versionada, observações seguras e resumo de prescrição aprovados 100%');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Prontuário & Anamnese Nutricional E2E (NI2-6: NI2-60 a NI2-64)', 'FAIL', 'Falha na suíte NI2-6: ' . substr($ni26Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

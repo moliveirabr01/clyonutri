@@ -72,12 +72,20 @@ class DashboardController
         $evolutionData = $anthroService->getEvolution($id);
         $assessments = $evolutionData['assessments'];
 
+        $clinicalService = new ClinicalRecordService();
+        $integrity = $clinicalService->verifyIntegrity($id);
+        $clinicalRecords = $profile['clinical_records'] ?? [];
+
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+        $latestAnamnesis = $anamnesisService->getLatestAnamnesis($id);
+        $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
+
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : 'Operação realizada com sucesso!' ?>
+            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro gravado com sucesso no prontuário!' : 'Operação realizada com sucesso!') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -94,12 +102,18 @@ class DashboardController
             <h1><?= htmlspecialchars($p['name']) ?></h1>
             <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-secondary">
+              Prontuário (SHA-256) ➔
+            </a>
+            <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-secondary">
+              Anamnese Estruturada ➔
+            </a>
             <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="btn btn-secondary">
-              Ver Evolução & Comparativo ➔
+              Antropometria ➔
             </a>
             <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
-              + Nova Avaliação Antropométrica
+              + Nova Avaliação
             </button>
           </div>
         </div>
@@ -120,9 +134,113 @@ class DashboardController
             <?php endif; ?>
           </div>
 
-          <!-- Coluna 2: Prontuário, Avaliações e Planos -->
+          <!-- Coluna 2: Prontuário, Anamnese, Avaliações e Planos -->
           <div>
-            <div class="card">
+            <!-- Card 1: Prontuário Eletrônico & Evoluções (NI2-60, NI2-63) -->
+            <div class="card" style="margin-bottom: var(--space-6);">
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <h3 style="margin: 0; display: inline-block;">Prontuário Longitudinal</h3>
+                  <?php if ($integrity['is_valid']): ?>
+                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ Cadeia SHA-256 Íntegra (<?= $integrity['total_records'] ?> registros)</span>
+                  <?php else: ?>
+                    <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 0.75rem; margin-left: 8px;">⚠️ Violação de Integridade Detectada</span>
+                  <?php endif; ?>
+                </div>
+                <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
+                  Abrir Prontuário Completo ➔
+                </a>
+              </div>
+
+              <?php if (empty($clinicalRecords)): ?>
+                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhum registro clínico adicionado ao prontuário até o momento.</p>
+              <?php else: ?>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <?php foreach (array_slice($clinicalRecords, 0, 3) as $cr): ?>
+                    <div style="padding: 10px 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px; font-size: 0.875rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($cr['title']) ?></strong>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                          <span style="font-size: 0.75rem; color: #64748B;">v<?= $cr['version'] ?> • <?= date('d/m/Y H:i', strtotime($cr['created_at'])) ?></span>
+                          <?php if ($cr['is_retracted']): ?>
+                            <span class="badge badge-warning" style="font-size: 0.7rem;">Retificado</span>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                      <div style="color: var(--neutral-gray-600); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <?= htmlspecialchars($cr['content']['text'] ?? $cr['content']['evolution_summary'] ?? json_encode($cr['content'], JSON_UNESCAPED_UNICODE)) ?>
+                      </div>
+                      <div style="margin-top: 4px; font-size: 0.7rem; color: #94A3B8; font-family: monospace;">
+                        Hash: <?= substr($cr['record_hash'], 0, 16) ?>... | Resp: <?= htmlspecialchars($cr['professional_name']) ?>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico (NI2-61, NI2-64) -->
+            <div class="card" style="margin-bottom: var(--space-6);">
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <h3 style="margin: 0; display: inline-block;">Anamnese Nutricional</h3>
+                  <?php if ($latestAnamnesis): ?>
+                    <span class="badge badge-info" style="font-size: 0.75rem; margin-left: 8px;">
+                      v<?= $latestAnamnesis['version'] ?> <?= $latestAnamnesis['is_draft'] ? '(Rascunho)' : '(Vigente)' ?> • <?= date('d/m/Y', strtotime($latestAnamnesis['created_at'])) ?>
+                    </span>
+                  <?php endif; ?>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
+                    <?= $latestAnamnesis ? 'Atualizar / Ver Histórico ➔' : '+ Realizar Anamnese ➔' ?>
+                  </a>
+                </div>
+              </div>
+
+              <?php if (!$latestAnamnesis): ?>
+                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhuma anamnese cadastrada para este paciente. Clique acima para coletar objetivos e restrições.</p>
+              <?php else: ?>
+                <!-- Destaques Críticos da Anamnese (NI2-64) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
+                  <!-- Alergias -->
+                  <div style="padding: 8px 12px; border-radius: 6px; background: <?= !empty($latestAnamnesis['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($latestAnamnesis['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($latestAnamnesis['allergies']) ? '#DC2626' : '#64748B' ?>; display: block;">
+                      <?= !empty($latestAnamnesis['allergies']) ? '⚠️ ALERGIAS (CRÍTICO)' : 'ALERGIAS' ?>
+                    </span>
+                    <span style="font-size: 0.85rem; color: #1E293B;">
+                      <?= htmlspecialchars($latestAnamnesis['allergies'] ?? 'Nenhuma relatada') ?>
+                    </span>
+                  </div>
+
+                  <!-- Restrições / Intolerâncias -->
+                  <div style="padding: 8px 12px; border-radius: 6px; background: <?= !empty($latestAnamnesis['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($latestAnamnesis['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($latestAnamnesis['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">
+                      <?= !empty($latestAnamnesis['restrictions']) ? '⚠️ RESTRIÇÕES ALIMENTARES' : 'RESTRIÇÕES' ?>
+                    </span>
+                    <span style="font-size: 0.85rem; color: #1E293B;">
+                      <?= htmlspecialchars($latestAnamnesis['restrictions'] ?? 'Nenhuma relatada') ?>
+                    </span>
+                  </div>
+
+                  <!-- Objetivos -->
+                  <div style="padding: 8px 12px; border-radius: 6px; background: #F8FAFC; border: 1px solid #E2E8F0;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: #0284C7; display: block;">OBJETIVOS & METAS</span>
+                    <span style="font-size: 0.85rem; color: #1E293B;">
+                      <?= htmlspecialchars($latestAnamnesis['objectives'] ?? 'Não especificados') ?>
+                    </span>
+                  </div>
+                </div>
+
+                <?php if (!empty($latestAnamnesis['symptoms'])): ?>
+                  <div style="padding: 6px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 0.8rem; margin-top: 6px;">
+                    <strong>Sinais & Sintomas:</strong> <?= htmlspecialchars($latestAnamnesis['symptoms']) ?>
+                  </div>
+                <?php endif; ?>
+              <?php endif; ?>
+            </div>
+
+            <!-- Card 3: Planos Alimentares -->
+            <div class="card" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-plan-p360').style.display='flex'" style="font-size: 0.8rem; padding: 3px 8px;">
@@ -895,6 +1013,695 @@ class DashboardController
             $res = $service->compareAssessments($patientId, $evalAId, $evalBId);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode($res);
+            exit;
+        } catch (\Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8', true, 400);
+            echo json_encode(['error' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    /**
+     * Tela dedicada do Prontuário Longitudinal Eletrônico com Encadeamento Criptográfico SHA-256 (NI2-60, NI2-63, NI2-64).
+     */
+    public function patientMedicalRecord(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $patient = $repo->findById($id);
+
+        if (!$patient) {
+            header('Location: /pacientes');
+            exit;
+        }
+
+        $title = 'Prontuário Eletrônico — ' . $patient['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $csrfToken = Csrf::token();
+
+        $clinicalService = new ClinicalRecordService();
+        $integrity = $clinicalService->verifyIntegrity($id);
+        $timeline = $clinicalService->getPatientTimeline($id);
+
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+        $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
+
+        ob_start();
+        ?>
+        <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['success'])): ?>
+          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+            ✓ <?= $_GET['success'] === 'registro_adicionado' ? 'Evolução clínica adicionada e assinada com hash SHA-256 no prontuário!' : ($_GET['success'] === 'registro_retificado' ? 'Retificação versionada gravada com justificativa formal!' : 'Operação realizada com sucesso!') ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['error'])): ?>
+          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
+            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro no processamento do registro clínico.' ?>
+          </div>
+        <?php endif; ?>
+
+        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+            </div>
+            <h1>Prontuário Eletrônico & Evolução Clínica</h1>
+            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico Longitudinal Append-Only</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="/pacientes/<?= $patient['id'] ?>/prontuario/exportar" target="_blank" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Exportar Trilha Auditada (JSON/Hash)
+            </a>
+            <a href="/pacientes/<?= $patient['id'] ?>/anamnese" class="btn btn-secondary">
+              Ver Anamnese ➔
+            </a>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+              + Nova Evolução / Anotação
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Integridade Criptográfica (NI2-158 / NI2-60) -->
+        <div style="background: <?= $integrity['is_valid'] ? '#F0FDF4' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#BBF7D0' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#22C55E' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
+              <?= $integrity['is_valid'] ? '✓' : '!' ?>
+            </div>
+            <div>
+              <strong style="color: <?= $integrity['is_valid'] ? '#166534' : '#991B1B' ?>; font-size: 0.95rem;">
+                <?= $integrity['is_valid'] ? 'Cadeia de Integridade Criptográfica 100% Válida' : 'ALERTA: Adulteração Detectada no Histórico' ?>
+              </strong>
+              <div style="font-size: 0.8rem; color: #64748B;">
+                <?= $integrity['message'] ?> (Total: <?= $integrity['total_records'] ?> versões registradas)
+                <?php if (!empty($integrity['latest_hash'])): ?>
+                  • Último Hash Raiz: <code style="font-size: 0.75rem; background: #E2E8F0; padding: 1px 4px; border-radius: 4px;"><?= substr($integrity['latest_hash'], 0, 20) ?>...</code>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumo Clínico para Prescrição (NI2-64) -->
+        <div class="card" style="margin-bottom: var(--space-6); border-left: 4px solid #0284C7;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);">Resumo Crítico da Anamnese para Prescrição (NI2-64)</h3>
+            <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
+              <span style="font-size: 0.75rem; color: #64748B;">
+                Fonte: <a href="<?= $clinicalSummary['source']['url'] ?>" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?></a> por <?= htmlspecialchars($clinicalSummary['source']['author']) ?> em <?= date('d/m/Y', strtotime($clinicalSummary['source']['recorded_at'])) ?>
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <?php if (!$clinicalSummary['has_data']): ?>
+            <p style="color: #64748B; font-size: 0.875rem; margin: 0;">Nenhum dado clínico registrado na anamnese ainda. Não há dados inferidos.</p>
+          <?php else: ?>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px;">
+              <div style="padding: 10px; background: <?= !empty($clinicalSummary['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>; border-radius: 6px;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; display: block;">ALERGIAS ALIMENTARES</span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergies'] ?? '[Não relatado]') ?></span>
+              </div>
+              <div style="padding: 10px; background: <?= !empty($clinicalSummary['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>; border-radius: 6px;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">RESTRIÇÕES & INTOLERÂNCIAS</span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['restrictions'] ?? '[Não relatado]') ?></span>
+              </div>
+              <div style="padding: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: #0284C7; display: block;">OBJETIVOS PRINCIPAIS</span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['objectives'] ?? '[Não relatado]') ?></span>
+              </div>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Linha do Tempo Longitudinal (NI2-60, NI2-63) -->
+        <div class="card">
+          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Histórico Clínico Append-Only (<?= count($timeline) ?> Registros)</h3>
+            <span style="font-size: 0.8rem; color: #64748B;">Nenhum registro pode ser apagado ou adulterado</span>
+          </div>
+
+          <?php if (empty($timeline)): ?>
+            <div style="text-align: center; padding: 32px; color: #64748B;">
+              <p>Nenhuma entrada clínica registrada ainda neste prontuário.</p>
+              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+                Registrar Primeira Evolução
+              </button>
+            </div>
+          <?php else: ?>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <?php foreach (array_reverse($timeline) as $rec): ?>
+                <div style="border: 1px solid <?= $rec['is_retracted'] ? '#FCA5A5' : '#E2E8F0' ?>; background: <?= $rec['is_retracted'] ? '#FFF5F5' : '#FFFFFF' ?>; border-radius: 8px; padding: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: #1E293B; color: #fff; font-size: 0.75rem;">v<?= $rec['version'] ?></span>
+                        <h4 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);"><?= htmlspecialchars($rec['title']) ?></h4>
+                        <?php if ($rec['is_retracted']): ?>
+                          <span class="badge badge-warning" style="font-size: 0.75rem;">Superado / Retificado</span>
+                        <?php endif; ?>
+                        <?php if ($rec['supersedes_id']): ?>
+                          <span class="badge badge-info" style="font-size: 0.75rem;">Retificação do Registro #<?= $rec['supersedes_id'] ?></span>
+                        <?php endif; ?>
+                      </div>
+                      <div style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
+                        Por <strong><?= htmlspecialchars($rec['professional_name']) ?></strong> em <?= date('d/m/Y \à\s H:i', strtotime($rec['created_at'])) ?>
+                      </div>
+                    </div>
+                    <?php if (!$rec['is_retracted']): ?>
+                      <button type="button" class="btn btn-sm btn-outline" onclick="openRevisionModal(<?= $rec['id'] ?>, '<?= htmlspecialchars(addslashes($rec['title'])) ?>')" style="font-size: 0.75rem; padding: 3px 8px;">
+                        Retificar Formalmente (v<?= $rec['version'] + 1 ?>)
+                      </button>
+                    <?php endif; ?>
+                  </div>
+
+                  <?php if (!empty($rec['revision_reason'])): ?>
+                    <div style="background: #FEF3C7; border-left: 3px solid #F59E0B; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; color: #92400E; margin-bottom: 10px;">
+                      <strong>Justificativa da retificação:</strong> <?= htmlspecialchars($rec['revision_reason']) ?>
+                    </div>
+                  <?php endif; ?>
+
+                  <!-- Conteúdo Clínico Estruturado / SOAP -->
+                  <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; font-size: 0.875rem; line-height: 1.6; color: #334155; margin-bottom: 10px;">
+                    <?php if (isset($rec['content']['evolution_summary'])): ?>
+                      <p style="margin: 0 0 8px 0;"><?= nl2br(htmlspecialchars($rec['content']['evolution_summary'])) ?></p>
+                    <?php elseif (isset($rec['content']['text'])): ?>
+                      <p style="margin: 0 0 8px 0;"><?= nl2br(htmlspecialchars($rec['content']['text'])) ?></p>
+                    <?php else: ?>
+                      <pre style="margin: 0; font-size: 0.8rem; font-family: inherit; white-space: pre-wrap;"><?= htmlspecialchars(json_encode($rec['content'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>
+                    <?php endif; ?>
+
+                    <?php if (!empty($rec['content']['weight_kg'])): ?>
+                      <div style="margin-top: 8px; font-size: 0.8rem; color: #0284C7;">
+                        <strong>Peso aferido:</strong> <?= $rec['content']['weight_kg'] ?> kg
+                        <?php if (!empty($rec['content']['waist_cm'])): ?>
+                          | <strong>Cintura:</strong> <?= $rec['content']['waist_cm'] ?> cm
+                        <?php endif; ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+
+                  <!-- Trilha Criptográfica de Bloco (NI2-60) -->
+                  <div style="display: flex; gap: 12px; font-size: 0.72rem; color: #64748B; font-family: monospace; background: #F1F5F9; padding: 6px 10px; border-radius: 4px; overflow-x: auto;">
+                    <div><strong>SHA-256:</strong> <?= htmlspecialchars($rec['record_hash']) ?></div>
+                    <div><strong>Prev-Hash:</strong> <?= htmlspecialchars($rec['previous_hash']) ?></div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Modal Nova Evolução / Observação Clínica (NI2-60, NI2-63) -->
+        <div id="modal-new-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Adicionar Entrada ao Prontuário</h3>
+            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">O registro será datado, assinado e concatenado à cadeia SHA-256 de forma imutável.</p>
+            <form method="POST" action="/pacientes/<?= $patient['id'] ?>/prontuario">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Título da Entrada *</label>
+                <input type="text" name="title" required placeholder="Ex: Evolução Clínica de Retorno, Intercorrência, Orientação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Categoria</label>
+                <select name="category" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <option value="evolucao">Evolução Clínica / Atendimento</option>
+                  <option value="observacao">Observação Clínica Geral</option>
+                  <option value="retorno">Consulta de Retorno</option>
+                  <option value="intercorrencia">Intercorrência Clínica</option>
+                </select>
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Conteúdo / Conduta Nutricional (Máx. 10.000 caracteres) *</label>
+                <textarea name="content_text" required rows="6" maxlength="10000" placeholder="Descreva os achados, relato do paciente, metas nutricionais e conduta estabelecida..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-record').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Assinar & Gravar no Prontuário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Retificação Formal Versionada (NI2-60) -->
+        <div id="modal-revise-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Retificação Formal de Registro Clínico</h3>
+            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">
+              Conforme as normas do CFN e integridade médica, o registro anterior será marcado como superado, mas permanecerá preservado no histórico. Uma nova versão será gravada com a justificativa obrigatória.
+            </p>
+            <form id="form-revise-record" method="POST" action="">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Justificativa Formal da Retificação (Mín. 10 caracteres) *</label>
+                <input type="text" name="revision_reason" minlength="10" required placeholder="Ex: Correção de digitação no percentual de gordura acordado..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Novo Texto Corrigido *</label>
+                <textarea name="revised_text" required rows="6" maxlength="10000" placeholder="Insira o texto retificado e atualizado para este atendimento..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-revise-record').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background: #D97706; border-color: #D97706;">Publicar Retificação Versionada</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          function openRevisionModal(recId, title) {
+            var form = document.getElementById('form-revise-record');
+            form.action = '/pacientes/<?= $patient['id'] ?>/prontuario/' + recId + '/retificar';
+            document.getElementById('modal-revise-record').style.display = 'flex';
+          }
+        </script>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function savePatientMedicalRecord(array $params): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        $patientId = (int)($params['id'] ?? 0);
+
+        if (!Csrf::validate($token)) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=csrf");
+            exit;
+        }
+
+        $title = trim((string)($_POST['title'] ?? ''));
+        $text = trim((string)($_POST['content_text'] ?? ''));
+        $category = trim((string)($_POST['category'] ?? 'observacao'));
+
+        if ($title === '' || $text === '') {
+            header("Location: /pacientes/{$patientId}/prontuario?error=campos_obrigatorios&msg=" . urlencode("Título e conteúdo são obrigatórios."));
+            exit;
+        }
+
+        $profId = $this->getActiveProfessionalId();
+        $clinicalService = new ClinicalRecordService();
+
+        try {
+            $clinicalService->addClinicalObservation($patientId, $profId, $title, $text, $category);
+            header("Location: /pacientes/{$patientId}/prontuario?success=registro_adicionado");
+            exit;
+        } catch (\Throwable $e) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    public function revisePatientMedicalRecord(array $params): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        $patientId = (int)($params['id'] ?? 0);
+        $recId = (int)($params['recId'] ?? 0);
+
+        if (!Csrf::validate($token)) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=csrf");
+            exit;
+        }
+
+        $reason = trim((string)($_POST['revision_reason'] ?? ''));
+        $revisedText = trim((string)($_POST['revised_text'] ?? ''));
+
+        if (mb_strlen($reason, 'UTF-8') < 10) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=motivo_curto&msg=" . urlencode("A justificativa de retificação deve conter no mínimo 10 caracteres."));
+            exit;
+        }
+
+        $profId = $this->getActiveProfessionalId();
+        $clinicalService = new ClinicalRecordService();
+
+        try {
+            $clinicalService->reviseRecord($recId, $patientId, $profId, $reason, [
+                'type' => 'revised_note',
+                'text' => $revisedText,
+                'revised_by' => $profId,
+            ]);
+            header("Location: /pacientes/{$patientId}/prontuario?success=registro_retificado");
+            exit;
+        } catch (\Throwable $e) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    public function exportMedicalRecord(array $params): void
+    {
+        $patientId = (int)($params['id'] ?? 0);
+        $profId = $this->getActiveProfessionalId();
+        $clinicalService = new ClinicalRecordService();
+
+        try {
+            $export = $clinicalService->exportRecordTimelineSafe($patientId, $profId);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Disposition: attachment; filename="prontuario_paciente_' . $patientId . '_' . date('Ymd_His') . '.json"');
+            echo json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            exit;
+        } catch (\Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8', true, 400);
+            echo json_encode(['error' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    /**
+     * Tela dedicada de Anamnese Nutricional Estruturada e Histórico Versionado (NI2-61, NI2-62, NI2-64).
+     */
+    public function patientAnamnesis(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $patient = $repo->findById($id);
+
+        if (!$patient) {
+            header('Location: /pacientes');
+            exit;
+        }
+
+        $title = 'Anamnese Nutricional — ' . $patient['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $csrfToken = Csrf::token();
+
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+        $latest = $anamnesisService->getLatestAnamnesis($id);
+        $history = $anamnesisService->getAnamnesisHistory($id);
+
+        // Se solicitou comparar versões via GET
+        $compareData = null;
+        if (!empty($_GET['v1']) && !empty($_GET['v2'])) {
+            try {
+                $compareData = $anamnesisService->compareVersions($id, (int)$_GET['v1'], (int)$_GET['v2']);
+            } catch (\Throwable $e) {
+                // Ignore compare error on display
+            }
+        }
+
+        ob_start();
+        ?>
+        <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['success'])): ?>
+          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+            ✓ Anamnese gravada com sucesso! Nova versão versionada e preservada no histórico longitudinal.
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['error'])): ?>
+          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
+            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro ao salvar a anamnese.' ?>
+          </div>
+        <?php endif; ?>
+
+        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+            </div>
+            <h1>Anamnese Nutricional Estruturada</h1>
+            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Coleta clínica versionada e imutável</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
+              Prontuário (SHA-256) ➔
+            </a>
+            <a href="#historico-versoes" class="btn btn-secondary">
+              Ver Histórico (<?= count($history) ?> Versões)
+            </a>
+          </div>
+        </div>
+
+        <!-- Se solicitou comparação de versões (NI2-62) -->
+        <?php if ($compareData): ?>
+          <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid var(--brand-copper-600);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">Comparativo de Versões: v<?= $compareData['v1_meta']['version'] ?> vs v<?= $compareData['v2_meta']['version'] ?></h3>
+              <a href="/pacientes/<?= $patient['id'] ?>/anamnese" style="color: #64748B; font-size: 0.85rem; text-decoration: none;">Fechar Comparador ✕</a>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="table" style="width: 100%; font-size: 0.875rem;">
+                <thead>
+                  <tr style="background: #F8FAFC;">
+                    <th style="width: 25%;">Seção Clínica</th>
+                    <th style="width: 37.5%;">v<?= $compareData['v1_meta']['version'] ?> (<?= date('d/m/Y', strtotime($compareData['v1_meta']['created_at'])) ?> por <?= htmlspecialchars($compareData['v1_meta']['professional_name']) ?>)</th>
+                    <th style="width: 37.5%;">v<?= $compareData['v2_meta']['version'] ?> (<?= date('d/m/Y', strtotime($compareData['v2_meta']['created_at'])) ?> por <?= htmlspecialchars($compareData['v2_meta']['professional_name']) ?>)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($compareData['diff'] as $fieldKey => $diffRow): ?>
+                    <tr style="<?= $diffRow['changed'] ? 'background: #FFFBEB;' : '' ?>">
+                      <td>
+                        <strong><?= htmlspecialchars($diffRow['label']) ?></strong>
+                        <?php if ($diffRow['changed']): ?>
+                          <span class="badge badge-warning" style="font-size: 0.65rem; margin-left: 4px;">Alterado</span>
+                        <?php endif; ?>
+                      </td>
+                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars($diffRow['v1'] ?? '—')) ?></td>
+                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars($diffRow['v2'] ?? '—')) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <!-- Formulário Estruturado da Anamnese (NI2-61) -->
+        <div class="card" style="margin-bottom: var(--space-6);">
+          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin: 0;">Coleta & Atualização da Anamnese</h3>
+              <p style="color: #64748B; font-size: 0.85rem; margin-top: 4px;">
+                Preencha as seções clínicas abaixo. Cada gravação cria uma nova versão (append-only) sem apagar as anteriores.
+              </p>
+            </div>
+            <?php if ($latest): ?>
+              <span class="badge badge-info" style="font-size: 0.8rem;">
+                Última Versão: v<?= $latest['version'] ?> (<?= date('d/m/Y', strtotime($latest['created_at'])) ?>)
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese">
+            <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+
+            <!-- 1. Objetivos & Metas -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                1. Objetivos & Metas do Paciente
+              </label>
+              <textarea name="objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
+            </div>
+
+            <!-- 2. Alergias & Restrições (Crítico para Prescrição - NI2-64) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #DC2626;">
+                  ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
+                </label>
+                <textarea name="allergies" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
+                <span style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
+              </div>
+              <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #D97706;">
+                  ⚠️ 3. Restrições Alimentares & Intolerâncias
+                </label>
+                <textarea name="restrictions" rows="3" placeholder="Ex: Intolerância à lactose, doença celíaca / glúten, dieta vegetariana estrita..." style="width: 100%; padding: 8px; border: 1px solid #FCD34D; border-radius: 6px;"><?= htmlspecialchars($latest['restrictions'] ?? '') ?></textarea>
+                <span style="font-size: 0.75rem; color: #92400E; display: block; margin-top: 4px;">Informações essenciais para formulação do plano alimentar.</span>
+              </div>
+            </div>
+
+            <!-- 3. Preferências & Aversões -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                4. Preferências Alimentares & Aversões
+              </label>
+              <textarea name="food_preferences" rows="2" placeholder="Alimentos preferidos, alimentos rejeitados, hábitos regionais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['food_preferences'] ?? '') ?></textarea>
+            </div>
+
+            <!-- 4. Sinais & Sintomas Clínicos -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                5. Sinais & Sintomas Gastrointestinais / Gerais
+              </label>
+              <textarea name="symptoms" rows="2" placeholder="Pirose, constipação, distensão abdominal, diarreia, cefaleia, indisposição..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['symptoms'] ?? '') ?></textarea>
+            </div>
+
+            <!-- 5. Rotina & Hábitos -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                  6. Rotina Diária & Horários
+                </label>
+                <textarea name="routine" rows="3" placeholder="Horário de acordar, dormir, trabalho, pausas de refeições, atividade física..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['routine'] ?? '') ?></textarea>
+              </div>
+              <div class="form-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                  7. Hábitos de Vida & Consumo
+                </label>
+                <textarea name="habits" rows="3" placeholder="Consumo de álcool, tabagismo, cafeína, mastigação rápida, beliscos..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['habits'] ?? '') ?></textarea>
+              </div>
+            </div>
+
+            <!-- 6. Histórico Clínico & Hidratação -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
+              <div class="form-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                  8. Histórico Clínico, Patologias & Medicamentos
+                </label>
+                <textarea name="clinical_history" rows="2" placeholder="Hipertensão, DM2, dislipidemia, cirurgias prévias, histórico familiar, medicamentos atuais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['clinical_history'] ?? '') ?></textarea>
+              </div>
+              <div class="form-group">
+                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                  9. Meta Hídrica (ml/dia)
+                </label>
+                <input type="number" step="50" min="0" max="10000" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '2000')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+            </div>
+
+            <!-- 7. Anotações Adicionais -->
+            <div class="form-group" style="margin-bottom: 24px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                10. Notas & Conduta Inicial do Nutricionista
+              </label>
+              <textarea name="notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
+            </div>
+
+            <!-- Botões de Ação com Suporte a Rascunho Parcial (NI2-61) -->
+            <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--neutral-gray-200); padding-top: 16px;">
+              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;">
+                Salvar como Rascunho Parcial
+              </button>
+              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
+                Finalizar & Gerar Nova Versão Imutável
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Seção: Histórico de Versões da Anamnese (NI2-62) -->
+        <div id="historico-versoes" class="card">
+          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Histórico Versionado da Anamnese (<?= count($history) ?> Versões)</h3>
+            <span style="font-size: 0.8rem; color: #64748B;">Imutabilidade garantida por versionamento append-only</span>
+          </div>
+
+          <?php if (empty($history)): ?>
+            <p style="color: #64748B; font-size: 0.875rem;">Nenhuma versão histórica anterior registrada.</p>
+          <?php else: ?>
+            <div style="overflow-x: auto; margin-bottom: 16px;">
+              <table class="table" style="width: 100%; font-size: 0.875rem;">
+                <thead>
+                  <tr style="background: #F8FAFC;">
+                    <th>Versão</th>
+                    <th>Data / Hora</th>
+                    <th>Profissional</th>
+                    <th>Status</th>
+                    <th>Alergias Relatadas</th>
+                    <th>Restrições Relatadas</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($history as $h): ?>
+                    <tr>
+                      <td><strong>v<?= $h['version'] ?></strong></td>
+                      <td><?= date('d/m/Y H:i', strtotime($h['created_at'])) ?></td>
+                      <td><?= htmlspecialchars($h['professional_name']) ?></td>
+                      <td>
+                        <span class="badge badge-<?= $h['is_draft'] ? 'warning' : 'success' ?>">
+                          <?= $h['is_draft'] ? 'Rascunho' : 'Finalizada' ?>
+                        </span>
+                      </td>
+                      <td>
+                        <?= !empty($h['allergies']) ? '<span style="color: #DC2626; font-weight: 600;">' . htmlspecialchars(mb_substr($h['allergies'], 0, 30)) . '...</span>' : '<span style="color: #94A3B8;">—</span>' ?>
+                      </td>
+                      <td>
+                        <?= !empty($h['restrictions']) ? '<span style="color: #D97706; font-weight: 600;">' . htmlspecialchars(mb_substr($h['restrictions'], 0, 30)) . '...</span>' : '<span style="color: #94A3B8;">—</span>' ?>
+                      </td>
+                      <td>
+                        <a href="/pacientes/<?= $patient['id'] ?>/anamnese?view_version=<?= $h['version'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 2px 6px;">Visualizar</a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Formulário para Comparar 2 Versões (NI2-62) -->
+            <?php if (count($history) >= 2): ?>
+              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px;">
+                <h4 style="margin: 0 0 8px 0; font-size: 0.875rem; color: var(--brand-navy-900);">Comparar Versões Lado a Lado (Diff Clínico)</h4>
+                <form method="GET" action="/pacientes/<?= $patient['id'] ?>/anamnese" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                  <div>
+                    <label style="font-size: 0.8rem; color: #64748B;">Versão A:</label>
+                    <select name="v1" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                      <?php foreach ($history as $h): ?>
+                        <option value="<?= $h['version'] ?>">v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; color: #64748B;">Versão B:</label>
+                    <select name="v2" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                      <?php foreach (array_reverse($history) as $h): ?>
+                        <option value="<?= $h['version'] ?>" <?= $h['version'] === $history[0]['version'] ? 'selected' : '' ?>>v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-secondary" style="margin-top: 16px; font-size: 0.85rem;">
+                    Comparar Versões Selecionadas ➔
+                  </button>
+                </form>
+              </div>
+            <?php endif; ?>
+          <?php endif; ?>
+        </div>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function savePatientAnamnesis(array $params): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        $patientId = (int)($params['id'] ?? 0);
+
+        if (!Csrf::validate($token)) {
+            header("Location: /pacientes/{$patientId}/anamnese?error=csrf");
+            exit;
+        }
+
+        $profId = $this->getActiveProfessionalId();
+        $isDraft = ($_POST['save_mode'] ?? '') === 'draft';
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+
+        try {
+            $anamnesisService->saveAnamnesis($patientId, $profId, $_POST, $isDraft);
+            header("Location: /pacientes/{$patientId}/anamnese?success=anamnese_salva");
+            exit;
+        } catch (\InvalidArgumentException $e) {
+            header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            exit;
+        } catch (\Throwable $e) {
+            header("Location: /pacientes/{$patientId}/anamnese?error=falha&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    public function prescriptionSummary(array $params): void
+    {
+        $patientId = (int)($params['id'] ?? 0);
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+
+        try {
+            $summary = $anamnesisService->getClinicalSummaryForPrescription($patientId);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             exit;
         } catch (\Throwable $e) {
             header('Content-Type: application/json; charset=utf-8', true, 400);
@@ -1751,6 +2558,9 @@ class DashboardController
             exit;
         }
 
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService($db);
+        $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription((int)$plan['patient_id']);
+
         $fStmt = $db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 250");
         $fStmt->execute();
         $foodsCatalog = $fStmt->fetchAll();
@@ -1804,6 +2614,32 @@ class DashboardController
             <?= htmlspecialchars($error) ?>
           </div>
         <?php endif; ?>
+
+        <!-- Resumo Clínico para Prescrição (NI2-64): Dados Críticos com Origem Rastreável -->
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #0284C7; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="color: var(--brand-navy-900); font-size: 0.95rem;">📋 Resumo Clínico da Anamnese (NI2-64)</strong>
+            <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
+              <span style="font-size: 0.75rem; color: #64748B;">
+                Origem: <a href="<?= $clinicalSummary['source']['url'] ?>" target="_blank" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?> ↗</a>
+              </span>
+            <?php endif; ?>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.85rem;">
+            <div>
+              <span style="color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">ALERGIAS:</span>
+              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergies'] ?? '[Nenhuma relatada]') ?></span>
+            </div>
+            <div>
+              <span style="color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">RESTRIÇÕES:</span>
+              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['restrictions'] ?? '[Nenhuma relatada]') ?></span>
+            </div>
+            <div>
+              <span style="color: #0284C7; font-weight: 600; display: block; font-size: 0.75rem;">OBJETIVOS:</span>
+              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['objectives'] ?? '[Não informado]') ?></span>
+            </div>
+          </div>
+        </div>
 
         <!-- Alertas de Segurança Clínica e Alérgenos -->
         <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>

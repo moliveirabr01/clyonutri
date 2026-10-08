@@ -334,6 +334,72 @@ class ClinicalRecordService
         }, $stmt->fetchAll());
     }
 
+    public const MAX_NOTE_LENGTH = 10000;
+
+    /**
+     * Registra uma observação clínica segura com sanitização, limite de caracteres e auditoria (NI2-63).
+     */
+    public function addClinicalObservation(int $patientId, int $professionalId, string $title, string $observationText, string $category = 'observacao'): array
+    {
+        $cleanTitle = trim($title);
+        if ($cleanTitle === '') {
+            throw new InvalidArgumentException("O título da observação clínica é obrigatório.");
+        }
+        if (mb_strlen($cleanTitle, 'UTF-8') > 255) {
+            $cleanTitle = mb_substr($cleanTitle, 0, 255, 'UTF-8');
+        }
+
+        $cleanText = trim($observationText);
+        if ($cleanText === '') {
+            throw new InvalidArgumentException("O texto da anotação clínica não pode ser vazio.");
+        }
+        if (mb_strlen($cleanText, 'UTF-8') > self::MAX_NOTE_LENGTH) {
+            throw new InvalidArgumentException("A observação clínica excede o limite máximo permitido de " . self::MAX_NOTE_LENGTH . " caracteres.");
+        }
+
+        $content = [
+            'type' => 'clinical_note',
+            'category' => $category,
+            'text' => $cleanText,
+            'recorded_by' => $professionalId,
+        ];
+
+        return $this->appendRecord($patientId, $professionalId, $cleanTitle, $content);
+    }
+
+    /**
+     * Exportação segura da linha do tempo clínica com validação de integridade e controle de acesso (NI2-63).
+     */
+    public function exportRecordTimelineSafe(int $patientId, int $requestingProfessionalId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($requestingProfessionalId, $clinicId, $this->db);
+
+        // 1. Verificação de integridade obrigatória antes da exportação
+        $integrity = $this->verifyIntegrity($patientId);
+        if (!$integrity['is_valid']) {
+            throw new RuntimeException("Exportação bloqueada: " . ($integrity['error'] ?? 'Falha de integridade criptográfica no prontuário.'));
+        }
+
+        // 2. Timeline cronológica
+        $timeline = $this->getPatientTimeline($patientId);
+
+        // 3. Auditoria do evento de exportação
+        $this->logClinicalAudit($clinicId, $patientId, 'CLINICAL_TIMELINE_EXPORTED', (string)$patientId, [
+            'records_count' => count($timeline),
+            'integrity_valid' => true,
+            'exported_by_professional_id' => $requestingProfessionalId,
+        ]);
+
+        return [
+            'patient_id' => $patientId,
+            'exported_at' => date('c'),
+            'integrity' => $integrity,
+            'records' => $timeline,
+        ];
+    }
+
     private function computeHash(
         int $clinicId,
         int $patientId,

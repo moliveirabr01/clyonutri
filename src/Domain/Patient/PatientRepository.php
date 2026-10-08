@@ -103,11 +103,27 @@ class PatientRepository
         $pStmt->execute(['patient_id' => $id, 'clinic_id' => $clinicId]);
         $mealPlans = $pStmt->fetchAll();
 
+        // Prontuário / Registros Clínicos com nome do profissional
+        $crStmt = $this->db->prepare("
+            SELECT r.*, u.name as professional_name
+            FROM clinical_records r
+            JOIN professionals p ON p.id = r.professional_id
+            JOIN users u ON u.id = p.user_id
+            WHERE r.clinic_id = :clinic_id AND r.patient_id = :patient_id
+            ORDER BY r.version DESC
+        ");
+        $crStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $id]);
+        $clinicalRecords = array_map(function ($row) {
+            $row['content'] = json_decode($row['content_json'] ?? '{}', true);
+            return $row;
+        }, $crStmt->fetchAll());
+
         return [
             'patient' => $patient,
             'anamneses' => $anamneses,
             'assessments' => $assessments,
             'meal_plans' => $mealPlans,
+            'clinical_records' => $clinicalRecords,
         ];
     }
 }

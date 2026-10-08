@@ -6,24 +6,60 @@ namespace ClyoNutri\Domain\Anamnesis;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\TenantGuard;
+use InvalidArgumentException;
 use PDO;
 
 class AnamnesisService
 {
     private PDO $db;
 
+    public const MAX_FIELD_LENGTH = 5000;
+
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Connection::getInstance();
     }
 
-    public function saveAnamnesis(int $patientId, int $professionalId, array $data): array
+    /**
+     * Salva uma anamnese estruturada (finalizada ou rascunho parcial).
+     * Sempre cria uma nova versão sequencial imutável (append-only).
+     */
+    public function saveAnamnesis(int $patientId, int $professionalId, array $data, bool $isDraft = false): array
     {
         $clinicId = TenantContext::getClinicId();
-        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
-        // Obter versão mais recente para incrementar
+        // 1. Sanitização e normalização de seções clínicas
+        $cleanData = [
+            'objectives' => $this->sanitizeText($data['objectives'] ?? null),
+            'routine' => $this->sanitizeText($data['routine'] ?? null),
+            'food_preferences' => $this->sanitizeText($data['food_preferences'] ?? null),
+            'restrictions' => $this->sanitizeText($data['restrictions'] ?? null),
+            'allergies' => $this->sanitizeText($data['allergies'] ?? null),
+            'symptoms' => $this->sanitizeText($data['symptoms'] ?? null),
+            'habits' => $this->sanitizeText($data['habits'] ?? null),
+            'clinical_history' => $this->sanitizeText($data['clinical_history'] ?? null),
+            'water_intake_ml' => isset($data['water_intake_ml']) && $data['water_intake_ml'] !== '' ? max(0, min(20000, (int)$data['water_intake_ml'])) : null,
+            'notes' => $this->sanitizeText($data['notes'] ?? null),
+        ];
+
+        // 2. Validação fail-closed se não for rascunho
+        if (!$isDraft) {
+            $hasAnyContent = false;
+            foreach ($cleanData as $key => $val) {
+                if ($val !== null && $val !== '') {
+                    $hasAnyContent = true;
+                    break;
+                }
+            }
+            if (!$hasAnyContent) {
+                throw new InvalidArgumentException("A anamnese finalizada exige o preenchimento de ao menos uma seção clínica.");
+            }
+        }
+
+        // 3. Obter versão mais recente para incrementar
         $vStmt = $this->db->prepare("
             SELECT COALESCE(MAX(version), 0) + 1 FROM anamneses
             WHERE patient_id = :patient_id AND clinic_id = :clinic_id
@@ -31,37 +67,273 @@ class AnamnesisService
         $vStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
         $nextVersion = (int)$vStmt->fetchColumn();
 
+        // 4. Inserção append-only
         $stmt = $this->db->prepare("
             INSERT INTO anamneses (
                 clinic_id, patient_id, professional_id, version,
-                habits, allergies, food_preferences, clinical_history,
-                water_intake_ml, routine
+                objectives, routine, food_preferences, restrictions,
+                allergies, symptoms, habits, clinical_history,
+                water_intake_ml, is_draft, notes, created_at
             ) VALUES (
                 :clinic_id, :patient_id, :professional_id, :version,
-                :habits, :allergies, :food_preferences, :clinical_history,
-                :water_intake_ml, :routine
+                :objectives, :routine, :food_preferences, :restrictions,
+                :allergies, :symptoms, :habits, :clinical_history,
+                :water_intake_ml, :is_draft, :notes, :created_at
             )
         ");
 
+        $createdAt = date('Y-m-d H:i:s');
         $stmt->execute([
             'clinic_id' => $clinicId,
             'patient_id' => $patientId,
             'professional_id' => $professionalId,
             'version' => $nextVersion,
-            'habits' => $data['habits'] ?? null,
-            'allergies' => $data['allergies'] ?? null,
-            'food_preferences' => $data['food_preferences'] ?? null,
-            'clinical_history' => $data['clinical_history'] ?? null,
-            'water_intake_ml' => isset($data['water_intake_ml']) ? (int)$data['water_intake_ml'] : null,
-            'routine' => $data['routine'] ?? null,
+            'objectives' => $cleanData['objectives'],
+            'routine' => $cleanData['routine'],
+            'food_preferences' => $cleanData['food_preferences'],
+            'restrictions' => $cleanData['restrictions'],
+            'allergies' => $cleanData['allergies'],
+            'symptoms' => $cleanData['symptoms'],
+            'habits' => $cleanData['habits'],
+            'clinical_history' => $cleanData['clinical_history'],
+            'water_intake_ml' => $cleanData['water_intake_ml'],
+            'is_draft' => $isDraft ? 1 : 0,
+            'notes' => $cleanData['notes'],
+            'created_at' => $createdAt,
         ]);
 
         $id = (int)$this->db->lastInsertId();
+
+        // 5. Auditoria sem PII
+        $this->logAudit($clinicId, $patientId, $isDraft ? 'ANAMNESIS_DRAFT_SAVED' : 'ANAMNESIS_RECORD_CREATED', (string)$id, [
+            'version' => $nextVersion,
+            'is_draft' => $isDraft,
+            'has_allergies' => !empty($cleanData['allergies']),
+            'has_restrictions' => !empty($cleanData['restrictions']),
+        ]);
 
         return [
             'id' => $id,
             'version' => $nextVersion,
             'patient_id' => $patientId,
+            'is_draft' => $isDraft,
+            'created_at' => $createdAt,
         ];
+    }
+
+    /**
+     * Recupera a anamnese vigente mais recente do paciente.
+     */
+    public function getLatestAnamnesis(int $patientId): ?array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $stmt = $this->db->prepare("
+            SELECT a.*, u.name as professional_name
+            FROM anamneses a
+            JOIN professionals p ON p.id = a.professional_id
+            JOIN users u ON u.id = p.user_id
+            WHERE a.clinic_id = :clinic_id AND a.patient_id = :patient_id
+            ORDER BY a.version DESC
+            LIMIT 1
+        ");
+        $stmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
+        $row = $stmt->fetch();
+
+        return $row ?: null;
+    }
+
+    /**
+     * Recupera o histórico completo cronológico de todas as versões da anamnese.
+     */
+    public function getAnamnesisHistory(int $patientId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $stmt = $this->db->prepare("
+            SELECT a.*, u.name as professional_name
+            FROM anamneses a
+            JOIN professionals p ON p.id = a.professional_id
+            JOIN users u ON u.id = p.user_id
+            WHERE a.clinic_id = :clinic_id AND a.patient_id = :patient_id
+            ORDER BY a.version DESC
+        ");
+        $stmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Recupera uma versão específica imutável da anamnese.
+     */
+    public function getAnamnesisVersion(int $patientId, int $version): ?array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $stmt = $this->db->prepare("
+            SELECT a.*, u.name as professional_name
+            FROM anamneses a
+            JOIN professionals p ON p.id = a.professional_id
+            JOIN users u ON u.id = p.user_id
+            WHERE a.clinic_id = :clinic_id AND a.patient_id = :patient_id AND a.version = :version
+        ");
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
+            'version' => $version,
+        ]);
+        $row = $stmt->fetch();
+
+        return $row ?: null;
+    }
+
+    /**
+     * Compara duas versões da anamnese lado a lado para auditoria e evolução clínica.
+     */
+    public function compareVersions(int $patientId, int $v1, int $v2): array
+    {
+        $ver1 = $this->getAnamnesisVersion($patientId, $v1);
+        $ver2 = $this->getAnamnesisVersion($patientId, $v2);
+
+        if (!$ver1 || !$ver2) {
+            throw new InvalidArgumentException("Uma ou ambas as versões de anamnese não foram encontradas para comparação.");
+        }
+
+        $fields = [
+            'objectives' => 'Objetivos & Metas',
+            'routine' => 'Rotina Diária & Sono',
+            'food_preferences' => 'Preferências Alimentares',
+            'restrictions' => 'Restrições & Intolerâncias',
+            'allergies' => 'Alergias Alimentares',
+            'symptoms' => 'Sinais & Sintomas',
+            'habits' => 'Hábitos Alimentares & Vida',
+            'clinical_history' => 'Histórico Clínico & Patologias',
+            'water_intake_ml' => 'Meta Hídrica (ml)',
+        ];
+
+        $comparison = [];
+        foreach ($fields as $key => $label) {
+            $comparison[$key] = [
+                'label' => $label,
+                'v1' => $ver1[$key] ?? null,
+                'v2' => $ver2[$key] ?? null,
+                'changed' => ($ver1[$key] ?? null) !== ($ver2[$key] ?? null),
+            ];
+        }
+
+        return [
+            'patient_id' => $patientId,
+            'v1_meta' => [
+                'version' => $ver1['version'],
+                'created_at' => $ver1['created_at'],
+                'professional_name' => $ver1['professional_name'],
+            ],
+            'v2_meta' => [
+                'version' => $ver2['version'],
+                'created_at' => $ver2['created_at'],
+                'professional_name' => $ver2['professional_name'],
+            ],
+            'diff' => $comparison,
+        ];
+    }
+
+    /**
+     * Resumo clínico para prescrição estruturada (NI2-64).
+     * Destaca alergias, restrições e objetivos críticos com origem rastreável.
+     * NUNCA infere ou inventa dados não cadastrados.
+     */
+    public function getClinicalSummaryForPrescription(int $patientId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $latest = $this->getLatestAnamnesis($patientId);
+
+        if (!$latest) {
+            return [
+                'has_data' => false,
+                'patient_id' => $patientId,
+                'message' => 'Nenhuma anamnese registrada para este paciente. Dados críticos não informados.',
+                'critical_alerts' => [],
+                'allergies' => null,
+                'restrictions' => null,
+                'objectives' => null,
+                'symptoms' => null,
+                'source' => null,
+            ];
+        }
+
+        $source = [
+            'anamnesis_id' => (int)$latest['id'],
+            'version' => (int)$latest['version'],
+            'recorded_at' => $latest['created_at'],
+            'author' => $latest['professional_name'],
+            'url' => "/pacientes/{$patientId}/anamnese?version={$latest['version']}",
+        ];
+
+        $criticalAlerts = [];
+        if (!empty($latest['allergies'])) {
+            $criticalAlerts[] = [
+                'type' => 'ALERGIA',
+                'severity' => 'CRITICAL',
+                'description' => $latest['allergies'],
+                'source_version' => $latest['version'],
+            ];
+        }
+        if (!empty($latest['restrictions'])) {
+            $criticalAlerts[] = [
+                'type' => 'RESTRICAO',
+                'severity' => 'HIGH',
+                'description' => $latest['restrictions'],
+                'source_version' => $latest['version'],
+            ];
+        }
+
+        return [
+            'has_data' => true,
+            'patient_id' => $patientId,
+            'critical_alerts' => $criticalAlerts,
+            'allergies' => !empty($latest['allergies']) ? $latest['allergies'] : null,
+            'restrictions' => !empty($latest['restrictions']) ? $latest['restrictions'] : null,
+            'objectives' => !empty($latest['objectives']) ? $latest['objectives'] : null,
+            'symptoms' => !empty($latest['symptoms']) ? $latest['symptoms'] : null,
+            'water_intake_ml' => $latest['water_intake_ml'] ? (int)$latest['water_intake_ml'] : null,
+            'source' => $source,
+        ];
+    }
+
+    private function sanitizeText(?string $text): ?string
+    {
+        if ($text === null) {
+            return null;
+        }
+        $trimmed = trim($text);
+        if ($trimmed === '') {
+            return null;
+        }
+        // Limitar tamanho para prevenir abusos / DoS
+        if (mb_strlen($trimmed, 'UTF-8') > self::MAX_FIELD_LENGTH) {
+            $trimmed = mb_substr($trimmed, 0, self::MAX_FIELD_LENGTH, 'UTF-8');
+        }
+        return $trimmed;
+    }
+
+    private function logAudit(int $clinicId, int $patientId, string $action, string $resourceId, array $meta): void
+    {
+        $stmt = $this->db->prepare("
+            INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
+            VALUES (:clinic_id, :action, 'anamneses', :res_id, :details)
+        ");
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'action' => $action,
+            'res_id' => $resourceId,
+            'details' => json_encode(array_merge([
+                'patient_id' => $patientId,
+                'timestamp' => date('c'),
+            ], $meta), JSON_UNESCAPED_UNICODE),
+        ]);
     }
 }
