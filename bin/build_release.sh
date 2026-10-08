@@ -74,6 +74,7 @@ TEST_FILES=(
     "tests/ni2_6_prontuario_e_anamnese_nutricional_test.php"
     "tests/teleconsultation_online_clinic_e2e_test.php"
     "tests/helpdesk_and_service_desk_e2e_test.php"
+    "tests/benchmark_360_competitive_suite_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

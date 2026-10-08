@@ -237,6 +237,13 @@ if (str_contains($helpdeskOutput, '8/8 TESTES PASSARAM COM COBERTURA COMPLETA'))
     recordCheck('E2E_JOURNEYS', 'Central de Ajuda & Service Desk E2E (NI2-195: NI2-196 a NI2-208)', 'FAIL', 'Falha na suíte de helpdesk: ' . substr($helpdeskOutput, 0, 200));
 }
 
+$benchmarkOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/benchmark_360_competitive_suite_test.php') . " 2>&1");
+if (str_contains($benchmarkOutput, '7/7 PILARES DO BENCHMARK 360 HOMOLOGADOS COM ÊXITO')) {
+    recordCheck('E2E_JOURNEYS', 'Benchmark 360 & Paridade Competitiva E2E (NI2-179: NI2-180 a NI2-194)', 'PASS', '7/7 pilares clínicos e de plataforma aprovados com zero mocks e isolamento fail-closed');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Benchmark 360 & Paridade Competitiva E2E (NI2-179: NI2-180 a NI2-194)', 'FAIL', 'Falha no Benchmark 360: ' . substr($benchmarkOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

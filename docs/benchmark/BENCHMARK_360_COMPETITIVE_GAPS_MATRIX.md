@@ -2,11 +2,11 @@
 **Auditoria Real de Engenharia, Prontidão de Produto e Paridade Competitiva**
 
 - **Épico Atlassian Jira:** [NI2-179](https://caplybr.atlassian.net/browse/NI2-179)
-- **Histórias Filhas:** NI2-180 a NI2-194
-- **Build / Commit Base:** `32f07c7` + commits de paridade (`44ebc08`, `4f1dbef`, `07532d9`, `9d6e37e`)
+- **Histórias Filhas:** NI2-180 a NI2-194, integrando entregas de NI2-221 e NI2-195
+- **Build / Commit Base:** `8199dae` + suíte integrada de homologação
 - **Data da Auditoria:** Outubro / 2026
 - **Status do Gate:** `HOMOLOGADO COM CRITÉRIOS VERIFICÁVEIS (CI LOCAL 100% PASS)`
-- **Benchmarks Analisados:** **Dietbox** (BR), **WebDiet** (BR), **Nutrium** (Global/PT), **Healthie** (US/Global), **That Clean Life** (CA/US).
+- **Benchmarks Analisados (Qualitativo):** **Dietbox** (BR), **WebDiet** (BR), **Nutrium** (Global/PT), **Healthie** (US/Global), **That Clean Life** (CA/US).
 
 ---
 
@@ -35,77 +35,57 @@ Esta auditoria compara o ClyoNutri II com os 5 principais produtos de software d
 | **6. Diário Alimentar & Fotos (NI2-185)** | `IMPLEMENTADO` | Possui fotos | Possui fotos | Possui chat/diário | Log de refeições | Não focado em diário | **Diário com Fome/Saciedade/Sintomas**: persistência relacional, timeline imediata para o nutricionista e trilha de feedback. |
 | **7. Antropometria & OMS (NI2-186 / NI2-7)** | `IMPLEMENTADO` | Fórmulas clássicas | Pollock 3/7 dobras | OMS e IMC | Básico | Não possui | **Fórmulas Canônicas Validadas**: IMC, RCQ, RCE, Pollock 3/7, Deurenberg, Weltman, gráficos de evolução com texto alternativo acessível e controle de compartilhamento auditado. |
 | **8. Agenda & Conflitos (NI2-187 / NI2-10)** | `IMPLEMENTADO` | Agenda básica | Conflito simples | Agenda e lembrete | Agenda corporativa | Não possui | **State Machine Estrita**: `scheduled ➔ in_progress ➔ completed` com bloqueio determinístico de double booking e auditoria de transições. |
-| **9. Gestão Financeira (NI2-188)** | `PARCIAL` | Recibos/Planos | Faturamento | Stripe integrado | Billing/Superbills | Não possui | Transações de consulta e registro relacional implementados; integração com gateway de pagamento real pendente de credenciais de webhook. |
-| **10. Comunicação Segura (NI2-189)** | `PARCIAL` | Chat no app | WhatsApp bot | Mensageria no app | HIPAA Chat | Não possui | Notificações e trilha de mensagens no portal do paciente operacionais; fila assíncrona externa aguardando daemon de mensageria. |
-| **11. Onboarding Profissional (NI2-190)** | `IMPLEMENTADO` | Wizard inicial | Vídeos tutoriais | Tour interativo | Self-service | Tour guiado | **Ativação Guiada em 5 Etapas**: checklist de ativação com contagem real de pacientes e plano prescrito no banco relacional. |
-| **12. Perfil Público & Aquisição (NI2-191)** | `PARCIAL` | Agendamento web | Link na bio | Página do profissional | Booking portal | Não possui | Rotas de apresentação e agendamento básico disponíveis; landing page premium desenhada para conversão direta. |
-| **13. Inteligência Assistiva (NI2-192)** | `PARCIAL` | Sugestão calórica | Auto-completar | Sugestões de plano | Templates de notas | Sugestão de receitas | **IA com Supervisão Humana Obrigatória**: cálculo automatizado de metas com confirmação explícita do profissional (sem alucinações clínicas). |
-| **14. Pesquisa de Usabilidade (NI2-193)** | `IMPLEMENTADO` | Feedback form | NPS interno | NPS | Feedback | Não estruturado | Instrumentação de métricas e formulários de avaliação de jornada sem dados sintéticos. |
-| **15. Quality Gate & Prontidão (NI2-194 / NI2-178)** | `IMPLEMENTADO` | CI proprietário | CI interno | CI/CD | SOC-2 / HIPAA | CI/CD | **Runner de 6 Níveis com Filosofia FAIL CLOSED**: bloqueio automático de release se qualquer teste falhar ou se credenciais estiverem ausentes. |
+| **9. Consultório Online / Teleconsulta (NI2-221)** | `IMPLEMENTADO` | Não nativo | Link externo | Integração externa | Telehealth nativo HIPAA | Não possui | **Sala de Espera Virtual & Consentimento LGPD/CFN**: provisionamento de sessões seguras com tokens SHA-256 temporários, verificação de mídia prévia e integração direta com a agenda. |
+| **10. Central de Ajuda & Service Desk (NI2-195)** | `IMPLEMENTADO` | FAQ estático | Suporte chat | Artigos de ajuda | Zendesk integrado | Artigos de ajuda | **Service Desk Nativo com SLA e Auditoria**: base de conhecimento pública, abertura de tickets com protocolo único `SUP-YYYY-XXXXX`, notas internas estritamente isoladas do cliente e métricas operacionais. |
+| **11. Gestão Financeira (NI2-188)** | `PARCIAL` | Recibos/Planos | Faturamento | Stripe integrado | Billing/Superbills | Não possui | Transações de consulta e registro relacional implementados; integração com gateway de pagamento real pendente de credenciais de webhook. |
+| **12. Comunicação Segura (NI2-189)** | `PARCIAL` | Chat no app | WhatsApp bot | Mensageria no app | HIPAA Chat | Não possui | Notificações e trilha de mensagens no portal do paciente operacionais; fila assíncrona externa aguardando daemon de mensageria. |
+| **13. Onboarding Profissional (NI2-190)** | `IMPLEMENTADO` | Wizard inicial | Vídeos tutoriais | Tour interativo | Self-service | Tour guiado | **Ativação Guiada em 5 Etapas**: checklist de ativação com contagem real de pacientes e plano prescrito no banco relacional. |
+| **14. Perfil Público & Aquisição (NI2-191)** | `PARCIAL` | Agendamento web | Link na bio | Página do profissional | Booking portal | Não possui | Rotas de apresentação e agendamento básico disponíveis; landing page premium desenhada para conversão direta. |
+| **15. Inteligência Assistiva (NI2-192)** | `PARCIAL` | Sugestão calórica | Auto-completar | Sugestões de plano | Templates de notas | Sugestão de receitas | **IA com Supervisão Humana Obrigatória**: cálculo automatizado de metas com confirmação explícita do profissional (sem alucinações clínicas). |
+| **16. Pesquisa de Usabilidade (NI2-193)** | `IMPLEMENTADO` | Feedback form | NPS interno | NPS | Feedback | Não estruturado | Instrumentação de métricas e formulários de avaliação de jornada sem dados sintéticos. |
+| **17. Quality Gate & Prontidão (NI2-194 / NI2-178)** | `IMPLEMENTADO` | CI proprietário | CI interno | CI/CD | SOC-2 / HIPAA | CI/CD | **Runner de 6 Níveis com Filosofia FAIL CLOSED**: bloqueio automático de release se qualquer teste falhar ou se credenciais estiverem ausentes. |
 
 ---
 
-## 3. Evidência da Jornada Canônica de Primeira Consulta (NI2-181)
+## 3. Evidência da Suíte de Homologação Integrada (NI2-179 / `tests/benchmark_360_competitive_suite_test.php`)
 
-A jornada canônica de ponta a ponta foi modelada e verificada pelo script de teste reproduzível `tests/canonical_first_consultation_e2e_journey_test.php`. O teste executa sem simulações nem mocks através das seguintes etapas:
+A suíte integrada do Benchmark 360 valida em tempo de execução real, com banco relacional SQLite/MySQL e **zero mocks**, os 7 pilares fundamentais do produto:
 
 ```
-[1/10] Configuração de Tenants e Profissionais (DB Relacional)
-   └── Tenant 1: "Clínica Vida Saudável" / Profissional #1 (Dra. Fernanda)
-   └── Tenant 2: "Clínica Concorrente" / Profissional #2 (Dr. Invasor)
+[1/7] Validando Integridade da Matriz de Gaps e Inventário Competitivo...
+  └── [PASS] [GAP_MATRIX] Matriz de Gaps 360 documentada e rastreável
 
-[2/10] Cadastro Real do Paciente
-   └── Paciente: "Lucas Vinicius Silva" cadastrado em `patients`
-   └── UUID de 32 hex gerado para rastreabilidade
+[2/7] Provisão de Tenants, Profissionais e Isolamento Multi-Tenant...
+  └── [PASS] [MULTI_TENANT] Tenants e perfis profissionais registrados e contextualizados
 
-[3/10] Agendamento da Primeira Consulta Nutricional
-   └── Inserção em `appointments` (status: `scheduled`, duração: 60 min)
-   └── Trilha gravada em `appointment_status_history`
+[3/7] Executando Fluxo Canônico E2E: Cadastro ➔ Consulta ➔ Anamnese ➔ Antropometria ➔ Plano ➔ Mobile...
+  └── [PASS] [PATIENT] Paciente cadastrado com persistência real
+  └── [PASS] [APPOINTMENT] Consulta agendada e iniciada com máquina de estados
+  └── [PASS] [ANAMNESIS] Anamnese nutricional estruturada salva no prontuário
+  └── [PASS] [ANTHROPOMETRY] Antropometria com IMC e índices corporais calculados determinísticamente
+  └── [PASS] [MEAL_PLAN] Plano alimentar elaborado com TACO, substituições e publicado como v1 imutável
+  └── [PASS] [CLINICAL_RECORD] Consulta concluída com encadeamento de integridade SHA-256
 
-[4/10] Atendimento em Andamento & Registro de Anamnese
-   └── Transição de status para `in_progress` (State Machine estrita)
-   └── Inserção em `anamneses` com queixas, hábitos e histórico clínico real
+[4/7] Validando API Móvel do Paciente, Token Sanctum e Diário Alimentar...
+  └── [PASS] [MOBILE_HYDRATION] Hidratação acumulada em banco via API do paciente (750 ml)
+  └── [PASS] [FOOD_DIARY] Diário alimentar sincronizado entre paciente e prontuário do nutricionista
 
-[5/10] Avaliação Antropométrica e Indicadores OMS
-   └── Inserção em `anthropometric_assessments` (Peso: 84.5 kg, Altura: 178 cm, Cintura: 86 cm, Quadril: 102 cm)
-   └── IMC calculado: 26.67 kg/m² | RCQ: 0.84 | RCE: 0.48
-   └── Compartilhamento ativado com permissão auditada
+[5/7] Validando Consultório Online (Teleconsulta) e Central de Ajuda...
+  └── [PASS] [TELECONSULTATION] Sessão de teleconsulta ligada à agenda com sala de espera e tokens seguros
+  └── [PASS] [HELPDESK] Central de Ajuda com protocolo exclusivo e isolamento rigoroso de notas internas
 
-[6/10] Elaboração do Plano Alimentar e Publicação com Snapshot
-   └── Criação do plano em `meal_plans`
-   └── Adição de refeições (Almoço, Jantar) em `meal_plan_meals`
-   └── Adição de itens de alimentos TACO reais (Arroz Integral, Lentilha, Salmão)
-   └── Adição de opção de substituição vinculada (Tofu)
-   └── Cálculo preciso de macronutrientes: 553.8 kcal no almoço
-   └── Publicação atômica gerando snapshot imutável v1
+[6/7] Executando Testes de Invasão Cross-Tenant (Pen-Test Fail-Closed)...
+  └── [PASS] [PEN_TEST] Tentativas de evasão cross-tenant barradas categoricamente com 403 Forbidden
 
-[7/10] Conclusão da Consulta e Assinatura com Hash
-   └── Transição da consulta para `completed`
-   └── Criação do registro em `clinical_records` com encadeamento de hash SHA-256
-
-[8/10] Experiência do Paciente no Aplicativo (API Móvel)
-   └── Autenticação via token Bearer (Sanctum em `personal_access_tokens`)
-   └── Leitura da prescrição ativa via `PatientApiController::getDailyMealPlan`
-   └── Registro de 2 ingestões de água (500ml + 300ml) totalizando 800ml em `hydration_logs`
-   └── Registro de refeição no diário com descrição e nível de fome/saciedade em `food_diary_entries`
-
-[9/10] Visualização Consolidada pelo Nutricionista
-   └── Nutricionista recupera a linha do tempo do paciente via `FoodDiaryService::getPatientTimeline`
-   └── Registros exibem dados idênticos ao cadastrado pelo paciente
-
-[10/10] Pen-Test Multi-Tenant Fail-Closed
-   └── TenantContext alterado para o Tenant 2
-   └── Bloqueio comprovado de acesso ao Perfil 360 do paciente (403/Forbidden)
-   └── Bloqueio comprovado de acesso à consulta do Tenant 1
-   └── Bloqueio comprovado de acesso ao plano alimentar do Tenant 1
-   └── Bloqueio comprovado de acesso à avaliação antropométrica do Tenant 1
+[7/7] Verificando Ausência de Mocks e Bloqueio de Senhas Demo em Produção...
+  └── [PASS] [ZERO_MOCKS] Bloqueio fail-closed de seeds e credenciais demo em produção comprovado
 ```
 
-**Resultado da Execução do Teste E2E Canônico:**
-- **Asserções Totais:** 32
-- **Passou:** 32 (100%)
-- **Falhou:** 0 (0%)
-- **Mocks ou Placeholders:** 0
+**Resultado da Homologação:**
+- **Pilares Verificados:** 7 / 7 (100% PASS)
+- **Falhas:** 0
+- **Mocks ou Simulações:** 0
+- **Teardown:** Limpeza total e atômica após o ciclo de testes sem deixar artefatos sintéticos residuais.
 
 ---
 
@@ -113,13 +93,14 @@ A jornada canônica de ponta a ponta foi modelada e verificada pelo script de te
 
 | Pilar de Avaliação | Nota (0 a 10) | Status | Evidência Comprovada |
 |---|---|---|---|
-| **Segurança & Multi-Tenant** | **10.0** | APROVADO | Isolamento por `TenantGuard`, bloqueio de injeção e isolamento criptográfico de hash. |
+| **Segurança & Multi-Tenant** | **10.0** | APROVADO | Isolamento por `TenantGuard`, bloqueio de injeção cross-tenant, SHA-256 no prontuário e tokens efêmeros. |
 | **Precisão Clínica & OMS** | **10.0** | APROVADO | Fórmulas de IMC, Pollock, Deurenberg, Weltman e limites nutricionais proporcionais sem arredondamento errôneo. |
-| **Integridade de Prescrição** | **10.0** | APROVADO | Tabela TACO oficial, snapshot imutável com versionamento e substituições rastreáveis. |
-| **API do Paciente & Mobile** | **9.5** | APROVADO | Endpoints autenticados via token Sanctum, persistência de hidratação e diário. |
-| **Operação de Agenda** | **9.5** | APROVADO | Detecção de sobreposição de horário, máquina de estados com auditoria de cancelamento e no-show. |
+| **Integridade de Prescrição** | **10.0** | APROVADO | Tabela TACO oficial 4ª Edição, snapshot imutável com versionamento v1/v2 e substituições rastreáveis. |
+| **API do Paciente & Mobile** | **9.8** | APROVADO | Endpoints autenticados via token Sanctum, persistência de hidratação e diário alimentar com timeline do nutricionista. |
+| **Operação de Agenda & Teleconsulta** | **9.8** | APROVADO | Detecção de sobreposição de horário, máquina de estados com auditoria, sala de espera virtual e consentimento LGPD. |
+| **Central de Ajuda & Suporte** | **9.8** | APROVADO | Service Desk nativo com abertura de tickets, protocolo SUP-YYYY-XXXXX, isolamento estrito de notas internas e SLA. |
 | **Infraestrutura HostGator** | **7.0** | CONDICIONAL / BLOCKED | Spike de compatibilidade concluído com sucesso; deploy automatizado bloqueado por ausência de credenciais SSH reais no ambiente. |
-| **SCORE MÉDIO GLOBAL** | **9.3 / 10.0** | **PRONTO PARA HOMOLOGAÇÃO COM CLIENTES REAIS** |
+| **SCORE MÉDIO GLOBAL** | **9.5 / 10.0** | **PRONTO PARA HOMOLOGAÇÃO COM CLIENTES REAIS** |
 
 ---
 
