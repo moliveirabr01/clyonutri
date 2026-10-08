@@ -51,25 +51,26 @@ class ConsultationSummaryAssistant
         }
 
         $structuredSoap = [
-            'subjective' => implode("; ", $subjective) ?: 'Paciente relata rotina alimentar estável.',
-            'objective' => implode("; ", $objective) ?: 'Medidas e dados antropométricos atualizados no prontuário.',
-            'assessment' => implode("; ", $assessment) ?: 'Evolução clínica favorável ao plano terapêutico.',
-            'plan' => implode("; ", $plan) ?: 'Ajustar plano alimentar e manter metas de ingestão hídrica.',
+            'subjective' => !empty($subjective) ? implode("; ", $subjective) : null,
+            'objective' => !empty($objective) ? implode("; ", $objective) : null,
+            'assessment' => !empty($assessment) ? implode("; ", $assessment) : null,
+            'plan' => !empty($plan) ? implode("; ", $plan) : null,
         ];
 
         return [
             'status' => 'draft',
             'requires_professional_review' => true,
+            'is_simulation' => false,
             'generated_at' => date('c'),
             'patient_id' => $patientId,
             'appointment_id' => $appointmentId,
             'soap' => $structuredSoap,
             'suggested_summary' => sprintf(
                 "S: %s\nO: %s\nA: %s\nP: %s",
-                $structuredSoap['subjective'],
-                $structuredSoap['objective'],
-                $structuredSoap['assessment'],
-                $structuredSoap['plan']
+                $structuredSoap['subjective'] ?? '[Não informado]',
+                $structuredSoap['objective'] ?? '[Não informado]',
+                $structuredSoap['assessment'] ?? '[Não informado]',
+                $structuredSoap['plan'] ?? '[Não informado]'
             ),
         ];
     }

@@ -19,33 +19,34 @@ class FoodCatalogService
 
     public function seedTacoReference(): int
     {
-        // Alimentos essenciais de referência TACO
+        // Alimentos essenciais de referência TACO com alergênicos e medidas
         $tacoItems = [
-            ['Arroz branco cozido', 'Cereais', 128.0, 2.5, 28.1, 0.2, 1.6, 100, 'g'],
-            ['Arroz integral cozido', 'Cereais', 124.0, 2.6, 25.8, 1.0, 2.7, 100, 'g'],
-            ['Feijão carioca cozido', 'Leguminosas', 76.0, 4.8, 13.6, 0.5, 8.5, 100, 'g'],
-            ['Peito de frango grelhado', 'Carnes e Aves', 159.0, 32.0, 0.0, 2.5, 0.0, 100, 'g'],
-            ['Ovo de galinha cozido', 'Ovos', 146.0, 13.3, 0.6, 9.5, 0.0, 50, 'unidade'],
-            ['Banana prata crua', 'Frutas', 98.0, 1.3, 26.0, 0.1, 2.0, 100, 'unidade'],
-            ['Aveia em flocos', 'Cereais', 394.0, 13.9, 66.6, 8.5, 9.1, 30, 'colher de sopa'],
-            ['Leite desnatado', 'Leites e Derivados', 35.0, 3.4, 4.9, 0.1, 0.0, 200, 'ml'],
-            ['Azeite de oliva extravirgem', 'Óleos e Gorduras', 884.0, 0.0, 0.0, 100.0, 0.0, 13, 'colher de sopa'],
-            ['Castanha-do-Pará', 'Oleaginosas', 643.0, 14.5, 15.1, 63.5, 7.9, 15, 'unidades'],
-            ['Alface americana crua', 'Verduras e Hortaliças', 9.0, 0.9, 1.7, 0.1, 1.0, 50, 'porção'],
-            ['Tomate com semente cru', 'Verduras e Hortaliças', 15.0, 1.1, 3.1, 0.2, 1.2, 100, 'unidade'],
+            ['Arroz branco cozido', 'Cereais', 128.0, 2.5, 28.1, 0.2, 1.6, 100, 'g', ''],
+            ['Arroz integral cozido', 'Cereais', 124.0, 2.6, 25.8, 1.0, 2.7, 100, 'g', ''],
+            ['Feijão carioca cozido', 'Leguminosas', 76.0, 4.8, 13.6, 0.5, 8.5, 100, 'g', ''],
+            ['Peito de frango grelhado', 'Carnes e Aves', 159.0, 32.0, 0.0, 2.5, 0.0, 100, 'g', ''],
+            ['Ovo de galinha cozido', 'Ovos', 146.0, 13.3, 0.6, 9.5, 0.0, 50, 'unidade', 'ovo'],
+            ['Banana prata crua', 'Frutas', 98.0, 1.3, 26.0, 0.1, 2.0, 100, 'unidade', ''],
+            ['Aveia em flocos', 'Cereais', 394.0, 13.9, 66.6, 8.5, 9.1, 30, 'colher de sopa', 'gluten, aveia'],
+            ['Leite desnatado', 'Leites e Derivados', 35.0, 3.4, 4.9, 0.1, 0.0, 200, 'ml', 'leite, lactose'],
+            ['Azeite de oliva extravirgem', 'Óleos e Gorduras', 884.0, 0.0, 0.0, 100.0, 0.0, 13, 'colher de sopa', ''],
+            ['Castanha-do-Pará', 'Oleaginosas', 643.0, 14.5, 15.1, 63.5, 7.9, 15, 'unidades', 'castanhas'],
+            ['Alface americana crua', 'Verduras e Hortaliças', 9.0, 0.9, 1.7, 0.1, 1.0, 50, 'porção', ''],
+            ['Tomate com semente cru', 'Verduras e Hortaliças', 15.0, 1.1, 3.1, 0.2, 1.2, 100, 'unidade', ''],
         ];
 
         $stmt = $this->db->prepare("
-            INSERT INTO foods (name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, is_custom)
-            VALUES (:name, :category, 'TACO', :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g, :serving_size_g, :serving_unit, 0)
+            INSERT INTO foods (name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens, is_custom)
+            VALUES (:name, :category, 'TACO', :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g, :serving_size_g, :serving_unit, :allergens, 0)
         ");
 
         $count = 0;
         foreach ($tacoItems as $item) {
-            // Verificar existência prévia
             $chk = $this->db->prepare("SELECT id FROM foods WHERE name = :name AND source = 'TACO'");
             $chk->execute(['name' => $item[0]]);
-            if (!$chk->fetch()) {
+            $existingId = $chk->fetchColumn();
+
+            if (!$existingId) {
                 $stmt->execute([
                     'name' => $item[0],
                     'category' => $item[1],
@@ -56,12 +57,45 @@ class FoodCatalogService
                     'fiber_g' => $item[6],
                     'serving_size_g' => $item[7],
                     'serving_unit' => $item[8],
+                    'allergens' => $item[9] ?? null,
                 ]);
+                $foodId = (int)$this->db->lastInsertId();
                 $count++;
+            } else {
+                $foodId = (int)$existingId;
+                // Atualizar alérgenos se vazios
+                $upd = $this->db->prepare("UPDATE foods SET allergens = :allergens WHERE id = :id AND (allergens IS NULL OR allergens = '')");
+                $upd->execute(['allergens' => $item[9] ?? null, 'id' => $foodId]);
+            }
+
+            // Inserir medidas caseiras específicas
+            if ($item[0] === 'Aveia em flocos') {
+                $this->registerMeasure($foodId, 'colher de sopa', 15.0);
+                $this->registerMeasure($foodId, 'xícara de chá', 90.0);
+            } elseif ($item[0] === 'Azeite de oliva extravirgem') {
+                $this->registerMeasure($foodId, 'colher de sopa', 13.0);
+                $this->registerMeasure($foodId, 'colher de sobremesa', 8.0);
+                $this->registerMeasure($foodId, 'colher de chá', 4.0);
+            } elseif ($item[0] === 'Arroz branco cozido') {
+                $this->registerMeasure($foodId, 'colher de sopa', 25.0);
+                $this->registerMeasure($foodId, 'escumadeira', 100.0);
             }
         }
 
         return $count;
+    }
+
+    private function registerMeasure(int $foodId, string $measure, float $grams): void
+    {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT OR IGNORE INTO food_household_measures (food_id, measure_name, grams_equivalent)
+                VALUES (:food_id, :measure, :grams)
+            ");
+            $stmt->execute(['food_id' => $foodId, 'measure' => $measure, 'grams' => $grams]);
+        } catch (\Throwable $e) {
+            // Ignorar se tabela ainda não criada ou erro de driver
+        }
     }
 
     public function search(string $term): array

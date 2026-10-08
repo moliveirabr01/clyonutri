@@ -54,6 +54,7 @@ TEST_FILES=(
     "tests/onda_4_benchmark_test.php"
     "tests/replatform_infrastructure_test.php"
     "tests/cross_tenant_offensive_test.php"
+    "tests/clinical_safety_and_precision_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}

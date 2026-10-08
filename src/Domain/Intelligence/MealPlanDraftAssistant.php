@@ -57,7 +57,7 @@ class MealPlanDraftAssistant
 
         $mealsStructure = [
             [
-                'name' => 'Café da Manhã (Sugerido por IA)',
+                'name' => 'Café da Manhã',
                 'time_of_day' => '07:30',
                 'items' => [
                     ['food_id' => $banana['id'], 'amount' => 100, 'measure_unit' => 'unidade'],
@@ -65,7 +65,7 @@ class MealPlanDraftAssistant
                 ],
             ],
             [
-                'name' => 'Almoço (Sugerido por IA)',
+                'name' => 'Almoço',
                 'time_of_day' => '12:30',
                 'items' => [
                     ['food_id' => $arroz['id'], 'amount' => 160, 'measure_unit' => 'g'],
@@ -78,7 +78,7 @@ class MealPlanDraftAssistant
         $created = $this->mealPlanService->createPlan(
             $patientId,
             $professionalId,
-            'Rascunho Inteligente de Prescrição (Aguardando Aprovação)',
+            'Rascunho de Prescrição Nutricional (Aguardando Revisão Profissional)',
             $mealsStructure
         );
 
