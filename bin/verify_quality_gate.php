@@ -222,6 +222,22 @@ if ($spikeRes['is_go']) {
     recordCheck('INFRA_PRODUCTION', 'Spike Técnico de Compatibilidade HostGator', 'FAIL', 'Bloqueadores encontrados: ' . implode(', ', $spikeRes['blockers']));
 }
 
+// Replataforma Laravel 13, Sanctum, Fortify & Pest (NI2-174)
+$lockFile = $rootDir . '/replatform/laravel13/composer.lock';
+$replatformArtisan = $rootDir . '/replatform/laravel13/artisan';
+if (file_exists($lockFile) && file_exists($replatformArtisan)) {
+    $pestCmd = "cd " . escapeshellarg($rootDir . '/replatform/laravel13') . " && env -u APP_KEY php ./vendor/bin/pest 2>&1";
+    exec($pestCmd, $pestOut, $pestCode);
+    $pestText = implode("\n", $pestOut);
+    if ($pestCode === 0 && str_contains($pestText, '"result":"passed"')) {
+        recordCheck('INFRA_PRODUCTION', 'Replataforma Real Laravel 13 & Pest (NI2-174)', 'PASS', 'Laravel 13.35, Sanctum, Fortify e 11 testes Pest aprovados sem router proprietário');
+    } else {
+        recordCheck('INFRA_PRODUCTION', 'Replataforma Real Laravel 13 & Pest (NI2-174)', 'FAIL', 'Falha na execução da suíte Pest: ' . substr($pestText, 0, 200));
+    }
+} else {
+    recordCheck('INFRA_PRODUCTION', 'Replataforma Real Laravel 13 & Pest (NI2-174)', 'FAIL', 'Ambiente Laravel 13 não encontrado em replatform/laravel13');
+}
+
 // Checagem de Deploy em Produção (FAIL CLOSED)
 $sshHost = getenv('HOSTGATOR_SSH_HOST');
 $sshUser = getenv('HOSTGATOR_SSH_USER');

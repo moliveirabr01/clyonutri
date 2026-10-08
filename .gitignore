@@ -9,6 +9,10 @@ storage/simulated_deploy/
 storage/rehearsal_restore/
 release/*.tar.gz
 vendor/
+replatform/laravel13/vendor/
+replatform/laravel13/.env
+replatform/laravel13/database/*.sqlite
+replatform/laravel13/storage/*.sqlite
 !storage/logs/.gitkeep
 !storage/uploads/.gitkeep
 !storage/backups/.gitkeep
