@@ -155,6 +155,7 @@ class DashboardController
                 <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Nova Prescrição Alimentar</h3>
                 <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;">Paciente: <strong><?= htmlspecialchars($p['name']) ?></strong></p>
                 <form method="POST" action="/planos/novo">
+                  <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                   <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
                   <div style="margin-bottom: 16px;">
                     <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título do Plano *</label>
@@ -1591,6 +1592,7 @@ class DashboardController
         $activeNav = 'planos';
         $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
         $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
+        $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
 
         $feedback = $_SESSION['feedback_message'] ?? null;
         $error = $_SESSION['error_message'] ?? null;
@@ -1664,6 +1666,7 @@ class DashboardController
                           <?= $pl['status'] === 'draft' ? 'Editar' : 'Visualizar' ?>
                         </a>
                         <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" onsubmit="return confirm('Deseja duplicar este plano para um novo rascunho?');">
+                          <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                           <button type="submit" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Duplicar</button>
                         </form>
                       </td>
@@ -1680,6 +1683,7 @@ class DashboardController
           <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Criar Novo Plano Alimentar</h2>
             <form method="POST" action="/planos/novo">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Paciente *</label>
                 <select name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
@@ -1718,9 +1722,7 @@ class DashboardController
         $title = trim($_POST['title'] ?? '');
         $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
 
-        $profStmt = $db->prepare("SELECT id FROM professionals WHERE clinic_id = :cid LIMIT 1");
-        $profStmt->execute(['cid' => TenantContext::getClinicId()]);
-        $professionalId = (int)$profStmt->fetchColumn();
+        $professionalId = $this->getActiveProfessionalId();
 
         try {
             $created = $service->createPlan($patientId, $professionalId, $title, $notes);
@@ -1757,6 +1759,7 @@ class DashboardController
         $activeNav = 'planos';
         $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
         $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
+        $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
 
         $feedback = $_SESSION['feedback_message'] ?? null;
         $error = $_SESSION['error_message'] ?? null;
@@ -1779,6 +1782,7 @@ class DashboardController
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
             <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;">Duplicar como Rascunho</button>
             </form>
             <?php if ($isDraft): ?>
@@ -1879,6 +1883,7 @@ class DashboardController
                   <?php if ($isDraft): ?>
                     <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>')" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
                     <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
+                      <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                       <button type="submit" class="btn btn-sm" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
                     </form>
                   <?php endif; ?>
@@ -1899,7 +1904,7 @@ class DashboardController
                   </div>
                 <?php else: ?>
                   <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                    <tbody>
+                     <tbody>
                       <?php foreach ($m['items'] as $it): ?>
                         <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
                           <td style="padding: 12px 20px; width: 40%;">
@@ -1920,6 +1925,7 @@ class DashboardController
                                 + Substituição
                               </button>
                               <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
+                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <button type="submit" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
                               </form>
                             <?php endif; ?>
@@ -1948,6 +1954,7 @@ class DashboardController
                               <td style="padding: 8px 20px; text-align: right;">
                                 <?php if ($isDraft): ?>
                                   <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover substituição?');">
+                                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                     <button type="submit" style="color: #a8a29e; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
                                   </form>
                                 <?php endif; ?>
@@ -1970,6 +1977,7 @@ class DashboardController
           <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Adicionar Refeição</h2>
             <form method="POST" action="/planos/<?= $planId ?>/refeicoes">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
                 <input type="text" name="name" required placeholder="Ex: Café da Manhã, Almoço, Ceia" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
@@ -1996,6 +2004,7 @@ class DashboardController
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar Alimento</h2>
             <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/itens">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento (Base TACO / Catálogo) *</label>
@@ -2042,6 +2051,7 @@ class DashboardController
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Configurar Substituição Vinculada</h2>
             <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/substituicoes">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="item_id" id="add-sub-item-id" value="">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento Substituto *</label>
@@ -2097,6 +2107,7 @@ class DashboardController
             <?php endif; ?>
 
             <form method="POST" action="/planos/<?= $planId ?>/publicar">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
                 <div style="margin-bottom: 16px;">
                   <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; cursor: pointer;">

@@ -35,7 +35,7 @@ class Router
 
         // Validação CSRF em requisições de mutação Web (rotas /api/ utilizam Bearer token)
         if ($method === 'POST' && !str_starts_with($path, '/api/')) {
-            $token = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);
                 header('Content-Type: application/json; charset=utf-8');
