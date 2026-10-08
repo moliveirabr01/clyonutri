@@ -1534,50 +1534,101 @@ class DashboardController
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $clinicId = TenantContext::getClinicId();
         $stmt = $db->prepare("
-            SELECT mp.*, p.name AS patient_name
+            SELECT mp.*, p.name AS patient_name, u.name AS professional_name
             FROM meal_plans mp
             JOIN patients p ON p.id = mp.patient_id
+            LEFT JOIN professionals pr ON pr.id = mp.professional_id
+            LEFT JOIN users u ON u.id = pr.user_id
             WHERE mp.clinic_id = :clinic_id
             ORDER BY mp.id DESC
         ");
         $stmt->execute(['clinic_id' => $clinicId]);
         $plans = $stmt->fetchAll();
 
+        $patStmt = $db->prepare("SELECT id, name FROM patients WHERE clinic_id = :clinic_id AND status = 'active' ORDER BY name ASC");
+        $patStmt->execute(['clinic_id' => $clinicId]);
+        $patients = $patStmt->fetchAll();
+
         $title = 'Planos Alimentares';
         $activeNav = 'planos';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
-        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
+        $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
+
+        $feedback = $_SESSION['feedback_message'] ?? null;
+        $error = $_SESSION['error_message'] ?? null;
+        unset($_SESSION['feedback_message'], $_SESSION['error_message']);
 
         ob_start();
         ?>
-        <div style="margin-bottom: var(--space-6);">
-          <h1>Planos Alimentares</h1>
-          <p style="color: var(--neutral-gray-500);">Prescrições nutricionais ativas, rascunhos e modelos.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
+          <div>
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Prescrições e Planos Alimentares</h1>
+            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Editor por refeições, alimentos, substituições, totais nutricionais e versionamento imutável.</p>
+          </div>
+          <button class="btn btn-primary" onclick="document.getElementById('modal-new-plan').style.display='flex'">
+            + Novo Plano Alimentar
+          </button>
         </div>
+
+        <?php if ($feedback): ?>
+          <div style="background: #e8f5e9; color: #2e7d32; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #c8e6c9;">
+            <?= htmlspecialchars($feedback) ?>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($error): ?>
+          <div style="background: #ffebee; color: #c62828; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ffcdd2;">
+            <?= htmlspecialchars($error) ?>
+          </div>
+        <?php endif; ?>
 
         <div class="card">
           <div class="table-responsive">
-            <table class="table">
+            <table class="table" style="width: 100%; border-collapse: collapse;">
               <thead>
-                <tr>
-                  <th>Plano</th>
-                  <th>Paciente</th>
-                  <th>Versão</th>
-                  <th>Status</th>
-                  <th>Criado em</th>
+                <tr style="border-bottom: 1px solid var(--neutral-gray-200); text-align: left;">
+                  <th style="padding: 12px;">Título do Plano</th>
+                  <th style="padding: 12px;">Paciente</th>
+                  <th style="padding: 12px;">Versão</th>
+                  <th style="padding: 12px;">Status</th>
+                  <th style="padding: 12px;">Energia</th>
+                  <th style="padding: 12px;">Última Atualização</th>
+                  <th style="padding: 12px; text-align: right;">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($plans)): ?>
-                  <tr><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum plano alimentar prescrito ainda.</td></tr>
+                  <tr><td colspan="7" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum plano alimentar cadastrado ainda.</td></tr>
                 <?php else: ?>
                   <?php foreach ($plans as $pl): ?>
-                    <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($pl['title']) ?></td>
-                      <td><?= htmlspecialchars($pl['patient_name']) ?></td>
-                      <td class="tabular-nums">V<?= $pl['version'] ?></td>
-                      <td><span class="badge badge-<?= $pl['status'] === 'published' ? 'success' : 'warning' ?>"><?= htmlspecialchars($pl['status']) ?></span></td>
-                      <td><?= date('d/m/Y H:i', strtotime($pl['created_at'])) ?></td>
+                    <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
+                      <td style="padding: 12px; font-weight: 600; color: var(--brand-navy-900);">
+                        <?= htmlspecialchars($pl['title']) ?>
+                        <?php if (!empty($pl['parent_plan_id'])): ?>
+                          <span style="font-size: 0.75rem; color: #64748b; display: block; font-weight: normal;">(Derivado de #<?= (int)$pl['parent_plan_id'] ?>)</span>
+                        <?php endif; ?>
+                      </td>
+                      <td style="padding: 12px;"><?= htmlspecialchars($pl['patient_name']) ?></td>
+                      <td style="padding: 12px;" class="tabular-nums">v<?= (int)$pl['version'] ?></td>
+                      <td style="padding: 12px;">
+                        <?php if ($pl['status'] === 'published'): ?>
+                          <span class="badge badge-success" style="background: #def7ec; color: #03543f; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Publicado</span>
+                        <?php elseif ($pl['status'] === 'draft'): ?>
+                          <span class="badge badge-warning" style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Rascunho</span>
+                        <?php else: ?>
+                          <span class="badge" style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;"><?= htmlspecialchars($pl['status']) ?></span>
+                        <?php endif; ?>
+                      </td>
+                      <td style="padding: 12px;" class="tabular-nums"><?= number_format((float)($pl['daily_energy_kcal'] ?? 0), 0, ',', '.') ?> kcal</td>
+                      <td style="padding: 12px; color: #64748b; font-size: 0.85rem;"><?= date('d/m/Y H:i', strtotime($pl['updated_at'] ?? $pl['created_at'])) ?></td>
+                      <td style="padding: 12px; text-align: right; white-space: nowrap;">
+                        <a href="/planos/<?= $pl['id'] ?>" class="btn btn-sm btn-outline" style="text-decoration: none; padding: 4px 10px; font-size: 0.8rem; margin-right: 4px;">
+                          <?= $pl['status'] === 'draft' ? 'Editar' : 'Visualizar' ?>
+                        </a>
+                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" onsubmit="return confirm('Deseja duplicar este plano para um novo rascunho?');">
+                          <button type="submit" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Duplicar</button>
+                        </form>
+                      </td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
@@ -1585,9 +1636,619 @@ class DashboardController
             </table>
           </div>
         </div>
+
+        <!-- Modal Novo Plano -->
+        <div id="modal-new-plan" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Criar Novo Plano Alimentar</h2>
+            <form method="POST" action="/planos/novo">
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Paciente *</label>
+                <select name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <option value="">Selecione o paciente...</option>
+                  <?php foreach ($patients as $p): ?>
+                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título da Prescrição *</label>
+                <input type="text" name="title" required placeholder="Ex: Plano Hipertrofia Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Gerais do Plano (Opcional)</label>
+                <textarea name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-plan').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Iniciar Prescrição</button>
+              </div>
+            </form>
+          </div>
+        </div>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function createMealPlan(): void
+    {
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        $patientId = (int)($_POST['patient_id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+        $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+
+        $profStmt = $db->prepare("SELECT id FROM professionals WHERE clinic_id = :cid LIMIT 1");
+        $profStmt->execute(['cid' => TenantContext::getClinicId()]);
+        $professionalId = (int)$profStmt->fetchColumn();
+
+        try {
+            $created = $service->createPlan($patientId, $professionalId, $title, $notes);
+            $_SESSION['feedback_message'] = "Plano alimentar '{$title}' criado com sucesso!";
+            header("Location: /planos/" . $created['plan_id']);
+            exit;
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao criar plano: " . $e->getMessage();
+            header("Location: /planos");
+            exit;
+        }
+    }
+
+    public function mealPlanEditor(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $preview = $service->getPlanPreview($planId);
+            $plan = $preview['plan'];
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = $e->getMessage();
+            header("Location: /planos");
+            exit;
+        }
+
+        $fStmt = $db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 250");
+        $fStmt->execute();
+        $foodsCatalog = $fStmt->fetchAll();
+
+        $title = "Plano Alimentar: " . htmlspecialchars($plan['title']);
+        $activeNav = 'planos';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
+        $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
+
+        $feedback = $_SESSION['feedback_message'] ?? null;
+        $error = $_SESSION['error_message'] ?? null;
+        unset($_SESSION['feedback_message'], $_SESSION['error_message']);
+
+        $isDraft = ($plan['status'] === 'draft');
+
+        ob_start();
+        ?>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <a href="/planos" style="text-decoration: none; color: #64748b; font-size: 0.9rem;">← Voltar para lista</a>
+              <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#def7ec' ?>; color: <?= $isDraft ? '#854d0e' : '#03543f' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
+                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (Imutável v' . (int)$plan['version'] . ')' ?>
+              </span>
+            </div>
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;"><?= htmlspecialchars($plan['title']) ?></h1>
+            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Paciente: <strong><?= htmlspecialchars($plan['patient_name']) ?></strong> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
+              <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;">Duplicar como Rascunho</button>
+            </form>
+            <?php if ($isDraft): ?>
+              <button class="btn btn-primary" onclick="document.getElementById('modal-publish-plan').style.display='flex'">
+                Revisar & Publicar
+              </button>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <?php if ($feedback): ?>
+          <div style="background: #e8f5e9; color: #2e7d32; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #c8e6c9;">
+            <?= htmlspecialchars($feedback) ?>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($error): ?>
+          <div style="background: #ffebee; color: #c62828; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ffcdd2;">
+            <?= htmlspecialchars($error) ?>
+          </div>
+        <?php endif; ?>
+
+        <!-- Alertas de Segurança Clínica e Alérgenos -->
+        <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
+          <div style="background: #fff3cd; color: #856404; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeeba;">
+            <strong style="display: block; margin-bottom: 6px;">⚠️ Atenção Clínica: Conflitos Alergênicos Detectados com a Anamnese!</strong>
+            <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+              <?php foreach ($preview['allergen_safety']['conflicts'] as $conf): ?>
+                <li>Alimento <strong><?= htmlspecialchars($conf['food_name']) ?></strong> possui grupo alergênico registrado: <em><?= htmlspecialchars($conf['allergen_group']) ?></em>.</li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+        <?php endif; ?>
+
+        <!-- Dashboard de Totais Nutricionais Consolidados -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #3b82f6;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Energia Diária</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">kcal</span></div>
+          </div>
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #10b981;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Carboidratos</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+          </div>
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #ef4444;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Proteínas</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+          </div>
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #f59e0b;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Lipídeos</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+          </div>
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #8b5cf6;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Fibras</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['fiber_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+          </div>
+        </div>
+
+        <?php if (!empty($plan['notes'])): ?>
+          <div class="card" style="padding: 16px; margin-bottom: 24px; background: #f8fafc;">
+            <strong style="color: var(--brand-navy-900); font-size: 0.9rem;">Orientações Gerais do Plano:</strong>
+            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; white-space: pre-line;"><?= htmlspecialchars($plan['notes']) ?></p>
+          </div>
+        <?php endif; ?>
+
+        <!-- Refeições e Alimentos -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Refeições do Dia</h2>
+          <?php if ($isDraft): ?>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-add-meal').style.display='flex'">
+              + Adicionar Refeição
+            </button>
+          <?php endif; ?>
+        </div>
+
+        <?php if (empty($plan['meals'])): ?>
+          <div class="card" style="padding: 32px; text-align: center; color: #64748b;">
+            <p style="margin-bottom: 12px;">Nenhuma refeição adicionada a esta prescrição.</p>
+            <?php if ($isDraft): ?>
+              <button class="btn btn-primary" onclick="document.getElementById('modal-add-meal').style.display='flex'">Adicionar Primeira Refeição</button>
+            <?php endif; ?>
+          </div>
+        <?php else: ?>
+          <?php foreach ($plan['meals'] as $m): ?>
+            <div class="card" style="margin-bottom: 20px; overflow: hidden; border: 1px solid var(--neutral-gray-200);">
+              <!-- Cabeçalho da Refeição -->
+              <div style="padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid var(--neutral-gray-200); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-weight: 700; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars($m['name']) ?></span>
+                  <?php if (!empty($m['time_of_day'])): ?>
+                    <span style="background: #e2e8f0; color: #334155; font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">⏰ <?= htmlspecialchars($m['time_of_day']) ?></span>
+                  <?php endif; ?>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 0.85rem; color: #64748b;">
+                    <strong><?= number_format((float)$m['totals']['energy_kcal'], 0) ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1) ?>g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1) ?>g | G: <?= number_format((float)$m['totals']['lipid_g'], 1) ?>g
+                  </span>
+                  <?php if ($isDraft): ?>
+                    <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>')" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
+                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
+                      <button type="submit" class="btn btn-sm" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
+                    </form>
+                  <?php endif; ?>
+                </div>
+              </div>
+
+              <?php if (!empty($m['notes'])): ?>
+                <div style="padding: 8px 20px; background: #f1f5f9; font-size: 0.85rem; color: #475569; border-bottom: 1px solid #e2e8f0;">
+                  <em>Orientações: <?= htmlspecialchars($m['notes']) ?></em>
+                </div>
+              <?php endif; ?>
+
+              <!-- Lista de Itens -->
+              <div style="padding: 0;">
+                <?php if (empty($m['items'])): ?>
+                  <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                    Nenhum alimento cadastrado nesta refeição.
+                  </div>
+                <?php else: ?>
+                  <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <tbody>
+                      <?php foreach ($m['items'] as $it): ?>
+                        <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
+                          <td style="padding: 12px 20px; width: 40%;">
+                            <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($it['food_name']) ?></strong>
+                            <?php if (!empty($it['notes'])): ?>
+                              <span style="display: block; font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($it['notes']) ?></span>
+                            <?php endif; ?>
+                          </td>
+                          <td style="padding: 12px 20px; font-weight: 600; color: #334155; width: 20%;">
+                            <?= number_format((float)$it['amount'], 0) ?> <?= htmlspecialchars($it['measure_unit']) ?>
+                          </td>
+                          <td style="padding: 12px 20px; color: #64748b; width: 25%; font-size: 0.85rem;">
+                            <?= number_format((float)$it['energy_kcal'], 0) ?> kcal <span style="font-size: 0.75rem;">(P:<?= number_format((float)$it['protein_g'], 1) ?> C:<?= number_format((float)$it['carbohydrate_g'], 1) ?> G:<?= number_format((float)$it['lipid_g'], 1) ?>)</span>
+                          </td>
+                          <td style="padding: 12px 20px; text-align: right; width: 15%;">
+                            <?php if ($isDraft): ?>
+                              <button class="btn btn-sm btn-outline" onclick="openAddSubModal(<?= $it['id'] ?>, '<?= htmlspecialchars(addslashes($it['food_name'])) ?>')" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
+                                + Substituição
+                              </button>
+                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
+                                <button type="submit" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
+                              </form>
+                            <?php endif; ?>
+                          </td>
+                        </tr>
+
+                        <!-- Substituições Vinculadas (Opções Alternativas - Não Cumulativas) -->
+                        <?php if (!empty($it['substitutions'])): ?>
+                          <?php foreach ($it['substitutions'] as $sub): ?>
+                            <tr style="background: #fafaf9; border-bottom: 1px dashed #e7e5e4;">
+                              <td style="padding: 8px 20px 8px 40px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                  <span style="color: #d97706; font-size: 0.8rem; font-weight: 600;">↳ Opção Alternativa:</span>
+                                  <span style="color: #44403c;"><?= htmlspecialchars($sub['food_name']) ?></span>
+                                </div>
+                                <?php if (!empty($sub['notes'])): ?>
+                                  <span style="display: block; font-size: 0.75rem; color: #78716c; margin-left: 20px;"><?= htmlspecialchars($sub['notes']) ?></span>
+                                <?php endif; ?>
+                              </td>
+                              <td style="padding: 8px 20px; font-size: 0.85rem; color: #44403c;">
+                                <?= number_format((float)$sub['amount'], 0) ?> <?= htmlspecialchars($sub['measure_unit']) ?>
+                              </td>
+                              <td style="padding: 8px 20px; font-size: 0.8rem; color: #78716c;">
+                                <?= number_format((float)$sub['energy_kcal'], 0) ?> kcal (P:<?= number_format((float)$sub['protein_g'], 1) ?> C:<?= number_format((float)$sub['carbohydrate_g'], 1) ?> G:<?= number_format((float)$sub['lipid_g'], 1) ?>)
+                              </td>
+                              <td style="padding: 8px 20px; text-align: right;">
+                                <?php if ($isDraft): ?>
+                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover substituição?');">
+                                    <button type="submit" style="color: #a8a29e; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
+                                  </form>
+                                <?php endif; ?>
+                              </td>
+                            </tr>
+                          <?php endforeach; ?>
+                        <?php endif; ?>
+
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
+
+        <!-- Modal Adicionar Refeição -->
+        <div id="modal-add-meal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Adicionar Refeição</h2>
+            <form method="POST" action="/planos/<?= $planId ?>/refeicoes">
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
+                <input type="text" name="name" required placeholder="Ex: Café da Manhã, Almoço, Ceia" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Horário Sugerido (HH:MM)</label>
+                <input type="text" name="time_of_day" placeholder="Ex: 08:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Clínicas da Refeição</label>
+                <textarea name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-meal').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar Refeição</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Adicionar Alimento -->
+        <div id="modal-add-item" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar Alimento</h2>
+            <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
+            <form method="POST" action="/planos/<?= $planId ?>/itens">
+              <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento (Base TACO / Catálogo) *</label>
+                <select name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <option value="">Selecione o alimento...</option>
+                  <?php foreach ($foodsCatalog as $fc): ?>
+                    <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?> (<?= number_format((float)$fc['energy_kcal'], 0) ?> kcal/100g)</option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div>
+                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade *</label>
+                  <input type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                </div>
+                <div>
+                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
+                  <select name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                    <option value="g">g (gramas)</option>
+                    <option value="ml">ml (mililitros)</option>
+                    <option value="colher de sopa">colher de sopa</option>
+                    <option value="colher de sobremesa">colher de sobremesa</option>
+                    <option value="unidade média">unidade média</option>
+                    <option value="xícara">xícara</option>
+                    <option value="fatia">fatia</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Observação / Orientação do Item</label>
+                <input type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-item').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Adicionar ao Plano</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Adicionar Substituição -->
+        <div id="modal-add-sub" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Configurar Substituição Vinculada</h2>
+            <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
+            <form method="POST" action="/planos/<?= $planId ?>/substituicoes">
+              <input type="hidden" name="item_id" id="add-sub-item-id" value="">
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento Substituto *</label>
+                <select name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <option value="">Selecione o alimento alternativo...</option>
+                  <?php foreach ($foodsCatalog as $fc): ?>
+                    <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div>
+                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade Equivalente *</label>
+                  <input type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                </div>
+                <div>
+                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
+                  <select name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                    <option value="g">g (gramas)</option>
+                    <option value="ml">ml (mililitros)</option>
+                    <option value="colher de sopa">colher de sopa</option>
+                    <option value="colher de sobremesa">colher de sobremesa</option>
+                    <option value="unidade média">unidade média</option>
+                    <option value="xícara">xícara</option>
+                    <option value="fatia">fatia</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientação da Substituição</label>
+                <input type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-sub').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar Opção</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Publicar Versão -->
+        <div id="modal-publish-plan" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">Revisar e Publicar Versão</h2>
+            <p style="color: #475569; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
+              A publicação torna este plano a <strong>prescrição ativa e vigente</strong> para o paciente no aplicativo móvel. Um snapshot imutável será gravado com número de versão e registro de auditoria clínica.
+            </p>
+
+            <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
+              <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85rem; border: 1px solid #ffeeba;">
+                <strong>⚠️ Conflito de Alérgeno:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa abaixo.
+              </div>
+            <?php endif; ?>
+
+            <form method="POST" action="/planos/<?= $planId ?>/publicar">
+              <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
+                <div style="margin-bottom: 16px;">
+                  <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" name="allow_allergen_override" value="1" required style="margin-top: 3px;">
+                    <span>Confirmo e autorizo clinicamente a prescrição dos alimentos assinalados mesmo com os alertas detectados.</span>
+                  </label>
+                </div>
+              <?php endif; ?>
+
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-publish-plan').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Confirmar e Publicar Versão</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+        function openAddItemModal(mealId, mealName) {
+          document.getElementById('add-item-meal-id').value = mealId;
+          document.getElementById('add-item-meal-name').innerText = 'Refeição: ' + mealName;
+          document.getElementById('modal-add-item').style.display = 'flex';
+        }
+        function openAddSubModal(itemId, foodName) {
+          document.getElementById('add-sub-item-id').value = itemId;
+          document.getElementById('add-sub-item-name').innerText = 'Substituição para o item: ' + foodName;
+          document.getElementById('modal-add-sub').style.display = 'flex';
+        }
+        </script>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function addMealToPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        $name = trim($_POST['name'] ?? '');
+        $timeOfDay = !empty($_POST['time_of_day']) ? trim($_POST['time_of_day']) : null;
+        $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+
+        try {
+            $service->addMeal($planId, $name, $timeOfDay, $notes);
+            $_SESSION['feedback_message'] = "Refeição '{$name}' adicionada com sucesso!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao adicionar refeição: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function deleteMealFromPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $mealId = (int)($params['mealId'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $service->deleteMeal($mealId);
+            $_SESSION['feedback_message'] = "Refeição removida com sucesso!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao remover refeição: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function addItemToPlanMeal(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $mealId = (int)($_POST['meal_id'] ?? 0);
+        $foodId = (int)($_POST['food_id'] ?? 0);
+        $amount = (float)($_POST['amount'] ?? 0);
+        $unit = trim($_POST['measure_unit'] ?? 'g');
+        $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $service->addItem($mealId, $foodId, $amount, $unit, $notes);
+            $_SESSION['feedback_message'] = "Alimento adicionado e totais nutricionais recalculados!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function deleteItemFromPlanMeal(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $itemId = (int)($params['itemId'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $service->deleteItem($itemId);
+            $_SESSION['feedback_message'] = "Alimento removido com sucesso!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao remover alimento: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function addSubstitutionToPlanItem(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $itemId = (int)($_POST['item_id'] ?? 0);
+        $foodId = (int)($_POST['food_id'] ?? 0);
+        $amount = (float)($_POST['amount'] ?? 0);
+        $unit = trim($_POST['measure_unit'] ?? 'g');
+        $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $service->addSubstitution($itemId, $foodId, $amount, $unit, $notes);
+            $_SESSION['feedback_message'] = "Opção de substituição cadastrada com sucesso!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao cadastrar substituição: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function deleteSubstitutionFromPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $subId = (int)($params['subId'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $service->deleteSubstitution($subId);
+            $_SESSION['feedback_message'] = "Substituição removida com sucesso!";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao remover substituição: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function publishMealPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $allowAllergenOverride = !empty($_POST['allow_allergen_override']);
+
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $res = $service->publishPlan($planId, $allowAllergenOverride, true);
+            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! Snapshot imutável gerado.";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro na publicação: " . $e->getMessage();
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function duplicateMealPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $res = $service->duplicatePlan($planId);
+            $_SESSION['feedback_message'] = "Plano duplicado com sucesso em um novo rascunho independente!";
+            header("Location: /planos/" . $res['plan_id']);
+            exit;
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao duplicar plano: " . $e->getMessage();
+            header("Location: /planos/{$planId}");
+            exit;
+        }
     }
 
     public function finance(): void

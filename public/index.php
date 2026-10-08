@@ -151,6 +151,16 @@ $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointment
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
 $router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
+$router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
+$router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
+$router->post('/planos/{id}/refeicoes', $requireAuth([$dashCtrl, 'addMealToPlan']));
+$router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl, 'deleteMealFromPlan']));
+$router->post('/planos/{id}/itens', $requireAuth([$dashCtrl, 'addItemToPlanMeal']));
+$router->post('/planos/{id}/itens/{itemId}/remover', $requireAuth([$dashCtrl, 'deleteItemFromPlanMeal']));
+$router->post('/planos/{id}/substituicoes', $requireAuth([$dashCtrl, 'addSubstitutionToPlanItem']));
+$router->post('/planos/{id}/substituicoes/{subId}/remover', $requireAuth([$dashCtrl, 'deleteSubstitutionFromPlan']));
+$router->post('/planos/{id}/publicar', $requireAuth([$dashCtrl, 'publishMealPlan']));
+$router->post('/planos/{id}/duplicar', $requireAuth([$dashCtrl, 'duplicateMealPlan']));
 $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 
