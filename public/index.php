@@ -49,6 +49,7 @@ $dashCtrl = new DashboardController();
 $landingCtrl = new LandingController();
 $teleCtrl = new \ClyoNutri\Application\Controllers\TeleconsultationController($db);
 $helpCtrl = new \ClyoNutri\Application\Controllers\HelpdeskController($db);
+$chatCtrl = new \ClyoNutri\Application\Controllers\ChatController($db);
 
 // 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -189,6 +190,13 @@ $router->get('/suporte/fila', $requireAuth([$helpCtrl, 'backofficeQueue']));
 $router->get('/suporte/chamado/{id}', $requireAuth([$helpCtrl, 'backofficeTicket']));
 $router->post('/suporte/chamado/{id}/responder', $requireAuth([$helpCtrl, 'backofficeReply']));
 $router->post('/suporte/chamado/{id}/status', $requireAuth([$helpCtrl, 'backofficeUpdateStatus']));
+
+// 3.3 Canal Seguro de Comunicação & Chat (NI2-189)
+$router->get('/chat', $requireAuth([$chatCtrl, 'index']));
+$router->get('/chat/{id}', $requireAuth([$chatCtrl, 'conversationView']));
+$router->post('/chat/{id}/enviar', $requireAuth([$chatCtrl, 'sendMessage']));
+$router->get('/chat/{id}/poll', $requireAuth([$chatCtrl, 'pollMessages']));
+$router->get('/chat/anexo/{id}', $requireAuth([$chatCtrl, 'downloadAttachment']));
 
 // 4. API Móvel do Paciente (/api/v1/patient/...)
 $authenticatePatientApi = function() use ($db): array {
@@ -418,6 +426,114 @@ $router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatie
     $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
     $res = $apiCtrl->portal()->recordSelfMetric($patientId, $metricType, $value, $unit, $notes);
     echo json_encode($res);
+});
+
+// 4.1 Chat Seguro do Paciente (NI2-189)
+$router->get('/api/v1/patient/chat/messages', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : null;
+
+    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
+    $convs = $chatService->listConversationsForPatient($patientId);
+    if (empty($convs)) {
+        echo json_encode(['conversation_id' => null, 'messages' => [], 'cursor' => ['after_id' => 0, 'count' => 0, 'has_more' => false]]);
+        return;
+    }
+
+    $convId = (int)$convs[0]['id'];
+    $data = $chatService->getMessagesWithCursor($convId, $afterId, 50, 'patient', $patientId);
+    echo json_encode($data);
+});
+
+$router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+
+    $message = trim((string)($input['message'] ?? ''));
+    $idempotencyKey = trim((string)($input['idempotency_key'] ?? ''));
+    if ($idempotencyKey === '') {
+        $idempotencyKey = bin2hex(random_bytes(16));
+    }
+
+    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
+    $convId = (int)($input['conversation_id'] ?? 0);
+
+    if ($convId <= 0) {
+        $convs = $chatService->listConversationsForPatient($patientId);
+        if (!empty($convs)) {
+            $convId = (int)$convs[0]['id'];
+        }
+    }
+
+    if ($convId <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Nenhuma conversa ativa encontrada para o paciente.']);
+        return;
+    }
+
+    try {
+        $msg = $chatService->sendMessage(
+            $convId,
+            'patient',
+            $patientId,
+            $message,
+            null,
+            $idempotencyKey
+        );
+        echo json_encode(['success' => true, 'message' => $msg]);
+    } catch (\Throwable $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+});
+
+$router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $convId = (int)($input['conversation_id'] ?? 0);
+
+    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
+    if ($convId <= 0) {
+        $convs = $chatService->listConversationsForPatient($patientId);
+        if (!empty($convs)) {
+            $convId = (int)$convs[0]['id'];
+        }
+    }
+
+    if ($convId > 0) {
+        $chatService->markAsRead($convId, 'patient');
+    }
+
+    echo json_encode(['success' => true]);
+});
+
+$router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use ($authenticatePatientApi, $db) {
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $attId = (int)($params['id'] ?? 0);
+
+    $attService = new \ClyoNutri\Domain\Chat\ChatAttachmentService($db);
+    try {
+        $fileData = $attService->getAttachmentForDownload($attId, 'patient', $patientId);
+        header('Content-Type: ' . $fileData['mime_type']);
+        header('Content-Length: ' . $fileData['size_bytes']);
+        header('Content-Disposition: inline; filename="' . addslashes($fileData['file_name']) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-cache, must-revalidate');
+        readfile($fileData['file_path']);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => $e->getMessage()]);
+        exit;
+    }
 });
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

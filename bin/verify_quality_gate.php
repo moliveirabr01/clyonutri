@@ -244,6 +244,13 @@ if (str_contains($benchmarkOutput, '7/7 PILARES DO BENCHMARK 360 HOMOLOGADOS COM
     recordCheck('E2E_JOURNEYS', 'Benchmark 360 & Paridade Competitiva E2E (NI2-179: NI2-180 a NI2-194)', 'FAIL', 'Falha no Benchmark 360: ' . substr($benchmarkOutput, 0, 200));
 }
 
+$chatOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/chat_secure_communication_and_engagement_e2e_test.php') . " 2>&1");
+if (str_contains($chatOutput, 'TODOS OS CRITÉRIOS DE ACEITE DE NI2-189 HOMOLOGADOS')) {
+    recordCheck('E2E_JOURNEYS', 'Canal Seguro de Comunicação & Engajamento E2E (NI2-189)', 'PASS', 'Idempotência anti-duplicação, anexos privados fora do webroot, polling delta com cursor e zero dados clínicos em notificações');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Canal Seguro de Comunicação & Engajamento E2E (NI2-189)', 'FAIL', 'Falha no Chat Seguro: ' . substr($chatOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',
