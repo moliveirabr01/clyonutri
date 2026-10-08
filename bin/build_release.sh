@@ -60,6 +60,7 @@ TEST_FILES=(
     "tests/patient_portal_e2e_suite_test.php"
     "tests/verifiable_multilateral_audit_suite_test.php"
     "tests/patient_mobile_api_integration_test.php"
+    "tests/patient_mobile_http_contract_test.php"
     "tests/anthropometry_lifecycle_and_evaluation_test.php"
     "tests/agenda_and_consultation_lifecycle_test.php"
     "tests/meal_plan_and_prescription_lifecycle_test.php"
