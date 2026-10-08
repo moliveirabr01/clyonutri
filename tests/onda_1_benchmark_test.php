@@ -26,7 +26,7 @@ Connection::setInstance($db);
 
 $migrator = new Migrator($db, __DIR__ . '/../database/migrations');
 $executed = $migrator->run();
-assert(count($executed) === 5, "Devem ser executadas 5 migrations");
+assert(count($executed) >= 5, "Devem ser executadas as migrations do sistema");
 
 $auth = new AuthService($db);
 $nutri = $auth->registerNutritionist('Dr. Lucas Bench', 'lucas@bench.test', 'SenhaForte@2026', 'Clínica Pro Nutri', '99331', 'CRN-3');

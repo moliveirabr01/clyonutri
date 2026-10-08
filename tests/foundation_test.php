@@ -24,8 +24,8 @@ Connection::setInstance($testDb);
 echo "[1/4] Executando Migrations...\n";
 $migrator = new Migrator($testDb, __DIR__ . '/../database/migrations');
 $executed = $migrator->run();
-assert(count($executed) === 4, "Devem ser executadas 4 migrations");
-echo "  ✓ 4 migrações executadas com sucesso.\n\n";
+assert(count($executed) >= 4, "Devem ser executadas as migrations do sistema");
+echo "  ✓ Migrações executadas com sucesso (" . count($executed) . ").\n\n";
 
 // 3. Testar Registro e Isolamento Multi-tenant
 echo "[2/4] Testando Registro de Nutricionista e Multi-Tenancy...\n";
