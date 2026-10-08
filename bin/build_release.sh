@@ -59,6 +59,7 @@ TEST_FILES=(
     "tests/delivery_e2e_and_contracts_test.php"
     "tests/patient_portal_e2e_suite_test.php"
     "tests/verifiable_multilateral_audit_suite_test.php"
+    "tests/patient_mobile_api_integration_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}

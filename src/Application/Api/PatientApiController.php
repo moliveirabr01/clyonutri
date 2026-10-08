@@ -47,6 +47,7 @@ class PatientApiController
         $meals = $mStmt->fetchAll();
 
         foreach ($meals as &$m) {
+            $m['time'] = $m['time_of_day'] ?? ($m['time'] ?? '');
             $iStmt = $this->db->prepare("
                 SELECT i.*, f.name AS food_name, f.energy_kcal, f.protein_g, f.carbohydrate_g, f.lipid_g
                 FROM meal_plan_items i
@@ -58,6 +59,8 @@ class PatientApiController
             $items = $iStmt->fetchAll();
 
             foreach ($items as &$it) {
+                $it['quantity'] = $it['amount'] ?? ($it['quantity'] ?? 0);
+                $it['unit'] = $it['measure_unit'] ?? ($it['unit'] ?? 'g');
                 $subStmt = $this->db->prepare("
                     SELECT s.*, f.name AS food_name
                     FROM meal_plan_substitutions s

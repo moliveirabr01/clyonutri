@@ -33,8 +33,8 @@ class Router
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
 
-        // Validação CSRF em requisições de mutação
-        if ($method === 'POST') {
+        // Validação CSRF em requisições de mutação Web (rotas /api/ utilizam Bearer token)
+        if ($method === 'POST' && !str_starts_with($path, '/api/')) {
             $token = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);
