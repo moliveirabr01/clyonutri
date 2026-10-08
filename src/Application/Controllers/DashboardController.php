@@ -21,8 +21,8 @@ class DashboardController
 
         $title = 'Dashboard';
         $activeNav = 'dashboard';
-        $clinicName = 'Clínica ClyoNutri Demo';
-        $userName = 'Dra. Camila Mendes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
         ?>
@@ -134,8 +134,8 @@ class DashboardController
 
         $title = 'Pacientes';
         $activeNav = 'pacientes';
-        $clinicName = 'Clínica ClyoNutri Demo';
-        $userName = 'Dra. Camila Mendes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
         ?>
@@ -196,8 +196,8 @@ class DashboardController
 
         $title = 'Base de Alimentos';
         $activeNav = 'alimentos';
-        $clinicName = 'Clínica ClyoNutri Demo';
-        $userName = 'Dra. Camila Mendes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
         ?>

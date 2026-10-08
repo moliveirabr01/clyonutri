@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use ClyoNutri\Application\Controllers\AuthController;
 use ClyoNutri\Application\Controllers\DashboardController;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\TenantContext;
@@ -16,55 +17,57 @@ use ClyoNutri\Domain\Patient\PatientRepository;
 
 Env::load(__DIR__ . '/../.env');
 
-// Garantir inicialização do banco SQLite local de desenvolvimento
+// Inicialização de conexão
 $db = Connection::getInstance();
 
-// Auto-seed para visualização imediata se vazio
+// Auto-seed inicial de referência
 $tacoSeed = new FoodCatalogService($db);
 $tacoSeed->seedTacoReference();
 
-// Inicializar contexto demo seguro se não autenticado
-if (!TenantContext::hasClinic()) {
-    $stmt = $db->query("SELECT id FROM clinics LIMIT 1");
-    $clinicId = $stmt->fetchColumn();
-    if (!$clinicId) {
-        $auth = new AuthService($db);
-        $res = $auth->registerNutritionist('Dra. Camila Mendes', 'camila@clyonutri.com.br', 'SenhaDemo123', 'Clínica ClyoNutri Demo', '12345', 'CRN-3');
-        $clinicId = $res['clinic_id'];
-        $userId = $res['user_id'];
-    } else {
-        $uStmt = $db->query("SELECT id, name FROM users LIMIT 1");
-        $u = $uStmt->fetch();
-        $userId = (int)$u['id'];
-    }
+// Garantir usuário demo existente para testes
+$auth = new AuthService($db);
+$stmt = $db->query("SELECT id FROM users WHERE email = 'camila@clyonutri.com.br' LIMIT 1");
+if (!$stmt->fetch()) {
+    $auth->registerNutritionist(
+        'Dra. Camila Mendes',
+        'camila@clyonutri.com.br',
+        'SenhaDemo123',
+        'Clínica ClyoNutri Demo',
+        '12345',
+        'CRN-3'
+    );
+}
 
-    TenantContext::set((int)$clinicId, ['id' => $userId, 'name' => 'Dra. Camila Mendes']);
+// Configuração segura de cookies de sessão
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_set_cookie_params([
+        'lifetime' => 7200,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    ]);
+    session_start();
+}
 
-    // Criar paciente demo se não houver
-    $pRepo = new PatientRepository($db);
-    if (count($pRepo->listAll()) === 0) {
-        $pRepo->create([
-            'name' => 'Roberto da Silva',
-            'email' => 'roberto@email.com',
-            'phone' => '(11) 98888-7777',
-            'birth_date' => '1990-05-15',
-            'gender' => 'masculino',
-            'lgpd_consent' => true,
-        ]);
-        $pRepo->create([
-            'name' => 'Larissa Antunes',
-            'email' => 'larissa@email.com',
-            'phone' => '(11) 97777-6666',
-            'birth_date' => '1995-08-20',
-            'gender' => 'feminino',
-            'lgpd_consent' => true,
-        ]);
-    }
+// Carregar TenantContext a partir da sessão se o usuário estiver autenticado
+if (!empty($_SESSION['clinic_id']) && !empty($_SESSION['user_id'])) {
+    TenantContext::set((int)$_SESSION['clinic_id'], [
+        'id' => (int)$_SESSION['user_id'],
+        'name' => $_SESSION['user_name'] ?? 'Nutricionista',
+    ]);
 }
 
 $router = new Router();
+$authCtrl = new AuthController();
+$dashCtrl = new DashboardController();
 
-// Rota de Health Check
+// 1. Rotas de Autenticação
+$router->get('/login', [$authCtrl, 'showLogin']);
+$router->post('/login', [$authCtrl, 'login']);
+$router->get('/logout', [$authCtrl, 'logout']);
+
+// 2. Health Check
 $router->get('/health', function () {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
@@ -75,21 +78,38 @@ $router->get('/health', function () {
     ]);
 });
 
-// Telas Principais do Design System & Portal Profissional
-$dashCtrl = new DashboardController();
+// Middleware de proteção: se tentar acessar rotas privadas sem login, redireciona
+$requireAuth = function (callable $action) {
+    return function ($params = []) use ($action) {
+        if (!TenantContext::hasClinic() || empty($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+        $action($params);
+    };
+};
 
-$router->get('/', [$dashCtrl, 'index']);
-$router->get('/dashboard', [$dashCtrl, 'index']);
-$router->get('/pacientes', [$dashCtrl, 'patients']);
-$router->get('/alimentos', [$dashCtrl, 'foods']);
-
-$router->get('/agenda', function () {
+// 3. Rotas Protegidas do Sistema
+$router->get('/', function () {
+    if (empty($_SESSION['user_id'])) {
+        header('Location: /login');
+        exit;
+    }
     header('Location: /dashboard');
+    exit;
 });
 
-$router->get('/planos', function () {
+$router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
+$router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));
+$router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
+
+$router->get('/agenda', $requireAuth(function () {
+    header('Location: /dashboard');
+}));
+
+$router->get('/planos', $requireAuth(function () {
     header('Location: /pacientes');
-});
+}));
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uri = $_SERVER['REQUEST_URI'] ?? '/';
