@@ -55,6 +55,7 @@ TEST_FILES=(
     "tests/replatform_infrastructure_test.php"
     "tests/cross_tenant_offensive_test.php"
     "tests/clinical_safety_and_precision_test.php"
+    "tests/privacy_and_lgpd_governance_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}

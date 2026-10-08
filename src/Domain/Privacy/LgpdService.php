@@ -70,7 +70,10 @@ class LgpdService
     {
         $clinicId = TenantContext::getClinicId();
 
-        $this->db->beginTransaction();
+        $manageTx = !$this->db->inTransaction();
+        if ($manageTx) {
+            $this->db->beginTransaction();
+        }
         try {
             $stmt = $this->db->prepare("
                 UPDATE patients
@@ -94,10 +97,14 @@ class LgpdService
 
             $this->auditLogger->log('LGPD_ANONYMIZATION', 'patients', (string)$patientId);
 
-            $this->db->commit();
+            if ($manageTx) {
+                $this->db->commit();
+            }
             return true;
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($manageTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }

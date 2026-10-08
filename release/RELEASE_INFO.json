@@ -1,13 +1,13 @@
 {
   "product": "ClyoNutri II",
-  "version": "1.3.0",
-  "build_timestamp": "20261007_234839",
-  "git_commit": "264a6aa",
+  "version": "1.4.0",
+  "build_timestamp": "20261007_235752",
+  "git_commit": "ae733c9",
   "release_gate": {
     "status": "APPROVED",
     "health_check": "PASSED",
-    "total_test_suites": 11,
-    "passed_test_suites": 11,
+    "total_test_suites": 12,
+    "passed_test_suites": 12,
     "zero_failures_verified": true
   },
   "modules_included": [
