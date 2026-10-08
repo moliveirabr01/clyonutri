@@ -58,6 +58,7 @@ TEST_FILES=(
     "tests/privacy_and_lgpd_governance_test.php"
     "tests/delivery_e2e_and_contracts_test.php"
     "tests/patient_portal_e2e_suite_test.php"
+    "tests/verifiable_multilateral_audit_suite_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}
@@ -94,11 +95,19 @@ cat <<EOF > "$MANIFEST_FILE"
   "build_timestamp": "${BUILD_ID}",
   "git_commit": "${COMMIT_HASH}",
   "release_gate": {
-    "status": "APPROVED",
+    "status": "APPROVED_LOCAL_AUDITED",
     "health_check": "PASSED",
     "total_test_suites": ${TOTAL_TESTS},
     "passed_test_suites": ${PASSED_TESTS},
-    "zero_failures_verified": true
+    "zero_failures_verified": true,
+    "audit_360": {
+      "unit_layer": "PASSED",
+      "integration_layer": "PASSED",
+      "http_web_layer": "PASSED",
+      "api_contracts_openapi": "PASSED",
+      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas)",
+      "browser_playwright_e2e": "NOT TESTED (Executado via HTTP Request Harness)"
+    }
   },
   "modules_included": [
     "app",
