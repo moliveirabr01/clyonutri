@@ -1,21 +1,25 @@
 {
   "product": "ClyoNutri II",
-  "version": "1.8.0",
-  "build_timestamp": "20261008_011041",
-  "git_commit": "723c143",
+  "version": "1.8.2",
+  "build_timestamp": "20261008_012207",
+  "git_commit": "10e740f",
   "release_gate": {
-    "status": "APPROVED_LOCAL_AUDITED",
+    "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
+    "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",
+    "is_production_approved": false,
+    "fail_closed_enforced": true,
     "health_check": "PASSED",
-    "total_test_suites": 16,
-    "passed_test_suites": 16,
+    "total_test_suites": 17,
+    "passed_test_suites": 17,
     "zero_failures_verified": true,
-    "audit_360": {
-      "unit_layer": "PASSED",
-      "integration_layer": "PASSED",
-      "http_web_layer": "PASSED",
-      "api_contracts_openapi": "PASSED",
-      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas)",
-      "browser_playwright_e2e": "NOT TESTED (Executado via HTTP Request Harness)"
+    "audit_360_layers": {
+      "syntax_static": "PASSED (Zero erros em php -l)",
+      "domain_services": "PASSED (Cálculo 100g e hash SHA-256)",
+      "http_web": "PASSED (CSRF e isolamento de sessão)",
+      "mobile_api": "PASSED (Sanctum tokens e persistência)",
+      "e2e_journeys": "PASSED (HTTP E2E Harness)",
+      "browser_playwright_e2e": "NOT TESTED (Playwright não configurado neste ambiente CI)",
+      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas no ambiente local)"
     }
   },
   "modules_included": [
@@ -24,12 +28,12 @@
     "public",
     "views",
     "config",
-    "database/migrations",
-    "database/baseline",
+    "database",
     "tests",
     "bin",
     "mobile",
-    "docs"
+    "docs",
+    "vendor"
   ],
   "runtime_requirements": {
     "php": ">=8.1",

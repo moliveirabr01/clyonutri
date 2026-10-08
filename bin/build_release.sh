@@ -60,6 +60,7 @@ TEST_FILES=(
     "tests/patient_portal_e2e_suite_test.php"
     "tests/verifiable_multilateral_audit_suite_test.php"
     "tests/patient_mobile_api_integration_test.php"
+    "tests/release_gate_and_fail_closed_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}
@@ -82,9 +83,17 @@ echo "  ✓ Suíte completa de testes aprovada: $PASSED_TESTS de $TOTAL_TESTS ar
 echo ""
 
 # ------------------------------------------------------------------------------
-# ETAPA 3: Geração do Manifesto da Release
+# ETAPA 3: Execução da Matriz de Qualidade em 6 Camadas (NI2-178)
 # ------------------------------------------------------------------------------
-echo "==> [3/4] Gerando Manifesto de Release (RELEASE_INFO.json)..."
+echo "==> [3/5] Executando Validação da Matriz de Qualidade Multicamada..."
+php bin/verify_quality_gate.php
+echo "  ✓ Matriz de qualidade avaliada com sucesso."
+echo ""
+
+# ------------------------------------------------------------------------------
+# ETAPA 4: Geração do Manifesto da Release com Princípio FAIL CLOSED
+# ------------------------------------------------------------------------------
+echo "==> [4/5] Gerando Manifesto de Release (RELEASE_INFO.json)..."
 
 mkdir -p "$RELEASE_DIR"
 
@@ -96,18 +105,22 @@ cat <<EOF > "$MANIFEST_FILE"
   "build_timestamp": "${BUILD_ID}",
   "git_commit": "${COMMIT_HASH}",
   "release_gate": {
-    "status": "APPROVED_LOCAL_AUDITED",
+    "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
+    "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",
+    "is_production_approved": false,
+    "fail_closed_enforced": true,
     "health_check": "PASSED",
     "total_test_suites": ${TOTAL_TESTS},
     "passed_test_suites": ${PASSED_TESTS},
     "zero_failures_verified": true,
-    "audit_360": {
-      "unit_layer": "PASSED",
-      "integration_layer": "PASSED",
-      "http_web_layer": "PASSED",
-      "api_contracts_openapi": "PASSED",
-      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas)",
-      "browser_playwright_e2e": "NOT TESTED (Executado via HTTP Request Harness)"
+    "audit_360_layers": {
+      "syntax_static": "PASSED (Zero erros em php -l)",
+      "domain_services": "PASSED (Cálculo 100g e hash SHA-256)",
+      "http_web": "PASSED (CSRF e isolamento de sessão)",
+      "mobile_api": "PASSED (Sanctum tokens e persistência)",
+      "e2e_journeys": "PASSED (HTTP E2E Harness)",
+      "browser_playwright_e2e": "NOT TESTED (Playwright não configurado neste ambiente CI)",
+      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas no ambiente local)"
     }
   },
   "modules_included": [
@@ -116,12 +129,12 @@ cat <<EOF > "$MANIFEST_FILE"
     "public",
     "views",
     "config",
-    "database/migrations",
-    "database/baseline",
+    "database",
     "tests",
     "bin",
     "mobile",
-    "docs"
+    "docs",
+    "vendor"
   ],
   "runtime_requirements": {
     "php": ">=8.1",
@@ -135,15 +148,14 @@ echo "  ✓ Manifesto gerado em: $MANIFEST_FILE"
 echo ""
 
 # ------------------------------------------------------------------------------
-# ETAPA 4: Empacotamento do Artefato (Incluindo Código, Migrations e Testes)
+# ETAPA 5: Empacotamento do Artefato Autossuficiente (Código, Migrations, Testes e Vendor)
 # ------------------------------------------------------------------------------
-echo "==> [4/4] Criando pacote distribuível de Release (tar.gz)..."
+echo "==> [5/5] Criando pacote distribuível de Release (tar.gz)..."
 
-# Criar pasta temporária para montagem limpa do pacote
 TEMP_STAGE="$RELEASE_DIR/stage_${BUILD_ID}"
 mkdir -p "$TEMP_STAGE"
 
-# Copiar componentes essenciais
+# Copiar componentes essenciais incluindo VENDOR para pacote autossuficiente (NI2-178)
 cp -R app "$TEMP_STAGE/"
 cp -R src "$TEMP_STAGE/"
 cp -R public "$TEMP_STAGE/"
@@ -154,6 +166,7 @@ cp -R bin "$TEMP_STAGE/"
 cp -R tests "$TEMP_STAGE/"
 cp -R mobile "$TEMP_STAGE/"
 cp -R docs "$TEMP_STAGE/"
+cp -R vendor "$TEMP_STAGE/"
 cp composer.json "$TEMP_STAGE/"
 cp .env.example "$TEMP_STAGE/"
 cp "$MANIFEST_FILE" "$TEMP_STAGE/"
@@ -172,11 +185,29 @@ rm -rf "$TEMP_STAGE"
 
 PACKAGE_SIZE="$(du -h "$RELEASE_DIR/$PACKAGE_NAME" | cut -f1)"
 
+# Validação Independente do Pacote Gerado: Extração e teste de autossuficiência
+echo "  ➔ Testando autossuficiência do pacote gerado..."
+TEST_EXTRACT_DIR="/tmp/test_extract_${BUILD_ID}"
+mkdir -p "$TEST_EXTRACT_DIR"
+tar -xzf "$RELEASE_DIR/$PACKAGE_NAME" -C "$TEST_EXTRACT_DIR"
+
+if [ -f "$TEST_EXTRACT_DIR/vendor/autoload.php" ]; then
+    echo "    ✓ vendor/autoload.php presente no pacote distribuível."
+else
+    echo "    ❌ ERRO: vendor/autoload.php ausente no pacote distribuível!"
+    rm -rf "$TEST_EXTRACT_DIR"
+    exit 1
+fi
+
+php -r "require '$TEST_EXTRACT_DIR/vendor/autoload.php'; echo '    ✓ Autoloader executado com sucesso no pacote isolado.\n';"
+rm -rf "$TEST_EXTRACT_DIR"
+
 echo "========================================================================"
 echo "   ✅ RELEASE GERADA COM SUCESSO!"
 echo "========================================================================"
 echo " Arquivo : $RELEASE_DIR/$PACKAGE_NAME"
 echo " Tamanho : $PACKAGE_SIZE"
 echo " Versão  : $VERSION"
-echo " Testes  : 100% Executados e Incluídos no Pacote"
+echo " Status  : APPROVED_LOCAL_CI_GATES_ONLY (FAIL CLOSED - PRODUCTION BLOCKED)"
+echo " Testes  : 100% Executados, Autossuficiente com Vendor Incluído"
 echo "========================================================================"
