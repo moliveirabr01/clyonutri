@@ -89,4 +89,33 @@ class EngagementService
             'average_adherence_pct' => $avgAdherence,
         ];
     }
+
+    /**
+     * Análise longitudinal semanal (NI2-117)
+     */
+    public function getLongitudinalTrends(int $patientId, int $weeks = 4): array
+    {
+        $clinicId = TenantContext::getClinicId();
+
+        $stmt = $this->db->prepare("
+            SELECT checkin_date, energy_level, hunger_level, meal_adherence_pct, notes
+            FROM checkins
+            WHERE patient_id = :patient_id AND clinic_id = :clinic_id
+            ORDER BY checkin_date ASC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':patient_id', $patientId, PDO::PARAM_INT);
+        $stmt->bindValue(':clinic_id', $clinicId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $weeks * 7, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $records = $stmt->fetchAll();
+
+        return [
+            'patient_id' => $patientId,
+            'period_weeks' => $weeks,
+            'total_checkins' => count($records),
+            'history' => $records,
+        ];
+    }
 }
