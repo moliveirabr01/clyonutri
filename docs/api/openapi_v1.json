@@ -1,0 +1,380 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ClyoNutri II API",
+    "version": "1.0.0",
+    "description": "API RESTful oficial do ecossistema ClyoNutri II para plataforma Web, mobile (React Native/Expo) e integrações parceiras. Arquitetura multi-tenant com autenticação Sanctum, isolamento estrito por organização e segurança clínica."
+  },
+  "servers": [
+    {
+      "url": "https://api.clyonutri.com.br/api/v1",
+      "description": "Ambiente de Produção"
+    },
+    {
+      "url": "https://staging-api.clyonutri.com.br/api/v1",
+      "description": "Ambiente de Staging"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Autenticação e emissão de token Sanctum",
+        "operationId": "authLogin",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" },
+                  "device_name": { "type": "string", "default": "mobile_app" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "token_type": { "type": "string", "example": "Bearer" },
+                    "user": { "$ref": "#/components/schemas/User" },
+                    "clinic": { "$ref": "#/components/schemas/Clinic" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/401Unauthorized" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Revogação de token ativo",
+        "operationId": "authLogout",
+        "responses": {
+          "200": { "description": "Token revogado com sucesso" }
+        }
+      }
+    },
+    "/patients": {
+      "get": {
+        "summary": "Listar pacientes da clínica ativa",
+        "operationId": "listPatients",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Patient" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cadastrar novo paciente",
+        "operationId": "createPatient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "phone": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paciente cadastrado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Patient" }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/422Unprocessable" }
+        }
+      }
+    },
+    "/patients/{id}/profile-360": {
+      "get": {
+        "summary": "Recuperar Perfil Clínico 360 do paciente",
+        "operationId": "getPatientProfile360",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Profile360" }
+              }
+            }
+          },
+          "403": { "$ref": "#/components/responses/403Forbidden" },
+          "404": { "$ref": "#/components/responses/404NotFound" }
+        }
+      }
+    },
+    "/patients/{id}/clinical-records": {
+      "post": {
+        "summary": "Adicionar registro clínico longitudinal append-only com encadeamento de hash",
+        "operationId": "appendClinicalRecord",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "content"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "content": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ClinicalRecord" }
+              }
+            }
+          },
+          "403": { "$ref": "#/components/responses/403Forbidden" }
+        }
+      }
+    },
+    "/patients/{id}/active-plan": {
+      "get": {
+        "summary": "Consultar plano alimentar publicado vigente do paciente",
+        "operationId": "getActivePublishedMealPlan",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MealPlanVersion" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/404NotFound" }
+        }
+      }
+    },
+    "/meal-plans/{id}/publish": {
+      "post": {
+        "summary": "Publicação atômica do plano alimentar com validação de alergênicos",
+        "operationId": "publishMealPlan",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "allow_allergen_override": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Plano alimentar publicado com snapshot imutável gravado" },
+          "400": { "description": "Conflito de alergênicos detectado sem autorização clínica" },
+          "403": { "$ref": "#/components/responses/403Forbidden" }
+        }
+      }
+    },
+    "/food-diary": {
+      "post": {
+        "summary": "Registrar refeição pelo paciente",
+        "operationId": "logFoodDiaryMeal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["meal_name"],
+                "properties": {
+                  "meal_name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "hunger_level": { "type": "integer", "minimum": 1, "maximum": 5 },
+                  "satiety_level": { "type": "integer", "minimum": 1, "maximum": 5 },
+                  "symptoms": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Refeição registrada no diário" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Sanctum"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["nutritionist", "assistant", "patient", "admin"] }
+        }
+      },
+      "Clinic": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" }
+        }
+      },
+      "Patient": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "inactive", "anonymized"] }
+        }
+      },
+      "ClinicalRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "version": { "type": "integer" },
+          "title": { "type": "string" },
+          "record_hash": { "type": "string" },
+          "previous_hash": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MealPlanVersion": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "version_number": { "type": "integer" },
+          "title": { "type": "string" },
+          "daily_energy_kcal": { "type": "number" },
+          "payload": { "type": "array", "items": { "type": "object" } },
+          "status": { "type": "string", "enum": ["published", "superseded"] },
+          "published_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Profile360": {
+        "type": "object",
+        "properties": {
+          "patient": { "$ref": "#/components/schemas/Patient" },
+          "active_plan": { "$ref": "#/components/schemas/MealPlanVersion" },
+          "assessments_count": { "type": "integer" },
+          "timeline": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    },
+    "responses": {
+      "401Unauthorized": {
+        "description": "Não autenticado ou token Sanctum inválido",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string", "example": "Unauthenticated." }
+              }
+            }
+          }
+        }
+      },
+      "403Forbidden": {
+        "description": "Acesso negado: recurso pertence a outra organização (Isolamento Multi-Tenant)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string", "example": "Acesso negado: o paciente ID não pertence à clínica ativa (403 Forbidden)." }
+              }
+            }
+          }
+        }
+      },
+      "404NotFound": {
+        "description": "Recurso não encontrado ou inexistente (Anti-Enumeração)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string", "example": "Recurso não encontrado." }
+              }
+            }
+          }
+        }
+      },
+      "422Unprocessable": {
+        "description": "Erro de validação de dados de entrada",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string" },
+                "errors": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
