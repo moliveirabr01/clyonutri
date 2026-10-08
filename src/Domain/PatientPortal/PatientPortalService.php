@@ -312,6 +312,29 @@ class PatientPortalService
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getDocument(int $patientId, int $documentId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $stmt = $this->db->prepare("
+            SELECT id, clinic_id, patient_id, title, category, file_path, mime_type, size_bytes, access_token, created_at
+            FROM patient_documents
+            WHERE id = :doc_id
+        ");
+        $stmt->execute(['doc_id' => $documentId]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc || (int)$doc['clinic_id'] !== $clinicId || (int)$doc['patient_id'] !== $patientId) {
+            throw new \ClyoNutri\Core\Security\TenantSecurityException(
+                "Acesso negado: o documento ID {$documentId} não pertence ao paciente ou clínica ativa (403 Forbidden).",
+                403
+            );
+        }
+
+        return $doc;
+    }
+
     // =========================================================================
     // NI2-137: Próxima Consulta e Agenda Integrada
     // =========================================================================

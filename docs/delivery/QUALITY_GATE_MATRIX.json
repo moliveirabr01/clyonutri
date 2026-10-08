@@ -1,7 +1,7 @@
 {
     "audit_issue": "NI2-178",
-    "git_commit": "7a09a63",
-    "timestamp": "2026-10-08T16:29:06+00:00",
+    "git_commit": "5194543",
+    "timestamp": "2026-10-08T17:03:06+00:00",
     "layers": {
         "SYNTAX_STATIC": [
             {
@@ -9,84 +9,84 @@
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de bin/migrate.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de bin/healthcheck.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de bin/hostgator_spike.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de src/Core/Http/Router.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de src/Core/Database/Connection.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de src/Application/Api/PatientApiController.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:06+00:00"
             },
             {
                 "name": "Sintaxe de src/Domain/PatientPortal/PatientPortalService.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Sintaxe de src/Domain/FoodDiary/FoodDiaryService.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:06+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Sintaxe de src/Domain/Engagement/EngagementService.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Sintaxe de src/Core/Database/DemoSeeder.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Sintaxe de bin/seed.php",
                 "status": "PASS",
                 "evidence": "Nenhum erro de sintaxe detectado",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             }
         ],
         "DOMAIN_SERVICES": [
@@ -95,14 +95,14 @@
                 "status": "PASS",
                 "evidence": "Calculado: 192 kcal (Exato: 192.00 kcal)",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Cadeia de Hash SHA-256 no Prontuário Clínico",
                 "status": "PASS",
                 "evidence": "ClinicalRecordService instanciado com sucesso",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             }
         ],
         "HTTP_WEB": [
@@ -111,21 +111,28 @@
                 "status": "PASS",
                 "evidence": "Tokens nulos e forjados rejeitados com validação estrita",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Remoção de Seed em Runtime & Credenciais Fixas (NI2-172)",
                 "status": "PASS",
                 "evidence": "19 regras de bootstrap HTTP limpo, ausência de senhas demo e bloqueio fail-closed em produção comprovadas",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             },
             {
                 "name": "Agenda Operacional, Conflitos e Contexto Clínico (NI2-187)",
                 "status": "PASS",
                 "evidence": "31 asserções de conflito, atomicidade, máquinas de estado, navegação e responsividade 390-1440px aprovadas",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
+            },
+            {
+                "name": "Isolamento Multi-Tenant e Autorização E2E (NI2-143)",
+                "status": "PASS",
+                "evidence": "27 asserções de segregação e 8 ataques barrados com 403 em Web, API, Jobs, Imports e Files sem PII",
+                "details": "",
+                "evaluated_at": "2026-10-08T17:03:07+00:00"
             }
         ],
         "MOBILE_API": [
@@ -134,7 +141,7 @@
                 "status": "PASS",
                 "evidence": "20 asserções de login, Bearer token, hidratação e diário aprovadas",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             }
         ],
         "E2E_JOURNEYS": [
@@ -143,14 +150,14 @@
                 "status": "PASS",
                 "evidence": "Fluxo E2E executado com persistência real em banco relacional",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             },
             {
                 "name": "Browser Real Playwright / Chromium",
                 "status": "NOT_TESTED",
                 "evidence": "Playwright/Chromium não configurado neste ambiente CI local; executado via HTTP Request Harness",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             }
         ],
         "INFRA_PRODUCTION": [
@@ -159,27 +166,27 @@
                 "status": "PASS",
                 "evidence": "GO (Aprovado com restrições operacionais)",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             },
             {
                 "name": "Replataforma Real Laravel 13 & Pest (NI2-174)",
                 "status": "PASS",
                 "evidence": "Laravel 13.35, Sanctum, Fortify e 11 testes Pest aprovados sem router proprietário",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             },
             {
                 "name": "Deploy Remoto Automatizado HostGator / MySQL 8",
                 "status": "BLOCKED",
                 "evidence": "Variáveis HOSTGATOR_SSH_HOST/USER não injetadas no ambiente atual",
                 "details": "",
-                "evaluated_at": "2026-10-08T16:29:07+00:00"
+                "evaluated_at": "2026-10-08T17:03:08+00:00"
             }
         ]
     },
     "summary": {
-        "total_checks": 23,
-        "pass": 21,
+        "total_checks": 24,
+        "pass": 22,
         "blocked": 1,
         "not_tested": 1,
         "fail": 0

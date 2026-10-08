@@ -68,6 +68,7 @@ TEST_FILES=(
     "tests/canonical_first_consultation_e2e_journey_test.php"
     "tests/meal_plan_web_csrf_and_form_test.php"
     "tests/demo_seeder_and_runtime_seed_protection_test.php"
+    "tests/cross_tenant_end_to_end_security_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

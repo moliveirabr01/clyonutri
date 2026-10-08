@@ -177,6 +177,13 @@ if (str_contains($agendaOperationalOutput, 'ALL CRITERIA SATISFIED')) {
     recordCheck('HTTP_WEB', 'Agenda Operacional, Conflitos e Contexto Clínico (NI2-187)', 'FAIL', 'Falha na validação operacional da agenda: ' . substr($agendaOperationalOutput, 0, 200));
 }
 
+$crossTenantOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/cross_tenant_end_to_end_security_test.php') . " 2>&1");
+if (str_contains($crossTenantOutput, 'TODOS OS TESTES PASSARAM COM 100%')) {
+    recordCheck('HTTP_WEB', 'Isolamento Multi-Tenant e Autorização E2E (NI2-143)', 'PASS', '27 asserções de segregação e 8 ataques barrados com 403 em Web, API, Jobs, Imports e Files sem PII');
+} else {
+    recordCheck('HTTP_WEB', 'Isolamento Multi-Tenant e Autorização E2E (NI2-143)', 'FAIL', 'Falha no isolamento multi-tenant: ' . substr($crossTenantOutput, 0, 200));
+}
+
 // -----------------------------------------------------------------------------
 // CAMADA 4: CAMADA MOBILE API & TOKENS SANCTUM (MOBILE_API)
 // -----------------------------------------------------------------------------

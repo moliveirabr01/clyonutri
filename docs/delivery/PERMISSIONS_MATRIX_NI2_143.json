@@ -1,0 +1,159 @@
+{
+  "epic": "NI2-143",
+  "title": "Matriz de Permissões e Controle de Acesso Multi-Tenant (RBAC & ABAC)",
+  "version": "1.0.0",
+  "timestamp": "2026-10-08T13:56:00-03:00",
+  "architecture": "Multi-Tenant Shared Database with Strict Column Discrimination and TenantGuard Fail-Closed Enforcement",
+  "roles": {
+    "CLINIC_OWNER": {
+      "name": "Proprietário / Administrador da Clínica",
+      "description": "Acesso total aos recursos clínicos, financeiros, equipe e configurações da sua própria clínica (clinic_id)."
+    },
+    "NUTRITIONIST": {
+      "name": "Nutricionista / Profissional Clínico",
+      "description": "Acesso a pacientes, prontuários, planos, antropometria, agenda e chat vinculados à sua clínica e atribuições."
+    },
+    "RECEPTIONIST": {
+      "name": "Recepcionista / Apoio Operacional",
+      "description": "Acesso a agendamentos, cadastro básico de pacientes e confirmações, sem acesso a prontuários clínicos sensíveis."
+    },
+    "PATIENT": {
+      "name": "Paciente (Aplicativo / Portal)",
+      "description": "Acesso estrito apenas aos seus próprios dados (patient_id) e recursos publicados pelo seu nutricionista dentro da clínica."
+    }
+  },
+  "modules": [
+    {
+      "module": "patients",
+      "description": "Gestão de Pacientes e Perfil 360",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "write_all_clinic"],
+        "RECEPTIONIST": ["read_basic_clinic", "write_basic_clinic"],
+        "PATIENT": ["read_self_only", "update_basic_self"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "clinical_records_anamnesis",
+      "description": "Prontuário Eletrônico, Evoluções e Anamnese",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "write_all_clinic"],
+        "RECEPTIONIST": ["DENIED"],
+        "PATIENT": ["read_published_summary_only"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "anthropometry",
+      "description": "Avaliações Antropométricas, Bioimpedância e Dobras",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "write_all_clinic"],
+        "RECEPTIONIST": ["DENIED"],
+        "PATIENT": ["read_shared_assessments_only"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "meal_plans",
+      "description": "Planos Alimentares, Prescrições e Metas",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "write_all_clinic"],
+        "RECEPTIONIST": ["DENIED"],
+        "PATIENT": ["read_active_published_plan_only"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "appointments_agenda",
+      "description": "Agendamentos, Fila de Espera e Sala de Atendimento",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "write_all_clinic"],
+        "RECEPTIONIST": ["read_all_clinic", "write_all_clinic"],
+        "PATIENT": ["read_self_appointments", "confirm_self_appointment"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "financial_receivables",
+      "description": "Contas a Receber, Recibos e Baixa Financeira",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "write_all_clinic"],
+        "NUTRITIONIST": ["read_assigned_clinic", "write_assigned_clinic"],
+        "RECEPTIONIST": ["read_billing_basic", "record_payment_clinic"],
+        "PATIENT": ["read_self_receipts_only"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "chat_communication",
+      "description": "Conversas Seguras e Mensagens Nutricionista-Paciente",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic"],
+        "NUTRITIONIST": ["read_assigned_conversations", "write_assigned_conversations"],
+        "RECEPTIONIST": ["DENIED"],
+        "PATIENT": ["read_self_conversation", "send_self_message"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "patient_documents_uploads",
+      "description": "Upload de Exames, Laudos e Documentos Médicos",
+      "tenant_isolation_key": "clinic_id",
+      "patient_isolation_key": "patient_id",
+      "rules": {
+        "CLINIC_OWNER": ["read_all_clinic", "upload_all_clinic"],
+        "NUTRITIONIST": ["read_all_clinic", "upload_all_clinic"],
+        "RECEPTIONIST": ["upload_only"],
+        "PATIENT": ["upload_self", "read_self_active_documents"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "migration_imports",
+      "description": "Importação em Lote de Pacientes via CSV de Concorrentes",
+      "tenant_isolation_key": "clinic_id",
+      "rules": {
+        "CLINIC_OWNER": ["execute_import_clinic_scoped"],
+        "NUTRITIONIST": ["execute_import_clinic_scoped"],
+        "RECEPTIONIST": ["DENIED"],
+        "PATIENT": ["DENIED"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    },
+    {
+      "module": "jobs_scheduler",
+      "description": "Processamento de Fila de Background e Agendamentos Cron",
+      "tenant_isolation_key": "clinic_id",
+      "rules": {
+        "SYSTEM_SCHEDULER": ["execute_strict_clinic_queue_only"]
+      },
+      "cross_tenant_policy": "BLOCKED_403_AUDIT_NO_PII"
+    }
+  ],
+  "audit_governance": {
+    "action": "SECURITY_CROSS_TENANT_VIOLATION_BLOCKED",
+    "pii_sanitization": {
+      "prohibited_fields": ["cpf", "email", "phone", "birth_date", "medical_notes", "password", "token"],
+      "allowed_fields": ["action", "resource", "resource_id", "clinic_id", "user_id", "timestamp", "ip_hash"]
+    }
+  }
+}
