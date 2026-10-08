@@ -20,6 +20,10 @@ class FinanceService
     public function createReceivable(int $patientId, string $description, int $amountCents, string $dueDate, ?int $appointmentId = null): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        if ($appointmentId !== null) {
+            \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        }
 
         $stmt = $this->db->prepare("
             INSERT INTO receivables (clinic_id, patient_id, appointment_id, description, amount_cents, due_date, status)
@@ -49,15 +53,7 @@ class FinanceService
     public function recordPayment(int $receivableId, int $amountCents, string $method): array
     {
         $clinicId = TenantContext::getClinicId();
-
-        // Validar recebível do tenant
-        $rStmt = $this->db->prepare("SELECT * FROM receivables WHERE id = :id AND clinic_id = :clinic_id");
-        $rStmt->execute(['id' => $receivableId, 'clinic_id' => $clinicId]);
-        $receivable = $rStmt->fetch();
-
-        if (!$receivable) {
-            throw new \InvalidArgumentException("Recebível não encontrado.");
-        }
+        $receivable = \ClyoNutri\Core\Security\TenantGuard::assertReceivableBelongsToClinic($receivableId, $clinicId, $this->db);
 
         $receiptCode = 'REC-' . strtoupper(bin2hex(random_bytes(4)));
 

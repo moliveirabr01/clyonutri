@@ -20,6 +20,7 @@ class HealthSyncService
     public function syncBiometrics(int $patientId, string $source, array $metrics): int
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO health_sync_data (clinic_id, patient_id, source, metric_type, value, unit, recorded_at)
@@ -46,6 +47,7 @@ class HealthSyncService
     public function getLatestSummary(int $patientId): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             SELECT source, metric_type, value, unit, recorded_at

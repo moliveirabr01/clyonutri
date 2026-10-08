@@ -20,6 +20,7 @@ class TelehealthService
     public function generateSession(int $appointmentId, string $provider = 'clyo_meet'): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
         $roomCode = 'clyo-' . bin2hex(random_bytes(6));
         $meetingUrl = "https://meet.clyonutri.com.br/room/{$roomCode}";
 

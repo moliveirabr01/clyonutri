@@ -20,6 +20,8 @@ class AppointmentService
     public function schedule(int $patientId, int $professionalId, string $scheduledAt, string $type = 'first_visit', int $duration = 60, ?string $notes = null): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, status, type, notes)
@@ -50,6 +52,8 @@ class AppointmentService
     public function updateStatus(int $appointmentId, string $newStatus): bool
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+
         $allowed = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled'];
         if (!in_array($newStatus, $allowed, true)) {
             throw new \InvalidArgumentException("Status de consulta inválido: {$newStatus}");

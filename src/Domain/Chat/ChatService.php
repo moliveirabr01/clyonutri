@@ -20,6 +20,8 @@ class ChatService
     public function getOrCreateConversation(int $patientId, int $professionalId): int
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             SELECT id FROM chat_conversations
@@ -53,6 +55,7 @@ class ChatService
     public function sendMessage(int $conversationId, string $senderType, int $senderId, string $message, ?string $attachment = null): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertConversationBelongsToClinic($conversationId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO chat_messages (conversation_id, clinic_id, sender_type, sender_id, message, attachment_path)
@@ -86,6 +89,7 @@ class ChatService
     public function getMessages(int $conversationId, int $limit = 50): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertConversationBelongsToClinic($conversationId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             SELECT * FROM chat_messages

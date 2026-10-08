@@ -23,6 +23,7 @@ class FoodDiaryService
     public function logMeal(int $patientId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO food_diary_entries (
@@ -82,7 +83,7 @@ class FoodDiaryService
     public function getPatientTimeline(int $patientId, ?string $fromDate = null): array
     {
         $clinicId = TenantContext::getClinicId();
-
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         $sql = "
             SELECT * FROM food_diary_entries
             WHERE patient_id = :patient_id AND clinic_id = :clinic_id

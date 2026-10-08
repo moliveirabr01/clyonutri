@@ -20,6 +20,8 @@ class AnamnesisService
     public function saveAnamnesis(int $patientId, int $professionalId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         // Obter versão mais recente para incrementar
         $vStmt = $this->db->prepare("

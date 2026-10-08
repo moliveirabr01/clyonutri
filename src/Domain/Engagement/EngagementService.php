@@ -20,6 +20,7 @@ class EngagementService
     public function logHydration(int $patientId, int $amountMl): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO hydration_logs (clinic_id, patient_id, amount_ml, logged_at)
@@ -40,6 +41,7 @@ class EngagementService
     public function recordCheckin(int $patientId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
             INSERT INTO checkins (clinic_id, patient_id, energy_level, hunger_level, meal_adherence_pct, notes, checkin_date)
@@ -66,6 +68,7 @@ class EngagementService
     public function getPatientAdherenceSummary(int $patientId): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         // Total de água registrada hoje
         $hStmt = $this->db->prepare("

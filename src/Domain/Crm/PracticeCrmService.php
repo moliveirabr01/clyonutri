@@ -43,6 +43,13 @@ class PracticeCrmService
     public function assignPackageToPatient(int $patientId, int $packageId): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $pkgStmt = $this->db->prepare("SELECT id FROM consultation_packages WHERE id = :id AND clinic_id = :clinic_id");
+        $pkgStmt->execute(['id' => $packageId, 'clinic_id' => $clinicId]);
+        if (!$pkgStmt->fetchColumn()) {
+            throw new \ClyoNutri\Core\Security\TenantSecurityException("Pacote não encontrado ou pertence a outra organização (403 Forbidden).", 403);
+        }
 
         $stmt = $this->db->prepare("
             INSERT INTO patient_packages (clinic_id, patient_id, package_id)

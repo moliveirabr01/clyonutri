@@ -20,6 +20,7 @@ class PublicProfileService
     public function createOrUpdateProfile(int $professionalId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
         $slug = preg_replace('/[^a-z0-9\-]/', '', strtolower(str_replace(' ', '-', trim($data['slug'] ?? 'nutri-' . $professionalId))));
 
         $chk = $this->db->prepare("SELECT id FROM public_profiles WHERE professional_id = :prof_id");

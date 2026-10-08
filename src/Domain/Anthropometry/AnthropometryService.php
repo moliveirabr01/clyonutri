@@ -20,6 +20,8 @@ class AnthropometryService
     public function recordAssessment(int $patientId, int $professionalId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $weight = (float)$data['weight_kg'];
         $height = (float)$data['height_cm'];
@@ -76,6 +78,7 @@ class AnthropometryService
     public function getEvolution(int $patientId): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         $stmt = $this->db->prepare("
             SELECT id, weight_kg, bmi, body_fat_pct, muscle_mass_pct, assessed_at
             FROM anthropometric_assessments

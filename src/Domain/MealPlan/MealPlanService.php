@@ -20,6 +20,8 @@ class MealPlanService
     public function createPlan(int $patientId, int $professionalId, string $title, array $meals = []): array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        \ClyoNutri\Core\Security\TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $this->db->beginTransaction();
         try {
@@ -117,6 +119,7 @@ class MealPlanService
     public function publishPlan(int $planId): bool
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertMealPlanBelongsToClinic($planId, $clinicId, $this->db);
         $stmt = $this->db->prepare("
             UPDATE meal_plans
             SET status = 'published', published_at = CURRENT_TIMESTAMP
