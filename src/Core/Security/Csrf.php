@@ -21,6 +21,11 @@ class Csrf
         return $_SESSION[self::SESSION_KEY];
     }
 
+    public static function generate(): string
+    {
+        return self::token();
+    }
+
     public static function validate(?string $token): bool
     {
         if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {

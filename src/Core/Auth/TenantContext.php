@@ -35,6 +35,11 @@ class TenantContext
         return self::$currentUser;
     }
 
+    public static function getUserId(): ?int
+    {
+        return isset(self::$currentUser['id']) ? (int)self::$currentUser['id'] : null;
+    }
+
     public static function clear(): void
     {
         self::$currentClinicId = null;
