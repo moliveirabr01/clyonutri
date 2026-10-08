@@ -1,8 +1,8 @@
 {
   "product": "ClyoNutri II",
-  "version": "1.6.2",
-  "build_timestamp": "20261008_002934",
-  "git_commit": "50ad260",
+  "version": "1.6.3",
+  "build_timestamp": "20261008_003303",
+  "git_commit": "a80a486",
   "release_gate": {
     "status": "APPROVED",
     "health_check": "PASSED",

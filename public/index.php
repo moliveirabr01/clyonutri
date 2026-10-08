@@ -62,9 +62,12 @@ $router = new Router();
 $authCtrl = new AuthController();
 $dashCtrl = new DashboardController();
 
-// 1. Rotas de Autenticação
+// 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
 $router->post('/login', [$authCtrl, 'login']);
+$router->get('/cadastro', [$authCtrl, 'showRegister']);
+$router->post('/cadastro', [$authCtrl, 'register']);
+$router->get('/onboarding', [$authCtrl, 'showRegister']);
 $router->get('/logout', [$authCtrl, 'logout']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
