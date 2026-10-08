@@ -50,6 +50,7 @@ $landingCtrl = new LandingController();
 $teleCtrl = new \ClyoNutri\Application\Controllers\TeleconsultationController($db);
 $helpCtrl = new \ClyoNutri\Application\Controllers\HelpdeskController($db);
 $chatCtrl = new \ClyoNutri\Application\Controllers\ChatController($db);
+$recipeCtrl = new \ClyoNutri\Application\Controllers\RecipeController($db);
 
 // 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -197,6 +198,15 @@ $router->get('/chat/{id}', $requireAuth([$chatCtrl, 'conversationView']));
 $router->post('/chat/{id}/enviar', $requireAuth([$chatCtrl, 'sendMessage']));
 $router->get('/chat/{id}/poll', $requireAuth([$chatCtrl, 'pollMessages']));
 $router->get('/chat/anexo/{id}', $requireAuth([$chatCtrl, 'downloadAttachment']));
+
+// 3.4 Receitas Culinárias & Prescrição ao Paciente (NI2-268)
+$router->get('/receitas', $requireAuth([$recipeCtrl, 'index']));
+$router->get('/receitas/nova', $requireAuth([$recipeCtrl, 'create']));
+$router->post('/receitas', $requireAuth([$recipeCtrl, 'store']));
+$router->get('/receitas/{id}', $requireAuth([$recipeCtrl, 'show']));
+$router->get('/receitas/{id}/prescrever', $requireAuth([$recipeCtrl, 'prescribeForm']));
+$router->post('/receitas/{id}/prescrever', $requireAuth([$recipeCtrl, 'prescribe']));
+$router->post('/receitas/{id}/duplicar', $requireAuth([$recipeCtrl, 'duplicate']));
 
 // 4. API Móvel do Paciente (/api/v1/patient/...)
 $authenticatePatientApi = function() use ($db): array {
@@ -534,6 +544,54 @@ $router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use 
         echo json_encode(['error' => $e->getMessage()]);
         exit;
     }
+});
+
+// 4.5 Receitas Prescritas & Lista de Compras do Paciente (NI2-268)
+$router->get('/api/v1/patient/recipes', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+
+    $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
+    $prescriptions = $recipeService->listPrescriptionsForPatient($patientId);
+    echo json_encode(['data' => $prescriptions]);
+});
+
+$router->get('/api/v1/patient/recipes/{id}', function($params = []) use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $recipeId = (int)($params['id'] ?? 0);
+
+    $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
+    try {
+        $details = $recipeService->getRecipeDetails($recipeId, (int)$auth['clinic_id']);
+        echo json_encode(['data' => $details]);
+    } catch (\Throwable $e) {
+        http_response_code(404);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+});
+
+$router->post('/api/v1/patient/recipes/{id}/favorite', function($params = []) use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $recipeId = (int)($params['id'] ?? 0);
+
+    $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
+    $isFav = $recipeService->togglePatientFavorite($patientId, $recipeId);
+    echo json_encode(['is_favorite' => $isFav]);
+});
+
+$router->get('/api/v1/patient/recipes-shopping-list', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $days = (int)($_GET['days'] ?? 7);
+
+    $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
+    $list = $recipeService->generateShoppingListFromRecipes($patientId, [], $days);
+    echo json_encode(['data' => $list]);
 });
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

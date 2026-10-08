@@ -251,6 +251,13 @@ if (str_contains($chatOutput, 'TODOS OS CRITÉRIOS DE ACEITE DE NI2-189 HOMOLOGA
     recordCheck('E2E_JOURNEYS', 'Canal Seguro de Comunicação & Engajamento E2E (NI2-189)', 'FAIL', 'Falha no Chat Seguro: ' . substr($chatOutput, 0, 200));
 }
 
+$recipeOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/recipe_culinary_domain_and_prescription_e2e_test.php') . " 2>&1");
+if (str_contains($recipeOutput, 'TODOS OS 9 CRITÉRIOS DE ACEITE DE RECEITAS (NI2-268) HOMOLOGADOS')) {
+    recordCheck('E2E_JOURNEYS', 'Receitas Culinárias, Composição Nutricional & Prescrição E2E (NI2-268: NI2-269 a NI2-280)', 'PASS', 'Composição TACO oficial, snapshot v1 imutável, medidas caseiras, busca com filtros, variantes com parent_id, alertas de alergênicos, favoritos do paciente e lista de compras por gôndolas');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Receitas Culinárias, Composição Nutricional & Prescrição E2E (NI2-268: NI2-269 a NI2-280)', 'FAIL', 'Falha no módulo de Receitas Culinárias: ' . substr($recipeOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

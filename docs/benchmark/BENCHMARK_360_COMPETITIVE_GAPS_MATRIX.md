@@ -43,7 +43,8 @@ Esta auditoria compara o ClyoNutri II com os 5 principais produtos de software d
 | **14. Perfil Público & Aquisição (NI2-191)** | `PARCIAL` | Agendamento web | Link na bio | Página do profissional | Booking portal | Não possui | Rotas de apresentação e agendamento básico disponíveis; landing page premium desenhada para conversão direta. |
 | **15. Inteligência Assistiva (NI2-192)** | `PARCIAL` | Sugestão calórica | Auto-completar | Sugestões de plano | Templates de notas | Sugestão de receitas | **IA com Supervisão Humana Obrigatória**: cálculo automatizado de metas com confirmação explícita do profissional (sem alucinações clínicas). |
 | **16. Pesquisa de Usabilidade (NI2-193)** | `IMPLEMENTADO` | Feedback form | NPS interno | NPS | Feedback | Não estruturado | Instrumentação de métricas e formulários de avaliação de jornada sem dados sintéticos. |
-| **17. Quality Gate & Prontidão (NI2-194 / NI2-178)** | `IMPLEMENTADO` | CI proprietário | CI interno | CI/CD | SOC-2 / HIPAA | CI/CD | **Runner de 6 Níveis com Filosofia FAIL CLOSED**: bloqueio automático de release se qualquer teste falhar ou se credenciais estiverem ausentes. |
+| **17. Receitas Culinárias & Prescrição (NI2-268)** | `IMPLEMENTADO` | Coleção de receitas | Banco simples | Receitas com foto | Receitas em inglês | Focado em PDF | **Biblioteca Oficial TACO com Prescrição & Variantes**: Composição nutricional por porção e total via TACO oficial, snapshot imutável v1, medidas caseiras padronizadas, busca com filtros, variantes supervisionadas com `parent_recipe_id`, alertas clínicos de alergênicos, favoritos do paciente e lista de compras consolidada por gôndolas de supermercado. |
+| **18. Quality Gate & Prontidão (NI2-194 / NI2-178)** | `IMPLEMENTADO` | CI proprietário | CI interno | CI/CD | SOC-2 / HIPAA | CI/CD | **Runner de 6 Níveis com Filosofia FAIL CLOSED**: bloqueio automático de release se qualquer teste falhar ou se credenciais estiverem ausentes. |
 
 ---
 
