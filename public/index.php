@@ -6,6 +6,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use ClyoNutri\Application\Controllers\AuthController;
 use ClyoNutri\Application\Controllers\DashboardController;
+use ClyoNutri\Application\Controllers\LandingController;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
@@ -39,7 +40,7 @@ if (!$stmt->fetch()) {
 }
 
 // Configuração segura de cookies de sessão
-if (session_status() !== PHP_SESSION_ACTIVE) {
+if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
     session_set_cookie_params([
         'lifetime' => 7200,
         'path' => '/',
@@ -61,6 +62,7 @@ if (!empty($_SESSION['clinic_id']) && !empty($_SESSION['user_id'])) {
 $router = new Router();
 $authCtrl = new AuthController();
 $dashCtrl = new DashboardController();
+$landingCtrl = new LandingController();
 
 // 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -128,15 +130,10 @@ $requireAuth = function (callable $action) {
     };
 };
 
-// 3. Rotas Protegidas do Sistema
-$router->get('/', function () {
-    if (empty($_SESSION['user_id'])) {
-        header('Location: /login');
-        exit;
-    }
-    header('Location: /dashboard');
-    exit;
-});
+// 3. Rotas Públicas & Institucionais (Landing Page & Legal)
+$router->get('/', [$landingCtrl, 'index']);
+$router->get('/termos', [$landingCtrl, 'terms']);
+$router->get('/privacidade', [$landingCtrl, 'privacy']);
 
 $router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
 $router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));
