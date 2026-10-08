@@ -34,11 +34,15 @@ $db->exec("DELETE FROM meal_plans WHERE patient_id = 955;");
 $db->exec("DELETE FROM patients WHERE id = 955;");
 $db->exec("DELETE FROM clinics WHERE id = 995;");
 
+$patientPassword = 'SenhaPaciente@123';
+$patientHash = password_hash($patientPassword, PASSWORD_BCRYPT);
+
 $db->exec("INSERT INTO clinics (id, uuid, name) VALUES (995, 'clinic-995-uuid', 'Clínica Móvel Digital');");
-$db->exec("
-    INSERT INTO patients (id, clinic_id, uuid, name, email, phone, status)
-    VALUES (955, 995, 'patient-955-uuid', 'Mariana Alencar', 'mariana.mobile@teste.com', '11988887777', 'active');
+$stmtPat = $db->prepare("
+    INSERT INTO patients (id, clinic_id, uuid, name, email, phone, password_hash, status)
+    VALUES (955, 995, 'patient-955-uuid', 'Mariana Alencar', 'mariana.mobile@teste.com', '11988887777', :hash, 'active');
 ");
+$stmtPat->execute(['hash' => $patientHash]);
 $db->exec("
     INSERT INTO appointments (id, clinic_id, patient_id, professional_id, scheduled_at, status)
     VALUES (9551, 995, 955, 1, '2026-10-20 10:00:00', 'scheduled');
@@ -103,14 +107,15 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
         $plainToken = substr($authHeader, 7);
         $hashed = hash('sha256', $plainToken);
 
+        // Validação estrita: SEM bypass plaintext e com expires_at obrigatório (NI2-209)
         $stmt = $db->prepare("
             SELECT t.*, p.id AS patient_id, p.clinic_id, p.name AS patient_name
             FROM personal_access_tokens t
             JOIN patients p ON p.id = t.tokenable_id
-            WHERE (t.token = :raw OR t.token = :hash) AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP)
+            WHERE t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
             LIMIT 1
         ");
-        $stmt->execute(['raw' => $plainToken, 'hash' => $hashed]);
+        $stmt->execute(['hash' => $hashed]);
         $tokenRow = $stmt->fetch();
 
         if (!$tokenRow) {
@@ -130,6 +135,14 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
         $input = $_POST;
         $email = trim($input['email'] ?? '');
         $phone = trim($input['phone'] ?? $input['cpf'] ?? '');
+        $password = (string)($input['password'] ?? $input['pin'] ?? '');
+        $otp = (string)($input['otp'] ?? '');
+
+        // 1. Proibição de login apenas por identificador (NI2-209)
+        if (empty($password) && empty($otp)) {
+            $respond(401, ['error' => 'Autenticação forte exigida: informe senha, PIN ou OTP (login apenas por identificador proibido).']);
+            return;
+        }
 
         $stmt = $db->prepare("SELECT * FROM patients WHERE (email = :email OR phone = :phone) AND status = 'active' LIMIT 1");
         $stmt->execute(['email' => $email, 'phone' => $phone]);
@@ -140,16 +153,44 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
             return;
         }
 
+        $authenticated = false;
+        if (!empty($password)) {
+            if (!empty($patient['password_hash']) && password_verify($password, $patient['password_hash'])) {
+                $authenticated = true;
+            } elseif (!empty($patient['access_pin']) && password_verify($password, $patient['access_pin'])) {
+                $authenticated = true;
+            }
+        }
+        if (!$authenticated && !empty($otp)) {
+            if (!empty($patient['otp_code']) && hash_equals((string)$patient['otp_code'], $otp)) {
+                if (!empty($patient['otp_expires_at']) && strtotime($patient['otp_expires_at']) > time()) {
+                    $authenticated = true;
+                }
+            }
+        }
+
+        if (!$authenticated) {
+            $respond(401, ['error' => 'Credencial inválida: senha, PIN ou código OTP incorreto ou expirado.']);
+            return;
+        }
+
         $token = bin2hex(random_bytes(32));
         $hashed = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+
         $ins = $db->prepare("
-            INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at)
-            VALUES ('patient', :pid, 'mobile_app_contract_test', :token, CURRENT_TIMESTAMP)
+            INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+            VALUES ('patient', :pid, 'mobile_app_contract_test', :token, :expires_at, CURRENT_TIMESTAMP)
         ");
-        $ins->execute(['pid' => $patient['id'], 'token' => $hashed]);
+        $ins->execute([
+            'pid' => $patient['id'],
+            'token' => $hashed,
+            'expires_at' => $expiresAt,
+        ]);
 
         $respond(200, [
             'token' => $token,
+            'expires_at' => $expiresAt,
             'patient' => [
                 'id' => (int)$patient['id'],
                 'clinic_id' => (int)$patient['clinic_id'],
@@ -247,13 +288,22 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
 echo "[1/6] Testando Endpoint POST /api/v1/auth/patient-login...\n";
 
 // Login com credencial inexistente
-$loginFail = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'naoexiste@teste.com']);
+$loginFail = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'naoexiste@teste.com', 'password' => 'qualquer']);
 assertContract($loginFail['status'] === 401, "Login com credencial inexistente rejeitado com HTTP 401");
 
-// Login com paciente legítimo
-$loginSuccess = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'mariana.mobile@teste.com']);
-assertContract($loginSuccess['status'] === 200, "Login de paciente válido retorna HTTP 200");
+// Tentativa de login apenas por identificador (sem senha/PIN/OTP - NI2-209)
+$loginNoCred = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'mariana.mobile@teste.com']);
+assertContract($loginNoCred['status'] === 401, "Login sem credencial (apenas e-mail) rejeitado com HTTP 401 (Autenticação forte obrigatória)");
+
+// Tentativa de login com senha incorreta
+$loginWrongCred = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'mariana.mobile@teste.com', 'password' => 'SenhaIncorreta']);
+assertContract($loginWrongCred['status'] === 401, "Login com senha incorreta rejeitado com HTTP 401");
+
+// Login legítimo com senha forte
+$loginSuccess = dispatchRequest('POST', '/api/v1/auth/patient-login', ['email' => 'mariana.mobile@teste.com', 'password' => $patientPassword]);
+assertContract($loginSuccess['status'] === 200, "Login de paciente com senha válida retorna HTTP 200");
 assertContract(!empty($loginSuccess['body']['token']), "Token de autenticação Sanctum de 64 caracteres retornado");
+assertContract(!empty($loginSuccess['body']['expires_at']), "Token emitido com data de expiração obrigatória (expires_at NOT NULL)");
 assertContract($loginSuccess['body']['patient']['id'] === 955, "Payload identifica Mariana Alencar (ID #955)");
 
 $token = $loginSuccess['body']['token'];

@@ -51,8 +51,8 @@ class AuthService
             ]);
             $clinicId = (int)$this->db->lastInsertId();
 
-            // 2. Criar Usuário
-            $insUser = $this->db->prepare("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status) VALUES (:uuid, :name, :email, :hash, 'nutritionist', 1, 'active')");
+            // 2. Criar Usuário (Inicia com is_verified = 0 até confirmação efetiva de e-mail/CRN - NI2-209)
+            $insUser = $this->db->prepare("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status) VALUES (:uuid, :name, :email, :hash, 'nutritionist', 0, 'active')");
             $insUser->execute([
                 'uuid' => $userUuid,
                 'name' => $name,
@@ -128,6 +128,27 @@ class AuthService
 
         unset($user['password_hash']);
         return $user;
+    }
+
+    /**
+     * Valida explicitamente o e-mail ou credencial do profissional (ativa is_verified)
+     */
+    public function verifyUserEmail(int $userId): bool
+    {
+        $stmt = $this->db->prepare("UPDATE users SET is_verified = 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+        $stmt->execute(['id' => $userId]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Consulta se a conta do usuário já foi verificada
+     */
+    public function isVerified(int $userId): bool
+    {
+        $stmt = $this->db->prepare("SELECT is_verified FROM users WHERE id = :id");
+        $stmt->execute(['id' => $userId]);
+        $val = $stmt->fetchColumn();
+        return (int)$val === 1;
     }
 
     public static function generateUuid(): string

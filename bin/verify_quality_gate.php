@@ -191,9 +191,17 @@ echo "\n--- [4/6] Camada Mobile API & Tokens Sanctum ---\n";
 
 $mobileTestOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/patient_mobile_api_integration_test.php') . " 2>&1");
 if (str_contains($mobileTestOutput, 'ALL TESTS PASSED')) {
-    recordCheck('MOBILE_API', 'Suíte Mobile API Sanctum (NI2-176)', 'PASS', '20 asserções de login, Bearer token, hidratação e diário aprovadas');
+    recordCheck('MOBILE_API', 'Suíte Mobile API Sanctum (NI2-176)', 'PASS', '22 asserções de login, Bearer token, hidratação e diário aprovadas');
 } else {
     recordCheck('MOBILE_API', 'Suíte Mobile API Sanctum (NI2-176)', 'FAIL', 'Falha na execução dos testes mobile: ' . substr($mobileTestOutput, 0, 200));
+}
+
+// Remediação de Bloqueadores e Gates de Go-Live (NI2-209)
+$remediationOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/ni2_209_remediation_and_go_live_gate_test.php') . " 2>&1");
+if (str_contains($remediationOutput, '100% SUCESSO')) {
+    recordCheck('MOBILE_API', 'Remediação de Bloqueadores e Gates de Go-Live (NI2-209)', 'PASS', '27 asserções aprovadas: autenticação forte, tokens com expires_at, profissional canônico e verificação explícita');
+} else {
+    recordCheck('MOBILE_API', 'Remediação de Bloqueadores e Gates de Go-Live (NI2-209)', 'FAIL', 'Falha na suíte de remediação: ' . substr($remediationOutput, 0, 200));
 }
 
 // -----------------------------------------------------------------------------

@@ -21,21 +21,34 @@ $checks['php_version'] = [
 ];
 
 // 2. PDO Connection & DB Integrity
-try {
-    $db = Connection::getInstance();
-    $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
-    $stmt = $db->query("SELECT COUNT(*) FROM migrations");
-    $migCount = (int)$stmt->fetchColumn();
+$driverName = getenv('DB_CONNECTION') ?: 'sqlite';
+if (!extension_loaded('pdo')) {
     $checks['database'] = [
-        'driver' => $driver,
-        'migrations_applied' => $migCount,
-        'status' => $migCount >= 4 ? 'OK' : 'WARNING',
+        'status' => 'BLOCKED',
+        'error' => 'Extensão PDO do PHP não instalada no ambiente de execução.',
     ];
-} catch (\Throwable $e) {
+} elseif (!extension_loaded('pdo_' . $driverName)) {
     $checks['database'] = [
-        'status' => 'FAIL',
-        'error' => $e->getMessage(),
+        'status' => 'BLOCKED',
+        'error' => "Driver pdo_{$driverName} não instalado no ambiente PHP.",
     ];
+} else {
+    try {
+        $db = Connection::getInstance();
+        $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $stmt = $db->query("SELECT COUNT(*) FROM migrations");
+        $migCount = (int)$stmt->fetchColumn();
+        $checks['database'] = [
+            'driver' => $driver,
+            'migrations_applied' => $migCount,
+            'status' => $migCount >= 4 ? 'OK' : 'WARNING',
+        ];
+    } catch (\Throwable $e) {
+        $checks['database'] = [
+            'status' => 'BLOCKED',
+            'error' => 'Conexão com o banco bloqueada por dependência de infraestrutura: ' . $e->getMessage(),
+        ];
+    }
 }
 
 // 3. Storage Permissions & Webroot Hardening

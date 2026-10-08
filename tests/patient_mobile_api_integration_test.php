@@ -114,40 +114,61 @@ assertCondition("Paciente cadastrado ativo foi localizado", $patient !== false &
 
 $tokenPlain = bin2hex(random_bytes(32));
 $tokenHashed = hash('sha256', $tokenPlain);
+$expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
 
 $ins = $db->prepare("
-    INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at)
-    VALUES ('patient', :pid, 'mobile_app', :token, CURRENT_TIMESTAMP)
+    INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+    VALUES ('patient', :pid, 'mobile_app', :token, :expires_at, CURRENT_TIMESTAMP)
 ");
-$ins->execute(['pid' => $patient['id'], 'token' => $tokenHashed]);
+$ins->execute(['pid' => $patient['id'], 'token' => $tokenHashed, 'expires_at' => $expiresAt]);
 $tokenId = (int)$db->lastInsertId();
 
-assertCondition("Token de acesso pessoal registrado com hash sha256 na tabela personal_access_tokens", $tokenId > 0);
+assertCondition("Token de acesso pessoal registrado com hash sha256 e expiração obrigatória (expires_at NOT NULL)", $tokenId > 0);
 
 // -----------------------------------------------------------------------------
 // TESTE 2: Autenticação Bearer e Validação de Sessão
 // -----------------------------------------------------------------------------
 echo "\n[2] Testando Validação do Token Bearer na API...\n";
 
-// Simular busca de token com hash válido
+// Simular busca de token com hash válido e expiração ativa
 $vStmt = $db->prepare("
     SELECT t.*, p.id AS patient_id, p.clinic_id, p.name AS patient_name
     FROM personal_access_tokens t
     JOIN patients p ON p.id = t.tokenable_id
-    WHERE (t.token = :raw OR t.token = :hash) AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP)
+    WHERE t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
     LIMIT 1
 ");
-$vStmt->execute(['raw' => $tokenPlain, 'hash' => $tokenHashed]);
+$vStmt->execute(['hash' => $tokenHashed]);
 $tokenRow = $vStmt->fetch();
 
 assertCondition("Token Bearer é decodificado e mapeado com sucesso para a paciente Juliana Mendes", $tokenRow !== false && $tokenRow['patient_id'] == 901);
 
+// Testar rejeição de token expirado
+$expiredPlain = bin2hex(random_bytes(32));
+$expiredHashed = hash('sha256', $expiredPlain);
+$db->exec("
+    INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+    VALUES ('patient', 901, 'expired_test', '{$expiredHashed}', datetime('now', '-1 day'), CURRENT_TIMESTAMP)
+");
+$vStmt->execute(['hash' => $expiredHashed]);
+assertCondition("Token expirado no passado é estritamente rejeitado com status não-autenticado", $vStmt->fetch() === false);
+
+// Testar rejeição de token com expires_at NULL (proibido pela DoD NI2-209)
+$nullPlain = bin2hex(random_bytes(32));
+$nullHashed = hash('sha256', $nullPlain);
+$db->exec("
+    INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+    VALUES ('patient', 901, 'null_test', '{$nullHashed}', NULL, CURRENT_TIMESTAMP)
+");
+$vStmt->execute(['hash' => $nullHashed]);
+assertCondition("Token legado com expires_at NULL é bloqueado fail-closed", $vStmt->fetch() === false);
+
 // Testar token inexistente / inválido
 $fakePlain = 'token_falso_invalido_12345';
 $fakeHashed = hash('sha256', $fakePlain);
-$vStmt->execute(['raw' => $fakePlain, 'hash' => $fakeHashed]);
+$vStmt->execute(['hash' => $fakeHashed]);
 $invalidRow = $vStmt->fetch();
-assertCondition("Token inválido é rejeitado pela consulta de autenticação", $invalidRow === false);
+assertCondition("Token inexistente é rejeitado pela consulta de autenticação", $invalidRow === false);
 
 // -----------------------------------------------------------------------------
 // TESTE 3: Leitura de Home com Empty State Real (Sem plano publicado inicialmente)
@@ -281,7 +302,7 @@ $delStmt->execute(['id' => $tokenId]);
 assertCondition("Token deletado da tabela personal_access_tokens", $delStmt->rowCount() > 0);
 
 // Tentar autenticar novamente com o mesmo token revogado
-$vStmt->execute(['raw' => $tokenPlain, 'hash' => $tokenHashed]);
+$vStmt->execute(['hash' => $tokenHashed]);
 $revokedRow = $vStmt->fetch();
 assertCondition("Token revogado é rejeitado e não permite mais acesso à API", $revokedRow === false);
 

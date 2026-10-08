@@ -70,6 +70,7 @@ TEST_FILES=(
     "tests/demo_seeder_and_runtime_seed_protection_test.php"
     "tests/cross_tenant_end_to_end_security_test.php"
     "tests/laravel_replatform_verification_test.php"
+    "tests/ni2_209_remediation_and_go_live_gate_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

@@ -159,14 +159,15 @@ $authenticatePatientApi = function() use ($db): array {
     $plainToken = substr($authHeader, 7);
     $hashed = hash('sha256', $plainToken);
 
+    // Validação estrita: SEM bypass por plaintext e com expiração estrita obrigatória (expires_at NOT NULL - NI2-209)
     $stmt = $db->prepare("
         SELECT t.*, p.id AS patient_id, p.clinic_id, p.name AS patient_name
         FROM personal_access_tokens t
         JOIN patients p ON p.id = t.tokenable_id
-        WHERE (t.token = :raw OR t.token = :hash) AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP)
+        WHERE t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
         LIMIT 1
     ");
-    $stmt->execute(['raw' => $plainToken, 'hash' => $hashed]);
+    $stmt->execute(['hash' => $hashed]);
     $tokenRow = $stmt->fetch();
 
     if (!$tokenRow) {
@@ -190,6 +191,15 @@ $router->post('/api/v1/auth/patient-login', function() use ($db) {
     $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
     $email = trim($input['email'] ?? '');
     $phone = trim($input['phone'] ?? $input['cpf'] ?? '');
+    $password = (string)($input['password'] ?? $input['pin'] ?? '');
+    $otp = (string)($input['otp'] ?? '');
+
+    // 1. Proibição de login apenas por identificador (NI2-209)
+    if (empty($password) && empty($otp)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Autenticação forte exigida: informe senha, PIN de acesso ou código OTP (login apenas por identificador proibido).']);
+        return;
+    }
 
     $stmt = $db->prepare("SELECT * FROM patients WHERE (email = :email OR phone = :phone) AND status = 'active' LIMIT 1");
     $stmt->execute(['email' => $email, 'phone' => $phone]);
@@ -201,16 +211,47 @@ $router->post('/api/v1/auth/patient-login', function() use ($db) {
         return;
     }
 
+    // 2. Validação da credencial
+    $authenticated = false;
+    if (!empty($password)) {
+        if (!empty($patient['password_hash']) && password_verify($password, $patient['password_hash'])) {
+            $authenticated = true;
+        } elseif (!empty($patient['access_pin']) && password_verify($password, $patient['access_pin'])) {
+            $authenticated = true;
+        }
+    }
+    if (!$authenticated && !empty($otp)) {
+        if (!empty($patient['otp_code']) && hash_equals((string)$patient['otp_code'], $otp)) {
+            if (!empty($patient['otp_expires_at']) && strtotime($patient['otp_expires_at']) > time()) {
+                $authenticated = true;
+            }
+        }
+    }
+
+    if (!$authenticated) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Credencial inválida: senha, PIN ou código OTP incorreto ou expirado.']);
+        return;
+    }
+
+    // 3. Emissão com expiração explícita obrigatória
     $token = bin2hex(random_bytes(32));
     $hashed = hash('sha256', $token);
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+
     $ins = $db->prepare("
-        INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at)
-        VALUES ('patient', :pid, 'mobile_app', :token, CURRENT_TIMESTAMP)
+        INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+        VALUES ('patient', :pid, 'mobile_app', :token, :expires_at, CURRENT_TIMESTAMP)
     ");
-    $ins->execute(['pid' => $patient['id'], 'token' => $hashed]);
+    $ins->execute([
+        'pid' => $patient['id'],
+        'token' => $hashed,
+        'expires_at' => $expiresAt,
+    ]);
 
     echo json_encode([
         'token' => $token,
+        'expires_at' => $expiresAt,
         'patient' => [
             'id' => (int)$patient['id'],
             'clinic_id' => (int)$patient['clinic_id'],
