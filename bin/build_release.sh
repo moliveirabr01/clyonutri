@@ -69,6 +69,7 @@ TEST_FILES=(
     "tests/meal_plan_web_csrf_and_form_test.php"
     "tests/demo_seeder_and_runtime_seed_protection_test.php"
     "tests/cross_tenant_end_to_end_security_test.php"
+    "tests/laravel_replatform_verification_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 
@@ -143,8 +144,17 @@ cat <<EOF > "$MANIFEST_FILE"
     "bin",
     "mobile",
     "docs",
-    "vendor"
+    "vendor",
+    "replatform",
+    "artisan"
   ],
+  "replatform_laravel13": {
+    "framework": "Laravel 13.35.0",
+    "sanctum": "present",
+    "fortify": "present",
+    "pest": "present (Pest 4.7.8)",
+    "artisan_cli": "present"
+  },
   "runtime_requirements": {
     "php": ">=8.1",
     "mysql": ">=8.0 ou sqlite3",
@@ -164,7 +174,7 @@ echo "==> [5/5] Criando pacote distribuível de Release (tar.gz)..."
 TEMP_STAGE="$RELEASE_DIR/stage_${BUILD_ID}"
 mkdir -p "$TEMP_STAGE"
 
-# Copiar componentes essenciais incluindo VENDOR para pacote autossuficiente (NI2-178)
+# Copiar componentes essenciais incluindo VENDOR e REPLATAFORMA LARAVEL 13 (NI2-174 / NI2-178)
 cp -R app "$TEMP_STAGE/"
 cp -R src "$TEMP_STAGE/"
 cp -R public "$TEMP_STAGE/"
@@ -176,6 +186,8 @@ cp -R tests "$TEMP_STAGE/"
 cp -R mobile "$TEMP_STAGE/"
 cp -R docs "$TEMP_STAGE/"
 cp -R vendor "$TEMP_STAGE/"
+cp -R replatform "$TEMP_STAGE/"
+cp artisan "$TEMP_STAGE/"
 cp composer.json "$TEMP_STAGE/"
 cp .env.example "$TEMP_STAGE/"
 cp "$MANIFEST_FILE" "$TEMP_STAGE/"
@@ -208,7 +220,16 @@ else
     exit 1
 fi
 
+if [ -f "$TEST_EXTRACT_DIR/replatform/laravel13/composer.lock" ] && [ -f "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" ]; then
+    echo "    ✓ replatform/laravel13 presente com composer.lock e artisan no pacote distribuível."
+else
+    echo "    ❌ ERRO: replatform/laravel13 incompleto no pacote distribuível!"
+    rm -rf "$TEST_EXTRACT_DIR"
+    exit 1
+fi
+
 php -r "require '$TEST_EXTRACT_DIR/vendor/autoload.php'; echo '    ✓ Autoloader executado com sucesso no pacote isolado.\n';"
+php "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" --version > /dev/null && echo "    ✓ Laravel 13 artisan executado com sucesso a partir do pacote extraído."
 rm -rf "$TEST_EXTRACT_DIR"
 
 echo "========================================================================"

@@ -1,16 +1,16 @@
 {
   "product": "ClyoNutri II",
   "version": "1.0.0",
-  "build_timestamp": "20261008_140257",
-  "git_commit": "5194543",
+  "build_timestamp": "20261008_145759",
+  "git_commit": "1b82ac6",
   "release_gate": {
     "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
     "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",
     "is_production_approved": false,
     "fail_closed_enforced": true,
     "health_check": "PASSED",
-    "total_test_suites": 26,
-    "passed_test_suites": 26,
+    "total_test_suites": 27,
+    "passed_test_suites": 27,
     "zero_failures_verified": true,
     "audit_360_layers": {
       "syntax_static": "PASSED (Zero erros em php -l)",
@@ -33,8 +33,17 @@
     "bin",
     "mobile",
     "docs",
-    "vendor"
+    "vendor",
+    "replatform",
+    "artisan"
   ],
+  "replatform_laravel13": {
+    "framework": "Laravel 13.35.0",
+    "sanctum": "present",
+    "fortify": "present",
+    "pest": "present (Pest 4.7.8)",
+    "artisan_cli": "present"
+  },
   "runtime_requirements": {
     "php": ">=8.1",
     "mysql": ">=8.0 ou sqlite3",
