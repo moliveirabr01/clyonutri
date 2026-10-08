@@ -48,6 +48,7 @@ $authCtrl = new AuthController();
 $dashCtrl = new DashboardController();
 $landingCtrl = new LandingController();
 $teleCtrl = new \ClyoNutri\Application\Controllers\TeleconsultationController($db);
+$helpCtrl = new \ClyoNutri\Application\Controllers\HelpdeskController($db);
 
 // 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -169,6 +170,25 @@ $router->post('/planos/{id}/publicar', $requireAuth([$dashCtrl, 'publishMealPlan
 $router->post('/planos/{id}/duplicar', $requireAuth([$dashCtrl, 'duplicateMealPlan']));
 $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
+
+// 3.2 Central de Ajuda & Service Desk (NI2-195 a NI2-208)
+$router->get('/ajuda', $requireAuth([$helpCtrl, 'index']));
+$router->get('/ajuda/categoria/{slug}', $requireAuth([$helpCtrl, 'categoryArticles']));
+$router->get('/ajuda/artigo/{slug}', $requireAuth([$helpCtrl, 'showArticle']));
+$router->get('/ajuda/abrir-chamado', $requireAuth([$helpCtrl, 'showCreateTicket']));
+$router->post('/ajuda/abrir-chamado', $requireAuth([$helpCtrl, 'storeTicket']));
+$router->get('/ajuda/meus-chamados', $requireAuth([$helpCtrl, 'myTickets']));
+$router->get('/ajuda/chamado/{protocol}', $requireAuth([$helpCtrl, 'ticketDetail']));
+$router->post('/ajuda/chamado/{protocol}/responder', $requireAuth([$helpCtrl, 'replyTicket']));
+$router->post('/ajuda/chamado/{protocol}/resolver', $requireAuth([$helpCtrl, 'resolveTicket']));
+$router->post('/ajuda/chamado/{protocol}/csat', $requireAuth([$helpCtrl, 'submitCsat']));
+$router->get('/ajuda/anexo/{id}', $requireAuth([$helpCtrl, 'downloadAttachment']));
+
+// Backoffice de Triagem e Atendimento do Suporte (RBAC)
+$router->get('/suporte/fila', $requireAuth([$helpCtrl, 'backofficeQueue']));
+$router->get('/suporte/chamado/{id}', $requireAuth([$helpCtrl, 'backofficeTicket']));
+$router->post('/suporte/chamado/{id}/responder', $requireAuth([$helpCtrl, 'backofficeReply']));
+$router->post('/suporte/chamado/{id}/status', $requireAuth([$helpCtrl, 'backofficeUpdateStatus']));
 
 // 4. API Móvel do Paciente (/api/v1/patient/...)
 $authenticatePatientApi = function() use ($db): array {

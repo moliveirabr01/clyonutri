@@ -1,6 +1,6 @@
 {
     "audit_issue": "NI2-175",
-    "timestamp": "2026-10-08T19:17:12+00:00",
+    "timestamp": "2026-10-08T20:52:06+00:00",
     "summary": {
         "total": 11,
         "pass": 9,
@@ -14,77 +14,77 @@
             "test": "Cálculo Nutricional de 100g para 150g",
             "status": "PASS",
             "evidence": "Calculado: 192 kcal (Esperado: 192.00 kcal)",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "UNIT",
             "test": "Cadeia de Hash SHA-256 no Prontuário",
             "status": "PASS",
-            "evidence": "Hash gerado: bbbed294b7aa60c3... e verificado com sucesso",
-            "timestamp": "2026-10-08 19:17:12"
+            "evidence": "Hash gerado: cae3bffd0e9e116f... e verificado com sucesso",
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "INTEGRATION",
             "test": "Persistência Relacional de Paciente",
             "status": "PASS",
-            "evidence": "Paciente persistido com ID 1209 e UUID 5efe421c9dba7fca2fb74486eba493cd",
-            "timestamp": "2026-10-08 19:17:12"
+            "evidence": "Paciente persistido com ID 1247 e UUID 272122fdda9d2f7719d3c128ac223990",
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "INTEGRATION",
             "test": "Barreira Cross-Tenant na Leitura/Escrita",
             "status": "PASS",
             "evidence": "Acesso bloqueado com HTTP 403 Forbidden e log de violação registrado",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "HTTP_WEB",
             "test": "Bloqueio de Requisicao POST sem CSRF",
             "status": "PASS",
             "evidence": "Rejeição com 403 Forbidden e token CSRF invalidado",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "HTTP_WEB",
             "test": "Autenticação Profissional com Sessão & Cookies",
             "status": "PASS",
             "evidence": "Sessão iniciada para User ID 1 (Tenant 1)",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "HTTP_WEB",
             "test": "Cadastro de Paciente via Form com CSRF",
             "status": "PASS",
-            "evidence": "Novo paciente 'Paciente Web E2E 1791487032' registrado e presente na listagem",
-            "timestamp": "2026-10-08 19:17:12"
+            "evidence": "Novo paciente 'Paciente Web E2E 1791492726' registrado e presente na listagem",
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "API_CONTRACT",
             "test": "Conformidade com OpenAPI 3.1 (/api/v1)",
             "status": "PASS",
             "evidence": "Contrato formal validado (8 endpoints) e schemas em conformidade",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "MOBILE_API",
             "test": "Sincronização de Diário do Paciente via API",
             "status": "PASS",
-            "evidence": "Entrada gravada com ID 258 e classificada como autorrelato",
-            "timestamp": "2026-10-08 19:17:12"
+            "evidence": "Entrada gravada com ID 282 e classificada como autorrelato",
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "INFRA",
             "test": "Deploy em HostGator Compartilhada",
             "status": "BLOCKED",
             "evidence": "Servidor HostGator remoto e credenciais SSH não configurados no ambiente local",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         },
         {
             "layer": "E2E_BROWSER",
             "test": "Execução Headless Browser com Captura de Tela",
             "status": "NOT TESTED",
             "evidence": "Node Playwright não instalado localmente (execução via HTTP Harness aprovada)",
-            "timestamp": "2026-10-08 19:17:12"
+            "timestamp": "2026-10-08 20:52:06"
         }
     ]
 }

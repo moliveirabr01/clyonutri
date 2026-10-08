@@ -72,6 +72,8 @@ TEST_FILES=(
     "tests/laravel_replatform_verification_test.php"
     "tests/ni2_209_remediation_and_go_live_gate_test.php"
     "tests/ni2_6_prontuario_e_anamnese_nutricional_test.php"
+    "tests/teleconsultation_online_clinic_e2e_test.php"
+    "tests/helpdesk_and_service_desk_e2e_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

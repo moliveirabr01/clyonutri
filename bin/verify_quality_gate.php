@@ -230,6 +230,13 @@ if (str_contains($teleOutput, 'TODOS OS GATES DA TELECONSULTA FORAM EXECUTADOS C
     recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'FAIL', 'Falha na suíte de teleconsulta: ' . substr($teleOutput, 0, 200));
 }
 
+$helpdeskOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/helpdesk_and_service_desk_e2e_test.php') . " 2>&1");
+if (str_contains($helpdeskOutput, '8/8 TESTES PASSARAM COM COBERTURA COMPLETA')) {
+    recordCheck('E2E_JOURNEYS', 'Central de Ajuda & Service Desk E2E (NI2-195: NI2-196 a NI2-208)', 'PASS', 'Base de conhecimento, busca, protocolo SUP, anexos fora do webroot, timeline com notas internas ocultas, CSAT e SLA aprovados');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Central de Ajuda & Service Desk E2E (NI2-195: NI2-196 a NI2-208)', 'FAIL', 'Falha na suíte de helpdesk: ' . substr($helpdeskOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

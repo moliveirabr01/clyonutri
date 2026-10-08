@@ -16,3 +16,5 @@ replatform/laravel13/storage/*.sqlite
 !storage/logs/.gitkeep
 !storage/uploads/.gitkeep
 !storage/backups/.gitkeep
+storage/app/helpdesk_attachments/*
+!storage/app/helpdesk_attachments/.gitkeep

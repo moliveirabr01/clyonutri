@@ -66,3 +66,24 @@ $router->post('/teleconsulta/sala-espera/{token}/consentir', [TeleconsultationCo
 $router->post('/teleconsulta/sala-espera/{token}/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
 $router->get('/teleconsulta/sala-espera/{token}/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
 $router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
+
+// 4. Central de Ajuda & Service Desk (NI2-195)
+use ClyoNutri\Application\Controllers\HelpdeskController;
+
+$router->get('/ajuda', [HelpdeskController::class, 'index'])->name('helpdesk.index');
+$router->get('/ajuda/categoria/{slug}', [HelpdeskController::class, 'categoryArticles'])->name('helpdesk.category');
+$router->get('/ajuda/artigo/{slug}', [HelpdeskController::class, 'showArticle'])->name('helpdesk.article');
+$router->get('/ajuda/abrir-chamado', [HelpdeskController::class, 'showCreateTicket'])->name('helpdesk.create_ticket');
+$router->post('/ajuda/abrir-chamado', [HelpdeskController::class, 'storeTicket'])->name('helpdesk.store_ticket');
+$router->get('/ajuda/meus-chamados', [HelpdeskController::class, 'myTickets'])->name('helpdesk.my_tickets');
+$router->get('/ajuda/chamado/{protocol}', [HelpdeskController::class, 'ticketDetail'])->name('helpdesk.ticket_detail');
+$router->post('/ajuda/chamado/{protocol}/responder', [HelpdeskController::class, 'replyTicket'])->name('helpdesk.reply');
+$router->post('/ajuda/chamado/{protocol}/resolver', [HelpdeskController::class, 'resolveTicket'])->name('helpdesk.resolve');
+$router->post('/ajuda/chamado/{protocol}/csat', [HelpdeskController::class, 'submitCsat'])->name('helpdesk.csat');
+$router->get('/ajuda/anexo/{id}', [HelpdeskController::class, 'downloadAttachment'])->name('helpdesk.attachment');
+
+// Backoffice de Triagem e Suporte (RBAC)
+$router->get('/suporte/fila', [HelpdeskController::class, 'backofficeQueue'])->name('support.queue');
+$router->get('/suporte/chamado/{id}', [HelpdeskController::class, 'backofficeTicket'])->name('support.ticket');
+$router->post('/suporte/chamado/{id}/responder', [HelpdeskController::class, 'backofficeReply'])->name('support.reply');
+$router->post('/suporte/chamado/{id}/status', [HelpdeskController::class, 'backofficeUpdateStatus'])->name('support.status');
