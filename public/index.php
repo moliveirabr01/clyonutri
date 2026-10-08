@@ -47,6 +47,7 @@ $router = new Router();
 $authCtrl = new AuthController();
 $dashCtrl = new DashboardController();
 $landingCtrl = new LandingController();
+$teleCtrl = new \ClyoNutri\Application\Controllers\TeleconsultationController($db);
 
 // 1. Rotas de Autenticação e Onboarding
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -141,6 +142,20 @@ $router->post('/agenda/{id}/editar', $requireAuth([$dashCtrl, 'editAppointment']
 $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointmentStatus']));
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
+
+// 3.1 Consultório Online & Teleconsulta (NI2-221)
+$router->get('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth([$teleCtrl, 'openFromAppointment']));
+$router->get('/teleconsulta/{id}/atendimento', $requireAuth([$teleCtrl, 'professionalRoom']));
+$router->post('/teleconsulta/{id}/admitir', $requireAuth([$teleCtrl, 'admit']));
+$router->post('/teleconsulta/{id}/rejeitar', $requireAuth([$teleCtrl, 'reject']));
+$router->post('/teleconsulta/{id}/evoluir', $requireAuth([$teleCtrl, 'recordEvolution']));
+$router->post('/teleconsulta/{id}/encerrar', $requireAuth([$teleCtrl, 'end']));
+$router->get('/teleconsulta/sala-espera/{token}', [$teleCtrl, 'patientWaitingRoom']);
+$router->post('/teleconsulta/sala-espera/{token}/dispositivo', [$teleCtrl, 'patientSubmitDeviceCheck']);
+$router->post('/teleconsulta/sala-espera/{token}/consentir', [$teleCtrl, 'patientAcceptConsent']);
+$router->post('/teleconsulta/sala-espera/{token}/entrar', [$teleCtrl, 'patientEnterWaiting']);
+$router->get('/teleconsulta/sala-espera/{token}/status', [$teleCtrl, 'patientStatus']);
+$router->get('/teleconsulta/sala/{token}', [$teleCtrl, 'patientConsultationRoom']);
 $router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
 $router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
 $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
