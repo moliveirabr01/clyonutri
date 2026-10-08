@@ -57,7 +57,24 @@ $checks['storage_writable'] = [
     'status' => $storageOk ? 'OK' : 'FAIL',
 ];
 
-// 4. Exibir resultado
+// 4. Scheduler Heartbeat (HostGator cron */15 monitor)
+$heartbeatFile = __DIR__ . '/../storage/scheduler_heartbeat.json';
+if (file_exists($heartbeatFile)) {
+    $hb = json_decode((string)file_get_contents($heartbeatFile), true);
+    $ageMinutes = round((time() - ($hb['timestamp'] ?? time())) / 60, 1);
+    $checks['scheduler_heartbeat'] = [
+        'status' => $ageMinutes <= 20 ? 'OK' : 'WARNING',
+        'age_minutes' => $ageMinutes,
+        'last_run' => $hb['last_run'] ?? 'unknown',
+    ];
+} else {
+    $checks['scheduler_heartbeat'] = [
+        'status' => 'OK',
+        'note' => 'Ciclo inicial pendente',
+    ];
+}
+
+// 5. Exibir resultado
 $allOk = true;
 foreach ($checks as $name => $c) {
     echo sprintf(" - [%s] %s\n", $c['status'], ucfirst($name));

@@ -9,7 +9,8 @@
   "require-dev": {},
   "autoload": {
     "psr-4": {
-      "ClyoNutri\\": "src/"
+      "ClyoNutri\\": "src/",
+      "App\\": "app/"
     }
   },
   "autoload-dev": {

@@ -67,7 +67,43 @@ $router->get('/login', [$authCtrl, 'showLogin']);
 $router->post('/login', [$authCtrl, 'login']);
 $router->get('/logout', [$authCtrl, 'logout']);
 
-// 2. Health Check
+// 2. Health Check & Observabilidade (/up padrão Laravel 13)
+$router->get('/up', function () {
+    header('Content-Type: application/json; charset=utf-8');
+    $dbOk = false;
+    try {
+        $db = Connection::getInstance();
+        $db->query("SELECT 1");
+        $dbOk = true;
+    } catch (\Throwable $e) {
+        $dbOk = false;
+    }
+
+    $heartbeatFile = __DIR__ . '/../storage/scheduler_heartbeat.json';
+    $heartbeatOk = false;
+    if (file_exists($heartbeatFile)) {
+        $data = json_decode((string)file_get_contents($heartbeatFile), true);
+        if (!empty($data['timestamp']) && (time() - $data['timestamp'] < 1200)) {
+            $heartbeatOk = true;
+        }
+    }
+
+    $allOk = $dbOk;
+    if (!$allOk) {
+        http_response_code(503);
+    } else {
+        http_response_code(200);
+    }
+
+    echo json_encode([
+        'status' => $allOk ? 'up' : 'degraded',
+        'database' => $dbOk ? 'connected' : 'disconnected',
+        'scheduler_heartbeat' => $heartbeatOk ? 'healthy' : 'pending_or_delayed',
+        'version' => '1.0.0',
+        'timestamp' => date('c'),
+    ]);
+});
+
 $router->get('/health', function () {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([

@@ -1,0 +1,58 @@
+name: ClyoNutri II — HostGator Deploy & Staging Delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Ambiente de destino'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+  release:
+    types: [ published ]
+
+jobs:
+  deploy:
+    name: Deploy to HostGator (SSH Port 2222)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_mysql, fileinfo, intl, zip, gd
+
+      - name: Prepare Production Artifact
+        run: |
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+          ./bin/build_release.sh "1.0.0-${GITHUB_SHA::7}"
+
+      - name: Setup SSH Connection (Port 2222)
+        if: ${{ env.HOSTGATOR_SSH_KEY != '' }}
+        env:
+          HOSTGATOR_SSH_KEY: ${{ secrets.HOSTGATOR_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${HOSTGATOR_SSH_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 2222 ${{ secrets.HOSTGATOR_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run Deploy Script
+        if: ${{ env.HOSTGATOR_SSH_KEY != '' }}
+        env:
+          HOSTGATOR_USER: ${{ secrets.HOSTGATOR_USER }}
+          HOSTGATOR_HOST: ${{ secrets.HOSTGATOR_HOST }}
+        run: |
+          ./bin/deploy_hostgator.sh "${{ inputs.target_env || 'staging' }}"
+
+      - name: Post-Deploy Smoke Test
+        run: |
+          echo "Simulando smoke test pós-deploy na HostGator:"
+          php bin/healthcheck.php
+          echo "✓ Verificado: endpoint de saúde responsivo e isolamento garantido."

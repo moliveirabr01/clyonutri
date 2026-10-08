@@ -1,0 +1,70 @@
+name: ClyoNutri II — CI / Quality & Release Gate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Build, Quality Gate & Release Packaging
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: clyonutri_test
+          MYSQL_USER: clyonutri_user
+          MYSQL_PASSWORD: clyonutri_password
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_mysql, pdo_sqlite, openssl, json, ctype, xml, fileinfo, dom, intl, zip, gd
+          coverage: none
+
+      - name: Validate Composer Configuration
+        run: composer validate --strict
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Syntax Linting (PHP Lint)
+        run: |
+          find src tests bin views -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: System Health & Observability Check
+        run: php bin/healthcheck.php
+
+      - name: HostGator Compatibility Spike Audit
+        run: php bin/hostgator_spike.php
+
+      - name: Execute Automated Test Suite & Release Gate
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+        run: ./bin/build_release.sh "1.0.0-${GITHUB_SHA::7}"
+
+      - name: Verify Secret Isolation (Zero Credentials in Artifact)
+        run: |
+          ! tar -ztvf release/*.tar.gz | grep -E '\.env$|\.git/'
+          echo "✓ Verificado: nenhum segredo ou pasta .git vazada no pacote de release."
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clyonutri-release-${{ github.sha }}
+          path: release/*.tar.gz
+          if-no-files-found: error

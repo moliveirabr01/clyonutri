@@ -4,6 +4,10 @@ storage/logs/*.log
 storage/uploads/*
 storage/*.sqlite
 storage/backups/*
+storage/*.json
+storage/simulated_deploy/
+storage/rehearsal_restore/
+release/*.tar.gz
 vendor/
 !storage/logs/.gitkeep
 !storage/uploads/.gitkeep

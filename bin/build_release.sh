@@ -52,6 +52,7 @@ TEST_FILES=(
     "tests/onda_2_benchmark_test.php"
     "tests/onda_3_benchmark_test.php"
     "tests/onda_4_benchmark_test.php"
+    "tests/replatform_infrastructure_test.php"
 )
 
 TOTAL_TESTS=${#TEST_FILES[@]}
@@ -95,6 +96,7 @@ cat <<EOF > "$MANIFEST_FILE"
     "zero_failures_verified": true
   },
   "modules_included": [
+    "app",
     "src",
     "public",
     "views",
@@ -103,7 +105,8 @@ cat <<EOF > "$MANIFEST_FILE"
     "database/baseline",
     "tests",
     "bin",
-    "mobile"
+    "mobile",
+    "docs"
   ],
   "runtime_requirements": {
     "php": ">=8.1",
@@ -126,6 +129,7 @@ TEMP_STAGE="$RELEASE_DIR/stage_${BUILD_ID}"
 mkdir -p "$TEMP_STAGE"
 
 # Copiar componentes essenciais
+cp -R app "$TEMP_STAGE/"
 cp -R src "$TEMP_STAGE/"
 cp -R public "$TEMP_STAGE/"
 cp -R views "$TEMP_STAGE/"
@@ -134,6 +138,7 @@ cp -R database "$TEMP_STAGE/"
 cp -R bin "$TEMP_STAGE/"
 cp -R tests "$TEMP_STAGE/"
 cp -R mobile "$TEMP_STAGE/"
+cp -R docs "$TEMP_STAGE/"
 cp composer.json "$TEMP_STAGE/"
 cp .env.example "$TEMP_STAGE/"
 cp "$MANIFEST_FILE" "$TEMP_STAGE/"
