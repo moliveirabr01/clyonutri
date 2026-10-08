@@ -137,16 +137,14 @@ $router->get('/', function () {
 
 $router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
 $router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));
+$router->post('/pacientes', $requireAuth([$dashCtrl, 'savePatient']));
+$router->get('/pacientes/{id}', $requireAuth([$dashCtrl, 'profile360']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
-
-$router->get('/agenda', $requireAuth(function () {
-    header('Location: /dashboard');
-}));
-
-$router->get('/planos', $requireAuth(function () {
-    header('Location: /pacientes');
-}));
+$router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
+$router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
+$router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
+$router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$uri = $_SERVER['REQUEST_URI'] ?? '/';
+$uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $router->dispatch($method, $uri);
