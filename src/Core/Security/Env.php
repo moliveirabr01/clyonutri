@@ -25,10 +25,25 @@ class Env
                 $value = trim($value);
                 $value = trim($value, '"\'');
 
-                putenv("{$key}={$value}");
-                $_ENV[$key] = $value;
-                $_SERVER[$key] = $value;
+                if (getenv($key) === false) {
+                    putenv("{$key}={$value}");
+                }
+                if (!isset($_ENV[$key])) {
+                    $_ENV[$key] = $value;
+                }
+                if (!isset($_SERVER[$key])) {
+                    $_SERVER[$key] = $value;
+                }
             }
         }
+    }
+
+    public static function get(string $key, mixed $default = null): mixed
+    {
+        $val = getenv($key);
+        if ($val !== false) {
+            return $val;
+        }
+        return $_ENV[$key] ?? $_SERVER[$key] ?? $default;
     }
 }

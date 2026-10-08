@@ -98,6 +98,8 @@ $criticalPhpFiles = [
     'src/Domain/PatientPortal/PatientPortalService.php',
     'src/Domain/FoodDiary/FoodDiaryService.php',
     'src/Domain/Engagement/EngagementService.php',
+    'src/Core/Database/DemoSeeder.php',
+    'bin/seed.php',
 ];
 
 $syntaxAllPass = true;
@@ -159,6 +161,13 @@ if ($csrfBlocked) {
     recordCheck('HTTP_WEB', 'Bloqueio de Requisicao POST sem CSRF', 'PASS', 'Tokens nulos e forjados rejeitados com validação estrita');
 } else {
     recordCheck('HTTP_WEB', 'Bloqueio de Requisicao POST sem CSRF', 'FAIL', 'Validação CSRF falhou ao rejeitar token inválido');
+}
+
+$demoProtectionOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/demo_seeder_and_runtime_seed_protection_test.php') . " 2>&1");
+if (str_contains($demoProtectionOutput, 'ALL CRITERIA SATISFIED')) {
+    recordCheck('HTTP_WEB', 'Remoção de Seed em Runtime & Credenciais Fixas (NI2-172)', 'PASS', '19 regras de bootstrap HTTP limpo, ausência de senhas demo e bloqueio fail-closed em produção comprovadas');
+} else {
+    recordCheck('HTTP_WEB', 'Remoção de Seed em Runtime & Credenciais Fixas (NI2-172)', 'FAIL', 'Falha na validação de proteção demo: ' . substr($demoProtectionOutput, 0, 200));
 }
 
 // -----------------------------------------------------------------------------

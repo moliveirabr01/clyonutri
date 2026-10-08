@@ -7,37 +7,17 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use ClyoNutri\Application\Controllers\AuthController;
 use ClyoNutri\Application\Controllers\DashboardController;
 use ClyoNutri\Application\Controllers\LandingController;
-use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Http\Router;
 use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Core\Security\Env;
-use ClyoNutri\Domain\Food\FoodCatalogService;
 use ClyoNutri\Domain\Patient\PatientRepository;
 
 Env::load(__DIR__ . '/../.env');
 
 // Inicialização de conexão
 $db = Connection::getInstance();
-
-// Auto-seed inicial de referência
-$tacoSeed = new FoodCatalogService($db);
-$tacoSeed->seedTacoReference();
-
-// Garantir usuário demo existente para testes
-$auth = new AuthService($db);
-$stmt = $db->query("SELECT id FROM users WHERE email = 'camila@clyonutri.com.br' LIMIT 1");
-if (!$stmt->fetch()) {
-    $auth->registerNutritionist(
-        'Dra. Camila Mendes',
-        'camila@clyonutri.com.br',
-        'SenhaDemo123',
-        'Clínica ClyoNutri Demo',
-        '12345',
-        'CRN-3'
-    );
-}
 
 // Configuração segura de cookies de sessão
 if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {

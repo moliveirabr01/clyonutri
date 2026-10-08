@@ -158,13 +158,19 @@ if ($validBlocked) {
 }
 
 // 3.2 Teste Positivo: POST /login com CSRF Token e Credenciais Válidas
+$authService = new \ClyoNutri\Core\Auth\AuthService($db);
+$checkUser = $db->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
+$checkUser->execute(['email' => 'camila@clyonutri.com.br']);
+if (!$checkUser->fetch()) {
+    $authService->registerNutritionist('Dra. Camila Mendes', 'camila@clyonutri.com.br', 'SenhaDemo123', 'Clínica Teste', '12345', 'CRN-3');
+}
+
 $csrfValid = Csrf::validate($csrfTokenReal);
 $_POST['_csrf_token'] = $csrfTokenReal;
 $_POST['email'] = 'camila@clyonutri.com.br';
 $_POST['password'] = 'SenhaDemo123';
 
 // Executar autenticação real
-$authService = new \ClyoNutri\Core\Auth\AuthService($db);
 $authenticatedUser = $authService->attempt($_POST['email'], $_POST['password']);
 if ($authenticatedUser && $csrfValid) {
     $_SESSION['user_id'] = $authenticatedUser['id'];

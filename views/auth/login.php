@@ -108,12 +108,7 @@
         </button>
       </form>
 
-      <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: var(--border-default); text-align: center; font-size: 0.8rem; color: #64748B;">
-        Credenciais demo:<br>
-        <strong>camila@clyonutri.com.br</strong> / <strong>SenhaDemo123</strong>
-      </div>
-
-      <div class="auth-footer">
+      <div class="auth-footer" style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: var(--border-default);">
         Ainda não tem conta? <a href="/cadastro">Cadastre-se</a>
       </div>
     </div>

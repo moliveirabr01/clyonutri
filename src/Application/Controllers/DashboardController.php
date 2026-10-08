@@ -64,7 +64,7 @@ class DashboardController
         $p = $profile['patient'];
         $title = 'Perfil 360 — ' . $p['name'];
         $activeNav = 'pacientes';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::token();
 
@@ -411,7 +411,7 @@ class DashboardController
 
         $title = 'Evolução Antropométrica — ' . $patient['name'];
         $activeNav = 'pacientes';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::token();
 
@@ -1055,7 +1055,7 @@ class DashboardController
 
         $title = "Consulta #{$id} — " . ($app['patient_name'] ?? 'Paciente');
         $activeNav = 'agenda';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
 
@@ -1305,7 +1305,7 @@ class DashboardController
 
         $title = 'Agenda de Atendimentos';
         $activeNav = 'agenda';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
 
@@ -2316,7 +2316,7 @@ class DashboardController
 
         $title = 'Financeiro Essencial';
         $activeNav = 'financeiro';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
@@ -2365,7 +2365,7 @@ class DashboardController
     {
         $title = 'Configurações do Consultório';
         $activeNav = 'configuracoes';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
@@ -2410,7 +2410,7 @@ class DashboardController
 
         $title = 'Dashboard';
         $activeNav = 'dashboard';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
@@ -2578,7 +2578,7 @@ class DashboardController
 
         $title = 'Pacientes';
         $activeNav = 'pacientes';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
@@ -2715,7 +2715,7 @@ class DashboardController
 
         $title = 'Base de Alimentos';
         $activeNav = 'alimentos';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();

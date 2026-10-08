@@ -164,7 +164,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid #E2E8F0; margin-bottom: 20px;">
               <div>
                 <h3 style="font-size: 1.125rem; font-weight: 700; color: #0F2747; margin-bottom: 2px;">Dra. Camila Mendes</h3>
-                <p style="font-size: 0.75rem; color: #64748B;">Clínica ClyoNutri Demo · CRN-3 12345 · São Paulo/SP</p>
+                <p style="font-size: 0.75rem; color: #64748B;">Consultório Nutricional · CRN-3 12345 · São Paulo/SP</p>
               </div>
               <div style="display: flex; gap: 8px;">
                 <span style="display: inline-flex; align-items: center; gap: 6px; background-color: #EBF3FA; color: #0F2747; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
