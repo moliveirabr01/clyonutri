@@ -223,6 +223,13 @@ if (str_contains($ni26Output, 'TODOS OS CRITÉRIOS DE ACEITE DO ÉPICO NI2-6 FOR
     recordCheck('E2E_JOURNEYS', 'Prontuário & Anamnese Nutricional E2E (NI2-6: NI2-60 a NI2-64)', 'FAIL', 'Falha na suíte NI2-6: ' . substr($ni26Output, 0, 200));
 }
 
+$teleOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/teleconsultation_online_clinic_e2e_test.php') . " 2>&1");
+if (str_contains($teleOutput, 'TODOS OS GATES DA TELECONSULTA FORAM EXECUTADOS COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'PASS', 'Sessão ligada à agenda, pré-consulta, sala de espera, admissão, evolução SHA-256 e fail-closed WebRTC aprovados');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'FAIL', 'Falha na suíte de teleconsulta: ' . substr($teleOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

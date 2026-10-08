@@ -1884,6 +1884,9 @@ class DashboardController
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
               <?= htmlspecialchars($app['status']) ?>
             </span>
+            <a href="/teleconsulta/sessao-agenda/<?= $app['id'] ?>" class="btn btn-primary" style="background-color: #059669; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+              <span>📹 Consultório Online</span>
+            </a>
             <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
               Ver Perfil 360 ↗
             </a>

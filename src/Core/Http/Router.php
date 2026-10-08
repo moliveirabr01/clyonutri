@@ -33,9 +33,9 @@ class Router
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
 
-        // Validação CSRF em requisições de mutação Web (rotas /api/ utilizam Bearer token)
-        if ($method === 'POST' && !str_starts_with($path, '/api/')) {
-            $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        // Validação CSRF em requisições de mutação Web (rotas /api/ e /teleconsulta/sala-espera/ autenticadas por token de URL)
+        if ($method === 'POST' && !str_starts_with($path, '/api/') && !str_starts_with($path, '/teleconsulta/sala-espera/')) {
+            $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);
                 header('Content-Type: application/json; charset=utf-8');

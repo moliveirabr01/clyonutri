@@ -35,7 +35,10 @@ class ClinicalRecordService
             throw new InvalidArgumentException("O título do registro clínico é obrigatório.");
         }
 
-        $this->db->beginTransaction();
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) {
+            $this->db->beginTransaction();
+        }
         try {
             // 1. Obter a última versão e o último hash do paciente de forma atômica
             $lastStmt = $this->db->prepare("
@@ -93,7 +96,9 @@ class ClinicalRecordService
                 'hash' => $recordHash,
             ]);
 
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
 
             return [
                 'id' => $id,
@@ -104,7 +109,9 @@ class ClinicalRecordService
                 'created_at' => $createdAt,
             ];
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }

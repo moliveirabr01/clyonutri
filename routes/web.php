@@ -45,3 +45,24 @@ $router->get('/alimentos', [DashboardController::class, 'foods'])->name('foods.i
 $router->get('/planos', [DashboardController::class, 'mealPlans'])->name('mealplans.index');
 $router->get('/financeiro', [DashboardController::class, 'finance'])->name('finance.index');
 $router->get('/configuracoes', [DashboardController::class, 'settings'])->name('settings.index');
+
+// 3. Consultório Online & Teleconsulta (NI2-221)
+use ClyoNutri\Application\Controllers\TeleconsultationController;
+
+// Atalho da Agenda para a Teleconsulta
+$router->get('/teleconsulta/sessao-agenda/{appointmentId}', [TeleconsultationController::class, 'openFromAppointment'])->name('teleconsultation.open_agenda');
+
+// Jornada do Profissional
+$router->get('/teleconsulta/{id}/atendimento', [TeleconsultationController::class, 'professionalRoom'])->name('teleconsultation.room');
+$router->post('/teleconsulta/{id}/admitir', [TeleconsultationController::class, 'admit'])->name('teleconsultation.admit');
+$router->post('/teleconsulta/{id}/rejeitar', [TeleconsultationController::class, 'reject'])->name('teleconsultation.reject');
+$router->post('/teleconsulta/{id}/evoluir', [TeleconsultationController::class, 'recordEvolution'])->name('teleconsultation.evolve');
+$router->post('/teleconsulta/{id}/encerrar', [TeleconsultationController::class, 'end'])->name('teleconsultation.end');
+
+// Jornada do Paciente (Convite Seguro & Sala de Espera)
+$router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
+$router->post('/teleconsulta/sala-espera/{token}/dispositivo', [TeleconsultationController::class, 'patientSubmitDeviceCheck'])->name('teleconsultation.device');
+$router->post('/teleconsulta/sala-espera/{token}/consentir', [TeleconsultationController::class, 'patientAcceptConsent'])->name('teleconsultation.consent');
+$router->post('/teleconsulta/sala-espera/{token}/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
+$router->get('/teleconsulta/sala-espera/{token}/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
+$router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
