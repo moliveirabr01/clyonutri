@@ -83,4 +83,9 @@ class PatientApiController
     {
         return $this->engagementService->recordCheckin($patientId, $data);
     }
+
+    public function portal(): \ClyoNutri\Domain\PatientPortal\PatientPortalService
+    {
+        return new \ClyoNutri\Domain\PatientPortal\PatientPortalService($this->db);
+    }
 }
