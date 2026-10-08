@@ -16,6 +16,10 @@ use ClyoNutri\Domain\Patient\PatientRepository;
 
 Env::load(__DIR__ . '/../.env');
 
+// Configuração segura de fuso horário da aplicação (NI2-187)
+$appTimezone = (string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo');
+date_default_timezone_set($appTimezone);
+
 // Inicialização de conexão
 $db = Connection::getInstance();
 

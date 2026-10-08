@@ -1083,7 +1083,7 @@ class DashboardController
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--space-6);">
+        <div class="consultation-room-layout" style="display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--space-6);">
           <!-- Coluna 1: Contexto Clínico do Paciente -->
           <div style="display: flex; flex-direction: column; gap: var(--space-6);">
             <!-- Card de Dados e Histórico -->
@@ -1337,7 +1337,7 @@ class DashboardController
             </p>
           </div>
 
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <div class="agenda-controls-layout" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <!-- Navegação por Data -->
             <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
               <a href="/agenda?view=<?= $view ?>&date=<?= $prevDate ?>" class="btn btn-secondary" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;">←</a>

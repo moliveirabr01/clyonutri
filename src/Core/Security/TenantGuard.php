@@ -39,15 +39,29 @@ class TenantGuard
      */
     public static function assertProfessionalBelongsToClinic(int $professionalId, int $clinicId, PDO $db): array
     {
+        // 1. Tentar casar por p.id (ID do profissional) vinculado a usuário membro da clínica
         $stmt = $db->prepare("
             SELECT p.id, cm.clinic_id, u.name 
             FROM professionals p
             JOIN users u ON u.id = p.user_id
             JOIN clinic_members cm ON cm.user_id = p.user_id
-            WHERE (p.id = :id OR p.user_id = :id) AND cm.clinic_id = :clinic_id
+            WHERE p.id = :prof_id AND cm.clinic_id = :clinic_id
         ");
-        $stmt->execute(['id' => $professionalId, 'clinic_id' => $clinicId]);
+        $stmt->execute(['prof_id' => $professionalId, 'clinic_id' => $clinicId]);
         $professional = $stmt->fetch();
+
+        // 2. Se não encontrado, tentar casar por p.user_id (se o chamador passou o user_id do membro da clínica)
+        if (!$professional) {
+            $stmtFallback = $db->prepare("
+                SELECT p.id, cm.clinic_id, u.name 
+                FROM professionals p
+                JOIN users u ON u.id = p.user_id
+                JOIN clinic_members cm ON cm.user_id = p.user_id
+                WHERE p.user_id = :user_id AND cm.clinic_id = :clinic_id
+            ");
+            $stmtFallback->execute(['user_id' => $professionalId, 'clinic_id' => $clinicId]);
+            $professional = $stmtFallback->fetch();
+        }
 
         if (!$professional) {
             self::logSecurityViolation($db, $clinicId, 'professionals', $professionalId, 'Tentativa de acesso a profissional de outro tenant');

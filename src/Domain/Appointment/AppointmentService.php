@@ -81,60 +81,82 @@ class AppointmentService
         $parsedDate = $this->normalizeDateTime($scheduledAt);
         $duration = max(15, min(240, $duration));
 
-        if (!$allowConflict) {
-            $conflict = $this->findConflict($clinicId, $professionalId, $parsedDate, $duration);
-            if ($conflict !== null) {
-                throw new AppointmentConflictException(
-                    "Conflito de agenda: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . " com duração de {$conflict['duration_minutes']} min.",
-                    $conflict
-                );
-            }
+        $ownsTransaction = false;
+        if (!$this->db->inTransaction()) {
+            $this->db->beginTransaction();
+            $ownsTransaction = true;
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO appointments (
-                clinic_id, patient_id, professional_id, scheduled_at,
-                duration_minutes, status, type, notes, created_at, updated_at
-            ) VALUES (
-                :clinic_id, :patient_id, :professional_id, :scheduled_at,
-                :duration, :status, :type, :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            )
-        ");
+        try {
+            if (!$allowConflict) {
+                if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                    $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
+                    $lockStmt->execute(['id' => $professionalId]);
+                }
 
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'patient_id' => $patientId,
-            'professional_id' => $professionalId,
-            'scheduled_at' => $parsedDate,
-            'duration' => $duration,
-            'status' => self::STATUS_SCHEDULED,
-            'type' => $type,
-            'notes' => $notes,
-        ]);
+                $conflict = $this->findConflict($clinicId, $professionalId, $parsedDate, $duration);
+                if ($conflict !== null) {
+                    throw new AppointmentConflictException(
+                        "Conflito de agenda: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . " com duração de {$conflict['duration_minutes']} min.",
+                        $conflict
+                    );
+                }
+            }
 
-        $id = (int)$this->db->lastInsertId();
+            $stmt = $this->db->prepare("
+                INSERT INTO appointments (
+                    clinic_id, patient_id, professional_id, scheduled_at,
+                    duration_minutes, status, type, notes, created_at, updated_at
+                ) VALUES (
+                    :clinic_id, :patient_id, :professional_id, :scheduled_at,
+                    :duration, :status, :type, :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+            ");
 
-        // Registrar trilha de auditoria inicial
-        $this->recordStatusHistory(
-            $clinicId,
-            $id,
-            null,
-            self::STATUS_SCHEDULED,
-            $userId ?? TenantContext::getUserId(),
-            'Agendamento inicial criado'
-        );
+            $stmt->execute([
+                'clinic_id' => $clinicId,
+                'patient_id' => $patientId,
+                'professional_id' => $professionalId,
+                'scheduled_at' => $parsedDate,
+                'duration' => $duration,
+                'status' => self::STATUS_SCHEDULED,
+                'type' => $type,
+                'notes' => $notes,
+            ]);
 
-        return [
-            'id' => $id,
-            'clinic_id' => $clinicId,
-            'patient_id' => $patientId,
-            'professional_id' => $professionalId,
-            'scheduled_at' => $parsedDate,
-            'duration_minutes' => $duration,
-            'status' => self::STATUS_SCHEDULED,
-            'type' => $type,
-            'notes' => $notes,
-        ];
+            $id = (int)$this->db->lastInsertId();
+
+            // Registrar trilha de auditoria inicial
+            $this->recordStatusHistory(
+                $clinicId,
+                $id,
+                null,
+                self::STATUS_SCHEDULED,
+                $userId ?? TenantContext::getUserId(),
+                'Agendamento inicial criado'
+            );
+
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
+
+            return [
+                'id' => $id,
+                'clinic_id' => $clinicId,
+                'patient_id' => $patientId,
+                'professional_id' => $professionalId,
+                'scheduled_at' => $parsedDate,
+                'duration_minutes' => $duration,
+                'status' => self::STATUS_SCHEDULED,
+                'type' => $type,
+                'notes' => $notes,
+            ];
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -159,49 +181,71 @@ class AppointmentService
         $type = $data['type'] ?? ($current['type'] ?? 'first_visit');
         $notes = array_key_exists('notes', $data) ? $data['notes'] : ($current['notes'] ?? null);
 
-        if (!$allowConflict) {
-            $conflict = $this->findConflict($clinicId, $professionalId, $scheduledAt, $duration, $appointmentId);
-            if ($conflict !== null) {
-                throw new AppointmentConflictException(
-                    "Conflito de agenda no reagendamento: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . ".",
-                    $conflict
-                );
-            }
+        $ownsTransaction = false;
+        if (!$this->db->inTransaction()) {
+            $this->db->beginTransaction();
+            $ownsTransaction = true;
         }
 
-        $stmt = $this->db->prepare("
-            UPDATE appointments
-            SET patient_id = :patient_id,
-                professional_id = :professional_id,
-                scheduled_at = :scheduled_at,
-                duration_minutes = :duration,
-                type = :type,
-                notes = :notes,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
+        try {
+            if (!$allowConflict) {
+                if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                    $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
+                    $lockStmt->execute(['id' => $professionalId]);
+                }
 
-        $stmt->execute([
-            'patient_id' => $patientId,
-            'professional_id' => $professionalId,
-            'scheduled_at' => $scheduledAt,
-            'duration' => $duration,
-            'type' => $type,
-            'notes' => $notes,
-            'id' => $appointmentId,
-            'clinic_id' => $clinicId,
-        ]);
+                $conflict = $this->findConflict($clinicId, $professionalId, $scheduledAt, $duration, $appointmentId);
+                if ($conflict !== null) {
+                    throw new AppointmentConflictException(
+                        "Conflito de agenda no reagendamento: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . ".",
+                        $conflict
+                    );
+                }
+            }
 
-        $this->recordStatusHistory(
-            $clinicId,
-            $appointmentId,
-            $current['status'],
-            $current['status'],
-            $userId ?? TenantContext::getUserId(),
-            "Consulta editada / reagendada para {$scheduledAt}"
-        );
+            $stmt = $this->db->prepare("
+                UPDATE appointments
+                SET patient_id = :patient_id,
+                    professional_id = :professional_id,
+                    scheduled_at = :scheduled_at,
+                    duration_minutes = :duration,
+                    type = :type,
+                    notes = :notes,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND clinic_id = :clinic_id
+            ");
 
-        return $this->getAppointment($appointmentId);
+            $stmt->execute([
+                'patient_id' => $patientId,
+                'professional_id' => $professionalId,
+                'scheduled_at' => $scheduledAt,
+                'duration' => $duration,
+                'type' => $type,
+                'notes' => $notes,
+                'id' => $appointmentId,
+                'clinic_id' => $clinicId,
+            ]);
+
+            $this->recordStatusHistory(
+                $clinicId,
+                $appointmentId,
+                $current['status'],
+                $current['status'],
+                $userId ?? TenantContext::getUserId(),
+                "Consulta editada / reagendada para {$scheduledAt}"
+            );
+
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
+
+            return $this->getAppointment($appointmentId);
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -322,6 +366,7 @@ class AppointmentService
     public function getAppointment(int $appointmentId): ?array
     {
         $clinicId = TenantContext::getClinicId();
+
         $stmt = $this->db->prepare("
             SELECT a.*, 
                    p.name AS patient_name, p.phone AS patient_phone, p.email AS patient_email, p.birth_date AS patient_birth_date,

@@ -63,6 +63,7 @@ TEST_FILES=(
     "tests/patient_mobile_http_contract_test.php"
     "tests/anthropometry_lifecycle_and_evaluation_test.php"
     "tests/agenda_and_consultation_lifecycle_test.php"
+    "tests/agenda_operational_and_concurrency_test.php"
     "tests/meal_plan_and_prescription_lifecycle_test.php"
     "tests/canonical_first_consultation_e2e_journey_test.php"
     "tests/meal_plan_web_csrf_and_form_test.php"

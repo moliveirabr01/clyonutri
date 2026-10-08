@@ -170,6 +170,13 @@ if (str_contains($demoProtectionOutput, 'ALL CRITERIA SATISFIED')) {
     recordCheck('HTTP_WEB', 'Remoção de Seed em Runtime & Credenciais Fixas (NI2-172)', 'FAIL', 'Falha na validação de proteção demo: ' . substr($demoProtectionOutput, 0, 200));
 }
 
+$agendaOperationalOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/agenda_operational_and_concurrency_test.php') . " 2>&1");
+if (str_contains($agendaOperationalOutput, 'ALL CRITERIA SATISFIED')) {
+    recordCheck('HTTP_WEB', 'Agenda Operacional, Conflitos e Contexto Clínico (NI2-187)', 'PASS', '31 asserções de conflito, atomicidade, máquinas de estado, navegação e responsividade 390-1440px aprovadas');
+} else {
+    recordCheck('HTTP_WEB', 'Agenda Operacional, Conflitos e Contexto Clínico (NI2-187)', 'FAIL', 'Falha na validação operacional da agenda: ' . substr($agendaOperationalOutput, 0, 200));
+}
+
 // -----------------------------------------------------------------------------
 // CAMADA 4: CAMADA MOBILE API & TOKENS SANCTUM (MOBILE_API)
 // -----------------------------------------------------------------------------

@@ -343,13 +343,35 @@ class PatientPortalService
         $stmt = $this->db->prepare("
             UPDATE appointments
             SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND patient_id = :patient_id AND clinic_id = :clinic_id
+            WHERE id = :id AND patient_id = :patient_id AND clinic_id = :clinic_id AND status = 'scheduled'
         ");
-        return $stmt->execute([
+        $stmt->execute([
             'id' => $appointmentId,
             'patient_id' => $patientId,
             'clinic_id' => $clinicId,
         ]);
+
+        $affected = $stmt->rowCount();
+        if ($affected > 0) {
+            try {
+                $hist = $this->db->prepare("
+                    INSERT INTO appointment_status_history (
+                        clinic_id, appointment_id, from_status, to_status, notes, created_at
+                    ) VALUES (
+                        :clinic_id, :app_id, 'scheduled', 'confirmed', 'Confirmado pelo paciente via aplicativo/portal', CURRENT_TIMESTAMP
+                    )
+                ");
+                $hist->execute([
+                    'clinic_id' => $clinicId,
+                    'app_id' => $appointmentId,
+                ]);
+            } catch (\Throwable $e) {
+                // Silencioso se tabela não existir
+            }
+            return true;
+        }
+
+        return false;
     }
 
     // =========================================================================
