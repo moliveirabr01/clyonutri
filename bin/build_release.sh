@@ -60,6 +60,11 @@ TEST_FILES=(
     "tests/patient_portal_e2e_suite_test.php"
     "tests/verifiable_multilateral_audit_suite_test.php"
     "tests/patient_mobile_api_integration_test.php"
+    "tests/anthropometry_lifecycle_and_evaluation_test.php"
+    "tests/agenda_and_consultation_lifecycle_test.php"
+    "tests/meal_plan_and_prescription_lifecycle_test.php"
+    "tests/canonical_first_consultation_e2e_journey_test.php"
+    "tests/meal_plan_web_csrf_and_form_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

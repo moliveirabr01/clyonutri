@@ -208,9 +208,15 @@ class MealPlanService
 
             return [
                 'plan_id' => $planId,
+                'id' => $planId,
                 'title' => $cleanTitle,
                 'status' => 'draft',
                 'parent_plan_id' => $parentPlanId,
+                'daily_energy_kcal' => $totals['energy_kcal'],
+                'protein_g' => $totals['protein_g'],
+                'carbohydrate_g' => $totals['carbohydrate_g'],
+                'lipid_g' => $totals['lipid_g'],
+                'fiber_g' => $totals['fiber_g'],
                 'totals' => $totals,
             ];
         } catch (\Throwable $e) {

@@ -53,6 +53,7 @@ $db->exec("DELETE FROM patient_invitations;");
 $db->exec("DELETE FROM patient_self_metrics;");
 $db->exec("DELETE FROM patient_documents;");
 $db->exec("DELETE FROM offline_sync_queue;");
+$db->exec("DELETE FROM food_diary_entries WHERE patient_id IN (1, 2);");
 $db->exec("DELETE FROM appointments WHERE patient_id IN (1, 2);");
 
 $clinicAId = 1;

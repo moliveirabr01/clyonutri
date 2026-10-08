@@ -42,6 +42,7 @@ $appointmentService = new AppointmentService($db);
 $agendamento = $appointmentService->schedule($patient['id'], $nutri['user_id'], '2026-10-10 14:00:00', 'first_visit', 60, 'Primeira consulta de avaliação');
 assert($agendamento['status'] === 'scheduled', "Consulta deve nascer como scheduled");
 
+$appointmentService->updateStatus($agendamento['id'], 'in_progress');
 $statusUpdated = $appointmentService->updateStatus($agendamento['id'], 'completed');
 assert($statusUpdated === true, "Status deve ser atualizado para completed");
 echo "  ✓ Agenda e ciclo de consulta validados com sucesso.\n\n";
