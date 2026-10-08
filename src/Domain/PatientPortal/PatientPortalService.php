@@ -223,7 +223,7 @@ class PatientPortalService
             SELECT id, assessed_at AS date, weight_kg, height_cm, bmi, waist_cm, notes,
                    'clinical_official' AS source
             FROM anthropometric_assessments
-            WHERE patient_id = :patient_id AND clinic_id = :clinic_id
+            WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND is_shared = 1
             ORDER BY assessed_at ASC
         ");
         $cStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);

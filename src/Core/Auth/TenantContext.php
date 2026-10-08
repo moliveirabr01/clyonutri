@@ -17,6 +17,11 @@ class TenantContext
         self::$currentUser = $user;
     }
 
+    public static function setTenant(int $clinicId, array $user): void
+    {
+        self::set($clinicId, $user);
+    }
+
     public static function getClinicId(): int
     {
         if (self::$currentClinicId === null) {

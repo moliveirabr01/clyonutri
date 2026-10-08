@@ -7,6 +7,9 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Domain\Anthropometry\AnthropometryCalculator;
+use ClyoNutri\Domain\Anthropometry\AnthropometryService;
+use ClyoNutri\Domain\Anthropometry\InvalidAnthropometricDataException;
 use ClyoNutri\Domain\Appointment\AppointmentConflictException;
 use ClyoNutri\Domain\Appointment\AppointmentService;
 use ClyoNutri\Domain\Appointment\InvalidAppointmentTransitionException;
@@ -63,10 +66,27 @@ class DashboardController
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $csrfToken = Csrf::token();
+
+        $anthroService = new AnthropometryService();
+        $evolutionData = $anthroService->getEvolution($id);
+        $assessments = $evolutionData['assessments'];
 
         ob_start();
         ?>
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center;">
+        <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['success'])): ?>
+          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : 'Operação realizada com sucesso!' ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['error'])): ?>
+          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
+            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na validação dos dados clínicos.' ?>
+          </div>
+        <?php endif; ?>
+
+        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
               <a href="/pacientes" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar para Pacientes</a>
@@ -74,7 +94,14 @@ class DashboardController
             <h1><?= htmlspecialchars($p['name']) ?></h1>
             <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
           </div>
-          <span class="badge badge-success"><?= htmlspecialchars($p['status']) ?></span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="btn btn-secondary">
+              Ver Evolução & Comparativo ➔
+            </a>
+            <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+              + Nova Avaliação Antropométrica
+            </button>
+          </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-6);">
@@ -111,24 +138,734 @@ class DashboardController
               <?php endif; ?>
             </div>
 
+            <!-- Card de Avaliações Antropométricas com Indicadores OMS (NI2-65, NI2-66, NI2-69) -->
             <div class="card">
-              <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Últimas Avaliações Antropométricas</h3>
-              <?php if (empty($profile['assessments'])): ?>
-                <p style="color: var(--neutral-gray-500);">Nenhuma avaliação antropométrica registrada.</p>
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0;">Avaliações Antropométricas (<?= count($assessments) ?>)</h3>
+                <a href="/pacientes/<?= $p['id'] ?>/antropometria" style="font-size: 0.85rem; color: var(--brand-copper-600); font-weight: 600; text-decoration: none;">Análise Completa ➔</a>
+              </div>
+
+              <?php if (empty($assessments)): ?>
+                <div style="text-align: center; padding: var(--space-6); color: var(--neutral-gray-500);">
+                  <p>Nenhuma avaliação antropométrica registrada ainda para este paciente.</p>
+                  <button type="button" class="btn btn-secondary" onclick="openAnthroModal()" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
+                </div>
               <?php else: ?>
-                <?php foreach (array_slice($profile['assessments'], 0, 3) as $as): ?>
-                  <div style="border-bottom: var(--border-default); padding: 8px 0;">
-                    <strong><?= date('d/m/Y', strtotime($as['assessed_at'])) ?>:</strong>
-                    Peso: <?= $as['weight_kg'] ?> kg | Altura: <?= $as['height_cm'] ?> cm | IMC: <strong><?= $as['bmi'] ?></strong>
-                  </div>
-                <?php endforeach; ?>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <?php foreach (array_reverse(array_slice($assessments, -5)) as $as): ?>
+                    <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 12px 16px;">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <div>
+                          <strong style="color: var(--brand-navy-900); font-size: 1rem;"><?= date('d/m/Y', strtotime($as['assessed_at'])) ?></strong>
+                          <span style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-left: 8px;">Avaliador: <?= htmlspecialchars($as['professional_name'] ?? 'Nutricionista') ?></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <?php if ($as['is_shared']): ?>
+                            <span class="badge badge-success" style="font-size: 0.75rem;">✓ Liberado ao Paciente</span>
+                          <?php else: ?>
+                            <span class="badge badge-secondary" style="font-size: 0.75rem; background: #E2E8F0; color: #475569;">Privado (Clínico)</span>
+                          <?php endif; ?>
+                          
+                          <form action="/pacientes/<?= $p['id'] ?>/antropometria/<?= $as['id'] ?>/compartilhar" method="POST" style="display: inline;">
+                            <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="is_shared" value="<?= $as['is_shared'] ? '0' : '1' ?>">
+                            <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 26px;">
+                              <?= $as['is_shared'] ? 'Revogar' : 'Liberar' ?>
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; font-size: 0.875rem;">
+                        <div>
+                          <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">PESO & ALTURA</span>
+                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['weight_kg'] ?> kg</strong> / <span class="tabular-nums"><?= $as['height_cm'] ?> cm</span>
+                        </div>
+                        <div>
+                          <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">IMC (OMS)</span>
+                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['bmi'] ?></strong>
+                          <span class="badge badge-info" style="font-size: 0.7rem; padding: 1px 5px;"><?= $as['bmi_classification'] ?></span>
+                        </div>
+                        <?php if ($as['whr'] !== null): ?>
+                          <div>
+                            <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">RCQ (CINTURA/QUADRIL)</span>
+                            <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['whr'] ?></strong>
+                            <span style="font-size: 0.7rem; color: var(--neutral-gray-600); display: block;"><?= $as['whr_classification'] ?></span>
+                          </div>
+                        <?php endif; ?>
+                        <?php if ($as['body_fat_pct'] !== null): ?>
+                          <div>
+                            <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">GORDURA CORPORAL</span>
+                            <strong class="tabular-nums" style="color: var(--brand-copper-600);"><?= $as['body_fat_pct'] ?>%</strong>
+                            <?php if ($as['fat_mass_kg'] !== null): ?>
+                              <span style="font-size: 0.75rem; color: var(--neutral-gray-500);">(<?= $as['fat_mass_kg'] ?> kg)</span>
+                            <?php endif; ?>
+                          </div>
+                        <?php endif; ?>
+                      </div>
+
+                      <?php if (!empty($as['notes'])): ?>
+                        <div style="margin-top: 8px; font-size: 0.8rem; color: var(--neutral-gray-600); background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--neutral-gray-200);">
+                          <strong>Notas:</strong> <?= htmlspecialchars($as['notes']) ?>
+                        </div>
+                      <?php endif; ?>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
               <?php endif; ?>
             </div>
           </div>
         </div>
+
+        <!-- Modal Nova Avaliação Antropométrica (NI2-65) -->
+        <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
+          <div class="modal-dialog" style="max-width: 650px;">
+            <div class="modal-header">
+              <h3>Nova Avaliação Antropométrica</h3>
+              <button class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+            </div>
+            <form method="POST" action="/pacientes/<?= $p['id'] ?>/antropometria">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
+
+              <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
+                    <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_height">Altura (cm) *</label>
+                    <input type="number" step="0.1" min="45" max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175.0" required>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="ant_date">Data da avaliação</label>
+                  <input type="datetime-local" id="ant_date" name="assessed_at" class="form-control" value="<?= date('Y-m-d\TH:i') ?>">
+                </div>
+
+                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Circunferências Corporais (cm)</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_waist">Cintura (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_hip">Quadril (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_hip" name="hip_cm" class="form-control" placeholder="Ex: 98.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_neck">Pescoço (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_neck" name="neck_cm" class="form-control" placeholder="Ex: 38.0">
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-3);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_arm">Braço (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_chest">Tórax (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_chest" name="chest_cm" class="form-control" placeholder="Ex: 96.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_thigh">Coxa (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_thigh" name="thigh_cm" class="form-control" placeholder="Ex: 55.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_calf">Panturrilha (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_calf" name="calf_cm" class="form-control" placeholder="Ex: 37.0">
+                  </div>
+                </div>
+
+                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Composição Corporal Informada (Bioimpedância / Dobras)</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_fat">% Gordura Corporal</label>
+                    <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_muscle">% Massa Muscular</label>
+                    <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="ant_notes">Anotações Clínicas & Metas</label>
+                  <textarea id="ant_notes" name="notes" class="form-control" style="min-height: 60px;" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
+                </div>
+
+                <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
+                    <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
+                    Liberar imediatamente para o paciente visualizar no aplicativo (NI2-69)
+                  </label>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          function openAnthroModal() {
+            document.getElementById('anthroModal').classList.add('active');
+            document.getElementById('ant_weight').focus();
+          }
+          function closeAnthroModal() {
+            document.getElementById('anthroModal').classList.remove('active');
+          }
+        </script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /**
+     * Tela dedicada de Evolução Temporal, Indicadores e Comparação de Avaliações (NI2-67, NI2-68, NI2-69).
+     */
+    public function patientAnthropometry(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $patient = $repo->findById($id);
+
+        if (!$patient) {
+            header('Location: /pacientes');
+            exit;
+        }
+
+        $metric = $_GET['metric'] ?? 'weight_kg';
+        $anthroService = new AnthropometryService();
+        $evolution = $anthroService->getEvolution($id, $metric);
+        $assessments = $evolution['assessments'];
+        $series = $evolution['series'];
+
+        // Comparativo entre avaliações (NI2-68)
+        $comparison = null;
+        $evalAId = isset($_GET['eval_a']) ? (int)$_GET['eval_a'] : 0;
+        $evalBId = isset($_GET['eval_b']) ? (int)$_GET['eval_b'] : 0;
+
+        if ($evalAId > 0 && $evalBId > 0 && $evalAId !== $evalBId) {
+            try {
+                $comparison = $anthroService->compareAssessments($id, $evalAId, $evalBId);
+            } catch (\Throwable $e) {
+                $comparison = null;
+            }
+        } elseif (count($assessments) >= 2) {
+            // Comparação padrão automática: primeira (baseline) vs última (atual)
+            $firstEval = $assessments[0];
+            $lastEval = end($assessments);
+            try {
+                $comparison = $anthroService->compareAssessments($id, (int)$firstEval['id'], (int)$lastEval['id']);
+                $evalAId = (int)$firstEval['id'];
+                $evalBId = (int)$lastEval['id'];
+            } catch (\Throwable $e) {
+                $comparison = null;
+            }
+        }
+
+        $latestEval = !empty($assessments) ? end($assessments) : null;
+        $firstEval = !empty($assessments) ? $assessments[0] : null;
+
+        $title = 'Evolução Antropométrica — ' . $patient['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri Demo';
+        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $csrfToken = Csrf::token();
+
+        ob_start();
+        ?>
+        <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['success'])): ?>
+          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação registrada com sucesso!' : 'Permissão de compartilhamento atualizada com sucesso!' ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['error'])): ?>
+          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
+            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
+          </div>
+        <?php endif; ?>
+
+        <!-- Cabeçalho -->
+        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+            </div>
+            <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
+            <p style="color: var(--neutral-gray-500);">Análise longitudinal de indicadores, composição corporal e comparativo clínico.</p>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+            + Nova Avaliação
+          </button>
+        </div>
+
+        <!-- KPIs Resumo Clínico -->
+        <?php if ($latestEval): ?>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: var(--space-6);">
+            <div class="card" style="margin-bottom: 0;">
+              <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">ÚLTIMO PESO REGISTRADO</div>
+              <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+                <?= $latestEval['weight_kg'] ?> kg
+              </div>
+              <?php if ($firstEval && $firstEval['id'] !== $latestEval['id']): ?>
+                <?php $deltaTot = round($latestEval['weight_kg'] - $firstEval['weight_kg'], 1); ?>
+                <span style="font-size: 0.8rem; color: <?= $deltaTot < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>; font-weight: 600;">
+                  <?= $deltaTot > 0 ? "+{$deltaTot}" : $deltaTot ?> kg desde a 1ª consulta
+                </span>
+              <?php else: ?>
+                <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Primeira avaliação</span>
+              <?php endif; ?>
+            </div>
+
+            <div class="card" style="margin-bottom: 0;">
+              <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">IMC ATUAL (OMS)</div>
+              <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+                <?= $latestEval['bmi'] ?>
+              </div>
+              <span class="badge badge-info"><?= $latestEval['bmi_classification'] ?></span>
+            </div>
+
+            <?php if ($latestEval['whr'] !== null): ?>
+              <div class="card" style="margin-bottom: 0;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">RCQ (CINTURA / QUADRIL)</div>
+                <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+                  <?= $latestEval['whr'] ?>
+                </div>
+                <span class="badge badge-<?= $latestEval['whr_risk'] === 'baixo' ? 'success' : ($latestEval['whr_risk'] === 'moderado' ? 'warning' : 'danger') ?>">
+                  <?= $latestEval['whr_classification'] ?>
+                </span>
+              </div>
+            <?php endif; ?>
+
+            <?php if ($latestEval['body_fat_pct'] !== null): ?>
+              <div class="card" style="margin-bottom: 0;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">% GORDURA CORPORAL</div>
+                <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-copper-600); margin: 6px 0;">
+                  <?= $latestEval['body_fat_pct'] ?>%
+                </div>
+                <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">
+                  <?= $latestEval['fat_mass_kg'] !== null ? "{$latestEval['fat_mass_kg']} kg massa gorda" : 'Informado' ?>
+                </span>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+
+        <!-- Alternativa Textual Acessível (NI2-67) -->
+        <div class="card" style="border-left: 4px solid var(--brand-copper-500); background: #FAF7F2; margin-bottom: var(--space-6);">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div>
+              <strong style="color: var(--brand-navy-900); font-size: 0.95rem; display: block;">Resumo Clínico da Evolução (Acessibilidade & Auditoria):</strong>
+              <span style="font-size: 0.875rem; color: var(--neutral-ink-900);"><?= htmlspecialchars($evolution['accessible_summary']) ?></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seletor de Métrica & Linha do Tempo -->
+        <div class="card" style="margin-bottom: var(--space-6);">
+          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <h3>Série Histórica Ponto a Ponto</h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
+              <select onchange="location.href='/pacientes/<?= $patient['id'] ?>/antropometria?metric='+this.value" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
+                <option value="weight_kg" <?= $metric === 'weight_kg' ? 'selected' : '' ?>>Peso Corporal (kg)</option>
+                <option value="bmi" <?= $metric === 'bmi' ? 'selected' : '' ?>>IMC (kg/m²)</option>
+                <option value="waist_cm" <?= $metric === 'waist_cm' ? 'selected' : '' ?>>Cintura (cm)</option>
+                <option value="hip_cm" <?= $metric === 'hip_cm' ? 'selected' : '' ?>>Quadril (cm)</option>
+                <option value="whr" <?= $metric === 'whr' ? 'selected' : '' ?>>RCQ (Cintura/Quadril)</option>
+                <option value="whtr" <?= $metric === 'whtr' ? 'selected' : '' ?>>RCE (Cintura/Estatura)</option>
+                <option value="body_fat_pct" <?= $metric === 'body_fat_pct' ? 'selected' : '' ?>>Gordura Corporal (%)</option>
+                <option value="muscle_mass_pct" <?= $metric === 'muscle_mass_pct' ? 'selected' : '' ?>>Massa Muscular (%)</option>
+              </select>
+            </div>
+          </div>
+
+          <?php if (empty($series)): ?>
+            <p style="color: var(--neutral-gray-500); text-align: center; padding: 24px;">Nenhuma medição encontrada para esta métrica.</p>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Valor</th>
+                    <th>Variação Ponto Anterior</th>
+                    <th>Variação %</th>
+                    <th>Status Paciente</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($series as $pnt): ?>
+                    <tr>
+                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= $pnt['formatted_date'] ?></td>
+                      <td class="tabular-nums" style="font-weight: 700; font-size: 1.05rem; color: var(--brand-navy-900);"><?= $pnt['value'] ?></td>
+                      <td class="tabular-nums">
+                        <?php if ($pnt['delta_previous'] === null): ?>
+                          <span style="color: var(--neutral-gray-500);">Baseline inicial</span>
+                        <?php else: ?>
+                          <span style="font-weight: 600; color: <?= $pnt['delta_previous'] < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>;">
+                            <?= $pnt['delta_previous'] > 0 ? "+{$pnt['delta_previous']}" : $pnt['delta_previous'] ?>
+                          </span>
+                        <?php endif; ?>
+                      </td>
+                      <td class="tabular-nums">
+                        <?php if ($pnt['delta_previous_pct'] === null): ?>
+                          —
+                        <?php else: ?>
+                          <span style="color: <?= $pnt['delta_previous_pct'] < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>;">
+                            <?= $pnt['delta_previous_pct'] > 0 ? "+{$pnt['delta_previous_pct']}%" : "{$pnt['delta_previous_pct']}%" ?>
+                          </span>
+                        <?php endif; ?>
+                      </td>
+                      <td>
+                        <?php 
+                          $isSh = false;
+                          foreach ($assessments as $aItem) {
+                              if ((int)$aItem['id'] === (int)$pnt['assessment_id']) {
+                                  $isSh = $aItem['is_shared'];
+                                  break;
+                              }
+                          }
+                        ?>
+                        <?php if ($isSh): ?>
+                          <span class="badge badge-success">✓ Visível no app</span>
+                        <?php else: ?>
+                          <span class="badge badge-secondary" style="background: #E2E8F0; color: #475569;">Privado</span>
+                        <?php endif; ?>
+                      </td>
+                      <td>
+                        <form action="/pacientes/<?= $patient['id'] ?>/antropometria/<?= $pnt['assessment_id'] ?>/compartilhar" method="POST" style="display: inline;">
+                          <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                          <input type="hidden" name="is_shared" value="<?= $isSh ? '0' : '1' ?>">
+                          <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 28px;">
+                            <?= $isSh ? 'Revogar do Paciente' : 'Liberar ao Paciente' ?>
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Seção: Comparador Clínico de Avaliações (NI2-68) -->
+        <div class="card" style="margin-bottom: var(--space-6);">
+          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3>Comparativo Clínico Entre Avaliações</h3>
+              <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.85rem;">Selecione duas avaliações para analisar deltas absolutos, percentuais e evolução corporal.</p>
+            </div>
+            
+            <?php if (count($assessments) >= 2): ?>
+              <form method="GET" action="/pacientes/<?= $patient['id'] ?>/antropometria" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <input type="hidden" name="metric" value="<?= htmlspecialchars($metric) ?>">
+                <select name="eval_a" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                  <?php foreach ($assessments as $opt): ?>
+                    <option value="<?= $opt['id'] ?>" <?= $evalAId === (int)$opt['id'] ? 'selected' : '' ?>>
+                      Baseline: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+
+                <span style="font-weight: 600; color: var(--neutral-gray-500);">vs</span>
+
+                <select name="eval_b" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                  <?php foreach ($assessments as $opt): ?>
+                    <option value="<?= $opt['id'] ?>" <?= $evalBId === (int)$opt['id'] ? 'selected' : '' ?>>
+                      Comparar: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+
+                <button type="submit" class="btn btn-secondary" style="min-height: 34px;">Comparar</button>
+              </form>
+            <?php endif; ?>
+          </div>
+
+          <?php if (!$comparison): ?>
+            <p style="color: var(--neutral-gray-500); text-align: center; padding: 24px;">
+              <?= count($assessments) < 2 ? 'São necessárias pelo menos duas avaliações para realizar o comparativo clínico.' : 'Selecione duas avaliações distintas para comparar.' ?>
+            </p>
+          <?php else: ?>
+            <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <strong>Período:</strong> <?= $comparison['baseline']['formatted_date'] ?> ➔ <?= $comparison['followup']['formatted_date'] ?>
+                <span style="color: var(--neutral-gray-500); margin-left: 8px;">(<?= $comparison['days_between'] ?> dias decorridos)</span>
+              </div>
+              <div style="font-size: 0.85rem; color: var(--neutral-gray-600);">
+                Avaliadores: <?= htmlspecialchars($comparison['baseline']['evaluator']) ?> e <?= htmlspecialchars($comparison['followup']['evaluator']) ?>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Indicador / Métrica</th>
+                    <th class="tabular-nums">Baseline (<?= $comparison['baseline']['formatted_date'] ?>)</th>
+                    <th class="tabular-nums">Follow-up (<?= $comparison['followup']['formatted_date'] ?>)</th>
+                    <th class="tabular-nums">Delta Absoluto</th>
+                    <th class="tabular-nums">Delta Percentual</th>
+                    <th>Tendência</th>
+                    <th>Status do Dado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($comparison['metrics'] as $mKey => $mRow): ?>
+                    <tr>
+                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($mRow['label']) ?></td>
+                      <td class="tabular-nums">
+                        <?= $mRow['initial_value'] !== null ? "{$mRow['initial_value']} {$mRow['unit']}" : '<span style="color: var(--neutral-gray-400);">—</span>' ?>
+                      </td>
+                      <td class="tabular-nums">
+                        <?= $mRow['final_value'] !== null ? "{$mRow['final_value']} {$mRow['unit']}" : '<span style="color: var(--neutral-gray-400);">—</span>' ?>
+                      </td>
+                      <td class="tabular-nums">
+                        <?php if ($mRow['delta_abs'] === null): ?>
+                          <span style="color: var(--neutral-gray-400);">—</span>
+                        <?php else: ?>
+                          <strong style="color: <?= $mRow['delta_abs'] < 0 ? 'var(--semantic-success)' : ($mRow['delta_abs'] > 0 ? 'var(--brand-copper-600)' : 'var(--neutral-gray-600)') ?>;">
+                            <?= $mRow['delta_abs'] > 0 ? "+{$mRow['delta_abs']}" : $mRow['delta_abs'] ?> <?= $mRow['unit'] ?>
+                          </strong>
+                        <?php endif; ?>
+                      </td>
+                      <td class="tabular-nums">
+                        <?php if ($mRow['delta_pct'] === null): ?>
+                          <span style="color: var(--neutral-gray-400);">—</span>
+                        <?php else: ?>
+                          <strong style="color: <?= $mRow['delta_pct'] < 0 ? 'var(--semantic-success)' : ($mRow['delta_pct'] > 0 ? 'var(--brand-copper-600)' : 'var(--neutral-gray-600)') ?>;">
+                            <?= $mRow['delta_pct'] > 0 ? "+{$mRow['delta_pct']}%" : "{$mRow['delta_pct']}%" ?>
+                          </strong>
+                        <?php endif; ?>
+                      </td>
+                      <td>
+                        <?php if ($mRow['trend'] === 'decrease'): ?>
+                          <span style="color: var(--semantic-success); font-weight: 700;">↓ Redução</span>
+                        <?php elseif ($mRow['trend'] === 'increase'): ?>
+                          <span style="color: var(--brand-copper-600); font-weight: 700;">↑ Aumento</span>
+                        <?php elseif ($mRow['trend'] === 'stable'): ?>
+                          <span style="color: var(--neutral-gray-500);">↔ Estável</span>
+                        <?php else: ?>
+                          <span style="color: var(--neutral-gray-400);">—</span>
+                        <?php endif; ?>
+                      </td>
+                      <td>
+                        <?php if ($mRow['status'] === 'evaluated'): ?>
+                          <span class="badge badge-success" style="font-size: 0.7rem;">Consistente</span>
+                        <?php elseif ($mRow['status'] === 'missing_in_baseline'): ?>
+                          <span class="badge badge-warning" style="font-size: 0.7rem;">Não medido no início</span>
+                        <?php elseif ($mRow['status'] === 'missing_in_followup'): ?>
+                          <span class="badge badge-warning" style="font-size: 0.7rem;">Não medido no follow-up</span>
+                        <?php else: ?>
+                          <span class="badge badge-secondary" style="font-size: 0.7rem;">Não medido</span>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Modal Nova Avaliação Antropométrica -->
+        <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
+          <div class="modal-dialog" style="max-width: 650px;">
+            <div class="modal-header">
+              <h3>Nova Avaliação Antropométrica</h3>
+              <button class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+            </div>
+            <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <input type="hidden" name="patient_id" value="<?= $patient['id'] ?>">
+
+              <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
+                    <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_height">Altura (cm) *</label>
+                    <input type="number" step="0.1" min="45" max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175.0" required>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="ant_date">Data da avaliação</label>
+                  <input type="datetime-local" id="ant_date" name="assessed_at" class="form-control" value="<?= date('Y-m-d\TH:i') ?>">
+                </div>
+
+                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Circunferências Corporais (cm)</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_waist">Cintura (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_hip">Quadril (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_hip" name="hip_cm" class="form-control" placeholder="Ex: 98.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_neck">Pescoço (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_neck" name="neck_cm" class="form-control" placeholder="Ex: 38.0">
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-3);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_arm">Braço (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_chest">Tórax (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_chest" name="chest_cm" class="form-control" placeholder="Ex: 96.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_thigh">Coxa (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_thigh" name="thigh_cm" class="form-control" placeholder="Ex: 55.0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_calf">Panturrilha (cm)</label>
+                    <input type="number" step="0.1" min="10" max="250" id="ant_calf" name="calf_cm" class="form-control" placeholder="Ex: 37.0">
+                  </div>
+                </div>
+
+                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Composição Corporal Informada (Bioimpedância / Dobras)</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                  <div class="form-group">
+                    <label class="form-label" for="ant_fat">% Gordura Corporal</label>
+                    <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="ant_muscle">% Massa Muscular</label>
+                    <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="ant_notes">Anotações Clínicas & Metas</label>
+                  <textarea id="ant_notes" name="notes" class="form-control" style="min-height: 60px;" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
+                </div>
+
+                <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
+                    <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
+                    Liberar imediatamente para o paciente visualizar no aplicativo (NI2-69)
+                  </label>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          function openAnthroModal() {
+            document.getElementById('anthroModal').classList.add('active');
+            document.getElementById('ant_weight').focus();
+          }
+          function closeAnthroModal() {
+            document.getElementById('anthroModal').classList.remove('active');
+          }
+        </script>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function saveAnthropometry(array $params): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        if (!Csrf::validate($token)) {
+            $patientId = (int)($params['id'] ?? $_POST['patient_id'] ?? 0);
+            header("Location: /pacientes/{$patientId}/antropometria?error=csrf");
+            exit;
+        }
+
+        $patientId = (int)($params['id'] ?? $_POST['patient_id'] ?? 0);
+        if ($patientId <= 0) {
+            header("Location: /pacientes?error=paciente_invalido");
+            exit;
+        }
+
+        $profId = $this->getActiveProfessionalId();
+        $userId = TenantContext::getUserId();
+        $service = new AnthropometryService();
+
+        try {
+            $service->recordAssessment($patientId, $profId, $_POST, $userId);
+            header("Location: /pacientes/{$patientId}/antropometria?success=avaliacao_registrada");
+            exit;
+        } catch (InvalidAnthropometricDataException $e) {
+            header("Location: /pacientes/{$patientId}/antropometria?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            exit;
+        } catch (\Throwable $e) {
+            header("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    public function shareAnthropometry(array $params): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        $patientId = (int)($params['id'] ?? 0);
+        $evalId = (int)($params['evalId'] ?? 0);
+
+        if (!Csrf::validate($token)) {
+            header("Location: /pacientes/{$patientId}/antropometria?error=csrf");
+            exit;
+        }
+
+        $isShared = !empty($_POST['is_shared']) && $_POST['is_shared'] === '1';
+        $reason = !empty($_POST['reason']) ? trim((string)$_POST['reason']) : ($isShared ? 'Liberado pelo nutricionista' : 'Revogado pelo nutricionista');
+        $userId = TenantContext::getUserId();
+
+        $service = new AnthropometryService();
+        try {
+            $service->shareAssessment($evalId, $isShared, $userId, $reason);
+            header("Location: /pacientes/{$patientId}/antropometria?success=compartilhamento_atualizado");
+            exit;
+        } catch (\Throwable $e) {
+            header("Location: /pacientes/{$patientId}/antropometria?error=falha_compartilhar&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    public function compareAnthropometry(array $params): void
+    {
+        $patientId = (int)($params['id'] ?? 0);
+        $evalAId = (int)($_GET['eval_a'] ?? 0);
+        $evalBId = (int)($_GET['eval_b'] ?? 0);
+
+        $service = new AnthropometryService();
+        try {
+            $res = $service->compareAssessments($patientId, $evalAId, $evalBId);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($res);
+            exit;
+        } catch (\Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8', true, 400);
+            echo json_encode(['error' => $e->getMessage()]);
+            exit;
+        }
     }
 
     private function getActiveProfessionalId(): int
