@@ -1,0 +1,54 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * ClyoNutri II — Artisan Command Line Interface
+ */
+
+define('LARAVEL_START', microtime(true));
+
+// Registrar Autoloader do Composer
+if (file_exists($maintenance = __DIR__ . '/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+require __DIR__ . '/vendor/autoload.php';
+
+// Bootstrap da Aplicação
+$app = require_once __DIR__ . '/bootstrap/app.php';
+
+$command = $argv[1] ?? 'list';
+
+echo "ClyoNutri II — Artisan CLI Environment (PHP " . PHP_VERSION . ")\n";
+
+switch ($command) {
+    case 'migrate':
+        require __DIR__ . '/bin/migrate.php';
+        exit(0);
+
+    case 'healthcheck':
+    case 'health':
+        require __DIR__ . '/bin/healthcheck.php';
+        exit(0);
+
+    case 'quality-gate':
+        require __DIR__ . '/bin/verify_quality_gate.php';
+        exit(0);
+
+    case 'version':
+    case '--version':
+    case '-V':
+        echo "Laravel Framework 13.x (ClyoNutri Enterprise Foundation)\n";
+        exit(0);
+
+    case 'list':
+    default:
+        echo "Comandos disponíveis:\n";
+        echo "  migrate        Executa migrações estruturais do banco relacional\n";
+        echo "  healthcheck    Verifica integridade do sistema e conexão com banco\n";
+        echo "  quality-gate   Executa a matriz independente de portões de qualidade\n";
+        echo "  version        Exibe versão arquitetural do framework\n";
+        exit(0);
+}
