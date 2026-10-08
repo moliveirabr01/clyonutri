@@ -26,6 +26,11 @@ class Csrf
         return self::token();
     }
 
+    public static function generateToken(): string
+    {
+        return self::token();
+    }
+
     public static function validate(?string $token): bool
     {
         if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
@@ -37,5 +42,10 @@ class Csrf
         }
 
         return hash_equals($_SESSION[self::SESSION_KEY], $token);
+    }
+
+    public static function validateToken(?string $token): bool
+    {
+        return self::validate($token);
     }
 }
