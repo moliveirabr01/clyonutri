@@ -99,9 +99,10 @@ $stmtPatientB = $db->prepare("INSERT INTO patients (uuid, clinic_id, name, email
 $stmtPatientB->execute(['uuid' => $patientUuidB]);
 $patientIdB = (int)$db->lastInsertId();
 
-$db->exec("DELETE FROM appointments WHERE patient_id IN ({$patientA1['id']}, {$patientA2['id']}) OR (professional_id = {$profIdA} AND scheduled_at LIKE '" . date('Y-m-d') . "%')");
-
 $service = new AppointmentService($db);
+$today = $service->todayDate();
+
+$db->exec("DELETE FROM appointments WHERE patient_id IN ({$patientA1['id']}, {$patientA2['id']}) OR (professional_id = {$profIdA} AND scheduled_at LIKE '{$today}%')");
 
 // =============================================================================
 // [1] NI2-81: CRIAR E EDITAR AGENDAMENTO (Conflitos, Duração, Tenant, Timezone)
@@ -109,7 +110,7 @@ $service = new AppointmentService($db);
 echo "[1] Testando NI2-81 — Criar e Editar Agendamento...\n";
 
 // 1.1 Agendar consulta válida
-$scheduleDate = date('Y-m-d') . ' 10:00:00';
+$scheduleDate = $today . ' 10:00:00';
 $app1 = $service->schedule(
     $patientA1['id'],
     $profIdA,
@@ -138,7 +139,7 @@ try {
     $service->schedule(
         $patientA2['id'],
         $profIdA,
-        date('Y-m-d') . ' 10:30:00',
+        $today . ' 10:30:00',
         'follow_up',
         45,
         'Tentativa com sobreposição'
@@ -152,7 +153,7 @@ assertCondition("Conflito de horário detectado e bloqueado com AppointmentConfl
 $app2Encaixe = $service->schedule(
     $patientA2['id'],
     $profIdA,
-    date('Y-m-d') . ' 10:30:00',
+    $today . ' 10:30:00',
     'follow_up',
     45,
     'Encaixe intencional autorizado',
@@ -161,7 +162,7 @@ $app2Encaixe = $service->schedule(
 assertCondition("Encaixe intencional criado com sucesso quando allowConflict = true", isset($app2Encaixe['id']));
 
 // 1.5 Edição / Reagendamento da consulta
-$newScheduleDate = date('Y-m-d') . ' 14:00:00';
+$newScheduleDate = $today . ' 14:00:00';
 $editedApp = $service->edit($app1['id'], [
     'scheduled_at' => $newScheduleDate,
     'duration_minutes' => 90,
@@ -173,7 +174,7 @@ assertCondition("Duração atualizada para 90 minutos", (int)$editedApp['duratio
 // 1.6 Tenant Guard: Tentativa de agendar paciente de outra clínica
 $crossTenantBlocked = false;
 try {
-    $service->schedule($patientIdB, $profIdA, date('Y-m-d') . ' 16:00:00');
+    $service->schedule($patientIdB, $profIdA, $today . ' 16:00:00');
 } catch (TenantSecurityException $e) {
     $crossTenantBlocked = true;
 }
@@ -185,7 +186,7 @@ assertCondition("Tentativa de agendar paciente de outro tenant bloqueada (403)",
 echo "\n[2] Testando NI2-82 — Estados e Ciclo da Consulta...\n";
 
 // Criar nova consulta para testar o ciclo completo
-$appCiclo = $service->schedule($patientA1['id'], $profIdA, date('Y-m-d') . ' 16:00:00', 'follow_up', 60);
+$appCiclo = $service->schedule($patientA1['id'], $profIdA, $today . ' 16:00:00', 'follow_up', 60);
 
 // 2.1 Transição scheduled -> confirmed
 $okConfirmed = $service->updateStatus($appCiclo['id'], AppointmentService::STATUS_CONFIRMED, 'Paciente confirmou via WhatsApp');
@@ -209,7 +210,7 @@ try {
 assertCondition("Transição inválida completed ➔ scheduled bloqueada com exceção", $terminalBlocked);
 
 // 2.5 Testar ciclo com No-Show (não compareceu)
-$appNoShow = $service->schedule($patientA2['id'], $profIdA, date('Y-m-d') . ' 17:00:00', 'follow_up', 45);
+$appNoShow = $service->schedule($patientA2['id'], $profIdA, $today . ' 17:00:00', 'follow_up', 45);
 $okNoShow = $service->updateStatus($appNoShow['id'], AppointmentService::STATUS_NO_SHOW, 'Paciente não compareceu no horário agendado');
 assertCondition("Transição scheduled ➔ no_show aprovada", $okNoShow);
 
@@ -234,12 +235,12 @@ assertCondition("Etapa 4 é completed", $cicloHistory[3]['to_status'] === 'compl
 // =============================================================================
 echo "\n[3] Testando NI2-83 — Visão Diária e Semanal da Agenda...\n";
 
-$todayList = $service->listByDay(date('Y-m-d'));
+$todayList = $service->listByDay($today);
 assertCondition("listByDay retornou consultas do dia atual", count($todayList) >= 3);
 assertCondition("Consultas ordenadas cronologicamente", strtotime($todayList[0]['scheduled_at']) <= strtotime($todayList[1]['scheduled_at']));
 assertCondition("Contém dados do paciente (nome e telefone)", isset($todayList[0]['patient_name']) && !empty($todayList[0]['patient_name']));
 
-$weekView = $service->listByWeek(date('Y-m-d'));
+$weekView = $service->listByWeek($today);
 assertCondition("listByWeek retornou estrutura semanal de 7 dias", isset($weekView['days']) && count($weekView['days']) === 7);
 assertCondition("Total de consultas da semana calculado corretamente", $weekView['total_appointments'] >= count($todayList));
 
@@ -249,7 +250,7 @@ assertCondition("Total de consultas da semana calculado corretamente", $weekView
 echo "\n[4] Testando NI2-84 — Execução do Atendimento e Conclusão Clínica...\n";
 
 // Criar consulta para execução clínica
-$appExec = $service->schedule($patientA1['id'], $profIdA, date('Y-m-d') . ' 18:00:00', 'first_visit', 60);
+$appExec = $service->schedule($patientA1['id'], $profIdA, $today . ' 18:00:00', 'first_visit', 60);
 
 // Executar conclusão clínica da consulta
 $evolutionSummary = "Paciente relata boa adaptação à rotina. Ajustado plano hipercalórico com aumento de 300 kcal. Metas de hidratação definidas para 2.500 ml/dia.";

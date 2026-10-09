@@ -75,7 +75,7 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Nutricionista e paciente.
 - **Descrição:** Onboarding grava nascimento e sexo não informados.
 - **Evidência verificável:** [src/Application/Controllers/OnboardingController.php:366](/Users/moliveira/Nutri_II/src/Application/Controllers/OnboardingController.php:366); [src/Domain/Onboarding/OnboardingService.php:220](/Users/moliveira/Nutri_II/src/Domain/Onboarding/OnboardingService.php:220); [persistência](evidence/persistence-final.json): 1995-04-10/male, sem edição desses campos.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-296) — Eliminação de campos fixos e fallbacks sintéticos; campos iniciam vazios com opção em branco 'Não informado (opcional)' e atributo max; validação restritiva impede datas futuras ou malformadas; persistência estrita de NULL no banco relacional comprovada na suíte tests/px_03_onboarding_birthdate_gender_optional_test.php (7/7 gates).
 - **Causa provável:** Data fixa no formulário e primeira opção selecionada; fallback female no serviço.
 - **Severidade de produto:** P1.
 - **Impacto na experiência:** Dados biográficos falsos podem contaminar idade, protocolos e confiança clínica; correção exige retrabalho.

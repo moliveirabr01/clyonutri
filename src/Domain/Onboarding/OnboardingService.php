@@ -205,6 +205,29 @@ class OnboardingService
                         'clinic_id' => $clinicId,
                     ]);
 
+                    // Sanitização e validação de nascimento (opcional, mas restritivo a datas válidas e não futuras)
+                    $birthDate = null;
+                    if (!empty($data['birth_date'])) {
+                        $rawBirthDate = trim((string)$data['birth_date']);
+                        if ($rawBirthDate !== '') {
+                            $parsedDate = \DateTime::createFromFormat('Y-m-d', $rawBirthDate);
+                            $today = new \DateTime('today');
+                            if (!$parsedDate || $parsedDate->format('Y-m-d') !== $rawBirthDate || $parsedDate > $today) {
+                                throw new InvalidArgumentException("A data de nascimento informada é inválida ou está no futuro.");
+                            }
+                            $birthDate = $rawBirthDate;
+                        }
+                    }
+
+                    // Sanitização de gênero / sexo biológico (opcional, sem fallback sintético)
+                    $gender = null;
+                    if (!empty($data['gender'])) {
+                        $rawGender = trim((string)$data['gender']);
+                        if (in_array($rawGender, ['male', 'female', 'other'], true)) {
+                            $gender = $rawGender;
+                        }
+                    }
+
                     if (!empty($progress['first_patient_id'])) {
                         $patientId = (int)$progress['first_patient_id'];
                         $stmtUpd = $this->db->prepare("
@@ -216,8 +239,8 @@ class OnboardingService
                             'name' => $patientName,
                             'email' => !empty($data['email']) ? trim((string)$data['email']) : null,
                             'phone' => !empty($data['phone']) ? trim((string)$data['phone']) : null,
-                            'birth_date' => !empty($data['birth_date']) ? $data['birth_date'] : null,
-                            'gender' => !empty($data['gender']) ? $data['gender'] : 'female',
+                            'birth_date' => $birthDate,
+                            'gender' => $gender,
                             'id' => $patientId,
                             'clinic_id' => $clinicId,
                         ]);
@@ -226,8 +249,8 @@ class OnboardingService
                             'name' => $patientName,
                             'email' => !empty($data['email']) ? trim((string)$data['email']) : null,
                             'phone' => !empty($data['phone']) ? trim((string)$data['phone']) : null,
-                            'birth_date' => !empty($data['birth_date']) ? $data['birth_date'] : null,
-                            'gender' => !empty($data['gender']) ? $data['gender'] : 'female',
+                            'birth_date' => $birthDate,
+                            'gender' => $gender,
                             'notes' => !empty($data['notes']) ? trim((string)$data['notes']) : 'Primeiro paciente cadastrado no onboarding de ativação.',
                             'lgpd_consent' => 1,
                         ]);

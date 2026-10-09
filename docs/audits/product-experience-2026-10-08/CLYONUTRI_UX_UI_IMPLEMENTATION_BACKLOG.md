@@ -88,6 +88,8 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Dependências:** Nenhuma.
 
+**Status de implementação:** Resolvido (NI2-296) · Suíte `tests/px_03_onboarding_birthdate_gender_optional_test.php` (7/7 gates aprovados) integrada ao quality gate e release pipeline.
+
 **Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
 
 ## PX-04 — Adesão fictícia de 94% em ausência de check-ins

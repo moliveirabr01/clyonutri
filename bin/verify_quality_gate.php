@@ -274,6 +274,13 @@ if (str_contains($evolutionOutput, 'TODOS OS 7 GATES DE EVOLUÇÃO E INSTALAÇÃ
     recordCheck('E2E_JOURNEYS', 'Evolução do Paciente & Instalação Limpa (NI2-295 / PX-02)', 'FAIL', 'Falha na evolução do paciente: ' . substr($evolutionOutput, 0, 200));
 }
 
+$px03Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_03_onboarding_birthdate_gender_optional_test.php') . " 2>&1");
+if (str_contains($px03Output, 'TODOS OS 7 GATES DO PX-03 (NI2-296) FORAM APROVADOS COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Onboarding Demográfico Real & Dados Não Informados (NI2-296 / PX-03)', 'PASS', 'Eliminação de nascimento fixo e gênero sintético, persistência estrita de NULL, validação de data futura e isolamento multi-tenant');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Onboarding Demográfico Real & Dados Não Informados (NI2-296 / PX-03)', 'FAIL', 'Falha no teste PX-03: ' . substr($px03Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',
