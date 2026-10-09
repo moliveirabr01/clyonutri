@@ -281,6 +281,13 @@ if (str_contains($px03Output, 'TODOS OS 7 GATES DO PX-03 (NI2-296) FORAM APROVAD
     recordCheck('E2E_JOURNEYS', 'Onboarding Demográfico Real & Dados Não Informados (NI2-296 / PX-03)', 'FAIL', 'Falha no teste PX-03: ' . substr($px03Output, 0, 200));
 }
 
+$px04Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_04_adherence_real_calculation_and_empty_state_test.php') . " 2>&1");
+if (str_contains($px04Output, 'TODOS OS 7 GATES DO PX-04 (NI2-297) FORAM APROVADOS COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Adesão Real no Dashboard & Estado de Vazio (NI2-297 / PX-04)', 'PASS', 'Eliminação do 94.0% sintético, estado de vazio Sem dados, metadados de período e amostra elegível exibidos');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Adesão Real no Dashboard & Estado de Vazio (NI2-297 / PX-04)', 'FAIL', 'Falha no teste PX-04: ' . substr($px04Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

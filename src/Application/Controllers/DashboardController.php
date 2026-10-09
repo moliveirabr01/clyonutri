@@ -14,6 +14,7 @@ use ClyoNutri\Domain\Appointment\AppointmentConflictException;
 use ClyoNutri\Domain\Appointment\AppointmentService;
 use ClyoNutri\Domain\Appointment\InvalidAppointmentTransitionException;
 use ClyoNutri\Domain\Clinical\ClinicalRecordService;
+use ClyoNutri\Domain\Engagement\EngagementService;
 use ClyoNutri\Domain\Finance\FinanceService;
 use ClyoNutri\Domain\Food\FoodCatalogService;
 use ClyoNutri\Domain\MealPlan\MealPlanService;
@@ -1375,13 +1376,16 @@ class DashboardController
      */
     public function patientAnamnesis(array $params): void
     {
+        if ($this->anamnesisProfessional() === null) {
+            return;
+        }
         $id = (int)($params['id'] ?? 0);
         $repo = new PatientRepository();
         $patient = $repo->findById($id);
 
         if (!$patient) {
-            header('Location: /pacientes');
-            exit;
+            $this->anamnesisError(404, 'Paciente ou documento não encontrado.');
+            return;
         }
 
         $title = 'Anamnese Nutricional — ' . $patient['name'];
@@ -1391,17 +1395,64 @@ class DashboardController
         $csrfToken = Csrf::token();
 
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
-        $latest = $anamnesisService->getLatestAnamnesis($id);
-        $history = $anamnesisService->getAnamnesisHistory($id);
-
-        // Se solicitou comparar versões via GET
+        $selectedVersion = null;
+        $revisionFrom = null;
         $compareData = null;
-        if (!empty($_GET['v1']) && !empty($_GET['v2'])) {
-            try {
-                $compareData = $anamnesisService->compareVersions($id, (int)$_GET['v1'], (int)$_GET['v2']);
-            } catch (\Throwable $e) {
-                // Ignore compare error on display
+        try {
+            // Canonical public contract is ?version=N; keep old bookmarks functional.
+            foreach (['version', 'view_version', 'revision_from', 'v1', 'v2'] as $key) {
+                if (isset($_GET[$key]) && (!is_string($_GET[$key]) || !preg_match('/^[1-9][0-9]{0,8}$/D', $_GET[$key]))) {
+                    $this->anamnesisError(400, 'Versão inválida. Informe um número inteiro positivo.');
+                    return;
+                }
             }
+            if (isset($_GET['view_version'])) {
+                if (isset($_GET['version']) && $_GET['version'] !== $_GET['view_version']) {
+                    $this->anamnesisError(400, 'Seleção de versão ambígua.');
+                    return;
+                }
+                $query = $_GET;
+                $query['version'] = $query['view_version'];
+                unset($query['view_version']);
+                header('Location: /pacientes/' . $id . '/anamnese?' . http_build_query($query));
+                return;
+            }
+            if (isset($_GET['version'], $_GET['revision_from'])) {
+                $this->anamnesisError(400, 'Selecione leitura histórica ou nova revisão.');
+                return;
+            }
+            $latest = $anamnesisService->getLatestAnamnesis($id);
+            $history = $anamnesisService->getAnamnesisHistory($id);
+            if (isset($_GET['version'])) {
+                $selectedVersion = $anamnesisService->getAnamnesisVersion($id, (int)$_GET['version']);
+                if (!$selectedVersion) {
+                    $this->anamnesisError(404, 'Versão de anamnese não encontrada.');
+                    return;
+                }
+            }
+            if (isset($_GET['revision_from'])) {
+                $revisionFrom = $anamnesisService->getAnamnesisVersion($id, (int)$_GET['revision_from']);
+                if (!$revisionFrom) {
+                    $this->anamnesisError(404, 'Versão de origem da revisão não encontrada.');
+                    return;
+                }
+                $latest = $revisionFrom; // Prefill a separate append-only revision, never edit the record.
+            }
+            if (isset($_GET['v1']) || isset($_GET['v2'])) {
+                if (!isset($_GET['v1'], $_GET['v2'])) {
+                    $this->anamnesisError(400, 'Informe as duas versões para comparação.');
+                    return;
+                }
+                try {
+                    $compareData = $anamnesisService->compareVersions($id, (int)$_GET['v1'], (int)$_GET['v2']);
+                } catch (\InvalidArgumentException $e) {
+                    $this->anamnesisError(404, 'Uma das versões de comparação não foi encontrada.');
+                    return;
+                }
+            }
+        } catch (\PDOException $e) {
+            $this->anamnesisError(503, 'Não foi possível carregar a anamnese. Tente novamente.');
+            return;
         }
 
         ob_start();
@@ -1461,8 +1512,8 @@ class DashboardController
                           <span class="badge badge-warning" style="font-size: 0.65rem; margin-left: 4px;">Alterado</span>
                         <?php endif; ?>
                       </td>
-                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars($diffRow['v1'] ?? '—')) ?></td>
-                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars($diffRow['v2'] ?? '—')) ?></td>
+                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars((string)($diffRow['v1'] ?? '—'))) ?></td>
+                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars((string)($diffRow['v2'] ?? '—'))) ?></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -1471,6 +1522,14 @@ class DashboardController
           </div>
         <?php endif; ?>
 
+        <?php if ($selectedVersion): ?>
+          <?php require __DIR__ . '/../../../views/anamnesis/version.php'; ?>
+        <?php elseif ($compareData): ?>
+          <div class="card">
+            <p>Comparação somente leitura. As versões permanecem preservadas.</p>
+            <a class="btn btn-secondary" href="/pacientes/<?= (int)$patient['id'] ?>/anamnese">Voltar à coleta atual</a>
+          </div>
+        <?php else: ?>
         <!-- Formulário Estruturado da Anamnese (NI2-61) -->
         <div class="card" style="margin-bottom: var(--space-6);">
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -1482,13 +1541,19 @@ class DashboardController
             </div>
             <?php if ($latest): ?>
               <span class="badge badge-info" style="font-size: 0.8rem;">
-                Última Versão: v<?= $latest['version'] ?> (<?= date('d/m/Y', strtotime($latest['created_at'])) ?>)
+                <?= $revisionFrom ? 'Nova revisão baseada em' : 'Última Versão:' ?> v<?= $latest['version'] ?> (<?= date('d/m/Y', strtotime($latest['created_at'])) ?>)
               </span>
             <?php endif; ?>
           </div>
 
           <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+            <?php if ($revisionFrom): ?>
+              <input type="hidden" name="revision_from" value="<?= (int)$revisionFrom['version'] ?>">
+              <p role="status">Esta gravação criará uma nova versão. A versão de origem será preservada.</p>
+            <?php elseif (!$latest): ?>
+              <p>Nenhuma anamnese registrada. Preencha a primeira coleta abaixo.</p>
+            <?php endif; ?>
 
             <!-- 1. Objetivos & Metas -->
             <div class="form-group" style="margin-bottom: 16px;">
@@ -1560,7 +1625,7 @@ class DashboardController
                 <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                   9. Meta Hídrica (ml/dia)
                 </label>
-                <input type="number" step="50" min="0" max="10000" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '2000')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <input type="number" step="50" min="0" max="10000" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
             </div>
 
@@ -1583,6 +1648,8 @@ class DashboardController
             </div>
           </form>
         </div>
+
+        <?php endif; ?>
 
         <!-- Seção: Histórico de Versões da Anamnese (NI2-62) -->
         <div id="historico-versoes" class="card">
@@ -1625,7 +1692,7 @@ class DashboardController
                         <?= !empty($h['restrictions']) ? '<span style="color: #D97706; font-weight: 600;">' . htmlspecialchars(mb_substr($h['restrictions'], 0, 30)) . '...</span>' : '<span style="color: #94A3B8;">—</span>' ?>
                       </td>
                       <td>
-                        <a href="/pacientes/<?= $patient['id'] ?>/anamnese?view_version=<?= $h['version'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 2px 6px;">Visualizar</a>
+                        <a href="/pacientes/<?= $patient['id'] ?>/anamnese?version=<?= $h['version'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 2px 6px;">Visualizar</a>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -1667,8 +1734,50 @@ class DashboardController
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
+    private function anamnesisProfessional(): ?int
+    {
+        $db = Connection::getInstance();
+        $stmt = $db->prepare("SELECT p.id FROM professionals p
+            JOIN users u ON u.id = p.user_id
+            JOIN clinic_members cm ON cm.user_id = u.id
+            JOIN clinics c ON c.id = cm.clinic_id
+            WHERE u.id = :uid AND cm.clinic_id = :cid
+              AND u.status = 'active' AND c.status = 'active' AND cm.status = 'active'
+              AND u.role = 'nutritionist' AND cm.role IN ('owner', 'nutritionist') LIMIT 1");
+        $stmt->execute(['uid' => TenantContext::getUserId(), 'cid' => TenantContext::getClinicId()]);
+        $id = $stmt->fetchColumn();
+        if (!$id) {
+            $this->anamnesisError(403, 'Acesso clínico não autorizado.');
+            return null;
+        }
+        return (int)$id;
+    }
+
+    private function anamnesisError(int $status, string $message): void
+    {
+        http_response_code($status);
+        $title = 'Anamnese indisponível';
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? '';
+        ob_start();
+        ?>
+        <div class="card" role="alert">
+          <h1>Anamnese indisponível</h1>
+          <p><?= htmlspecialchars($message) ?></p>
+          <a href="/pacientes" class="btn btn-secondary">Voltar aos pacientes</a>
+        </div>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
     public function savePatientAnamnesis(array $params): void
     {
+        $profId = $this->anamnesisProfessional();
+        if ($profId === null) {
+            return;
+        }
         $token = $_POST['_csrf_token'] ?? '';
         $patientId = (int)($params['id'] ?? 0);
 
@@ -1677,7 +1786,11 @@ class DashboardController
             exit;
         }
 
-        $profId = $this->getActiveProfessionalId();
+        if (isset($_GET['version']) || isset($_GET['view_version']) || isset($_POST['version']) || isset($_POST['view_version'])) {
+            $this->anamnesisError(405, 'A visualização histórica é somente leitura. Use a ação de criar nova revisão.');
+            return;
+        }
+
         $isDraft = ($_POST['save_mode'] ?? '') === 'draft';
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
 
@@ -1685,6 +1798,12 @@ class DashboardController
             $anamnesisService->saveAnamnesis($patientId, $profId, $_POST, $isDraft);
             header("Location: /pacientes/{$patientId}/anamnese?success=anamnese_salva");
             exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
+            return;
+        } catch (\PDOException $e) {
+            $this->anamnesisError(503, 'Não foi possível salvar a nova revisão. Tente novamente.');
+            return;
         } catch (\InvalidArgumentException $e) {
             header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
             exit;
@@ -2100,18 +2219,32 @@ class DashboardController
         $patientRepo = new PatientRepository();
         $patients = $patientRepo->listAll();
 
-        $currentDate = $_GET['date'] ?? date('Y-m-d');
+        $currentDate = $_GET['date'] ?? $appointmentService->todayDate();
+        try {
+            if (!is_string($currentDate)) {
+                throw new \InvalidArgumentException('Data inválida.');
+            }
+            (new \ClyoNutri\Core\Time\ClinicCalendar())->day($currentDate);
+        } catch (\InvalidArgumentException $e) {
+            $this->scheduleError(400, 'Data inválida. Selecione uma data existente no formato AAAA-MM-DD.', 'agenda');
+            return;
+        }
         $view = $_GET['view'] ?? 'day';
 
         $prevDate = date('Y-m-d', strtotime($currentDate . ' -1 day'));
         $nextDate = date('Y-m-d', strtotime($currentDate . ' +1 day'));
 
-        if ($view === 'week') {
-            $weekData = $appointmentService->listByWeek($currentDate);
-            $appointments = [];
-        } else {
-            $appointments = $appointmentService->listByDay($currentDate);
-            $weekData = null;
+        try {
+            if ($view === 'week') {
+                $weekData = $appointmentService->listByWeek($currentDate);
+                $appointments = [];
+            } else {
+                $appointments = $appointmentService->listByDay($currentDate);
+                $weekData = null;
+            }
+        } catch (\PDOException $e) {
+            $this->scheduleError(503, 'Não foi possível carregar a agenda. Tente novamente.', 'agenda');
+            return;
         }
 
         $title = 'Agenda de Atendimentos';
@@ -3226,15 +3359,40 @@ class DashboardController
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
+    private function scheduleError(int $status, string $message, string $activeNav): void
+    {
+        http_response_code($status);
+        $title = 'Não foi possível carregar a agenda';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? '';
+        ob_start();
+        ?>
+        <div class="card" role="alert">
+          <h1>Não foi possível carregar a agenda</h1>
+          <p><?= htmlspecialchars($message) ?></p>
+          <a class="btn btn-primary" href="/<?= $activeNav ?>">Tentar novamente</a>
+        </div>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
     public function index(): void
     {
         $patientRepo = new PatientRepository();
         $patients = $patientRepo->listAll();
 
         $appointmentService = new AppointmentService();
-        $todayAppointments = $appointmentService->listByDay(date('Y-m-d'));
-        $todayStats = $appointmentService->getTodayStats();
-        $attentionItems = $appointmentService->getAttentionRequired();
+        // Resolve the local day once so a request spanning midnight stays consistent.
+        $today = $appointmentService->todayDate();
+        try {
+            $todayAppointments = $appointmentService->listByDay($today);
+            $todayStats = $appointmentService->getTodayStats($today);
+            $attentionItems = $appointmentService->getAttentionRequired($today);
+        } catch (\PDOException $e) {
+            $this->scheduleError(503, 'Não foi possível carregar as consultas e pendências. Tente novamente.', 'dashboard');
+            return;
+        }
 
         $db = Connection::getInstance();
         $clinicId = TenantContext::getClinicId();
@@ -3243,10 +3401,8 @@ class DashboardController
         $stmtDraft->execute(['cid' => $clinicId]);
         $draftPlansCount = (int)$stmtDraft->fetchColumn();
 
-        $stmtAdh = $db->prepare("SELECT AVG(meal_adherence_pct) FROM checkins WHERE clinic_id = :cid AND checkin_date >= date('now', '-30 days')");
-        $stmtAdh->execute(['cid' => $clinicId]);
-        $avgAdh = $stmtAdh->fetchColumn();
-        $adherenceText = $avgAdh !== null ? number_format((float)$avgAdh, 1) . '%' : '94.0%';
+        $engagementService = new EngagementService($db);
+        $adherenceMetrics = $engagementService->getClinicAdherenceMetrics($clinicId, 30);
 
         $userId = (int)($_SESSION['user_id'] ?? 0);
         $onboardingProgress = null;
@@ -3302,7 +3458,7 @@ class DashboardController
           <div class="card" style="margin-bottom: 0;">
             <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS HOJE</div>
             <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
-              <?= $todayStats['total_today'] ?>
+              <span data-testid="appointments-today-count"><?= $todayStats['total_today'] ?></span>
             </div>
             <span class="badge badge-info"><?= $todayStats['confirmed'] ?> confirmada(s) • <?= $todayStats['completed'] ?> realizada(s)</span>
           </div>
@@ -3318,9 +3474,19 @@ class DashboardController
           <div class="card" style="margin-bottom: 0;">
             <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">ADESÃO MÉDIA</div>
             <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
-              <?= $adherenceText ?>
+              <span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span>
             </div>
-            <span class="badge badge-success">Baseada em check-ins</span>
+            <?php if ($adherenceMetrics['has_data']): ?>
+              <span class="badge badge-success"><?= $adherenceMetrics['responses_count'] ?> resposta(s) • <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
+              <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">
+                <?= $adherenceMetrics['responding_patients_count'] ?> de <?= $adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis responderam
+              </div>
+            <?php else: ?>
+              <span class="badge" style="background: var(--neutral-gray-100); color: var(--neutral-gray-600); border: 1px solid var(--neutral-gray-300);">Sem dados (<?= $adherenceMetrics['period_days'] ?> dias)</span>
+              <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">
+                0 respostas • <?= $adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis
+              </div>
+            <?php endif; ?>
           </div>
 
           <div class="card" style="margin-bottom: 0;">

@@ -121,4 +121,54 @@ class EngagementService
             'history' => $records,
         ];
     }
+
+    /**
+     * Retorna métricas de adesão alimentar consolidada da clínica para o Dashboard (NI2-297 / PX-04).
+     * Elimina fallbacks fictícios (como 94.0%) e deriva estritamente de dados elegíveis reais.
+     */
+    public function getClinicAdherenceMetrics(int $clinicId, int $days = 30): array
+    {
+        if ($clinicId <= 0) {
+            throw new \InvalidArgumentException("Clinic ID inválido para cálculo de adesão.");
+        }
+
+        // População elegível: total de pacientes cadastrados no tenant
+        $stmtPatients = $this->db->prepare("SELECT COUNT(*) FROM patients WHERE clinic_id = :cid");
+        $stmtPatients->execute(['cid' => $clinicId]);
+        $totalEligiblePatients = (int)$stmtPatients->fetchColumn();
+
+        // Limite da janela temporal em dias corridos
+        $startDate = date('Y-m-d', strtotime("-{$days} days"));
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) AS total_checkins,
+                COUNT(meal_adherence_pct) AS adherence_responses_count,
+                COUNT(DISTINCT patient_id) AS responding_patients_count,
+                AVG(meal_adherence_pct) AS avg_adherence
+            FROM checkins 
+            WHERE clinic_id = :cid 
+              AND checkin_date >= :start_date
+              AND meal_adherence_pct IS NOT NULL
+        ");
+        $stmt->execute(['cid' => $clinicId, 'start_date' => $startDate]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        $responsesCount = (int)($row['adherence_responses_count'] ?? 0);
+        $respondingPatients = (int)($row['responding_patients_count'] ?? 0);
+        $rawAvg = $row['avg_adherence'] !== null ? (float)$row['avg_adherence'] : null;
+
+        $hasData = ($responsesCount > 0 && $rawAvg !== null);
+
+        return [
+            'has_data' => $hasData,
+            'average_pct' => $hasData ? round($rawAvg, 1) : null,
+            'formatted_value' => $hasData ? number_format(round($rawAvg, 1), 1) . '%' : 'Sem dados',
+            'responses_count' => $responsesCount,
+            'responding_patients_count' => $respondingPatients,
+            'total_eligible_patients' => $totalEligiblePatients,
+            'period_days' => $days,
+            'period_label' => "Últimos {$days} dias",
+        ];
+    }
 }

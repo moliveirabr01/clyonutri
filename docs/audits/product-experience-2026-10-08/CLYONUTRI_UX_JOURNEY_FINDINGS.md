@@ -91,7 +91,7 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Nutricionista.
 - **Descrição:** Adesão fictícia de 94% em ausência de check-ins.
 - **Evidência verificável:** [src/Application/Controllers/DashboardController.php:3249](/Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:3249); dashboard de tenant novo com zero pacientes também exibe 94.0%.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-297) — Remoção do fallback ilustrativo de 94.0%; cálculo dinâmico implementado em EngagementService::getClinicAdherenceMetrics; estado de vazio 'Sem dados' nos últimos 30 dias com metadados de respostas e população elegível visíveis no card do Dashboard; comprovado com 7 gates na suíte tests/px_04_adherence_real_calculation_and_empty_state_test.php.
 - **Causa provável:** Fallback ilustrativo em indicador clínico operacional.
 - **Severidade de produto:** P1.
 - **Impacto na experiência:** Cria confiança em desempenho inexistente e distorce prioridades de acompanhamento.
