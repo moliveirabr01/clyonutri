@@ -1,0 +1,109 @@
+{
+    "clock": "injected DateTimeImmutable into production service; real SQLite queries",
+    "checks": [
+        {
+            "name": "Clock 2026-10-09T20:59:59-03:00: local day\/list\/indicator agree including both boundaries",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T20:59:59-03:00: scheduled\/completed\/cancelled status breakdown preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T20:59:59-03:00: same-day pending consultation only",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T21:00:00-03:00: local day\/list\/indicator agree including both boundaries",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T21:00:00-03:00: scheduled\/completed\/cancelled status breakdown preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T21:00:00-03:00: same-day pending consultation only",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T22:30:00-03:00: local day\/list\/indicator agree including both boundaries",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T22:30:00-03:00: scheduled\/completed\/cancelled status breakdown preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T22:30:00-03:00: same-day pending consultation only",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T23:59:59-03:00: local day\/list\/indicator agree including both boundaries",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T23:59:59-03:00: scheduled\/completed\/cancelled status breakdown preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-09T23:59:59-03:00: same-day pending consultation only",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-10T00:00:00Z: local day\/list\/indicator agree including both boundaries",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-10T00:00:00Z: scheduled\/completed\/cancelled status breakdown preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Clock 2026-10-10T00:00:00Z: same-day pending consultation only",
+            "status": "PASS"
+        },
+        {
+            "name": "Local midnight advances every view to next day",
+            "status": "PASS"
+        },
+        {
+            "name": "Midnight pending list advances to next-day scheduled appointment",
+            "status": "PASS"
+        },
+        {
+            "name": "Professional filter preserved",
+            "status": "PASS"
+        },
+        {
+            "name": "Tenant two sees only its own appointment",
+            "status": "PASS"
+        },
+        {
+            "name": "Invalid date rejected: 2026-02-30",
+            "status": "PASS"
+        },
+        {
+            "name": "Invalid date rejected: 2026-13-01",
+            "status": "PASS"
+        },
+        {
+            "name": "Invalid date rejected: garbage",
+            "status": "PASS"
+        },
+        {
+            "name": "Invalid date rejected: 2026-10-08' OR 1=1 --",
+            "status": "PASS"
+        },
+        {
+            "name": "Read queries preserve appointment status history byte-for-byte",
+            "status": "PASS"
+        },
+        {
+            "name": "UTC year boundary resolves previous local year",
+            "status": "PASS"
+        },
+        {
+            "name": "Leap-day interval ends at next local midnight",
+            "status": "PASS"
+        }
+    ]
+}

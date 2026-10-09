@@ -1,0 +1,44 @@
+
+========================================================================
+>>> CLYONUTRI II — SUÍTE DE TESTES E2E DE ONBOARDING & ATIVAÇÃO (NI2-282) <<<
+    UX 360, Stepper Clínico, Persistência Real, Resiliência & Multi-Tenant
+========================================================================
+
+--> [1/8] Provisionando Clínicas Alfa e Beta com Nutricionistas Reais...
+  [PASS] [SETUP] Tenants Alfa (#1) e Beta (#2) provisionados ➔ Usuários #1 e #2
+
+--> [2/8] Verificando Inicialização Automática e Estado Virgin do Onboarding...
+  [PASS] [INITIAL_STATE] Progresso de onboarding inicializado em 0% no Passo 1 ➔ DB record ID #1
+
+--> [3/8] Testando Execução e Persistência do Passo 1 (Objetivos Clínicos)...
+  [PASS] [STEP_1] Passo 1 salvo: foco clínico e metas registrados com sucesso ➔ Progresso: 20%, Próximo: Passo 2
+
+--> [4/8] Testando Execução do Passo 2 e Sincronização com Tabela `professionals`...
+  [PASS] [STEP_2] Passo 2 salvo e sincronizado na tabela `professionals` ➔ CRN: CRN3-98765 • Especialidade: Nutrição Clínica Funcional & Ortomolecular
+
+--> [5/8] Testando Execução do Passo 3 (Preferências de Atendimento e Preço)...
+  [PASS] [STEP_3] Passo 3 salvo: preferências, dias, teleconsulta e valor ➔ Valor: R$ 320,00 • Duração: 60 min • Intervalo: 15 min
+
+--> [6/8] Testando Capacidade de Retomada (Resume) Após Logout / Nova Sessão...
+  [PASS] [RESUME] Retomada perfeita no Passo 4 sem perda de dados ou estado prévio ➔ Concluídos: [1, 2, 3] • 60%
+
+--> [7/8] Testando Criação do Primeiro Paciente Real (Passo 4) e Ativação Final (Passo 5)...
+  [PASS] [STEP_4] Primeiro paciente real criado no banco com governança LGPD ➔ Paciente #1: Mariana Oliveira da Silva
+  [PASS] [IDEMPOTENCY] Reenvio do Passo 4 atualizou paciente existente sem duplicar registros ➔ Paciente #1
+  [PASS] [STEP_5] Onboarding 100% concluído e consultório ativado com sucesso ➔ completed_at: 2026-10-09 05:08:01
+
+--> [8/8] Testando Isolamento Multi-Tenant e Restrições de Acesso Ofensivo...
+  [PASS] [SECURITY] Isolamento multi-tenant comprovado: fail-closed em dados e pacientes ➔ Acesso cruzado bloqueado
+
+--> [9/9] Testando Controller Web, Proteção CSRF e Endpoint de Status JSON...
+  [PASS] [API_STATUS] Endpoint /api/v1/onboarding/status validado ➔ is_completed: true, progress_pct: 100%
+  [PASS] [CSRF_GUARD] submitStep bloqueia requisições com CSRF token inválido (Fail-closed) ➔ Rejeição 403 comprovada
+  [PASS] [WEB_VIEW] View do Onboarding renderizada em conformidade com o Design System ➔ Stepper, badges e shell presentes
+
+========================================================================
+>>> TODOS OS 9 GATES DE ONBOARDING & ATIVAÇÃO (NI2-282) FORAM APROVADOS! <<<
+========================================================================
+
+--> [CLEANUP] Executando teardown e limpeza rigorosa de fixtures...
+  [OK] Teardown concluído com sucesso.
+

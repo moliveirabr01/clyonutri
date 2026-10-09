@@ -1,0 +1,83 @@
+{
+  "issue": "NI2-312",
+  "finding": "PX-19",
+  "transport": "real HTTP/browser, production routes and temporary SQLite with official migrations",
+  "checks": [
+    {
+      "name": "Unauthenticated editor denied",
+      "status": "PASS"
+    },
+    {
+      "name": "No anamnesis is not assessed, not negative",
+      "status": "PASS"
+    },
+    {
+      "name": "CSRF protects assessment writes",
+      "status": "PASS"
+    },
+    {
+      "name": "Draft negative remains unassessed and pending",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit finalized negative persisted",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit negative renders with origin and date",
+      "status": "PASS"
+    },
+    {
+      "name": "Publication snapshot records reviewed negative and source",
+      "status": "PASS"
+    },
+    {
+      "name": "New allergy visible and finalized",
+      "status": "PASS"
+    },
+    {
+      "name": "Update after publication preserves old snapshot and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Contradictory negative rejected without writes",
+      "status": "PASS"
+    },
+    {
+      "name": "Positive without description rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Finalized unrelated data does not imply negative",
+      "status": "PASS"
+    },
+    {
+      "name": "Read failure is 503 distinct from absent assessment",
+      "status": "PASS"
+    },
+    {
+      "name": "Other tenant denied without clinical data",
+      "status": "PASS"
+    },
+    {
+      "name": "Other tenant cannot write assessment",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role denied without assessment exposure",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role cannot collect assessment",
+      "status": "PASS"
+    },
+    {
+      "name": "Browser explicitly collects negative",
+      "status": "PASS"
+    },
+    {
+      "name": "Browser positive preserves prior published safety snapshot",
+      "status": "PASS"
+    }
+  ]
+}

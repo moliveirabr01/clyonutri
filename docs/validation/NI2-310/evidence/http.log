@@ -1,0 +1,30 @@
+PASS Unauthenticated route denied
+PASS Real professional login
+PASS Empty draft is explicit and has no item editor
+PASS Draft renders contextual editor and current values
+PASS CSRF missing blocked
+PASS Cross-plan item rejected
+PASS Other tenant item rejected
+PASS Edit routed through real HTTP
+PASS Identity, context and substitutions preserved
+PASS Portion, note and totals persisted
+PASS Stale second tab rejected
+PASS Conflict has explicit feedback
+PASS Invalid amount rejected 0
+PASS Invalid amount rejected -1
+PASS Invalid amount rejected abc
+PASS Invalid amount rejected 1e999
+PASS Invalid unit rejected without writes
+PASS Totals failure rolls back item and totals
+PASS Persistence error differs from empty and hides database details
+PASS Unit conversion and clearing note persisted
+PASS Real publication preserves snapshot
+PASS Published mutation refused without rewriting snapshot
+PASS Published editor offers new version and hides direct item editing
+PASS New draft links original and preserves substitutions
+PASS Editing new version leaves published history unchanged
+PASS Unauthorized role denied without writes
+PASS Other authorized clinic can edit own item
+PASS Other clinic edit persists
+PASS Browser form submission persists and shows success
+PASS Mobile edit form fits viewport

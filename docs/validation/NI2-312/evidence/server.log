@@ -1,0 +1,263 @@
+[Fri Oct  9 02:08:03 2026] PHP 8.5.10 Development Server (http://127.0.0.1:64360) started
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64362 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64362 [200]: GET /health
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64362 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64363 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64363 [302]: GET /planos/1
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64363 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64364 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64364 [302]: GET /logout
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64364 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64365 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64365 [200]: GET /login
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64365 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64366 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64366 [302]: POST /login
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64366 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64367 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64367 [200]: GET /planos/1
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64367 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64368 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64368 [403]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64368 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64369 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64369 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64369 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64370 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64370 [200]: GET /planos/1
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64370 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64371 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64371 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64371 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64372 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64372 [200]: GET /planos/1
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64372 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64373 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64373 [302]: POST /planos/1/publicar
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64373 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64374 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64374 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64374 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64375 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64375 [200]: GET /planos/1
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64375 Closing
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64376 Accepted
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64376 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:03 2026] 127.0.0.1:64376 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64377 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64377 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64377 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64378 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64378 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64378 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64379 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64379 [200]: GET /planos/1
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64379 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64380 Accepted
+[Fri Oct  9 02:08:04 2026] NI2-312 clinical summary failed: SQLSTATE[HY000]: General error: 1 no such table: anamneses
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64380 [503]: GET /planos/1
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64380 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64381 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64381 [302]: GET /logout
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64381 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64382 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64382 [200]: GET /login
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64382 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64383 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64383 [302]: POST /login
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64383 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64384 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64384 [403]: GET /planos/1
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64384 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64385 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64385 [404]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64385 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64386 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64386 [302]: GET /logout
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64386 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64387 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64387 [200]: GET /login
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64387 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64388 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64388 [302]: POST /login
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64388 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64389 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64389 [403]: GET /planos/1
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64389 Closing
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64390 Accepted
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64390 [403]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:04 2026] 127.0.0.1:64390 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64398 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64398 [200]: GET /login
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64398 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64399 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64400 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64399 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64400 [200]: GET /assets/clyonutri-logo-light.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64399 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64400 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64404 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64404 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64404 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64405 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64405 [302]: POST /login
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64405 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64406 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64406 [200]: GET /dashboard
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64406 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64407 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64408 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64407 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64409 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64408 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64409 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64407 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64408 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64409 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64410 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64410 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64410 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64411 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64411 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64411 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64412 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64412 [200]: GET /planos/3
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64412 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64413 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64414 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64415 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64413 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64413 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64416 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64414 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64415 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64414 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64415 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64417 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64416 [200]: GET /assets/js/food-picker.js
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64416 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64417 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64417 Closing
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64418 Accepted
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64418 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:06 2026] 127.0.0.1:64418 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64419 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64419 [200]: GET /pacientes/1/anamnese
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64419 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64420 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64421 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64422 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64420 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64421 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64422 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64420 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64421 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64422 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64423 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64423 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64423 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64424 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64424 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64424 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64425 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64425 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64425 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64426 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64426 [200]: GET /pacientes/1/anamnese?success=anamnese_salva
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64426 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64427 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64428 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64429 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64427 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64428 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64429 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64427 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64428 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64429 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64430 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64430 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64430 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64431 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64431 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64431 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64432 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64432 [200]: GET /planos/3
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64432 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64433 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64434 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64435 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64433 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64434 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64435 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64433 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64434 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64435 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64436 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64437 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64436 [200]: GET /assets/js/food-picker.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64437 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64436 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64437 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64438 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64438 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64438 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64439 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64439 [200]: GET /pacientes/1/anamnese
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64439 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64440 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64441 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64442 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64440 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64441 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64442 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64440 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64441 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64442 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64443 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64443 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64443 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64444 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64444 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64444 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64445 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64445 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64445 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64446 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64446 [200]: GET /pacientes/1/anamnese?success=anamnese_salva
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64446 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64447 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64448 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64447 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64449 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64448 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64450 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64449 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64447 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64450 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64448 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64449 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64450 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64451 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64451 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64451 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64452 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64452 [200]: GET /planos/1
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64452 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64453 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64454 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64455 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64453 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64454 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64455 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64453 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64454 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64455 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64456 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64457 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64456 [200]: GET /assets/js/food-picker.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64457 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64456 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64457 Closing
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64458 Accepted
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64458 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:08:07 2026] 127.0.0.1:64458 Closing

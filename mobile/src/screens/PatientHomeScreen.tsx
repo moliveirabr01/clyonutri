@@ -10,13 +10,31 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import BrandLogo from '../components/BrandLogo';
+import { tokens as t } from '../theme/tokens';
 import {
   ApiService,
+  ApiError,
   PatientAuthData,
   PatientHomeData,
   FoodDiaryEntry,
   EvolutionData,
 } from '../services/api';
+
+type ResourceState = { loading: boolean; error: string | null; updatedAt: string | null };
+const initialResource: ResourceState = { loading: false, error: null, updatedAt: null };
+function resourceError(error: unknown): string {
+  if (error instanceof ApiError) return error.message + (error.requestId ? ` Código de atendimento: ${error.requestId}.` : '');
+  return 'Não foi possível carregar os dados. Tente novamente.';
+}
+function ResourceNotice({ state, retry, name }: { state: ResourceState; retry: () => void; name: string }) {
+  return <View style={{ marginBottom: t.space }}>
+    {state.loading && <ActivityIndicator accessibilityLabel={`Atualizando ${name}`} />}
+    {state.updatedAt && <Text style={{ color: t.muted }} accessibilityLiveRegion="polite">{state.error ? 'Dados desatualizados. ' : ''}Última atualização: {state.updatedAt}</Text>}
+    {state.error && <Text style={{ color: t.error }} accessibilityRole="alert" accessibilityLiveRegion="assertive">{state.error}</Text>}
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${state.error ? 'Tentar novamente' : 'Atualizar'} ${name}`} onPress={retry} disabled={state.loading} accessibilityState={{ busy: state.loading, disabled: state.loading }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{state.error ? 'Tentar novamente' : 'Atualizar'}</Text></TouchableOpacity>
+  </View>;
+}
 
 export type NavigationTab = 'Hoje' | 'Plano' | 'Diario' | 'Evolucao' | 'Perfil';
 
@@ -31,40 +49,51 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [homeData, setHomeData] = useState<PatientHomeData | null>(null);
   const [diaryEntries, setDiaryEntries] = useState<FoodDiaryEntry[]>([]);
   const [evolutionData, setEvolutionData] = useState<EvolutionData | null>(null);
-  const [diaryError, setDiaryError] = useState<string | null>(null);
-  const [evolutionError, setEvolutionError] = useState<string | null>(null);
+  const [diaryState, setDiaryState] = useState<ResourceState>(initialResource);
+  const [evolutionState, setEvolutionState] = useState<ResourceState>(initialResource);
+  const [homeUpdatedAt, setHomeUpdatedAt] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  // Carregamento principal
-  const fetchAllData = useCallback(async () => {
+  const refreshDiary = useCallback(async () => {
+    setDiaryState(prev => ({ ...prev, loading: true }));
     try {
-      setErrorMessage(null);
-      const data = await ApiService.getHome();
-      setHomeData(data);
-      setIsOffline(false);
-
-      // Carregar diário e evolução de forma não bloqueante
-      try {
-        const diary = await ApiService.getFoodDiary();
-        setDiaryEntries(diary.entries || []);
-        setDiaryError(null);
-      } catch (_) { setDiaryError('Não foi possível carregar o diário. Tente atualizar.'); }
-
-      try {
-        const evo = await ApiService.getEvolution();
-        setEvolutionData(evo);
-        setEvolutionError(null);
-      } catch (_) { setEvolutionError('Não foi possível carregar a evolução. Tente atualizar.'); }
-    } catch (err: any) {
-      setIsOffline(true);
-      setErrorMessage(err.message || 'Falha na comunicação com o servidor');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      const diary = await ApiService.getFoodDiary();
+      setDiaryEntries(diary.entries);
+      setDiaryState({ loading: false, error: null, updatedAt: new Date().toLocaleString('pt-BR') });
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'auth') return;
+      setDiaryState(prev => ({ ...prev, loading: false, error: resourceError(error) }));
     }
   }, []);
+  const refreshEvolution = useCallback(async () => {
+    setEvolutionState(prev => ({ ...prev, loading: true }));
+    try {
+      const evolution = await ApiService.getEvolution();
+      setEvolutionData(evolution);
+      setEvolutionState({ loading: false, error: null, updatedAt: new Date().toLocaleString('pt-BR') });
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'auth') return;
+      setEvolutionState(prev => ({ ...prev, loading: false, error: resourceError(error) }));
+    }
+  }, []);
+  const fetchAllData = useCallback(async () => {
+    setErrorMessage(null);
+    const home = async () => {
+      try {
+        setHomeData(await ApiService.getHome());
+        setHomeUpdatedAt(new Date().toLocaleString('pt-BR'));
+        setIsOffline(false);
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === 'auth') return;
+        setIsOffline(error instanceof ApiError && error.kind === 'offline');
+        setErrorMessage(resourceError(error));
+      } finally { setLoading(false); }
+    };
+    await Promise.all([home(), refreshDiary(), refreshEvolution()]);
+    setRefreshing(false);
+  }, [refreshDiary, refreshEvolution]);
 
   useEffect(() => {
     fetchAllData();
@@ -88,7 +117,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       setIsOffline(false);
     } catch (err: any) {
       Alert.alert('Erro ao registrar', 'Não foi possível salvar o registro de água no servidor.');
-      setIsOffline(true);
+      setIsOffline(err instanceof ApiError && err.kind === 'offline');
     } finally {
       setActionLoading(false);
     }
@@ -155,16 +184,17 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         accessibilityLabel={
           isOffline
             ? 'Atenção: Modo offline ou falha de conexão com o servidor'
-            : 'Resumo atualizado com seu consultório'
+            : errorMessage || diaryState.error || evolutionState.error ? 'Atualização parcial. Alguns dados não foram atualizados.' : 'Resumo atualizado com seu consultório'
         }
       >
         <Text style={[styles.syncText, isOffline && styles.syncTextOffline]}>
           {isOffline
             ? '⚠️ Conexão indisponível — dados podem estar desatualizados'
-            : '✓ Resumo atualizado com seu consultório'}
+            : errorMessage || diaryState.error || evolutionState.error ? '⚠️ Atualização parcial — confira os avisos em cada aba' : '✓ Resumo atualizado com seu consultório'}
         </Text>
       </View>
 
+      {homeUpdatedAt && <Text accessibilityLiveRegion="polite">{errorMessage ? 'Resumo desatualizado. ' : ''}Última atualização do resumo: {homeUpdatedAt}</Text>}
       {errorMessage && (
         <View style={styles.errorAlert}>
           <Text style={styles.errorAlertText}>{errorMessage}</Text>
@@ -189,6 +219,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
           <>
             {/* Header com Design System Premium */}
             <View style={styles.header}>
+              <BrandLogo compact />
               <Text
                 style={styles.greeting}
                 accessibilityRole="header"
@@ -380,7 +411,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             <Text style={styles.sectionTitle} accessibilityRole="header">Diário Alimentar</Text>
             <Text style={styles.helperText}>Histórico com distinção clara entre planejado e realizado</Text>
 
-            {diaryError ? <Text accessibilityRole="alert" style={styles.errorAlertText}>{diaryError}</Text> : diaryEntries.length > 0 ? (
+            {<ResourceNotice state={diaryState} retry={refreshDiary} name="diário" />}
+            {diaryEntries.length > 0 ? (
               diaryEntries.map((entry) => (
                 <View key={entry.id} style={styles.card}>
                   <Text style={styles.cardTitle}>
@@ -398,14 +430,14 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   <Text style={styles.diaryStatus}>✓ Registrado pelo paciente</Text>
                 </View>
               ))
-            ) : (
+            ) : !diaryState.error && !diaryState.loading ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyTitle}>Nenhum registro ainda hoje</Text>
                 <Text style={styles.emptyDescription}>
                   Clique em &ldquo;Registrar Consumo&rdquo; na aba Hoje para anotar suas refeições realizadas.
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         )}
 
@@ -413,7 +445,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle} accessibilityRole="header">Evolução & Metas</Text>
 
-            {evolutionError ? <Text accessibilityRole="alert" style={styles.errorAlertText}>{evolutionError}</Text> : evolutionData?.clinical_records && evolutionData.clinical_records.length > 0 ? (
+            {<ResourceNotice state={evolutionState} retry={refreshEvolution} name="evolução" />}
+            {evolutionData?.clinical_records && evolutionData.clinical_records.length > 0 ? (
               evolutionData.clinical_records.map((c) => (
                 <View key={c.id} style={styles.card}>
                   <Text style={styles.cardTitle}>📊 Medição Clínica Oficial • {c.date}</Text>
@@ -422,11 +455,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   <Text style={styles.metaLabel}>Aferido presencialmente pelo profissional</Text>
                 </View>
               ))
-            ) : (
+            ) : !evolutionState.error && !evolutionState.loading && evolutionData ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyTitle}>Sem avaliações clínicas cadastradas</Text>
               </View>
-            )}
+            ) : null}
 
             {evolutionData?.self_reports && evolutionData.self_reports.length > 0 && (
               evolutionData.self_reports.map((s) => (

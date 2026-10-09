@@ -134,13 +134,15 @@ class RecipeService
             $ingSnapshot = [];
             foreach ($ingredients as $idx => $ing) {
                 $calc = $ing['_calc'] ?? [];
+                $amt = (float)($ing['amount'] ?? $ing['quantity'] ?? 0);
+                $unit = trim((string)($ing['measure_unit'] ?? $ing['unit'] ?? 'g'));
                 $iStmt->execute([
                     'recipe_id' => $recipeId,
                     'food_id' => (int)$ing['food_id'],
-                    'amount' => (float)$ing['amount'],
-                    'measure_unit' => trim((string)($ing['measure_unit'] ?? 'g')),
-                    'gross_w' => $calc['weight_grams'] ?? (float)$ing['amount'],
-                    'net_w' => $calc['weight_grams'] ?? (float)$ing['amount'],
+                    'amount' => $amt,
+                    'measure_unit' => $unit,
+                    'gross_w' => $calc['weight_grams'] ?? $amt,
+                    'net_w' => $calc['weight_grams'] ?? $amt,
                     'fc' => (float)($ing['correction_factor'] ?? 1.0),
                     'fcook' => (float)($ing['cooking_factor'] ?? 1.0),
                     'notes' => $ing['notes'] ?? null,
@@ -150,8 +152,8 @@ class RecipeService
                 $ingSnapshot[] = [
                     'food_id' => $ing['food_id'],
                     'name' => $calc['food_name'] ?? '',
-                    'amount' => $ing['amount'],
-                    'measure_unit' => $ing['measure_unit'] ?? 'g',
+                    'amount' => $amt,
+                    'measure_unit' => $unit,
                     'weight_grams' => $calc['weight_grams'] ?? 0,
                     'energy_kcal' => $calc['energy_kcal'] ?? 0,
                     'protein_g' => $calc['protein_g'] ?? 0,
@@ -274,6 +276,205 @@ class RecipeService
                 'sodium_mg_per_serving' => $sodiumPerServing,
                 'totals' => $nutritionTotals,
                 'allergens' => $allAllergens,
+            ];
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Edição versionada de receita culinária no runtime (PX-27 / NI2-320).
+     * Preserva imutabilidade de versões anteriores e prescrições já emitidas.
+     */
+    public function updateRecipe(int $recipeId, array $data, ?int $clinicId = null, ?int $userId = null): array
+    {
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $authorId = $userId ?? TenantContext::getUserId();
+
+        // 1. Verificar se a receita existe e pertence à clínica (receitas públicas não podem ser alteradas diretamente)
+        $stmt = $this->db->prepare("SELECT * FROM recipes WHERE id = :id");
+        $stmt->execute(['id' => $recipeId]);
+        $existing = $stmt->fetch();
+        if (!$existing) {
+            throw new \InvalidArgumentException("Receita não encontrada.");
+        }
+        if ((int)$existing['clinic_id'] !== $clinicId) {
+            throw new \ClyoNutri\Core\Security\TenantSecurityException("Acesso negado: você não tem permissão para editar esta receita.");
+        }
+
+        $cleanTitle = trim((string)($data['title'] ?? $existing['title']));
+        if ($cleanTitle === '') {
+            throw new \InvalidArgumentException("O título da receita é obrigatório.");
+        }
+
+        $servings = max(1, (int)($data['servings'] ?? $existing['servings']));
+        $prepTime = max(1, (int)($data['prep_time_minutes'] ?? $existing['prep_time_minutes']));
+        $cookTime = max(0, (int)($data['cook_time_minutes'] ?? $existing['cook_time_minutes']));
+        $instructions = trim((string)($data['instructions'] ?? $existing['instructions']));
+        $mealType = (string)($data['meal_type'] ?? $existing['meal_type']);
+        $difficulty = (string)($data['difficulty'] ?? $existing['difficulty']);
+        $summary = isset($data['summary']) ? trim((string)$data['summary']) : $existing['summary'];
+        $servingSizeName = isset($data['serving_size_name']) ? trim((string)$data['serving_size_name']) : $existing['serving_size_name'];
+        $servingSizeG = isset($data['serving_size_g']) && $data['serving_size_g'] !== '' ? (float)$data['serving_size_g'] : (float)$existing['serving_size_g'];
+
+        // Se novos ingredientes foram fornecidos, recalcula nutrição; senão mantém os atuais
+        $ingredients = $data['ingredients'] ?? null;
+        if ($ingredients === null) {
+            $iStmt = $this->db->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order ASC, id ASC");
+            $iStmt->execute([$recipeId]);
+            $ingredients = $iStmt->fetchAll();
+        }
+
+        $nutritionTotals = $this->calculateIngredientsNutrition($ingredients);
+        $kcalPerServing = round($nutritionTotals['energy_kcal'] / $servings, 2);
+        $proteinPerServing = round($nutritionTotals['protein_g'] / $servings, 2);
+        $carbsPerServing = round(($nutritionTotals['carbohydrate_g'] ?? $nutritionTotals['carbs_g'] ?? 0) / $servings, 2);
+        $fatPerServing = round(($nutritionTotals['lipid_g'] ?? $nutritionTotals['fat_g'] ?? 0) / $servings, 2);
+        $fiberPerServing = round($nutritionTotals['fiber_g'] / $servings, 2);
+        $sodiumPerServing = round($nutritionTotals['sodium_mg'] / $servings, 2);
+
+        $this->db->beginTransaction();
+        try {
+            // 2. Atualizar tabela principal de receitas
+            $upStmt = $this->db->prepare("
+                UPDATE recipes
+                SET title = :title,
+                    servings = :servings,
+                    prep_time_minutes = :prep,
+                    cook_time_minutes = :cook,
+                    instructions = :instructions,
+                    meal_type = :meal_type,
+                    difficulty = :difficulty,
+                    summary = :summary,
+                    serving_size_name = :serving_name,
+                    serving_size_g = :serving_g,
+                    energy_kcal_per_serving = :kcal,
+                    protein_g_per_serving = :protein,
+                    carbs_g_per_serving = :carbs,
+                    fat_g_per_serving = :fat,
+                    fiber_g_per_serving = :fiber,
+                    sodium_mg_per_serving = :sodium,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND clinic_id = :clinic_id
+            ");
+            $upStmt->execute([
+                'title' => $cleanTitle,
+                'servings' => $servings,
+                'prep' => $prepTime,
+                'cook' => $cookTime,
+                'instructions' => $instructions,
+                'meal_type' => $mealType,
+                'difficulty' => $difficulty,
+                'summary' => $summary,
+                'serving_name' => $servingSizeName,
+                'serving_g' => $servingSizeG,
+                'kcal' => $kcalPerServing,
+                'protein' => $proteinPerServing,
+                'carbs' => $carbsPerServing,
+                'fat' => $fatPerServing,
+                'fiber' => $fiberPerServing,
+                'sodium' => $sodiumPerServing,
+                'id' => $recipeId,
+                'clinic_id' => $clinicId,
+            ]);
+
+            // Se ingredientes foram atualizados, recriar os ingredientes da receita
+            if (isset($data['ingredients'])) {
+                $this->db->prepare("DELETE FROM recipe_ingredients WHERE recipe_id = ?")->execute([$recipeId]);
+                $insIng = $this->db->prepare("
+                    INSERT INTO recipe_ingredients (
+                        recipe_id, food_id, amount, measure_unit,
+                        gross_weight_g, net_weight_g, correction_factor, cooking_factor, notes, ordering
+                    ) VALUES (
+                        :recipe_id, :food_id, :amount, :measure_unit,
+                        :gross_w, :net_w, :fc, :fcook, :notes, :ordering
+                    )
+                ");
+                $idx = 0;
+                foreach ($ingredients as $ing) {
+                    $idx++;
+                    $calc = $ing['_calc'] ?? [];
+                    $amt = (float)($ing['amount'] ?? $ing['quantity'] ?? 100);
+                    $insIng->execute([
+                        'recipe_id' => $recipeId,
+                        'food_id' => (int)($ing['food_id'] ?? 0),
+                        'amount' => $amt,
+                        'measure_unit' => trim((string)($ing['measure_unit'] ?? $ing['unit'] ?? 'g')),
+                        'gross_w' => $calc['weight_grams'] ?? $amt,
+                        'net_w' => $calc['weight_grams'] ?? $amt,
+                        'fc' => (float)($ing['correction_factor'] ?? 1.0),
+                        'fcook' => (float)($ing['cooking_factor'] ?? 1.0),
+                        'notes' => $ing['notes'] ?? null,
+                        'ordering' => $idx,
+                    ]);
+                }
+            }
+
+            // 3. Obter próximo version_number
+            $vNumStmt = $this->db->prepare("SELECT COALESCE(MAX(version_number), 1) + 1 FROM recipe_versions WHERE recipe_id = ?");
+            $vNumStmt->execute([$recipeId]);
+            $nextVersion = (int)$vNumStmt->fetchColumn();
+
+            // Marcar versões anteriores como 'superseded'
+            $this->db->prepare("UPDATE recipe_versions SET status = 'superseded' WHERE recipe_id = ?")->execute([$recipeId]);
+
+            // 4. Inserir nova versão imutável
+            $versionSnapshot = [
+                'recipe_id' => $recipeId,
+                'version' => $nextVersion,
+                'title' => $cleanTitle,
+                'servings' => $servings,
+                'instructions' => $instructions,
+                'nutrition_per_serving' => [
+                    'energy_kcal' => $kcalPerServing,
+                    'protein_g' => $proteinPerServing,
+                    'carbs_g' => $carbsPerServing,
+                    'fat_g' => $fatPerServing,
+                    'fiber_g' => $fiberPerServing,
+                    'sodium_mg' => $sodiumPerServing,
+                ],
+                'updated_at' => date('c'),
+            ];
+
+            $vStmt = $this->db->prepare("
+                INSERT INTO recipe_versions (
+                    recipe_id, version_number, title, servings, serving_size_g,
+                    energy_kcal_per_serving, protein_g_per_serving, carbs_g_per_serving,
+                    fat_g_per_serving, fiber_g_per_serving, sodium_mg_per_serving,
+                    payload_json, status, published_at, published_by_user_id
+                ) VALUES (
+                    :recipe_id, :vnum, :title, :servings, :serving_g,
+                    :kcal, :protein, :carbs, :fat, :fiber, :sodium,
+                    :payload, 'published', CURRENT_TIMESTAMP, :user_id
+                )
+            ");
+            $vStmt->execute([
+                'recipe_id' => $recipeId,
+                'vnum' => $nextVersion,
+                'title' => $cleanTitle,
+                'servings' => $servings,
+                'serving_g' => $servingSizeG,
+                'kcal' => $kcalPerServing,
+                'protein' => $proteinPerServing,
+                'carbs' => $carbsPerServing,
+                'fat' => $fatPerServing,
+                'fiber' => $fiberPerServing,
+                'sodium' => $sodiumPerServing,
+                'payload' => json_encode($versionSnapshot, JSON_UNESCAPED_UNICODE),
+                'user_id' => $authorId,
+            ]);
+
+            $this->db->commit();
+
+            return [
+                'id' => $recipeId,
+                'version_number' => $nextVersion,
+                'title' => $cleanTitle,
+                'servings' => $servings,
+                'energy_kcal_per_serving' => $kcalPerServing,
             ];
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -741,8 +942,8 @@ class RecipeService
 
         foreach ($ingredients as &$ing) {
             $foodId = (int)$ing['food_id'];
-            $amount = (float)$ing['amount'];
-            $unit = trim((string)($ing['measure_unit'] ?? 'g'));
+            $amount = (float)($ing['amount'] ?? $ing['quantity'] ?? 0);
+            $unit = trim((string)($ing['measure_unit'] ?? $ing['unit'] ?? 'g'));
 
             $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
             $fStmt->execute(['id' => $foodId]);

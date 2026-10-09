@@ -1,0 +1,17 @@
+{
+  "timestamp_utc": "2026-10-09T02:39:12.492554+00:00",
+  "sha256": {
+    "mobile/App.tsx": "01b97f3e10921c02ba211999bde8cac0d113dc83c98fa58d509544438c3928b3",
+    "mobile/package.json": "e5b2f8a29d8b5bb7fa939b0627ca86d1ac8e511ae11109316d6c18018a21447e",
+    "mobile/package-lock.json": "e9968e5f2746b0cea9e13b38196126bc4b8440c381f23f9948c5ea8b8d888308",
+    "mobile/tsconfig.json": "cdd2b68a66be39ee1c4770105525ee2a261b4389ecc9b12dffc9843f58bf1e68",
+    "mobile/src/theme/tokens.ts": "108c1aa09471c19e8359fec3986c32bfb3e8df0474329cf837d207c3cc71697d",
+    "mobile/src/services/api.ts": "11cd4f5dca78d833ca653e13db850350bab00aae3f46abf3d8e45cc424fa77ce",
+    "mobile/src/screens/PatientHomeScreen.tsx": "0dacdfd77666899d4c857011ecec3b00a7ac3f5381c2849e5327fcfb8ea142f2",
+    "public/index.php": "fe61974db617241b0da2bcf5a9937cc6dbccd802bf66e114e057b7f7f9eac21d",
+    "tests/ni2_294_real_http_client_test.cjs": "1ccf8e918c7b91d60a2a464cf40df8571167d63644c507ead7e9c902541704ad",
+    "tests/ni2_294_verify.sh": "8087c90dd6838b1aa8d0adfe80b0cace23eaf1b31fd23923209c7baf674ef5df",
+    "tests/support/ni2_294_fixture.php": "6b3e7b2c21027b6d027b73ff1ed6c0aa79666aee85a4529427d65a5241dbefdd",
+    "tests/support/ni2_294_ui_router.php": "0268b831d4ec89922821f8ff990ea79712f1a89f4046378f5a6dd749c8f66eda"
+  }
+}

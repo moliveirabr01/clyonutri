@@ -31,6 +31,18 @@ class AnamnesisService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
+        $sourceVersion = null;
+        if (isset($data['revision_from'])) {
+            $rawVersion = $data['revision_from'];
+            if ((!is_string($rawVersion) && !is_int($rawVersion)) || !preg_match('/^[1-9][0-9]{0,8}$/D', (string)$rawVersion)) {
+                throw new InvalidArgumentException('Versão de origem inválida.');
+            }
+            $sourceVersion = (int)$rawVersion;
+            if (!$this->getAnamnesisVersion($patientId, $sourceVersion)) {
+                throw new InvalidArgumentException('Versão de origem não encontrada.');
+            }
+        }
+
         // 1. Sanitização e normalização de seções clínicas
         $cleanData = [
             'objectives' => $this->sanitizeText($data['objectives'] ?? null),
@@ -45,6 +57,18 @@ class AnamnesisService
             'notes' => $this->sanitizeText($data['notes'] ?? null),
         ];
 
+        $assessment = $data['allergy_assessment'] ?? (!empty($cleanData['allergies']) ? 'recorded' : 'not_assessed');
+        if (!is_string($assessment) || !in_array($assessment, ['not_assessed', 'denied', 'recorded'], true)) {
+            throw new InvalidArgumentException('Selecione a avaliação de alergias.');
+        }
+        if ($assessment === 'denied' && !empty($cleanData['allergies'])) {
+            throw new InvalidArgumentException('A negativa de alergias não pode conter alergias registradas. Confira a seleção.');
+        }
+        if ($assessment === 'recorded' && empty($cleanData['allergies'])) {
+            throw new InvalidArgumentException('Descreva as alergias registradas.');
+        }
+        if ($assessment === 'not_assessed' && !empty($cleanData['allergies'])) $assessment = 'recorded';
+
         // 2. Validação fail-closed se não for rascunho
         if (!$isDraft) {
             $hasAnyContent = false;
@@ -54,7 +78,7 @@ class AnamnesisService
                     break;
                 }
             }
-            if (!$hasAnyContent) {
+            if (!$hasAnyContent && $assessment !== 'denied') {
                 throw new InvalidArgumentException("A anamnese finalizada exige o preenchimento de ao menos uma seção clínica.");
             }
         }
@@ -72,12 +96,12 @@ class AnamnesisService
             INSERT INTO anamneses (
                 clinic_id, patient_id, professional_id, version,
                 objectives, routine, food_preferences, restrictions,
-                allergies, symptoms, habits, clinical_history,
+                allergies, allergy_assessment, symptoms, habits, clinical_history,
                 water_intake_ml, is_draft, notes, created_at
             ) VALUES (
                 :clinic_id, :patient_id, :professional_id, :version,
                 :objectives, :routine, :food_preferences, :restrictions,
-                :allergies, :symptoms, :habits, :clinical_history,
+                :allergies, :allergy_assessment, :symptoms, :habits, :clinical_history,
                 :water_intake_ml, :is_draft, :notes, :created_at
             )
         ");
@@ -93,6 +117,7 @@ class AnamnesisService
             'food_preferences' => $cleanData['food_preferences'],
             'restrictions' => $cleanData['restrictions'],
             'allergies' => $cleanData['allergies'],
+            'allergy_assessment' => $assessment,
             'symptoms' => $cleanData['symptoms'],
             'habits' => $cleanData['habits'],
             'clinical_history' => $cleanData['clinical_history'],
@@ -109,7 +134,9 @@ class AnamnesisService
             'version' => $nextVersion,
             'is_draft' => $isDraft,
             'has_allergies' => !empty($cleanData['allergies']),
+            'allergy_assessment' => $assessment,
             'has_restrictions' => !empty($cleanData['restrictions']),
+            'source_version' => $sourceVersion,
         ]);
 
         return [
@@ -254,6 +281,10 @@ class AnamnesisService
         if (!$latest) {
             return [
                 'has_data' => false,
+                'allergy_state' => 'not_assessed',
+                'allergy_label' => 'Não avaliado',
+                'allergy_pending' => true,
+                'is_draft' => false,
                 'patient_id' => $patientId,
                 'message' => 'Nenhuma anamnese registrada para este paciente. Dados críticos não informados.',
                 'critical_alerts' => [],
@@ -273,6 +304,8 @@ class AnamnesisService
             'url' => "/pacientes/{$patientId}/anamnese?version={$latest['version']}",
         ];
 
+        $state = !empty($latest['allergies']) ? 'recorded'
+            : (empty($latest['is_draft']) && ($latest['allergy_assessment'] ?? '') === 'denied' ? 'denied' : 'not_assessed');
         $criticalAlerts = [];
         if (!empty($latest['allergies'])) {
             $criticalAlerts[] = [
@@ -293,6 +326,10 @@ class AnamnesisService
 
         return [
             'has_data' => true,
+            'allergy_state' => $state,
+            'allergy_label' => ['not_assessed' => 'Não avaliado', 'denied' => 'Nega alergias', 'recorded' => 'Alergia registrada'][$state],
+            'allergy_pending' => $state === 'not_assessed' || !empty($latest['is_draft']),
+            'is_draft' => !empty($latest['is_draft']),
             'patient_id' => $patientId,
             'critical_alerts' => $criticalAlerts,
             'allergies' => !empty($latest['allergies']) ? $latest['allergies'] : null,

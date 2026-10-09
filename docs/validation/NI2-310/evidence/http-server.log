@@ -1,0 +1,192 @@
+[Fri Oct  9 02:01:06 2026] PHP 8.5.10 Development Server (http://127.0.0.1:63073) started
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63076 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63076 [200]: GET /health
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63076 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63079 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63079 [403]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63079 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63081 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63081 [302]: GET /logout
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63081 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63083 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63083 [200]: GET /login
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63083 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63085 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63085 [302]: POST /login
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63085 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63087 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63087 [200]: GET /planos/3
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63087 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63088 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63088 [200]: GET /planos/1
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63088 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63089 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63089 [403]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63089 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63092 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63092 [302]: POST /planos/2/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63092 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63094 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63094 [302]: POST /planos/2/itens/2/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63094 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63100 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63100 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63100 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63102 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63102 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63102 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63105 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63105 [200]: GET /planos/1
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63105 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63106 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63106 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63106 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63108 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63108 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63108 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63111 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63111 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63111 Closing
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63114 Accepted
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63114 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:06 2026] 127.0.0.1:63114 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63117 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63117 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63117 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63122 Accepted
+[Fri Oct  9 02:01:07 2026] NI2-310 update item failed: SQLSTATE[23000]: Integrity constraint violation: 19 synthetic persistence failure
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63122 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63122 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63123 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63123 [200]: GET /planos/1
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63123 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63124 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63124 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63124 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63126 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63126 [200]: GET /planos/1
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63126 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63127 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63127 [302]: POST /planos/1/publicar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63127 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63129 Accepted
+[Fri Oct  9 02:01:07 2026] NI2-310 update item failed: Plano alimentar com status 'published' é imutável. Para realizar alterações, crie uma cópia/duplicação.
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63129 [302]: POST /planos/1/itens/1/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63129 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63134 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63134 [200]: GET /planos/1
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63134 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63135 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63135 [302]: POST /planos/1/duplicar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63135 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63136 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63136 [200]: GET /planos/4
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63136 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63137 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63137 [302]: POST /planos/4/itens/3/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63137 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63138 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63138 [302]: GET /logout
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63138 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63140 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63140 [200]: GET /login
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63140 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63141 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63141 [302]: POST /login
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63141 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63144 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63144 [403]: POST /planos/4/itens/3/editar
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63144 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63145 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63145 [302]: GET /logout
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63145 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63146 Accepted
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63146 [200]: GET /login
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63146 Closing
+[Fri Oct  9 02:01:07 2026] 127.0.0.1:63147 Accepted
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63147 [302]: POST /login
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63147 Closing
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63148 Accepted
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63148 [200]: GET /planos/2
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63148 Closing
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63149 Accepted
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63149 [302]: POST /planos/2/itens/2/editar
+[Fri Oct  9 02:01:08 2026] 127.0.0.1:63149 Closing
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63174 Accepted
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63174 [200]: GET /login
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63174 Closing
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63176 Accepted
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63177 Accepted
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63176 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63177 [200]: GET /assets/clyonutri-logo-light.svg
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63176 Closing
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63177 Closing
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63181 Accepted
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63181 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:01:09 2026] 127.0.0.1:63181 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63214 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63214 [302]: POST /login
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63214 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63237 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63237 [200]: GET /dashboard
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63237 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63250 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63251 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63252 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63250 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63251 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63252 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63250 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63251 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63252 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63253 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63253 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63253 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63255 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63255 [200]: GET /planos/4
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63255 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63258 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63258 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63258 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63262 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63263 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63264 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63262 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63263 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63264 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63262 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63263 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63264 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63265 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63266 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63265 [200]: GET /assets/js/food-picker.js
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63266 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63265 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63266 Closing
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63267 Accepted
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63267 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:01:10 2026] 127.0.0.1:63267 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63271 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63271 [302]: POST /planos/4/itens/3/editar
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63271 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63272 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63272 [200]: GET /planos/4
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63272 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63273 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63274 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63275 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63273 [200]: GET /assets/css/clinical-botanical.css
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63274 [200]: GET /assets/css/clinical-journeys.css
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63275 [200]: GET /assets/clyonutri-logo-dark.svg
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63273 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63274 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63275 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63276 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63277 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63276 [200]: GET /assets/js/food-picker.js
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63277 [200]: GET /assets/js/clinical-journeys.js
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63276 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63277 Closing
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63278 Accepted
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63278 [200]: GET /assets/clyonutri-icon.svg
+[Fri Oct  9 02:01:12 2026] 127.0.0.1:63278 Closing

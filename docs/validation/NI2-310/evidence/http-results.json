@@ -1,0 +1,127 @@
+{
+  "finding": "PX-17",
+  "issue": "NI2-310",
+  "transport": "real HTTP and browser against production public/index.php, isolated persisted SQLite",
+  "checks": [
+    {
+      "name": "Unauthenticated route denied",
+      "status": "PASS"
+    },
+    {
+      "name": "Real professional login",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty draft is explicit and has no item editor",
+      "status": "PASS"
+    },
+    {
+      "name": "Draft renders contextual editor and current values",
+      "status": "PASS"
+    },
+    {
+      "name": "CSRF missing blocked",
+      "status": "PASS"
+    },
+    {
+      "name": "Cross-plan item rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Other tenant item rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Edit routed through real HTTP",
+      "status": "PASS"
+    },
+    {
+      "name": "Identity, context and substitutions preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "Portion, note and totals persisted",
+      "status": "PASS"
+    },
+    {
+      "name": "Stale second tab rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Conflict has explicit feedback",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid amount rejected 0",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid amount rejected -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid amount rejected abc",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid amount rejected 1e999",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid unit rejected without writes",
+      "status": "PASS"
+    },
+    {
+      "name": "Totals failure rolls back item and totals",
+      "status": "PASS"
+    },
+    {
+      "name": "Persistence error differs from empty and hides database details",
+      "status": "PASS"
+    },
+    {
+      "name": "Unit conversion and clearing note persisted",
+      "status": "PASS"
+    },
+    {
+      "name": "Real publication preserves snapshot",
+      "status": "PASS"
+    },
+    {
+      "name": "Published mutation refused without rewriting snapshot",
+      "status": "PASS"
+    },
+    {
+      "name": "Published editor offers new version and hides direct item editing",
+      "status": "PASS"
+    },
+    {
+      "name": "New draft links original and preserves substitutions",
+      "status": "PASS"
+    },
+    {
+      "name": "Editing new version leaves published history unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role denied without writes",
+      "status": "PASS"
+    },
+    {
+      "name": "Other authorized clinic can edit own item",
+      "status": "PASS"
+    },
+    {
+      "name": "Other clinic edit persists",
+      "status": "PASS"
+    },
+    {
+      "name": "Browser form submission persists and shows success",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile edit form fits viewport",
+      "status": "PASS"
+    }
+  ]
+}

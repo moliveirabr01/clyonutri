@@ -1,0 +1,32 @@
+[
+  {
+    "test": "onboarding_guided_and_activation_e2e_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  },
+  {
+    "test": "px_03_onboarding_birthdate_gender_optional_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  },
+  {
+    "test": "canonical_first_consultation_e2e_journey_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  },
+  {
+    "test": "patient_edit_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  },
+  {
+    "test": "meal_plan_and_prescription_lifecycle_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  },
+  {
+    "test": "ni2_6_prontuario_e_anamnese_nutricional_test.php",
+    "migration_exit": 0,
+    "exit": 0
+  }
+]

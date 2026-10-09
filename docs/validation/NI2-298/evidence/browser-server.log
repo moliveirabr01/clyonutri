@@ -1,0 +1,137 @@
+[Thu Oct  8 23:51:03 2026] PHP 8.5.10 Development Server (http://127.0.0.1:8084) started
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57374 Accepted
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57374 [302]: GET /login
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57374 Closing
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57375 Accepted
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57375 [200]: GET /dashboard
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57375 Closing
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57376 Accepted
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57377 Accepted
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57376 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57377 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57376 Closing
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57377 Closing
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57379 Accepted
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57379 [200]: GET /assets/clyonutri-icon.svg
+[Thu Oct  8 23:51:08 2026] 127.0.0.1:57379 Closing
+[Thu Oct  8 23:51:27 2026] PHP 8.5.10 Development Server (http://127.0.0.1:8084) started
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57430 Accepted
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57430 [302]: GET /dashboard
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57430 Closing
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57431 Accepted
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57431 [200]: GET /login
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57431 Closing
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57432 Accepted
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57433 Accepted
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57432 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57433 [200]: GET /assets/clyonutri-logo-light.svg
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57432 Closing
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57433 Closing
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57434 Accepted
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57434 [200]: GET /assets/clyonutri-icon.svg
+[Thu Oct  8 23:51:32 2026] 127.0.0.1:57434 Closing
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57448 Accepted
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57448 [302]: POST /login
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57448 Closing
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57450 Accepted
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57450 [200]: GET /dashboard
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57450 Closing
+[Thu Oct  8 23:51:37 2026] 127.0.0.1:57451 Accepted
+[Thu Oct  8 23:51:38 2026] 127.0.0.1:57452 Accepted
+[Thu Oct  8 23:51:38 2026] 127.0.0.1:57451 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:51:38 2026] 127.0.0.1:57452 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:51:38 2026] 127.0.0.1:57451 Closing
+[Thu Oct  8 23:51:38 2026] 127.0.0.1:57452 Closing
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57465 Accepted
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57465 [200]: GET /agenda
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57465 Closing
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57466 Accepted
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57467 Accepted
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57466 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57467 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57466 Closing
+[Thu Oct  8 23:51:43 2026] 127.0.0.1:57467 Closing
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57801 Accepted
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57801 [503]: GET /dashboard
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57801 Closing
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57803 Accepted
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57804 Accepted
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57803 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57804 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57803 Closing
+[Thu Oct  8 23:55:40 2026] 127.0.0.1:57804 Closing
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57830 Accepted
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57830 [200]: GET /dashboard
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57830 Closing
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57831 Accepted
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57832 Accepted
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57831 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57832 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57831 Closing
+[Thu Oct  8 23:55:47 2026] 127.0.0.1:57832 Closing
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57834 Accepted
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57834 [302]: GET /logout
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57834 Closing
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57835 Accepted
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57835 [200]: GET /login
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57835 Closing
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57836 Accepted
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57837 Accepted
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57836 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57837 [200]: GET /assets/clyonutri-logo-light.svg
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57836 Closing
+[Thu Oct  8 23:55:48 2026] 127.0.0.1:57837 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57850 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57850 [302]: POST /login
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57850 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57852 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57852 [200]: GET /dashboard
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57852 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57853 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57855 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57853 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57855 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57853 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57855 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57856 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57856 [200]: GET /agenda
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57856 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57857 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57859 Accepted
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57857 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57859 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57857 Closing
+[Thu Oct  8 23:55:57 2026] 127.0.0.1:57859 Closing
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57871 Accepted
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57871 [302]: GET /logout
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57871 Closing
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57872 Accepted
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57872 [200]: GET /login
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57872 Closing
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57875 Accepted
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57876 Accepted
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57875 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57876 [200]: GET /assets/clyonutri-logo-light.svg
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57875 Closing
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57876 Closing
+[Thu Oct  8 23:56:05 2026] 127.0.0.1:57880 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57880 [302]: POST /login
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57880 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57881 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57881 [200]: GET /dashboard
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57881 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57882 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57883 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57882 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57883 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57882 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57883 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57887 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57887 [200]: GET /agenda
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57887 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57888 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57889 Accepted
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57888 [200]: GET /assets/css/clinical-botanical.css
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57889 [200]: GET /assets/clyonutri-logo-dark.svg
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57888 Closing
+[Thu Oct  8 23:56:06 2026] 127.0.0.1:57889 Closing

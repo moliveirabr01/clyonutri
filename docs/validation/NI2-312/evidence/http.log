@@ -1,0 +1,20 @@
+PASS Unauthenticated editor denied
+PASS No anamnesis is not assessed, not negative
+PASS CSRF protects assessment writes
+PASS Draft negative remains unassessed and pending
+PASS Explicit finalized negative persisted
+PASS Explicit negative renders with origin and date
+PASS Publication snapshot records reviewed negative and source
+PASS New allergy visible and finalized
+PASS Update after publication preserves old snapshot and history
+PASS Contradictory negative rejected without writes
+PASS Positive without description rejected
+PASS Finalized unrelated data does not imply negative
+PASS Read failure is 503 distinct from absent assessment
+PASS Other tenant denied without clinical data
+PASS Other tenant cannot write assessment
+PASS Unauthorized role denied without assessment exposure
+PASS Unauthorized role cannot collect assessment
+final buttons 1
+PASS Browser explicitly collects negative
+PASS Browser positive preserves prior published safety snapshot

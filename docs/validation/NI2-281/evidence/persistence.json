@@ -1,0 +1,192 @@
+{
+  "patients": [
+    {
+      "id": 1,
+      "clinic_id": 1,
+      "uuid": "ni281-p1",
+      "name": "Paciente sintético 1",
+      "email": null,
+      "phone": null,
+      "birth_date": null,
+      "gender": null,
+      "status": "active",
+      "notes": null,
+      "created_at": "2026-10-09 05:33:24",
+      "updated_at": "2026-10-09 05:33:24",
+      "password_hash": null,
+      "access_pin": null,
+      "otp_code": null,
+      "otp_expires_at": null
+    },
+    {
+      "id": 2,
+      "clinic_id": 2,
+      "uuid": "ni281-p2",
+      "name": "Paciente sintético 2",
+      "email": null,
+      "phone": null,
+      "birth_date": null,
+      "gender": null,
+      "status": "active",
+      "notes": null,
+      "created_at": "2026-10-09 05:33:24",
+      "updated_at": "2026-10-09 05:33:24",
+      "password_hash": null,
+      "access_pin": null,
+      "otp_code": null,
+      "otp_expires_at": null
+    },
+    {
+      "id": 3,
+      "clinic_id": 1,
+      "uuid": "8363923f2f5367cfffb433144415709a",
+      "name": "Paciente sintético not_collected",
+      "email": null,
+      "phone": null,
+      "birth_date": null,
+      "gender": null,
+      "status": "active",
+      "notes": null,
+      "created_at": "2026-10-09 05:33:24",
+      "updated_at": "2026-10-09 05:33:24",
+      "password_hash": null,
+      "access_pin": null,
+      "otp_code": null,
+      "otp_expires_at": null
+    },
+    {
+      "id": 4,
+      "clinic_id": 1,
+      "uuid": "946f05bb480df089c11409ec6cfd6281",
+      "name": "Paciente sintético granted",
+      "email": null,
+      "phone": null,
+      "birth_date": null,
+      "gender": null,
+      "status": "active",
+      "notes": null,
+      "created_at": "2026-10-09 05:33:24",
+      "updated_at": "2026-10-09 05:33:24",
+      "password_hash": null,
+      "access_pin": null,
+      "otp_code": null,
+      "otp_expires_at": null
+    },
+    {
+      "id": 5,
+      "clinic_id": 1,
+      "uuid": "113ef7ecfa036f26058947d1685d0ff5",
+      "name": "Paciente sintético declined",
+      "email": null,
+      "phone": null,
+      "birth_date": null,
+      "gender": null,
+      "status": "active",
+      "notes": null,
+      "created_at": "2026-10-09 05:33:24",
+      "updated_at": "2026-10-09 05:33:24",
+      "password_hash": null,
+      "access_pin": null,
+      "otp_code": null,
+      "otp_expires_at": null
+    }
+  ],
+  "consents": [
+    {
+      "id": 1,
+      "clinic_id": 1,
+      "patient_id": 4,
+      "consent_type": "clinical_care",
+      "granted": 1,
+      "ip_address": null,
+      "granted_at": "2026-10-09 02:33:24",
+      "term_id": 1,
+      "revoked_at": null,
+      "revocation_reason": null,
+      "source_channel": "professional_attestation",
+      "user_agent": null
+    },
+    {
+      "id": 2,
+      "clinic_id": 1,
+      "patient_id": 5,
+      "consent_type": "clinical_care",
+      "granted": 0,
+      "ip_address": null,
+      "granted_at": "2026-10-09 05:33:24",
+      "term_id": 1,
+      "revoked_at": null,
+      "revocation_reason": null,
+      "source_channel": "professional_attestation",
+      "user_agent": null
+    }
+  ],
+  "audit": [
+    {
+      "id": 1,
+      "clinic_id": 1,
+      "user_id": 1,
+      "action": "CONSENT_GRANTED",
+      "resource": "patient_consents",
+      "resource_id": "1",
+      "ip_address": null,
+      "user_agent": null,
+      "details": "{\"patient_id\":4,\"purpose_code\":\"clinical_care\",\"term_version\":\"TEST-1\",\"channel\":\"professional_attestation\",\"timestamp\":\"2026-10-09 02:33:24\"}",
+      "created_at": "2026-10-09 05:33:24"
+    },
+    {
+      "id": 2,
+      "clinic_id": 1,
+      "user_id": 1,
+      "action": "CONSENT_DECLINED",
+      "resource": "patient_consents",
+      "resource_id": "2",
+      "ip_address": null,
+      "user_agent": null,
+      "details": "{\"term_id\":1,\"channel\":\"professional_attestation\"}",
+      "created_at": "2026-10-09 05:33:24"
+    },
+    {
+      "id": 3,
+      "clinic_id": 1,
+      "user_id": 1,
+      "action": "PROFESSIONAL_PROFILE_UPDATED",
+      "resource": "users",
+      "resource_id": "1",
+      "ip_address": null,
+      "user_agent": null,
+      "details": "{}",
+      "created_at": "2026-10-09 05:33:25"
+    }
+  ],
+  "profiles": [
+    {
+      "id": 1,
+      "name": "Profissional atualizado",
+      "specialty": "Nutrição de teste",
+      "bio": "Apresentação sintética"
+    },
+    {
+      "id": 2,
+      "name": "Usuário sintético 2",
+      "specialty": null,
+      "bio": null
+    },
+    {
+      "id": 3,
+      "name": "Usuário sintético 3",
+      "specialty": null,
+      "bio": null
+    }
+  ],
+  "clinics": [
+    {
+      "id": 1,
+      "name": "Consultório atualizado"
+    },
+    {
+      "id": 2,
+      "name": "Clínica sintética 2"
+    }
+  ]
+}

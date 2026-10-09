@@ -238,7 +238,7 @@ class PasswordResetService
             // 1. Atualiza hash da senha do usuário
             $upd = $this->db->prepare("
                 UPDATE users
-                SET password_hash = :hash, updated_at = CURRENT_TIMESTAMP
+                SET password_hash = :hash, auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ");
             $upd->execute([

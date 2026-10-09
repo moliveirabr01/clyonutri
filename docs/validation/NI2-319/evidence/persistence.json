@@ -1,0 +1,67 @@
+{
+  "before": {
+    "tokens": [
+      {
+        "tokenable_type": "patient",
+        "tokenable_id": 1,
+        "token": "1f59642a013e35a002fb28496e6339fdebd4d13aec917232ed65f9de3997efdd",
+        "expires_at": "2026-11-08 04:49:53"
+      }
+    ],
+    "plans": [
+      {
+        "id": 1,
+        "title": "Plano vigente NI2-294",
+        "status": "published"
+      },
+      {
+        "id": 2,
+        "title": "Rascunho não acessível",
+        "status": "draft"
+      }
+    ],
+    "snapshots": 1,
+    "water": []
+  },
+  "after": {
+    "tokens": [
+      {
+        "tokenable_type": "patient",
+        "tokenable_id": 1,
+        "token": "1f59642a013e35a002fb28496e6339fdebd4d13aec917232ed65f9de3997efdd",
+        "expires_at": "2000-01-01 00:00:00"
+      },
+      {
+        "tokenable_type": "patient",
+        "tokenable_id": 1,
+        "token": "6a00bf094f9d95e928555df463deea82b16b11b4018295659d1b8269dc5e7919",
+        "expires_at": "2000-01-01 00:00:00"
+      },
+      {
+        "tokenable_type": "patient",
+        "tokenable_id": 1,
+        "token": "7e6b7447cfe81f838737808abee5f255f5d05ed7e7e5f2fa6f46e2098da000ce",
+        "expires_at": "2000-01-01 00:00:00"
+      }
+    ],
+    "plans": [
+      {
+        "id": 1,
+        "title": "Plano vigente NI2-294",
+        "status": "published"
+      },
+      {
+        "id": 2,
+        "title": "Rascunho não acessível",
+        "status": "draft"
+      }
+    ],
+    "snapshots": 1,
+    "water": [
+      {
+        "patient_id": 1,
+        "amount_ml": 250
+      }
+    ]
+  }
+}

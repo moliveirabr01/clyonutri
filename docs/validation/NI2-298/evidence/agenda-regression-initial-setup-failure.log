@@ -1,0 +1,16 @@
+====================================================================
+   CLYONUTRI II — SUÍTE DE VERIFICAÇÃO INTEGRAL DO ÉPICO NI2-10
+   Agenda, Ciclo da Consulta e Execução do Atendimento Clínico
+====================================================================
+
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 FOREIGN KEY constraint failed in /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php:66
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php(66): PDO->exec('INSERT INTO pro...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php on line 66
+
+Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 FOREIGN KEY constraint failed in /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php:66
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php(66): PDO->exec('INSERT INTO pro...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/agenda_and_consultation_lifecycle_test.php on line 66

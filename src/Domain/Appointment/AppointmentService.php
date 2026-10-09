@@ -6,6 +6,7 @@ namespace ClyoNutri\Domain\Appointment;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Time\ClinicCalendar;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use DateTimeImmutable;
@@ -15,6 +16,7 @@ use PDO;
 class AppointmentService
 {
     private PDO $db;
+    private ClinicCalendar $calendar;
 
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_CONFIRMED = 'confirmed';
@@ -56,9 +58,15 @@ class AppointmentService
         self::STATUS_NO_SHOW   => [], // Terminal
     ];
 
-    public function __construct(?PDO $db = null)
+    public function __construct(?PDO $db = null, ?DateTimeImmutable $now = null)
     {
         $this->db = $db ?? Connection::getInstance();
+        $this->calendar = new ClinicCalendar($now);
+    }
+
+    public function todayDate(): string
+    {
+        return $this->calendar->today();
     }
 
     /**
@@ -80,6 +88,7 @@ class AppointmentService
 
         $parsedDate = $this->normalizeDateTime($scheduledAt);
         $duration = max(15, min(240, $duration));
+        $this->assertAvailability($professionalId,$parsedDate,$duration);
 
         $ownsTransaction = false;
         if (!$this->db->inTransaction()) {
@@ -178,6 +187,7 @@ class AppointmentService
 
         $scheduledAt = isset($data['scheduled_at']) ? $this->normalizeDateTime($data['scheduled_at']) : $current['scheduled_at'];
         $duration = isset($data['duration_minutes']) ? max(15, min(240, (int)$data['duration_minutes'])) : (int)($current['duration_minutes'] ?? 60);
+        if($scheduledAt!==$current['scheduled_at']||$duration!==(int)$current['duration_minutes']||$professionalId!==(int)$current['professional_id'])$this->assertAvailability($professionalId,$scheduledAt,$duration);
         $type = $data['type'] ?? ($current['type'] ?? 'first_visit');
         $notes = array_key_exists('notes', $data) ? $data['notes'] : ($current['notes'] ?? null);
 
@@ -411,7 +421,7 @@ class AppointmentService
     public function listByDay(string $date, ?int $professionalId = null): array
     {
         $clinicId = TenantContext::getClinicId();
-        $targetDate = date('Y-m-d', strtotime($date));
+        $window = $this->calendar->day($date);
 
         $sql = "
             SELECT a.*, 
@@ -422,9 +432,9 @@ class AppointmentService
             JOIN professionals prof ON prof.id = a.professional_id
             JOIN users u ON u.id = prof.user_id
             WHERE a.clinic_id = :clinic_id
-              AND date(a.scheduled_at) = :date
+              AND a.scheduled_at >= :day_start AND a.scheduled_at < :day_end
         ";
-        $params = ['clinic_id' => $clinicId, 'date' => $targetDate];
+        $params = ['clinic_id' => $clinicId, 'day_start' => $window['start'], 'day_end' => $window['end']];
 
         if ($professionalId !== null) {
             $sql .= " AND a.professional_id = :prof_id";
@@ -508,9 +518,10 @@ class AppointmentService
      * Retorna itens prioritários que exigem atenção clínica do nutricionista (NI2-85).
      * Substitui qualquer placeholder por dados reais calculados do banco de dados.
      */
-    public function getAttentionRequired(): array
+    public function getAttentionRequired(?string $date = null): array
     {
         $clinicId = TenantContext::getClinicId();
+        $window = $this->calendar->day($date ?? $this->todayDate());
         $items = [];
 
         // 1. Consultas para hoje ainda sem confirmação
@@ -519,11 +530,11 @@ class AppointmentService
             FROM appointments a
             JOIN patients p ON p.id = a.patient_id
             WHERE a.clinic_id = :clinic_id
-              AND date(a.scheduled_at) = CURRENT_DATE
+              AND a.scheduled_at >= :day_start AND a.scheduled_at < :day_end
               AND a.status = 'scheduled'
             ORDER BY a.scheduled_at ASC
         ");
-        $stmtToday->execute(['clinic_id' => $clinicId]);
+        $stmtToday->execute(['clinic_id' => $clinicId, 'day_start' => $window['start'], 'day_end' => $window['end']]);
         while ($row = $stmtToday->fetch()) {
             $items[] = [
                 'type' => 'unconfirmed_today',
@@ -542,10 +553,10 @@ class AppointmentService
             JOIN patients p ON p.id = a.patient_id
             WHERE a.clinic_id = :clinic_id
               AND a.status = 'no_show'
-              AND a.scheduled_at >= date('now', '-14 days')
+              AND a.scheduled_at >= :follow_up_start
             ORDER BY a.scheduled_at DESC
         ");
-        $stmtNoShow->execute(['clinic_id' => $clinicId]);
+        $stmtNoShow->execute(['clinic_id' => $clinicId, 'follow_up_start' => (new DateTimeImmutable($window['start']))->modify('-14 days')->format('Y-m-d H:i:s')]);
         while ($row = $stmtNoShow->fetch()) {
             $items[] = [
                 'type' => 'no_show_follow_up',
@@ -585,9 +596,10 @@ class AppointmentService
     /**
      * Retorna métricas consolidadas em tempo real do dia atual para o Dashboard (NI2-85).
      */
-    public function getTodayStats(): array
+    public function getTodayStats(?string $date = null): array
     {
         $clinicId = TenantContext::getClinicId();
+        $window = $this->calendar->day($date ?? $this->todayDate());
         $stmt = $this->db->prepare("
             SELECT 
                 COUNT(*) AS total_today,
@@ -599,9 +611,9 @@ class AppointmentService
                 SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS count_no_show
             FROM appointments
             WHERE clinic_id = :clinic_id
-              AND date(scheduled_at) = CURRENT_DATE
+              AND scheduled_at >= :day_start AND scheduled_at < :day_end
         ");
-        $stmt->execute(['clinic_id' => $clinicId]);
+        $stmt->execute(['clinic_id' => $clinicId, 'day_start' => $window['start'], 'day_end' => $window['end']]);
         $row = $stmt->fetch() ?: [];
 
         return [
@@ -613,6 +625,37 @@ class AppointmentService
             'cancelled' => (int)($row['count_cancelled'] ?? 0),
             'no_show' => (int)($row['count_no_show'] ?? 0),
         ];
+    }
+
+    /** Saved preferences for the professional in the current clinic. */
+    public function practicePreferences(int $professionalId): array
+    {
+        $stmt=$this->db->prepare('SELECT op.practice_preferences FROM onboarding_progress op JOIN professionals p ON p.user_id=op.user_id WHERE op.clinic_id=? AND p.id=?');
+        $stmt->execute([TenantContext::getClinicId(),$professionalId]);return json_decode((string)($stmt->fetchColumn()?:'{}'),true)?:[];
+    }
+    private function assertAvailability(int $professionalId,string $scheduledAt,int $duration): void
+    {
+        $prefs=$this->practicePreferences($professionalId);
+        if(!array_key_exists('weekly_availability',$prefs))return;
+        $start=new DateTimeImmutable($scheduledAt);$end=$start->modify('+'.$duration.' minutes');
+        $day=['seg','ter','qua','qui','sex','sab','dom'][(int)$start->format('N')-1];$row=$prefs['weekly_availability'][$day]??[];
+        $time=$start->format('H:i:s');$endTime=$end->format('H:i:s');
+        if(empty($row['enabled'])||$start->format('Y-m-d')!==$end->format('Y-m-d')||$time<(($row['start']??'').':00')||$endTime>(($row['end']??'').':00'))throw new InvalidArgumentException('Consulta fora da disponibilidade semanal do profissional. Confira os horários em Configurações.');
+        if(!empty($row['break_start'])&&$time<($row['break_end'].':00')&&$endTime>($row['break_start'].':00'))throw new InvalidArgumentException('A consulta coincide com a pausa do profissional. Escolha outro horário.');
+    }
+
+    /** Current clinic week, Monday inclusive through next Monday exclusive. */
+    public function getWeekStats(?string $date = null): array
+    {
+        $day = $this->calendar->day($date ?? $this->todayDate());
+        $anchor = new DateTimeImmutable($day['start']);
+        $start = $anchor->modify('-' . ((int)$anchor->format('N') - 1) . ' days');
+        $end = $start->modify('+7 days');
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM appointments
+            WHERE clinic_id = :clinic_id AND scheduled_at >= :start AND scheduled_at < :end
+            AND status <> 'cancelled'");
+        $stmt->execute(['clinic_id'=>TenantContext::getClinicId(), 'start'=>$start->format('Y-m-d H:i:s'), 'end'=>$end->format('Y-m-d H:i:s')]);
+        return ['total'=>(int)$stmt->fetchColumn(), 'start'=>$start->format('d/m'), 'end'=>$end->modify('-1 day')->format('d/m')];
     }
 
     /**

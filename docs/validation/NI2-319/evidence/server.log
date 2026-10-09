@@ -1,0 +1,73 @@
+[Fri Oct  9 01:49:53 2026] PHP 8.5.10 Development Server (http://127.0.0.1:62357) started
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62359 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62359 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62360 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62360 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62361 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62361 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62363 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62363 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62364 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62364 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62365 Accepted
+[Fri Oct  9 01:49:53 2026] {"request_id":"2c49652b627622f9d22f555e","exception":"PDOException","file":"FoodDiaryService.php","line":100}
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62365 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62366 Accepted
+[Fri Oct  9 01:49:53 2026] {"request_id":"053fa8206f85c04c06ca1c11","exception":"PDOException","file":"FoodDiaryService.php","line":100}
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62366 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62367 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62367 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62368 Accepted
+[Fri Oct  9 01:49:53 2026] {"request_id":"1c84371c16ace9677a0791f6","exception":"PDOException","file":"PatientPortalService.php","line":259}
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62368 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62370 Accepted
+[Fri Oct  9 01:49:53 2026] {"request_id":"91d7af6c5be6bb60e98a8782","exception":"PDOException","file":"PatientPortalService.php","line":259}
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62370 Closing
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62371 Accepted
+[Fri Oct  9 01:49:53 2026] 127.0.0.1:62371 Closing
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62372 Accepted
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62372 Closing
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62377 Accepted
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62377 Closing
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62378 Accepted
+[Fri Oct  9 01:49:54 2026] 127.0.0.1:62378 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62385 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62385 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62386 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62386 [200]: GET /_expo/static/js/web/AppEntry-c9544858734b9102e1919fc1d3972ab4.js
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62386 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62387 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62387 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62391 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62391 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62392 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62393 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62394 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62392 Closing
+[Fri Oct  9 01:49:55 2026] {"request_id":"150ae91f4c8a071a7c36d85c","exception":"PDOException","file":"FoodDiaryService.php","line":100}
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62393 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62394 Closing
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62395 Accepted
+[Fri Oct  9 01:49:55 2026] 127.0.0.1:62395 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62397 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62397 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62398 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62398 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62400 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62400 [200]: GET /_expo/static/js/web/AppEntry-c9544858734b9102e1919fc1d3972ab4.js
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62400 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62401 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62401 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62402 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62402 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62403 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62403 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62404 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62404 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62405 Accepted
+[Fri Oct  9 01:49:56 2026] {"request_id":"ea0707714cce5eeecf836130","exception":"PDOException","file":"PatientPortalService.php","line":259}
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62405 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62406 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62406 Closing
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62407 Accepted
+[Fri Oct  9 01:49:56 2026] 127.0.0.1:62407 Closing

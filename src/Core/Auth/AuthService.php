@@ -107,7 +107,7 @@ class AuthService
     {
         $email = strtolower(trim($email));
         $stmt = $this->db->prepare("
-            SELECT u.id, u.uuid, u.name, u.email, u.password_hash, u.role, u.status,
+            SELECT u.id, u.uuid, u.name, u.email, u.password_hash, u.auth_version, u.role, u.status,
                    cm.clinic_id, cm.role AS member_role, c.name AS clinic_name
             FROM users u
             LEFT JOIN clinic_members cm ON cm.user_id = u.id AND cm.status = 'active'
@@ -158,4 +158,34 @@ class AuthService
         $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // variant RFC 4122
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
+
+    /**
+     * Invalida todas as sessões e tokens de API ativos do usuário (PX-23 / NI2-316)
+     */
+    public function revokeUserSessions(int $userId): void
+    {
+        $this->db->prepare("UPDATE users SET auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id")
+            ->execute(['id' => $userId]);
+
+        try {
+            $this->db->prepare("DELETE FROM sessions WHERE user_id = :id")->execute(['id' => $userId]);
+        } catch (\Throwable) {}
+
+        try {
+            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'user' AND tokenable_id = :id")
+                ->execute(['id' => $userId]);
+        } catch (\Throwable) {}
+    }
+
+    /**
+     * Revoga vínculo de um profissional com uma clínica e invalida sessões (PX-23 / NI2-316)
+     */
+    public function revokeClinicMembership(int $clinicId, int $userId): void
+    {
+        $this->db->prepare("UPDATE clinic_members SET status = 'revoked' WHERE clinic_id = :clinic_id AND user_id = :user_id")
+            ->execute(['clinic_id' => $clinicId, 'user_id' => $userId]);
+
+        $this->revokeUserSessions($userId);
+    }
 }
+

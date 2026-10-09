@@ -1,0 +1,22 @@
+{
+  "issue": "NI2-281",
+  "date": "2026-10-09",
+  "status": "IN_PROGRESS",
+  "environment": "local isolated SQLite and production public/index.php",
+  "real_participants": 0,
+  "http_browser_checks": 47,
+  "failed_checks": 0,
+  "regression_suites": 6,
+  "regression_failures": 0,
+  "axe_version": "4.14.0",
+  "axe_pages": 5,
+  "axe_violations": 0,
+  "user_TSR": null,
+  "user_task_time": null,
+  "user_error_rate": null,
+  "SEQ": null,
+  "SUS": null,
+  "internal_heuristic_score": null,
+  "staging": "not provided",
+  "WCAG_AA_certified": false
+}

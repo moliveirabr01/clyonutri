@@ -1,11 +1,15 @@
+import Constants from 'expo-constants';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import BrandLogo from './src/components/BrandLogo';
+import PatientOnboardingScreen from './src/screens/PatientOnboardingScreen';
 import PatientHomeScreen from './src/screens/PatientHomeScreen';
 import ProfessionalHomeScreen from './src/screens/ProfessionalHomeScreen';
-import { ApiService, PatientAuthData, ProfessionalAuthData, setSessionExpiredHandler } from './src/services/api';
+import { ApiService, PatientAuthData, ProfessionalAuthData, setApiBaseUrl, setSessionExpiredHandler } from './src/services/api';
 import { tokens as t } from './src/theme/tokens';
 
 export default function App() {
+  const [onboarding, setOnboarding] = useState(false);
   const [session, setSession] = useState<PatientAuthData | null>(null);
   const [profSession, setProfSession] = useState<ProfessionalAuthData | null>(null);
   const [role, setRole] = useState<'patient' | 'professional'>('patient');
@@ -15,6 +19,10 @@ export default function App() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (Platform.OS !== 'web' && !process.env.EXPO_PUBLIC_API_URL) {
+      const host = Constants.expoConfig?.hostUri?.split(':')[0];
+      if (host) setApiBaseUrl(`http://${host}:8080`);
+    }
     setSessionExpiredHandler(() => {
       setSession(null);
       setProfSession(null);
@@ -73,10 +81,18 @@ export default function App() {
     );
   }
 
+  if (onboarding) return <PatientOnboardingScreen onBack={() => setOnboarding(false)} onActivated={auth => { setOnboarding(false); setSession(auth); }} />;
+
   return (
     <SafeAreaView style={styles.page}>
+      <KeyboardAvoidingView style={{ flex: 1, width: '100%' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.loginContent} keyboardShouldPersistTaps="handled">
       <View style={styles.card}>
-        <Text style={styles.brand}>ClyoNutri</Text>
+        <View style={styles.brandPanel}>
+          <BrandLogo light />
+          <Text style={styles.brandCaption}>Nutrição que transforma.</Text>
+        </View>
+        <View style={styles.formBody}>
         <Text accessibilityRole="header" style={styles.title}>
           {role === 'patient' ? 'Acompanhamento do Paciente' : 'Acesso do Nutricionista'}
         </Text>
@@ -122,6 +138,8 @@ export default function App() {
         <TextInput
           accessibilityLabel={role === 'patient' ? 'E-mail do paciente' : 'E-mail do profissional'}
           style={styles.input}
+          placeholder="seuemail@exemplo.com"
+          placeholderTextColor={t.muted}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -135,6 +153,8 @@ export default function App() {
         <TextInput
           accessibilityLabel={role === 'patient' ? 'Senha do paciente' : 'Senha do profissional'}
           style={styles.input}
+          placeholder="Digite sua senha"
+          placeholderTextColor={t.muted}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -160,30 +180,39 @@ export default function App() {
           )}
         </TouchableOpacity>
 
+        {role === 'patient' && <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }} onPress={() => { setPassword(''); setMessage(null); setOnboarding(true); }}><Text style={{ color: t.navy, fontWeight: '600' }}>Primeiro acesso · Tenho um convite</Text></TouchableOpacity>}
         <Text style={styles.footerNote}>
           {role === 'patient'
-            ? 'Primeiro acesso ou senha esquecida: contate seu nutricionista para emissão da credencial.'
+            ? 'Ainda não recebeu um convite ou esqueceu a senha? Contate seu nutricionista.'
             : 'Acesso restrito a profissionais de saúde e nutricionistas cadastrados na clínica.'}
         </Text>
+        </View>
       </View>
+      <Text style={styles.pageFooter}>Cuidado e acompanhamento em um só lugar.</Text>
+      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: t.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 440, backgroundColor: t.white, padding: 24, borderRadius: t.cardRadius, gap: t.space },
-  brand: { color: t.navy, fontSize: 28, fontWeight: '700' },
-  title: { color: t.ink, fontSize: 22, fontWeight: '600' },
+  page: { flex: 1, backgroundColor: t.background },
+  loginContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20, paddingVertical: 32 },
+  card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E4E7EC', shadowColor: t.navy, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+  brandPanel: { backgroundColor: t.navy, padding: 28, borderTopWidth: 4, borderTopColor: '#E67E3A', alignItems: 'center', gap: 10 },
+  brandCaption: { color: '#D7E1E9', fontSize: 14, lineHeight: 20 },
+  formBody: { padding: 24, gap: t.space },
+  pageFooter: { color: t.muted, fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
+  title: { color: t.navy, fontSize: 23, fontWeight: '700', lineHeight: 30 },
   description: { color: t.muted, fontSize: 14, lineHeight: 22 },
   roleSelector: { flexDirection: 'row', backgroundColor: t.background, borderRadius: t.inputRadius, padding: 4, gap: 4 },
   roleTab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6, minHeight: 44, justifyContent: 'center' },
   roleTabActive: { backgroundColor: t.navy },
   roleTabText: { color: t.muted, fontSize: 14, fontWeight: '600' },
   roleTabTextActive: { color: t.white, fontWeight: '700' },
-  label: { color: t.ink, fontSize: 16 },
+  label: { color: t.navy, fontSize: 14, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, padding: 12, fontSize: 16, color: t.ink, minHeight: 48 },
-  message: { color: t.error, fontSize: 14, lineHeight: 22 },
+  message: { color: t.error, backgroundColor: '#FEF3F2', borderLeftWidth: 3, borderLeftColor: t.error, padding: 12, borderRadius: 6, fontSize: 14, lineHeight: 22 },
   button: { backgroundColor: t.copper, padding: 14, borderRadius: t.buttonRadius, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   buttonText: { color: t.white, fontSize: 16, fontWeight: '600' },
   footerNote: { color: t.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },

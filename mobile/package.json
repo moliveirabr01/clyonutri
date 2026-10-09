@@ -5,13 +5,20 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "build:api-test": "tsc src/services/api.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck",
+    "test:auth": "npm run build:api-test && node ../tests/ni2_294_real_http_client_test.cjs"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~3.2.3",
     "expo": "~51.0.0",
+    "expo-constants": "~16.0.2",
+    "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
+    "react-dom": "18.2.0",
     "react-native": "0.74.2",
-    "expo-status-bar": "~1.12.1"
+    "react-native-web": "~0.19.10"
   },
   "devDependencies": {
     "@types/react": "~18.2.45",

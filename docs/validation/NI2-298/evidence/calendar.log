@@ -1,0 +1,27 @@
+PASS Clock 2026-10-09T20:59:59-03:00: local day/list/indicator agree including both boundaries
+PASS Clock 2026-10-09T20:59:59-03:00: scheduled/completed/cancelled status breakdown preserved
+PASS Clock 2026-10-09T20:59:59-03:00: same-day pending consultation only
+PASS Clock 2026-10-09T21:00:00-03:00: local day/list/indicator agree including both boundaries
+PASS Clock 2026-10-09T21:00:00-03:00: scheduled/completed/cancelled status breakdown preserved
+PASS Clock 2026-10-09T21:00:00-03:00: same-day pending consultation only
+PASS Clock 2026-10-09T22:30:00-03:00: local day/list/indicator agree including both boundaries
+PASS Clock 2026-10-09T22:30:00-03:00: scheduled/completed/cancelled status breakdown preserved
+PASS Clock 2026-10-09T22:30:00-03:00: same-day pending consultation only
+PASS Clock 2026-10-09T23:59:59-03:00: local day/list/indicator agree including both boundaries
+PASS Clock 2026-10-09T23:59:59-03:00: scheduled/completed/cancelled status breakdown preserved
+PASS Clock 2026-10-09T23:59:59-03:00: same-day pending consultation only
+PASS Clock 2026-10-10T00:00:00Z: local day/list/indicator agree including both boundaries
+PASS Clock 2026-10-10T00:00:00Z: scheduled/completed/cancelled status breakdown preserved
+PASS Clock 2026-10-10T00:00:00Z: same-day pending consultation only
+PASS Local midnight advances every view to next day
+PASS Midnight pending list advances to next-day scheduled appointment
+PASS Professional filter preserved
+PASS Tenant two sees only its own appointment
+PASS Invalid date rejected: 2026-02-30
+PASS Invalid date rejected: 2026-13-01
+PASS Invalid date rejected: garbage
+PASS Invalid date rejected: 2026-10-08' OR 1=1 --
+PASS Read queries preserve appointment status history byte-for-byte
+PASS UTC year boundary resolves previous local year
+PASS Leap-day interval ends at next local midnight
+26/26 checks passed

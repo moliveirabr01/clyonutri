@@ -1,0 +1,23 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true,channel:'chrome'});const page=await browser.newPage({viewport:{width:390,height:844}});
+ page.setDefaultTimeout(15000);
+ await page.goto(process.env.ONBOARDING_UI_URL || 'http://127.0.0.1:8097');
+ await page.getByRole('tab',{name:'Entrar como Nutricionista'}).click();
+ await page.getByLabel('E-mail do profissional',{exact:true}).fill('plan2@example.test');await page.getByLabel('Senha do profissional',{exact:true}).fill('PlanTeste@2026');await page.getByRole('button',{name:'Entrar',exact:true}).click();
+ await page.getByRole('tab',{name:'Aba Pacientes',exact:true}).click();
+ await page.getByRole('button',{name:'Gerar convite para primeiro acesso'}).click();
+ const code=await page.getByLabel('Código do convite',{exact:true}).innerText();assert.match(code,/^[a-f0-9]{64}$/);
+ await page.reload();
+ await page.getByRole('button',{name:'Primeiro acesso · Tenho um convite'}).click();
+ await page.getByLabel('Código do convite',{exact:true}).fill(code);await page.getByRole('button',{name:'Conferir convite'}).click();
+ await page.getByLabel('E-mail para acessar o app',{exact:true}).fill('ui-onboarding@example.test');
+ await page.getByLabel('Nova senha do paciente',{exact:true}).fill('AppTeste@2026');await page.getByLabel('Confirmação da senha',{exact:true}).fill('AppTeste@2026');
+ await page.screenshot({path:'/tmp/patient-onboarding-mobile.png',fullPage:true});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+ await page.getByRole('button',{name:'Ativar meu acesso'}).click();await page.getByText('Tudo pronto!',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Começar acompanhamento'}).click();await page.getByText('Paciente sintético 2',{exact:false}).first().waitFor();
+ await page.screenshot({path:'/tmp/patient-onboarding-home.png',fullPage:true});
+ console.log('PASS UI: professional invitation, 390px mobile onboarding, activation and patient home');await browser.close();
+})();

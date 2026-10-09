@@ -302,7 +302,13 @@ class RecipeController
               </div>
             </div>
 
-            <div style="display: flex; gap: var(--space-3); align-items: center;">
+            <div style="display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;">
+              <?php if (!empty($recipe['clinic_id']) && (int)$recipe['clinic_id'] === (int)$auth['clinicId']): ?>
+                <a href="/receitas/<?= (int)$recipe['id'] ?>/editar" class="btn btn-secondary">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  Editar Receita
+                </a>
+              <?php endif; ?>
               <a href="/receitas/<?= (int)$recipe['id'] ?>/prescrever" class="btn btn-primary">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 Prescrever ao Paciente
@@ -950,6 +956,162 @@ class RecipeController
         } catch (\Throwable $e) {
             http_response_code(400);
             echo "Erro ao duplicar receita: " . htmlspecialchars($e->getMessage());
+        }
+    }
+
+    /**
+     * Tela de Edição de Receita no Runtime Web (PX-27 / NI2-320)
+     */
+    public function edit(array $params = []): void
+    {
+        $auth = $this->getAuthInfo();
+        $recipeId = (int)($params['id'] ?? 0);
+
+        try {
+            $recipe = $this->recipeService->getRecipeDetails($recipeId, $auth['clinicId']);
+        } catch (\Throwable $e) {
+            http_response_code(404);
+            echo "Receita não encontrada.";
+            return;
+        }
+
+        if (empty($recipe['clinic_id']) || (int)$recipe['clinic_id'] !== (int)$auth['clinicId']) {
+            http_response_code(403);
+            echo "Receitas padrão da biblioteca pública não podem ser editadas diretamente. Use 'Duplicar como Variante' para personalizar.";
+            return;
+        }
+
+        $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
+        $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $title = 'Editar Receita — ' . $recipe['title'];
+        $activeNav = 'receitas';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+        $csrfToken = Csrf::token();
+
+        ob_start();
+        ?>
+        <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: var(--space-4);">
+          <a href="/receitas/<?= (int)$recipe['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none; font-weight: 600;">← Voltar aos Detalhes da Receita</a>
+        </div>
+
+        <div class="card" style="max-width: 960px; margin: 0 auto;">
+          <div class="card__header">
+            <div>
+              <h2 style="font-family: var(--font-editorial); color: var(--brand-navy-900); margin-bottom: 4px;">Editar Receita (Nova Versão Supervisionada)</h2>
+              <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin: 0;">A edição gera uma nova versão auditada (v<?= ((int)($recipe['current_version'] ?? 1)) + 1 ?>) e preserva prescrições já emitidas.</p>
+            </div>
+          </div>
+
+          <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/editar" id="editRecipeForm" style="margin-top: var(--space-4);">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
+              <input type="text" name="title" required value="<?= htmlspecialchars($recipe['title']) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+            </div>
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
+              <input type="text" name="summary" value="<?= htmlspecialchars($recipe['summary'] ?? '') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
+                <select name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                  <?php foreach (['Café da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar', 'Ceia', 'Pré-Treino', 'Pós-Treino', 'Sobremesa'] as $mt): ?>
+                    <option value="<?= $mt ?>" <?= ($recipe['meal_type'] ?? '') === $mt ? 'selected' : '' ?>><?= $mt ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
+                <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                  <?php foreach (['fácil', 'média', 'difícil'] as $df): ?>
+                    <option value="<?= $df ?>" <?= ($recipe['difficulty'] ?? '') === $df ? 'selected' : '' ?>><?= ucfirst($df) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
+                <input type="number" name="servings" min="1" value="<?= (int)($recipe['servings'] ?? 1) ?>" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
+                <input type="text" name="serving_size_name" value="<?= htmlspecialchars($recipe['serving_size_name'] ?? 'porção') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
+                <input type="number" name="prep_time_minutes" min="1" value="<?= (int)($recipe['prep_time_minutes'] ?? 15) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
+                <input type="number" name="cook_time_minutes" min="0" value="<?= (int)($recipe['cook_time_minutes'] ?? 0) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+            </div>
+
+            <!-- Instruções de Preparo -->
+            <div style="margin-bottom: var(--space-6);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Modo de Preparo / Instruções *</label>
+              <textarea name="instructions" required rows="6" style="padding: 12px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); line-height: 1.5;"><?= htmlspecialchars($recipe['instructions'] ?? '') ?></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
+              <a href="/receitas/<?= (int)$recipe['id'] ?>" class="btn btn-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-primary">Salvar Nova Versão da Receita</button>
+            </div>
+          </form>
+        </div>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /**
+     * Atualiza receita (POST) gerando versão auditada (PX-27 / NI2-320)
+     */
+    public function update(array $params = []): void
+    {
+        $auth = $this->getAuthInfo();
+        $recipeId = (int)($params['id'] ?? 0);
+
+        $csrfToken = (string)($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        if (!Csrf::validate($csrfToken)) {
+            http_response_code(403);
+            echo "Token CSRF inválido ou expirado.";
+            return;
+        }
+
+        $title = trim((string)($_POST['title'] ?? ''));
+        $servings = max(1, (int)($_POST['servings'] ?? 1));
+
+        $recipeData = [
+            'title' => $title,
+            'summary' => trim((string)($_POST['summary'] ?? '')),
+            'meal_type' => trim((string)($_POST['meal_type'] ?? 'Almoço')),
+            'difficulty' => trim((string)($_POST['difficulty'] ?? 'fácil')),
+            'prep_time_minutes' => (int)($_POST['prep_time_minutes'] ?? 15),
+            'cook_time_minutes' => (int)($_POST['cook_time_minutes'] ?? 0),
+            'servings' => $servings,
+            'serving_size_name' => trim((string)($_POST['serving_size_name'] ?? 'porção')),
+            'instructions' => trim((string)($_POST['instructions'] ?? '')),
+        ];
+
+        try {
+            $updated = $this->recipeService->updateRecipe($recipeId, $recipeData, $auth['clinicId'], $auth['userId']);
+            header('Location: /receitas/' . (int)$recipeId . '?success=receita_atualizada');
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(400);
+            echo "Erro ao atualizar receita: " . htmlspecialchars($e->getMessage());
         }
     }
 }

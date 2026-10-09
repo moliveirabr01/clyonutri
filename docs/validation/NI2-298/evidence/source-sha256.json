@@ -1,0 +1,12 @@
+{
+  "timestamp_utc": "2026-10-09T02:58:42.510322+00:00",
+  "sha256": {
+    "src/Core/Time/ClinicCalendar.php": "8120d281cf3580a5cbd93e5a15f124fe7e88200f1e5e22e8eac565b16fbe16f0",
+    "src/Domain/Appointment/AppointmentService.php": "3cb181de6b08b8b510df30c7f5cc76e06ae8c0550c313cd3b79226ed6ceffaf1",
+    "src/Application/Controllers/DashboardController.php": "32ab00958491cf09b816b1ef37d6d4eadaae551bc619e32078108e6b72da8473",
+    "tests/support/ni2_298_fixture.php": "0ab3812abc1e99a8d1eb8204bb4bca3aab4163d7d8fbbc5918bf4b3fdc277806",
+    "tests/ni2_298_calendar_integration_test.php": "7cc689c9a4e0590d044da753b8bf786a3170677df84315b663da9052c920ecbd",
+    "tests/ni2_298_real_http_test.cjs": "0b73a88b12fcef32f59a565dc5498d932fb8aeba7877350dbb4516a502a52125",
+    "tests/ni2_298_verify.sh": "eb7d69f9091e0ef49a6a9f2ede16bfcad43b9d2cb1b0c300bcdbdcc99af6c006"
+  }
+}

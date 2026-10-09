@@ -1,0 +1,107 @@
+[Thu Oct  8 23:32:06 2026] PHP 8.5.10 Development Server (http://127.0.0.1:8082) started
+[Thu Oct  8 23:32:11 2026] 127.0.0.1:56126 Accepted
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56126 Closing
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56127 Accepted
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56127 [200]: GET /_expo/static/js/web/AppEntry-864bea7a8ecfedc5f41b4d40f9c466bb.js
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56127 Closing
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56128 Accepted
+[Thu Oct  8 23:32:12 2026] 127.0.0.1:56128 Closing
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56218 Accepted
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56218 Closing
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56219 Accepted
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56219 [200]: GET /_expo/static/js/web/AppEntry-f1f934f236e53c395a0ac5a79ccb147b.js
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56219 Closing
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56220 Accepted
+[Thu Oct  8 23:32:47 2026] 127.0.0.1:56220 Closing
+[Thu Oct  8 23:32:53 2026] 127.0.0.1:56241 Accepted
+[Thu Oct  8 23:32:53 2026] 127.0.0.1:56241 Closing
+[Thu Oct  8 23:33:00 2026] 127.0.0.1:56277 Accepted
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56277 Closing
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56280 Accepted
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56280 Closing
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56281 Accepted
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56281 Closing
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56282 Accepted
+[Thu Oct  8 23:33:01 2026] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metrics in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php:233
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php(233): PDO->prepare('\n            SE...')
+#1 /Users/moliveira/Nutri_II/public/index.php(443): ClyoNutri\Domain\PatientPortal\PatientPortalService->getEvolutionTimeline(1)
+#2 [internal function]: {closure:/Users/moliveira/Nutri_II/public/index.php:437}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(622): ClyoNutri\Core\Http\Router->dispatch('GET', '/api/v1/patient...')
+#5 /Users/moliveira/Nutri_II/tests/support/ni2_294_ui_router.php(6): require('/Users/moliveir...')
+#6 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php on line 233
+[Thu Oct  8 23:33:01 2026] 127.0.0.1:56282 Closing
+[Thu Oct  8 23:33:32 2026] 127.0.0.1:56346 Accepted
+[Thu Oct  8 23:33:32 2026] 127.0.0.1:56346 Closing
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56498 Accepted
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56498 Closing
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56499 Accepted
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56499 [200]: GET /_expo/static/js/web/AppEntry-fd72f7da9f74dd329af936d2363a7c6d.js
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56499 Closing
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56500 Accepted
+[Thu Oct  8 23:34:36 2026] 127.0.0.1:56500 Closing
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56515 Accepted
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56515 Closing
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56517 Accepted
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56517 Closing
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56518 Accepted
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56518 Closing
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56519 Accepted
+[Thu Oct  8 23:34:40 2026] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metrics in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php:233
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php(233): PDO->prepare('\n            SE...')
+#1 /Users/moliveira/Nutri_II/public/index.php(443): ClyoNutri\Domain\PatientPortal\PatientPortalService->getEvolutionTimeline(3)
+#2 [internal function]: {closure:/Users/moliveira/Nutri_II/public/index.php:437}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(622): ClyoNutri\Core\Http\Router->dispatch('GET', '/api/v1/patient...')
+#5 /Users/moliveira/Nutri_II/tests/support/ni2_294_ui_router.php(6): require('/Users/moliveir...')
+#6 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php on line 233
+[Thu Oct  8 23:34:40 2026] 127.0.0.1:56519 Closing
+[Thu Oct  8 23:35:06 2026] 127.0.0.1:56562 Accepted
+[Thu Oct  8 23:35:06 2026] 127.0.0.1:56562 Closing
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56582 Accepted
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56582 Closing
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56583 Accepted
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56583 Closing
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56584 Accepted
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56584 Closing
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56585 Accepted
+[Thu Oct  8 23:35:10 2026] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metrics in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php:233
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php(233): PDO->prepare('\n            SE...')
+#1 /Users/moliveira/Nutri_II/public/index.php(443): ClyoNutri\Domain\PatientPortal\PatientPortalService->getEvolutionTimeline(1)
+#2 [internal function]: {closure:/Users/moliveira/Nutri_II/public/index.php:437}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(622): ClyoNutri\Core\Http\Router->dispatch('GET', '/api/v1/patient...')
+#5 /Users/moliveira/Nutri_II/tests/support/ni2_294_ui_router.php(6): require('/Users/moliveir...')
+#6 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php on line 233
+[Thu Oct  8 23:35:10 2026] 127.0.0.1:56585 Closing
+[Thu Oct  8 23:35:29 2026] PHP 8.5.10 Development Server (http://127.0.0.1:8082) started
+[Thu Oct  8 23:35:34 2026] 127.0.0.1:56654 Accepted
+[Thu Oct  8 23:35:34 2026] 127.0.0.1:56654 Closing
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56667 Accepted
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56667 Closing
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56670 Accepted
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56670 Closing
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56671 Accepted
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56671 Closing
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56672 Accepted
+[Thu Oct  8 23:35:39 2026] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metrics in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php:233
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php(233): PDO->prepare('\n            SE...')
+#1 /Users/moliveira/Nutri_II/public/index.php(443): ClyoNutri\Domain\PatientPortal\PatientPortalService->getEvolutionTimeline(1)
+#2 [internal function]: {closure:/Users/moliveira/Nutri_II/public/index.php:437}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(622): ClyoNutri\Core\Http\Router->dispatch('GET', '/api/v1/patient...')
+#5 /Users/moliveira/Nutri_II/tests/support/ni2_294_ui_router.php(6): require('/Users/moliveir...')
+#6 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/PatientPortal/PatientPortalService.php on line 233
+[Thu Oct  8 23:35:39 2026] 127.0.0.1:56672 Closing
+[Thu Oct  8 23:35:47 2026] 127.0.0.1:56697 Accepted
+[Thu Oct  8 23:35:47 2026] 127.0.0.1:56697 Closing
+[Thu Oct  8 23:42:22 2026] 127.0.0.1:56968 Accepted
+[Thu Oct  8 23:42:22 2026] 127.0.0.1:56968 Closing

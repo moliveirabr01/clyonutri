@@ -87,6 +87,13 @@ class LgpdService
             ");
             $stmt->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
 
+            // Revogar atomicamente tokens móveis e de acesso do paciente (PX-24 / NI2-317)
+            $delTok = $this->db->prepare("
+                DELETE FROM personal_access_tokens
+                WHERE tokenable_type = 'patient' AND tokenable_id = :id
+            ");
+            $delTok->execute(['id' => $patientId]);
+
             // Registrar revogação de consentimentos
             $revStmt = $this->db->prepare("
                 UPDATE patient_consents

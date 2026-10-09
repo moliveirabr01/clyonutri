@@ -1,0 +1,28 @@
+{
+  "checks": [
+    "Email requires current password",
+    "Profile identity persisted",
+    "CRN and region persisted",
+    "Stale profile rejected",
+    "Invalid time range rejected",
+    "Availability saved",
+    "Week and break persisted",
+    "Domain permits working hours and refuses closed days, breaks and overrun",
+    "Agenda uses configured default duration",
+    "CSRF required for password change",
+    "Wrong current password rejected",
+    "Confirmation required",
+    "Browser shows saved identification",
+    "Browser shows saved Monday and break",
+    "Settings fit viewport 375",
+    "Settings fit viewport 1280",
+    "Password change redirects to login",
+    "Other existing session revoked",
+    "Old password rejected",
+    "New password authenticates",
+    "Password audit contains no credentials"
+  ],
+  "status": "PASS",
+  "database": "isolated SQLite",
+  "transport": "production HTTP and browser"
+}

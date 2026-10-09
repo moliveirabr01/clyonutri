@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-10-09T06:47:44.901Z",
+  "transport": "real HTTP TCP to production public/index.php; SQLite persisted synthetic fixtures",
+  "checks": [
+    {
+      "name": "Unauthenticated dashboard denied without appointment data",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthenticated agenda denied",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid professional password cannot establish session",
+      "status": "PASS"
+    },
+    {
+      "name": "Real password authentication establishes professional session",
+      "status": "PASS"
+    },
+    {
+      "name": "Dashboard indicator reads six persisted current-day appointments",
+      "status": "PASS"
+    },
+    {
+      "name": "Dashboard table contains six statuses excluding adjacent days and other tenant",
+      "status": "PASS"
+    },
+    {
+      "name": "Agenda count agrees with dashboard indicator",
+      "status": "PASS"
+    },
+    {
+      "name": "Pending unconfirmed appointment matches actual agenda row",
+      "status": "PASS"
+    },
+    {
+      "name": "Reading views preserves records and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutation without CSRF is denied and persists nothing",
+      "status": "PASS"
+    },
+    {
+      "name": "Real authenticated scheduling persists appointment and history",
+      "status": "PASS"
+    },
+    {
+      "name": "Scheduling appends history without rewriting existing events",
+      "status": "PASS"
+    },
+    {
+      "name": "Persisted new appointment updates indicator, agenda and pending list",
+      "status": "PASS"
+    },
+    {
+      "name": "Cross-tenant scheduling denied without persisting",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid date returns explicit 400 rather than empty agenda",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed date returns 400: ?date[]=2026-10-08",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed date returns 400: ?date=2026-10-08%00",
+      "status": "PASS"
+    },
+    {
+      "name": "Database failure produces 503 and retry rather than false zero",
+      "status": "PASS"
+    },
+    {
+      "name": "Agenda database failure differs from empty state",
+      "status": "PASS"
+    },
+    {
+      "name": "Recovery restores actual persisted agenda",
+      "status": "PASS"
+    },
+    {
+      "name": "Other authenticated clinic sees only own indicator and patient",
+      "status": "PASS"
+    },
+    {
+      "name": "Real empty clinic yields zero and explicit empty state",
+      "status": "PASS"
+    },
+    {
+      "name": "Logout removes access to protected views",
+      "status": "PASS"
+    }
+  ]
+}

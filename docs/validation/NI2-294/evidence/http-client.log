@@ -1,0 +1,39 @@
+npm notice run clyonutri-mobile@1.0.0 test:auth
+npm notice run npm run build:api-test && node ../tests/ni2_294_real_http_client_test.cjs
+npm notice run clyonutri-mobile@1.0.0 build:api-test
+npm notice run tsc src/services/api.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck
+PASS Production front controller reachable over real HTTP
+PASS Identifier alone rejected without token
+PASS Wrong password rejected without token
+PASS Unknown identifier cannot match empty phone rejected without token
+PASS Inactive patient rejected without token
+PASS Professional account cannot enter patient API rejected without token
+PASS Malformed credential type rejected without token
+PASS Rejected logins persisted no tokens
+PASS Compiled client sends password and receives patient session
+PASS Server persists SHA256 token, never plaintext
+PASS Token expires in 30 days UTC
+PASS Published plan returned with actual meal and item
+PASS Caller cannot override patient or tenant using query parameters
+PASS Patient bearer cannot access professional web session
+PASS Newer draft excluded
+PASS Authenticated hydration persisted by patient
+PASS New request reads persisted hydration
+PASS Other tenant receives neither plan nor hydration
+PASS Real empty plan is null rather than request failure
+PASS Logout clears client token
+PASS Logout deletes server token
+PASS Revoked token rejected
+PASS Expired token rejected
+PASS 401 clears client session and dispatches expiry event
+PASS Token without mandatory expiry rejected
+PASS Existing token rejected after patient deactivation
+PASS Existing token rejected after clinic deactivation
+PASS Inactive clinic cannot issue a token
+PASS Non-patient token type rejected despite colliding id
+PASS Ambiguous identity across tenants fails closed
+PASS Plan records and immutable published history preserved
+PASS Network outage produces real transport error
+PASS Logout during network outage reports failure
+PASS Failed revocation retains token for retry
+34/34 checks passed

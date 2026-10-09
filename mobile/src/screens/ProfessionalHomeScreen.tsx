@@ -11,6 +11,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
   ApiService,
@@ -30,6 +31,8 @@ export default function ProfessionalHomeScreen({
   session: ProfessionalAuthData;
   onLogout: () => void;
 }) {
+  const [invitation, setInvitation] = useState<{ patientId: number; invitation_code: string; expires_at: string } | null>(null);
+  const [inviting, setInviting] = useState<number | null>(null);
   const [currentTab, setCurrentTab] = useState<ProfessionalTab>('Agenda');
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -152,6 +155,7 @@ export default function ProfessionalHomeScreen({
       {/* Header do Nutricionista */}
       <View style={styles.headerBar}>
         <View>
+          <BrandLogo light compact />
           <Text style={styles.clinicBadge}>{clinicName}</Text>
           <Text accessibilityRole="header" style={styles.headerTitle}>
             Dr(a). {profName}
@@ -255,6 +259,19 @@ export default function ProfessionalHomeScreen({
                   <Text style={styles.patientName}>{p.name}</Text>
                   <Text style={styles.patientContact}>📧 {p.email}</Text>
                   {p.phone && <Text style={styles.patientContact}>📱 {p.phone}</Text>}
+                  <TouchableOpacity accessibilityRole="button" disabled={inviting !== null} style={{ minHeight: 44, justifyContent: 'center' }} onPress={async () => {
+                    if (inviting !== null) return;
+                    setInviting(p.id); setErrorMessage(null); setInvitation(null);
+                    try { const data = await ApiService.createPatientInvitation(p.id); setInvitation({ ...data, patientId: p.id }); }
+                    catch (e) { setErrorMessage(e instanceof Error ? e.message : 'Não foi possível gerar o convite.'); }
+                    finally { setInviting(null); }
+                  }}><Text style={{ color: t.copper, fontWeight: '600' }}>{inviting === p.id ? 'Gerando convite…' : 'Gerar convite para primeiro acesso'}</Text></TouchableOpacity>
+                  {invitation?.patientId === p.id && <View style={{ padding: 12, backgroundColor: t.background, gap: 8 }}>
+                    <Text>Entregue este código ao paciente por um canal privado. No app, ele deve escolher Primeiro acesso.</Text>
+                    <Text selectable accessibilityLabel="Código do convite">{invitation.invitation_code}</Text>
+                    <Text>Validade: 48 horas, uso único. Um novo convite invalida o anterior.</Text>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => setInvitation(null)}><Text style={{ color: t.navy, paddingVertical: 10 }}>Ocultar convite</Text></TouchableOpacity>
+                  </View>}
                   <View style={styles.patientFooter}>
                     <Text style={styles.patientBadge}>Status: {p.status}</Text>
                     <Text style={styles.patientDate}>Desde: {p.created_at.substring(0, 10)}</Text>

@@ -1,0 +1,80 @@
+[
+  {
+    "path": "/configuracoes",
+    "version": "4.14.0",
+    "violations": [],
+    "incomplete": [],
+    "passes": 22
+  },
+  {
+    "path": "/pacientes",
+    "version": "4.14.0",
+    "violations": [],
+    "incomplete": [],
+    "passes": 27
+  },
+  {
+    "path": "/pacientes/1/anamnese",
+    "version": "4.14.0",
+    "violations": [],
+    "incomplete": [],
+    "passes": 25
+  },
+  {
+    "path": "/pacientes/1/antropometria",
+    "version": "4.14.0",
+    "violations": [],
+    "incomplete": [],
+    "passes": 21
+  },
+  {
+    "path": "/planos/1",
+    "version": "4.14.0",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "messageKey": "nonBmp"
+                },
+                "relatedNodes": [],
+                "impact": "serious",
+                "message": "Element content contains only non-text characters"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<button type=\"submit\" style=\"color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.8rem;\">✕</button>",
+            "target": [
+              "form[action=\"/planos/1/itens/1/remover\"] > button[type=\"submit\"]"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+          }
+        ]
+      }
+    ],
+    "passes": 26
+  }
+]

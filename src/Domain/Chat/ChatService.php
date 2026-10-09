@@ -352,11 +352,29 @@ class ChatService
     }
 
     /**
-     * Marca mensagens enviadas pelo outro participante como lidas.
+     * Marca mensagens enviadas pelo outro participante como lidas com validação estrita do participante (PX-25 / NI2-318).
      */
-    public function markAsRead(int $conversationId, string $currentReaderType): void
+    public function markAsRead(int $conversationId, string $currentReaderType, ?int $readerId = null): void
     {
         $clinicId = TenantContext::getClinicId();
+
+        // Validar propriedade da conversa quando readerId for informado (PX-25 / NI2-318)
+        if ($readerId !== null) {
+            if ($currentReaderType === 'patient') {
+                $chk = $this->db->prepare("SELECT id FROM chat_conversations WHERE id = :conv_id AND clinic_id = :clinic_id AND patient_id = :reader_id");
+                $chk->execute(['conv_id' => $conversationId, 'clinic_id' => $clinicId, 'reader_id' => $readerId]);
+                if (!$chk->fetchColumn()) {
+                    throw new \ClyoNutri\Core\Security\AuthorizationException("Acesso não autorizado: conversa não pertence ao paciente autenticado.");
+                }
+            } elseif ($currentReaderType === 'professional') {
+                $chk = $this->db->prepare("SELECT id FROM chat_conversations WHERE id = :conv_id AND clinic_id = :clinic_id AND professional_id = :reader_id");
+                $chk->execute(['conv_id' => $conversationId, 'clinic_id' => $clinicId, 'reader_id' => $readerId]);
+                if (!$chk->fetchColumn()) {
+                    throw new \ClyoNutri\Core\Security\AuthorizationException("Acesso não autorizado: conversa não pertence ao profissional autenticado.");
+                }
+            }
+        }
+
         $otherType = ($currentReaderType === 'professional') ? 'patient' : 'professional';
 
         $stmt = $this->db->prepare("

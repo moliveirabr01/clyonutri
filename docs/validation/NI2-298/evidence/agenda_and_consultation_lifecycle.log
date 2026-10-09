@@ -1,0 +1,69 @@
+====================================================================
+   CLYONUTRI II — SUÍTE DE VERIFICAÇÃO INTEGRAL DO ÉPICO NI2-10
+   Agenda, Ciclo da Consulta e Execução do Atendimento Clínico
+====================================================================
+
+[1] Testando NI2-81 — Criar e Editar Agendamento...
+  [PASS] Consulta #1 criada com status inicial 'scheduled'
+  [PASS] Duração e horário salvos corretamente
+  [PASS] Agendamento persistido fisicamente no banco relacional
+  [PASS] Trilha de auditoria inicial registrada na criação
+  [PASS] Conflito de horário detectado e bloqueado com AppointmentConflictException
+  [PASS] Encaixe intencional criado com sucesso quando allowConflict = true
+PHP Warning:  Undefined array key "scheduled_at" in /Users/moliveira/Nutri_II/src/Domain/Appointment/AppointmentService.php on line 190
+
+Warning: Undefined array key "scheduled_at" in /Users/moliveira/Nutri_II/src/Domain/Appointment/AppointmentService.php on line 190
+  [PASS] Consulta reagendada com sucesso para 14:00
+  [PASS] Duração atualizada para 90 minutos
+  [PASS] Tentativa de agendar paciente de outro tenant bloqueada (403)
+
+[2] Testando NI2-82 — Estados e Ciclo da Consulta...
+  [PASS] Transição scheduled ➔ confirmed aprovada
+  [PASS] Transição confirmed ➔ in_progress aprovada
+  [PASS] Transição in_progress ➔ completed aprovada
+  [PASS] Transição inválida completed ➔ scheduled bloqueada com exceção
+  [PASS] Transição scheduled ➔ no_show aprovada
+  [PASS] Transição inválida no_show ➔ in_progress bloqueada (terminal)
+  [PASS] Histórico de auditoria registrou todas as 4 etapas do ciclo
+  [PASS] Etapa 1 é scheduled
+  [PASS] Etapa 2 é confirmed com justificativa
+  [PASS] Etapa 3 é in_progress
+  [PASS] Etapa 4 é completed
+
+[3] Testando NI2-83 — Visão Diária e Semanal da Agenda...
+  [PASS] listByDay retornou consultas do dia atual
+  [PASS] Consultas ordenadas cronologicamente
+  [PASS] Contém dados do paciente (nome e telefone)
+  [PASS] listByWeek retornou estrutura semanal de 7 dias
+  [PASS] Total de consultas da semana calculado corretamente
+
+[4] Testando NI2-84 — Execução do Atendimento e Conclusão Clínica...
+  [PASS] Consulta finalizada com status 'completed'
+  [PASS] Registro de prontuário gerado
+  [PASS] Hash SHA-256 de 64 caracteres computado e encadeado
+  [PASS] Prontuário armazenado append-only com hash imutável
+  [PASS] Conteúdo clínico contém anotações reais da consulta
+
+[5] Testando NI2-85 — Dashboard com Métricas Reais e Prioridades...
+  [PASS] Métricas do dia calculadas dinamicamente
+  [PASS] Contagem de confirmadas é numérica real
+  [PASS] Contagem de completed reflete consultas concluídas
+  [PASS] Contagem de no_show reflete faltosos
+  [PASS] Lista de pendências que exigem atenção retornou array estruturado
+  [PASS] Paciente faltoso identificado automaticamente na lista de atenção do Dashboard
+
+[6] Testando Integração das Rotas HTTP Web (/agenda, /consulta/id)...
+  [PASS] GET /agenda retornou HTML válido
+  [PASS] Página contém controles de navegação (Dia, Semana, Hoje)
+  [PASS] Página exibe consultas reais criadas no banco
+  [PASS] Formulário de novo agendamento presente com CSRF
+  [PASS] GET /consulta/{id} retornou HTML de atendimento clínico
+  [PASS] Tela de consulta contém contexto do paciente
+  [PASS] Tela contém campo de evolução clínica e botão de concluir
+  [PASS] Tela exibe trilha de auditoria da consulta
+  [PASS] GET /dashboard exibe seção de Pacientes & Prioridades que Exigem Atenção
+  [PASS] Dashboard exibe métricas calculadas reais do dia
+
+====================================================================
+   RESULTADO DA SUÍTE DE TESTES NI2-10: 46 PASS, 0 FAIL
+====================================================================

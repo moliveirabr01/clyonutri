@@ -1,0 +1,24 @@
+PASS Unauthenticated dashboard denied without appointment data
+PASS Unauthenticated agenda denied
+PASS Invalid professional password cannot establish session
+PASS Real password authentication establishes professional session
+PASS Dashboard indicator reads six persisted current-day appointments
+PASS Dashboard table contains six statuses excluding adjacent days and other tenant
+PASS Agenda count agrees with dashboard indicator
+PASS Pending unconfirmed appointment matches actual agenda row
+PASS Reading views preserves records and history
+PASS Mutation without CSRF is denied and persists nothing
+PASS Real authenticated scheduling persists appointment and history
+PASS Scheduling appends history without rewriting existing events
+PASS Persisted new appointment updates indicator, agenda and pending list
+PASS Cross-tenant scheduling denied without persisting
+PASS Invalid date returns explicit 400 rather than empty agenda
+PASS Malformed date returns 400: ?date[]=2026-10-08
+PASS Malformed date returns 400: ?date=2026-10-08%00
+PASS Database failure produces 503 and retry rather than false zero
+PASS Agenda database failure differs from empty state
+PASS Recovery restores actual persisted agenda
+PASS Other authenticated clinic sees only own indicator and patient
+PASS Real empty clinic yields zero and explicit empty state
+PASS Logout removes access to protected views
+23/23 checks passed

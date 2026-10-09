@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cadastre-se — ClyoNutri</title>
@@ -15,7 +16,7 @@
       align-items: center;
       justify-content: center;
       padding: var(--space-6);
-      background: linear-gradient(135deg, #FAF7F2 0%, #F4F5F6 100%);
+      background: linear-gradient(135deg, #F8F4ED 0%, #F8F4ED 100%);
     }
     .auth-card {
       width: 100%;
@@ -74,8 +75,7 @@
   <div class="auth-wrapper">
     <div class="auth-card">
       <div class="auth-logo">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-500);"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V18a1 1 0 0 1-2 0v-1.07A6 6 0 0 1 7 11V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v5a6 6 0 0 1-4 5.93zM9 7v4a3 3 0 0 0 6 0V7z"/></svg>
-        <span>Clyo</span>Nutri
+        <img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64" style="display: block; width: 100%; max-width: 260px; height: auto;">
       </div>
 
       <p class="auth-subtitle">Crie seu consultório e comece a atender com o ClyoNutri II</p>

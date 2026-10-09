@@ -38,6 +38,10 @@ class OnboardingController
             exit;
         }
 
+        $access=$this->db->prepare("SELECT 1 FROM users u JOIN clinic_members cm ON cm.user_id=u.id WHERE u.id=? AND cm.clinic_id=? AND u.role='nutritionist' AND u.status='active' AND cm.status='active' AND cm.role IN ('owner','admin','nutritionist')");
+        $access->execute([$userId,$clinicId]);
+        if (!$access->fetchColumn()) { http_response_code(403); echo 'Configuração não autorizada.'; exit; }
+
         // Buscar ID profissional
         $stmt = $this->db->prepare("SELECT id FROM professionals WHERE user_id = :uid LIMIT 1");
         $stmt->execute(['uid' => $userId]);
@@ -60,7 +64,7 @@ class OnboardingController
             'clinicId' => $clinicId,
             'userName' => $userName,
             'clinicName' => $clinicName,
-            'profId' => $profId > 0 ? $profId : 1,
+            'profId' => $profId,
         ];
     }
 
@@ -378,6 +382,7 @@ class OnboardingController
                   </div>
                 </div>
 
+                <?php $term = $this->db->query("SELECT * FROM consent_terms WHERE purpose_code='clinical_care' AND is_active=1 ORDER BY id DESC LIMIT 1")->fetch(); require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               <?php elseif ($step === 5): ?>
                 <!-- PASSO 5: Orientação Contextual & Ativação Concluída -->
                 <div style="text-align: center; padding: var(--space-4) 0 var(--space-6);">

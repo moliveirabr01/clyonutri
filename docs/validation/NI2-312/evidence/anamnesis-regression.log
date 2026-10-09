@@ -1,0 +1,26 @@
+====================================================================
+   CLYONUTRI TEST SUITE: ÉPICO NI2-6 (PRONTUÁRIO & ANAMNESE)
+   Histórias: NI2-60, NI2-61, NI2-62, NI2-63, NI2-64
+====================================================================
+
+✓ Infraestrutura, bancos isolados e contas profissionais inicializados com sucesso.
+
+[1/5] Validando NI2-60: Registro nutricional longitudinal...
+  ✓ NI2-60 Aprovado: registros datados, autoria rastreável, histórico imutável, retificação versionada e isolamento multi-tenant comprovados.
+
+[2/5] Validando NI2-61: Anamnese nutricional estruturada...
+  ✓ NI2-61 Aprovado: seções clínicas completas, salvamento parcial (rascunho), validação fail-closed e sanitização comprovadas.
+
+[3/5] Validando NI2-62: Versionar e preservar histórico da anamnese...
+  ✓ NI2-62 Aprovado: versionamento estritamente imutável, comparação side-by-side e histórico cronológico íntegro.
+
+[4/5] Validando NI2-63: Observações clínicas seguras e exportação auditada...
+  ✓ NI2-63 Aprovado: limites de segurança, sanitização, exportação auditada e fail-closed contra adulteração validados.
+
+[5/5] Validando NI2-64: Resumo clínico para prescrição estruturada...
+  ✓ NI2-64 Aprovado: resumo sem dados inferidos, links de rastreabilidade e integração ativa com segurança de prescrição comprovadas.
+
+====================================================================
+   TODOS OS CRITÉRIOS DE ACEITE DO ÉPICO NI2-6 FORAM ATENDIDOS!
+   NI2-60, NI2-61, NI2-62, NI2-63 e NI2-64 VALIDADOS COM 100% PASS.
+====================================================================

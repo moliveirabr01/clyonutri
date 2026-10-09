@@ -173,7 +173,12 @@ class DashboardController
             <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="/chat?patient_id=<?= $p['id'] ?>" class="btn btn-secondary">Conversar via Chat</a>
             <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary">Editar paciente</a>
+            <form method="post" action="/pacientes/<?= $p['id'] ?>/convite-app" style="margin:0">
+              <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+              <button class="btn btn-secondary" type="submit">Gerar convite para o app</button>
+            </form>
             <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-secondary">
               Prontuário ➔
             </a>
@@ -1651,7 +1656,7 @@ class DashboardController
               <label for="anamnesis_objectives" id="label_anamnesis_objectives" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 1. Objetivos & Metas do Paciente
               </label>
-              <textarea id="anamnesis_objectives" name="objectives" aria-labelledby="label_anamnesis_objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
+              <textarea name="objectives" id="anamnesis_objectives" aria-labelledby="label_anamnesis_objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
             </div>
 
             <!-- 2. Alergias & Restrições (Crítico para Prescrição) -->
@@ -1730,7 +1735,7 @@ class DashboardController
                   <label for="anamnesis_water_intake_ml" id="label_anamnesis_water_intake_ml" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                     9. Meta Hídrica (ml/dia)
                   </label>
-                  <input type="number" step="50" min="0" max="10000" id="anamnesis_water_intake_ml" name="water_intake_ml" aria-labelledby="label_anamnesis_water_intake_ml" aria-describedby="anamnesis_water_help" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <input type="number" step="50" min="0" max="10000" id="anamnesis_water_intake_ml" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" aria-labelledby="label_anamnesis_water_intake_ml" aria-describedby="anamnesis_water_help" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <span id="anamnesis_water_help" style="font-size: 0.75rem; color: var(--neutral-gray-500); display: block; margin-top: 4px;">Meta prescrita em ml exibida na Home do paciente.</span>
                 </div>
               </div>
@@ -1898,7 +1903,17 @@ class DashboardController
             return;
         }
 
-        if (!(new PatientRepository())->findById($patientId)) { $this->anamnesisError(404,'Paciente não encontrado.'); return; }
+        if (!(new PatientRepository())->findById($patientId)) {
+            $db = Connection::getInstance();
+            $patientExists = $db->prepare("SELECT 1 FROM patients WHERE id = ?");
+            $patientExists->execute([$patientId]);
+            if ($patientExists->fetchColumn()) {
+                $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
+            } else {
+                $this->anamnesisError(404, 'Paciente não encontrado.');
+            }
+            return;
+        }
         \ClyoNutri\Domain\Clinical\FormRecovery::remember($patientId,'anamnese',$_POST);
         $isDraft = ($_POST['save_mode'] ?? '') === 'draft';
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
@@ -2363,6 +2378,8 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
 
+        $appointmentPreferences=(new AppointmentService())->practicePreferences($this->getActiveProfessionalId());
+        $defaultDuration=(int)($appointmentPreferences['default_duration_minutes']??60);
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
@@ -2442,11 +2459,9 @@ class DashboardController
               <div>
                 <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
                 <select name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <option value="30">30 minutos</option>
-                  <option value="45">45 minutos</option>
-                  <option value="60" selected>60 minutos (Padrão)</option>
-                  <option value="90">90 minutos</option>
-                  <option value="120">120 minutos</option>
+                  <?php $durationChoices=array_unique([30,45,60,90,120,$defaultDuration]);sort($durationChoices);foreach($durationChoices as $minutes): ?>
+                  <option value="<?= $minutes ?>" <?= $minutes===$defaultDuration?'selected':'' ?>><?= $minutes ?> minutos<?= $minutes===$defaultDuration?' (Padrão)':'' ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
 
@@ -3055,7 +3070,7 @@ class DashboardController
                             <tr style="background: #fafaf9; border-bottom: 1px dashed #e7e5e4;">
                               <td style="padding: 8px 20px 8px 40px;">
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                  <span style="color: #d97706; font-size: 0.8rem; font-weight: 600;">↳ Opção Alternativa:</span>
+                                  <span style="color: #92400E; font-size: 0.8rem; font-weight: 600;">↳ Opção Alternativa:</span>
                                   <span style="color: #44403c;"><?= htmlspecialchars($sub['food_name']) ?></span>
                                 </div>
                                 <?php if (!empty($sub['notes'])): ?>
@@ -3072,7 +3087,7 @@ class DashboardController
                                 <?php if ($isDraft): ?>
                                   <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover substituição?');">
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                    <button type="submit" style="color: #a8a29e; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
+                                    <button type="submit" style="color: #57534E; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
                                   </form>
                                 <?php endif; ?>
                               </td>
@@ -4006,6 +4021,7 @@ class DashboardController
         try {
             $todayAppointments = $appointmentService->listByDay($today);
             $todayStats = $appointmentService->getTodayStats($today);
+            $weekStats = $appointmentService->getWeekStats($today);
             $attentionItems = $appointmentService->getAttentionRequired($today);
         } catch (\PDOException $e) {
             $this->scheduleError(503, 'Não foi possível carregar as consultas e pendências. Tente novamente.', 'dashboard');
@@ -4072,13 +4088,22 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Cards de Métricas Consolidadas -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
           <div class="card" style="margin-bottom: 0;">
             <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS HOJE</div>
             <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
               <span data-testid="appointments-today-count"><?= $todayStats['total_today'] ?></span>
             </div>
             <span class="badge badge-info"><?= $todayStats['confirmed'] ?> confirmada(s) • <?= $todayStats['completed'] ?> realizada(s)</span>
+          </div>
+
+          <div class="card" style="margin-bottom: 0;">
+            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS NA SEMANA</div>
+            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
+              <span data-testid="appointments-week-count"><?= $weekStats['total'] ?></span>
+            </div>
+            <span class="badge badge-info"><?= $weekStats['start'] ?> a <?= $weekStats['end'] ?></span>
+            <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">Canceladas não incluídas</div>
           </div>
 
           <div class="card" style="margin-bottom: 0;">
@@ -4230,6 +4255,17 @@ class DashboardController
         $patientRepo = new PatientRepository();
         $patients = $patientRepo->listAll();
 
+        $today = (new \ClyoNutri\Core\Time\ClinicCalendar())->today();
+        $month = substr($today, 5, 2);
+        $monthNames = ['01'=>'Janeiro','02'=>'Fevereiro','03'=>'Março','04'=>'Abril','05'=>'Maio','06'=>'Junho','07'=>'Julho','08'=>'Agosto','09'=>'Setembro','10'=>'Outubro','11'=>'Novembro','12'=>'Dezembro'];
+        $birthdays = array_values(array_filter($patients, static function (array $patient) use ($today, $month): bool {
+            $birth = $patient['birth_date'] ?? null;
+            if (!is_string($birth) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $birth)) return false;
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $birth);
+            return $date && $date->format('Y-m-d') === $birth && $birth <= $today && substr($birth, 5, 2) === $month;
+        }));
+        usort($birthdays, static fn(array $a, array $b): int => strcmp(substr($a['birth_date'], 8, 2), substr($b['birth_date'], 8, 2)) ?: strcasecmp($a['name'], $b['name']));
+
         $submissionId = bin2hex(random_bytes(16));
         $_SESSION['patient_submissions'] = array_slice($_SESSION['patient_submissions'] ?? [], -20, null, true);
         $_SESSION['patient_submissions'][$submissionId] = 'pending';
@@ -4262,7 +4298,37 @@ class DashboardController
           </button>
         </div>
 
+        <section class="card" aria-labelledby="patient-birthdays-heading">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+            <h2 id="patient-birthdays-heading" style="font-size: 1.25rem; margin: 0;">Aniversariantes do mês · <?= $monthNames[$month] ?></h2>
+            <span class="badge badge-info"><?= count($birthdays) ?> paciente<?= count($birthdays) === 1 ? '' : 's' ?></span>
+          </div>
+          <?php if (!$birthdays): ?>
+            <p style="color: var(--neutral-gray-500); margin: 0;">Nenhum paciente com aniversário neste mês. A lista considera as datas de nascimento cadastradas.</p>
+          <?php else: ?>
+            <ul style="list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px;">
+              <?php foreach ($birthdays as $birthday): $isToday = substr($birthday['birth_date'], 5) === substr($today, 5); ?>
+              <li data-patient-birthday="<?= (int)$birthday['id'] ?>" style="border: 1px solid var(--neutral-gray-300); border-radius: 8px; padding: 16px;">
+                <div style="font-weight: 700; color: var(--brand-navy-900); margin-bottom: 8px;"><?= htmlspecialchars($birthday['name']) ?></div>
+                <div style="margin-bottom: 12px;">
+                  <span class="badge badge-<?= $isToday ? 'success' : 'info' ?>"><?= substr($birthday['birth_date'], 8, 2) ?>/<?= $month ?><?= $isToday ? ' · Hoje!' : '' ?></span>
+                </div>
+                <a class="btn btn-secondary" href="/pacientes/<?= (int)$birthday['id'] ?>" aria-label="Ver perfil de <?= htmlspecialchars($birthday['name'], ENT_QUOTES) ?>">Ver perfil</a>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
+        </section>
+
         <div class="card">
+          <div style="margin-bottom: var(--space-4);">
+            <label for="patient-search" class="form-label">Buscar paciente por nome, celular ou e-mail</label>
+            <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+              <input type="search" id="patient-search" class="form-control" placeholder="Digite o nome, celular ou e-mail" autocomplete="off" aria-controls="patient-list" style="flex: 1; min-width: 180px;">
+              <button type="button" id="patient-search-clear" class="btn btn-secondary">Limpar</button>
+            </div>
+            <p id="patient-search-count" role="status" aria-live="polite" style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-top: var(--space-2);"></p>
+          </div>
           <div class="table-responsive">
             <table class="table">
               <thead>
@@ -4274,12 +4340,12 @@ class DashboardController
                   <th>Ações</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="patient-list">
                 <?php if (empty($patients)): ?>
-                  <tr><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum paciente cadastrado nesta clínica.</td></tr>
+                  <tr id="patient-list-empty"><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum paciente cadastrado nesta clínica.</td></tr>
                 <?php else: ?>
                   <?php foreach ($patients as $p): ?>
-                    <tr>
+                    <tr data-patient-row>
                       <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($p['name']) ?></td>
                       <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
@@ -4291,10 +4357,13 @@ class DashboardController
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
+                <tr id="patient-search-empty" hidden><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum paciente encontrado para esta busca.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
+
+        <script src="/assets/js/patient-search.js" defer></script>
 
         <!-- Modal Cadastrar Paciente (Design System Premium) -->
         <div id="patientModal" class="modal-overlay" onclick="if(event.target === this) closePatientModal()">
@@ -4379,7 +4448,8 @@ class DashboardController
     {
         $foodService = new FoodCatalogService();
         $foodService->seedTacoReference();
-        $foods = $foodService->search('');
+        $query = trim((string)($_GET['q'] ?? ''));
+        $foods = $foodService->search($query);
 
         $title = 'Base de Alimentos';
         $activeNav = 'alimentos';
@@ -4388,39 +4458,79 @@ class DashboardController
 
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>
-            <h1>Tabela de Alimentos (TACO)</h1>
-            <p style="color: var(--neutral-gray-500);">Referência nutricional para montagem e cálculo de planos alimentares.</p>
+            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Tabela de Alimentos (TACO)</h1>
+            <p style="color: var(--neutral-gray-600); margin: 0; font-size: 0.95rem;">Referência analítica por 100g da Tabela Brasileira de Composição de Alimentos com cálculo proporcional por medida caseira.</p>
           </div>
+          <form method="GET" action="/alimentos" style="display: flex; gap: 8px; align-items: center;">
+            <label for="food-search-input" class="sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);">Buscar alimento</label>
+            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="Buscar alimento ou categoria..." class="form-control" style="width: 260px; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+            <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Buscar</button>
+            <?php if ($query !== ''): ?>
+              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none;">Limpar</a>
+            <?php endif; ?>
+          </form>
         </div>
 
-        <div class="card">
+        <!-- Banner Explicativo de Integridade Clínica (PX-16) -->
+        <div class="card" style="padding: 16px 20px; background: rgba(15, 39, 71, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
+          <div style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem; margin-bottom: 4px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Diferença entre Referência Padrão (100g) e Medida Caseira
+          </div>
+          <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.5;">
+            Os dados laboratoriais oficiais (TACO) são mensurados na <strong>base fixa de 100g</strong>. Na coluna <em>Medida Caseira</em>, a quantidade em gramas/ml e a energia resultante são calculadas proporcionalmente para orientar prescrições clínicas seguras sem confusão métrica.
+          </p>
+        </div>
+
+        <div class="card" style="padding: 0; overflow: hidden;">
           <div class="table-responsive">
-            <table class="table">
-              <thead>
+            <table class="table" style="margin-bottom: 0;">
+              <thead style="background: var(--neutral-gray-50);">
                 <tr>
-                  <th>Alimento</th>
-                  <th>Categoria</th>
-                  <th>Porção</th>
-                  <th class="tabular-nums">Energia (kcal)</th>
-                  <th class="tabular-nums">Proteína (g)</th>
-                  <th class="tabular-nums">Carboidratos (g)</th>
-                  <th class="tabular-nums">Lipídios (g)</th>
+                  <th scope="col" style="min-width: 200px;">Alimento</th>
+                  <th scope="col">Categoria</th>
+                  <th scope="col">Medida Caseira</th>
+                  <th scope="col" class="tabular-nums" style="color: var(--brand-navy-900);">Energia na Porção</th>
+                  <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Energia (100g)</th>
+                  <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Proteína (100g)</th>
+                  <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Carboidratos (100g)</th>
+                  <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Lipídios (100g)</th>
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($foods as $f): ?>
+                <?php if (empty($foods)): ?>
                   <tr>
-                    <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?></td>
-                    <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span></td>
-                    <td><?= $f['serving_size_g'] ?> <?= htmlspecialchars($f['serving_unit']) ?></td>
-                    <td class="tabular-nums" style="font-weight: 600;"><?= $f['energy_kcal'] ?></td>
-                    <td class="tabular-nums"><?= $f['protein_g'] ?></td>
-                    <td class="tabular-nums"><?= $f['carbohydrate_g'] ?></td>
-                    <td class="tabular-nums"><?= $f['lipid_g'] ?></td>
+                    <td colspan="8" style="text-align: center; padding: 48px 16px; color: var(--neutral-gray-500);">
+                      Nenhum alimento encontrado para o termo pesquisado.
+                    </td>
                   </tr>
-                <?php endforeach; ?>
+                <?php else: ?>
+                  <?php foreach ($foods as $f): 
+                    $servingG = (float)($f['serving_size_g'] > 0 ? $f['serving_size_g'] : 100);
+                    $energy100 = (float)$f['energy_kcal'];
+                    $portionKcal = round(($energy100 * $servingG) / 100, 1);
+                    $servingUnit = htmlspecialchars($f['serving_unit'] ?? 'g');
+                  ?>
+                    <tr>
+                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?></td>
+                      <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span></td>
+                      <td>
+                        <span style="font-weight: 500; color: var(--neutral-gray-800);">
+                          <?= $servingG < 100 || $servingUnit !== 'g' ? '1 ' . $servingUnit . ' (' . $servingG . 'g)' : '100g' ?>
+                        </span>
+                      </td>
+                      <td class="tabular-nums" style="font-weight: 700; color: var(--brand-navy-900);">
+                        <?= number_format($portionKcal, 1, ',', '.') ?> kcal
+                      </td>
+                      <td class="tabular-nums" style="color: var(--neutral-gray-600);"><?= number_format($energy100, 1, ',', '.') ?> kcal</td>
+                      <td class="tabular-nums"><?= number_format((float)$f['protein_g'], 1, ',', '.') ?> g</td>
+                      <td class="tabular-nums"><?= number_format((float)$f['carbohydrate_g'], 1, ',', '.') ?> g</td>
+                      <td class="tabular-nums"><?= number_format((float)$f['lipid_g'], 1, ',', '.') ?> g</td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </tbody>
             </table>
           </div>

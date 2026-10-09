@@ -4,10 +4,12 @@
  */
 
 :root {
-  /* Brand Tokens */
+  /* Brand Tokens (Design System Premium Oficial ClyoNutri - PX-21) */
   --brand-navy-900: #0F2A44;
+  --brand-navy-reference: #0F2747;
   --brand-copper-500: #E67E3A;
   --brand-copper-600: #B94F1F;
+  --brand-copper-reference: #E67A3F;
 
   --brand-green-500: #2E7D58;
   --brand-green-200: #A7C7A1;
@@ -271,6 +273,22 @@ p { margin-bottom: var(--space-3); }
   color: var(--neutral-white);
 }
 
+.btn-danger:hover {
+  background-color: #991B1B;
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--brand-navy-900);
+  border: 1px solid var(--neutral-gray-300);
+}
+
+.btn-outline:hover {
+  background-color: var(--neutral-gray-100);
+  border-color: var(--brand-navy-900);
+  color: var(--brand-navy-900);
+}
+
 /* Inputs & Form Groups */
 .form-group {
   margin-bottom: var(--space-5);
@@ -346,7 +364,8 @@ textarea.form-control {
 
 .badge-success { background-color: var(--semantic-success-light); color: var(--semantic-success); }
 .badge-warning { background-color: var(--semantic-warning-light); color: var(--semantic-warning); }
-.badge-error { background-color: var(--semantic-error-light); color: var(--semantic-error); }
+.badge-error,
+.badge-danger { background-color: var(--semantic-error-light); color: var(--semantic-error); }
 .badge-info { background-color: var(--semantic-info-light); color: var(--semantic-info); }
 
 /* Tabular Numbers */

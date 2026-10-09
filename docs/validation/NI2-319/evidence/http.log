@@ -1,0 +1,24 @@
+PASS Real login and home remain valid
+PASS Empty diary is valid data
+PASS Empty evolution is valid data
+PASS diary SQL failure returns 500 JSON without internals
+PASS diary correlation matches header
+PASS diary compiled client classifies server failure
+PASS Partial SQL failure does not invalidate home
+PASS evolution SQL failure returns 500 JSON without internals
+PASS evolution correlation matches header
+PASS evolution compiled client classifies server failure
+PASS Partial SQL failure does not invalidate home
+PASS Response identifiers correlate with restricted server logs
+PASS Failed reads preserve data
+PASS Successful mutation still persists
+PASS Invalid JSON/schema cannot become empty data
+PASS Invalid JSON/schema cannot become empty data
+PASS Transport failure classified offline
+PASS 401 triggers session expiry and auth classification
+PASS Diary failure has accessible alert and local retry
+PASS Local retry recovers real empty state
+PASS Offline retry preserves cached data and marks outdated
+PASS Malformed response produces visible error, not empty state
+PASS Evolution server failure retains cache, suppresses false empty and marks stale
+PASS Real UI 401 returns to login without patient data

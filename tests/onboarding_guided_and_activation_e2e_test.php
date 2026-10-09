@@ -17,7 +17,7 @@ if (session_status() === PHP_SESSION_NONE) {
  * 2. Passo 1: Boas-vindas & Objetivos clínicos do consultório (meta, especialidades).
  * 3. Passo 2: Dados profissionais reais (CRN, região, especialidade, bio) em `professionals` e `onboarding_progress`.
  * 4. Passo 3: Preferências de atendimento (modalidades, duração, dias, preço, teleconsulta).
- * 5. Passo 4: Criação do primeiro paciente real no banco (`patients`) com LGPD consent.
+ * 5. Passo 4: Criação do primeiro paciente sintético sem fabricação de consentimento.
  * 6. Passo 5: Ativação concluída (`is_completed = 1`, timestamp `completed_at`, 100% de progresso).
  * 7. Retomada resiliente (Resume): interrupção no meio do fluxo retoma sem perda de dados.
  * 8. Idempotência e reedição de passos sem corrupção ou duplicatas.
@@ -240,9 +240,9 @@ try {
     assertOnboarding($patientDb['name'] === 'Mariana Oliveira da Silva', "Nome do paciente no banco divergente");
     assertOnboarding($patientDb['clinic_id'] === $clinicIdAlfa, "clinic_id do paciente deve ser o tenant Alfa");
 
-    // Verificar consentimento LGPD registrado automaticamente
+    // Sem manifestação expressa, o onboarding não pode fabricar consentimento.
     $consentDb = $db->query("SELECT * FROM patient_consents WHERE patient_id = {$patientId} AND clinic_id = {$clinicIdAlfa}")->fetch();
-    assertOnboarding($consentDb !== false && (int)$consentDb['granted'] === 1, "Consentimento LGPD inicial não registrado");
+    assertOnboarding($consentDb === false, "Consentimento não pode ser fabricado automaticamente");
 
     logOnboardingPass("STEP_4", "Primeiro paciente real criado no banco com governança LGPD", "Paciente #{$patientId}: {$patientDb['name']}");
 

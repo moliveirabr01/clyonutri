@@ -1,0 +1,57 @@
+====================================================================
+   CLYONUTRI II — OPERATIONAL AGENDA & CONCURRENCY TEST SUITE (NI2-187)
+   Detecção de Conflitos, Máquina de Estados & Fluxo Contextual
+====================================================================
+
+[1/5] Testando ciclo operacional de Criação, Reagendamento e Cancelamento...
+  [PASS] Consulta criada com persistência física no banco (ID #1)
+  [PASS] Status inicial gravado como 'scheduled'
+PHP Warning:  Undefined array key "scheduled_at" in /Users/moliveira/Nutri_II/src/Domain/Appointment/AppointmentService.php on line 190
+
+Warning: Undefined array key "scheduled_at" in /Users/moliveira/Nutri_II/src/Domain/Appointment/AppointmentService.php on line 190
+  [PASS] Horário reagendado atualizado imediatamente no banco (2026-11-10 14:00:00)
+  [PASS] Duração atualizada para 45 minutos
+  [PASS] Cancelamento executado com sucesso
+  [PASS] Status 'cancelled' persistido na tabela appointments
+
+[2/5] Testando Detecção de Conflitos e Proteção contra Concorrência...
+  [PASS] Consulta base das 09:00 às 10:00 criada com sucesso
+  [PASS] Sobreposição das 09:30 às 10:30 detectada e bloqueada com AppointmentConflictException
+  [PASS] Encaixe autorizado (allow_conflict=true) persistido com sucesso
+  [PASS] Slot concorrente idêntico bloqueado atomicamente pela transação
+
+[3/5] Testando Máquina de Estados e Histórico de Auditoria...
+  [PASS] Transição válida: scheduled -> confirmed
+  [PASS] Transição válida: confirmed -> in_progress
+  [PASS] Transição válida: in_progress -> completed
+  [PASS] Transição proibida a partir de estado terminal bloqueada com InvalidAppointmentTransitionException
+  [PASS] Portal do paciente não permite reconfirmar consulta cancelada (retorna false)
+  [PASS] Histórico de auditoria contém todas as transições registradas (4 eventos)
+  [PASS] Evento 1: Agendamento inicial criado
+  [PASS] Evento 2: Confirmado
+  [PASS] Evento 3: Em atendimento
+  [PASS] Evento 4: Concluído
+
+[4/5] Testando Navegação e Preservação de Contexto Clínico...
+  [PASS] Contexto da consulta carrega ID correto do paciente (#1)
+  [PASS] Contexto da consulta carrega nome real do paciente (Paciente Agenda 187 A)
+  [PASS] Consulta transicionada para 'completed'
+  [PASS] Registro clínico gravado com hash SHA-256: 79246ede7ae8f5ba...
+  [PASS] ID do registro clínico persistido no prontuário (#1)
+
+[5/5] Testando Responsividade CSS, Fuso Horário e Barreira Multi-Tenant...
+  [PASS] CSS contempla breakpoint mobile compacto de 390px
+  [PASS] CSS contempla breakpoint tablet/mobile de 768px
+  [PASS] CSS contempla breakpoint laptop de 1280px
+  [PASS] CSS contempla breakpoint desktop amplo de 1440px
+  [PASS] Fuso horário configurado e ativo como 'America/Sao_Paulo'
+  [PASS] getAppointment retorna NULL quando requisitado por tenant que não é dono da consulta
+  [PASS] TenantGuard bloqueia acesso cross-tenant com TenantSecurityException (403 Forbidden)
+
+====================================================================
+RESULTADO DA VALIDAÇÃO DA AGENDA OPERACIONAL (NI2-187):
+  TOTAL DE ASSERÇÕES: 32
+  PASSOU            : 32
+  FALHOU            : 0
+====================================================================
+STATUS: ALL CRITERIA SATISFIED (100% SUCESSO - AUDITORIA NI2-187 APROVADA)

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle ?? 'Política de Privacidade & LGPD — ClyoNutri II') ?></title>
@@ -71,12 +72,7 @@
   <!-- Header -->
   <header class="header">
     <div class="container header__inner">
-      <a href="/" class="logo" aria-label="ClyoNutri Página Inicial">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <span><span class="logo__brand-clyo">Clyo</span>Nutri <small style="font-size: 0.65em; font-weight: 500; color: var(--neutral-gray-500);">II</small></span>
-      </a>
+      <a href="/" class="logo" aria-label="ClyoNutri Página Inicial"><img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64" style="display: block; width: 200px; max-width: 100%; height: auto;"></a>
       <div class="header__actions">
         <a href="/" class="btn-link">Voltar ao Início</a>
         <a href="/login" class="btn-secondary">Entrar</a>
@@ -110,7 +106,7 @@
         <li><strong>Dados dos Pacientes (inseridos pelo profissional):</strong> Nome, data de nascimento, gênero, contato, registros antropométricos, histórico clínico/anamnese e planos alimentares. Finalidade: suporte ao atendimento nutricional e acompanhamento longitudinal.</li>
       </ul>
 
-      <h2>4. Medidas Técnicas e Segurança da Informação</h2>
+      <h2 id="seguranca">4. Medidas Técnicas e Segurança da Informação</h2>
       <p>Implementamos salvaguardas técnicas avançadas para assegurar a confidencialidade, integridade e disponibilidade das informações:</p>
       <ul>
         <li><strong>Isolamento Multitenant:</strong> Separação lógica estrita das bases de dados, impedindo qualquer acesso cruzado entre clínicas.</li>

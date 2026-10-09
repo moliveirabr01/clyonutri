@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "e61f5c0b-9a66-4b06-bc08-4d3748705798"
+      }
+    },
+    "android": {
+      "package": "com.moliveirabr.clyonutrimobile"
+    }
+  }
+}

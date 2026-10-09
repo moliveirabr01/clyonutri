@@ -1,0 +1,63 @@
+====================================================================
+   CLYONUTRI II — SUÍTE E2E DA JORNADA CANÔNICA DE ATENDIMENTO
+   Validação de Ponta a Ponta: NI2-179, NI2-181 e NI2-194
+====================================================================
+
+--> [1/10] Configurando Tenants e Profissionais...
+
+--> [2/10] Cadastro Real do Paciente na Plataforma...
+  [PASS] Paciente cadastrado com persistência relacional (ID #1)
+  [PASS] Nome e dados cadastrais corretos
+  [PASS] UUID seguro gerado para rastreabilidade
+
+--> [3/10] Agendamento da Primeira Consulta Nutricional...
+  [PASS] Consulta criada com sucesso na agenda (ID #1)
+  [PASS] Status inicial é 'scheduled'
+
+--> [4/10] Atendimento em Andamento & Registro de Anamnese...
+  [PASS] Consulta transicionada para 'in_progress'
+  [PASS] Anamnese clínica completa registrada no prontuário
+
+--> [5/10] Avaliação Antropométrica e Indicadores OMS...
+  [PASS] Avaliação antropométrica registrada (ID #1)
+  [PASS] IMC canônico calculado: 26.67 kg/m² (Sobrepeso)
+  [PASS] Relação Cintura-Quadril calculada: 0.84
+  [PASS] Relação Cintura-Estatura calculada: 0.48 (Baixo risco cardiometabólico)
+  [PASS] Avaliação compartilhada com autorização auditada
+
+--> [6/10] Elaboração do Plano Alimentar e Publicação com Snapshot...
+  [PASS] Rascunho de plano alimentar criado (ID #1)
+  [PASS] Opção de substituição vinculada configurada
+  [PASS] Totais calculados com precisão proporcional: 553.8 kcal
+  [PASS] Plano alimentar publicado com sucesso
+  [PASS] Publicado como Versão 1 imutável
+
+--> [7/10] Conclusão Clínica da Consulta e Assinatura com Hash...
+  [PASS] Status da consulta atualizado para 'completed'
+  [PASS] Registro de prontuário append-only gerado para a consulta
+  [PASS] Hash SHA-256 de integridade computado (Hash: 509e7fbef7eae120...)
+
+--> [8/10] Experiência do Paciente no Aplicativo (API Móvel)...
+  [PASS] Paciente obtém com sucesso a prescrição alimentar ativa
+  [PASS] Plano entregue é exatamente a versão publicada #1
+  [PASS] Paciente visualiza as 2 refeições prescritas
+  [PASS] Registros de água executados via API
+  [PASS] Hidratação persistida fisicamente no banco relacional (Total: 800 ml)
+  [PASS] Entrada no Diário Alimentar persistida com sucesso (ID #1)
+
+--> [9/10] Visualização dos Registros do Paciente pelo Nutricionista...
+  [PASS] Nutricionista visualiza o diário alimentar do paciente na linha do tempo
+  [PASS] Dados do diário refletem exatamente o consumo real registrado
+
+--> [10/10] Pen-Test de Isolamento Multi-Tenant em Cada Etapa...
+  [PASS] Tentativa de Tenant B acessar Perfil 360 do paciente bloqueada (403/Forbidden)
+  [PASS] Tentativa de Tenant B acessar consulta agendada bloqueada
+  [PASS] Tentativa de Tenant B acessar plano alimentar bloqueada
+  [PASS] Tentativa de Tenant B acessar avaliação antropométrica bloqueada
+
+====================================================================
+RESULTADO DA JORNADA CANÔNICA DE ATENDIMENTO (NI2-179 / NI2-181):
+  TOTAL DE ASSERÇÕES: 32
+  PASSOU            : 32
+  FALHOU            : 0
+====================================================================

@@ -82,6 +82,7 @@ try {
 
     logPx03Pass("SETUP", "Tenants Alfa (#{$clinicIdAlfa}) e Beta (#{$clinicIdBeta}) provisionados");
 
+    TenantContext::set($clinicIdAlfa, ['id'=>$nutriIdAlfa,'clinic_id'=>$clinicIdAlfa]);
     $service = new OnboardingService($db);
 
     // Avançar passos 1 a 3 para deixar no passo 4

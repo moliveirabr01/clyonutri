@@ -1,0 +1,194 @@
+{
+  "issue": "NI2-281",
+  "transport": "real HTTP and browser, production public/index.php, isolated SQLite",
+  "checks": [
+    {
+      "name": "Default and legacy flag create no fabricated consent",
+      "status": "PASS"
+    },
+    {
+      "name": "Repeated submission does not duplicate patient",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit grant persists term, purpose, channel and date",
+      "status": "PASS"
+    },
+    {
+      "name": "Grant audit identifies professional",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit refusal recorded without blocking patient registration",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid term atomically rolls back patient",
+      "status": "PASS"
+    },
+    {
+      "name": "Failed registration retains entered name",
+      "status": "PASS"
+    },
+    {
+      "name": "Database failure rolls back patient and consent",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid email rejected without writes",
+      "status": "PASS"
+    },
+    {
+      "name": "Future birth date rejected without writes",
+      "status": "PASS"
+    },
+    {
+      "name": "CSRF enforced",
+      "status": "PASS"
+    },
+    {
+      "name": "Editable professional settings save",
+      "status": "PASS"
+    },
+    {
+      "name": "Own profile and owner clinic persisted; forged IDs ignored",
+      "status": "PASS"
+    },
+    {
+      "name": "Stale settings rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings validation retains entered values",
+      "status": "PASS"
+    },
+    {
+      "name": "Accent-insensitive search matches Maçã",
+      "status": "PASS"
+    },
+    {
+      "name": "Other clinic custom food excluded",
+      "status": "PASS"
+    },
+    {
+      "name": "Server pagination is bounded and stable",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed search rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized onboarding denied",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role cannot edit settings",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role cannot edit patient",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role cannot search",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-owner cannot rename clinic",
+      "status": "PASS"
+    },
+    {
+      "name": "Failed clinical form retained server-side",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings viewport fits 320",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile menu expands and Escape returns focus 320",
+      "status": "PASS"
+    },
+    {
+      "name": "Escape closes navigation 320",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings viewport fits 375",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile menu expands and Escape returns focus 375",
+      "status": "PASS"
+    },
+    {
+      "name": "Escape closes navigation 375",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings viewport fits 768",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile menu expands and Escape returns focus 768",
+      "status": "PASS"
+    },
+    {
+      "name": "Escape closes navigation 768",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings viewport fits 1280",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /pacientes",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /pacientes/1",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /pacientes/1/anamnese",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /pacientes/1/antropometria",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /planos/1",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /agenda",
+      "status": "PASS"
+    },
+    {
+      "name": "Journey fits mobile /dashboard",
+      "status": "PASS"
+    },
+    {
+      "name": "Consent is not preselected in real browser",
+      "status": "PASS"
+    },
+    {
+      "name": "Debounced browser search renders accent match",
+      "status": "PASS"
+    },
+    {
+      "name": "Keyboard reaches native food selector",
+      "status": "PASS"
+    },
+    {
+      "name": "Food dialog Escape restores trigger",
+      "status": "PASS"
+    },
+    {
+      "name": "Browser recovers clinical fields after failed validation",
+      "status": "PASS"
+    }
+  ]
+}

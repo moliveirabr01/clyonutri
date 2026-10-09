@@ -1,0 +1,13 @@
+Starting Metro Bundler
+transform[stderr]: (node:76040) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 598ms node_modules/expo/AppEntry.js (128 modules)
+
+Exporting 1 bundle for web:
+_expo/static/js/web/AppEntry-c9544858734b9102e1919fc1d3972ab4.js (303 kB)
+
+Exporting 2 files:
+index.html (1.19 kB)
+metadata.json (49 B)
+
+App exported to: dist

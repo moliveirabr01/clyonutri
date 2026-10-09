@@ -1,8 +1,8 @@
 {
   "product": "ClyoNutri II",
   "version": "1.0.0",
-  "build_timestamp": "20261009_033146",
-  "git_commit": "a4f5f6b",
+  "build_timestamp": "20261009_050133",
+  "git_commit": "171df5a",
   "release_gate": {
     "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
     "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",

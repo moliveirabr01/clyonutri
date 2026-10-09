@@ -1,0 +1,50 @@
+PASS Anonymous historical read denied
+PASS Invalid password cannot open anamnesis
+PASS Real owner nutritionist session authenticated
+PASS Current collection retains latest v2 editor
+PASS Unreported hydration stays empty in current collection instead of fixed default
+PASS History table emits canonical version links
+PASS Historical v1 shows its exact content without substituting v2
+PASS Historical v1 shows stored date author and finalized state
+PASS Historical v1 preserves zero rather than treating it as absent
+PASS Historical read has no mutation form and exposes separate revision action
+PASS Historical v2 shows distinct content date author and draft state
+PASS Existing bookmark redirects to canonical same-version URL
+PASS Missing historical version returns clear 404 without latest fallback
+PASS Invalid or ambiguous selector denied: version=0
+PASS Invalid or ambiguous selector denied: version=-1
+PASS Invalid or ambiguous selector denied: version=1.5
+PASS Invalid or ambiguous selector denied: version=abc
+PASS Invalid or ambiguous selector denied: version[]=1
+PASS Invalid or ambiguous selector denied: version=1%00
+PASS Invalid or ambiguous selector denied: version=1000000000
+PASS Invalid or ambiguous selector denied: version=1&view_version=2
+PASS Invalid or ambiguous selector denied: version=1&revision_from=2
+PASS Comparison executes real distinct version diff with metadata
+PASS Comparison completes numeric zero and full document
+PASS Comparison is read-only without mutation form
+PASS Missing comparison version is explicit 404
+PASS Incomplete comparison is explicit 400
+PASS True empty history has explicit first-collection state
+PASS Empty patient cannot fall back when version requested
+PASS Other tenant document denied without clinical disclosure
+PASS All reads and rejected selectors preserve persisted history
+PASS Real plan editor links to its displayed source version
+PASS Separate revision editor prefills selected historical content
+PASS CSRF omission denied without mutation
+PASS Historical URL refuses POST even with valid CSRF
+PASS Cross-tenant write with valid CSRF denied without data disclosure
+PASS Nonexistent revision source cannot persist a new record
+PASS Real revision POST persists new v3 with authenticated author
+PASS Original historical records remain byte-for-byte unchanged
+PASS New revision audit records source version
+PASS Plan source bookmark still opens v2 after v3 exists
+PASS Current collection advances to persisted v3
+PASS Actual schema outage returns 503 distinct from empty/missing version
+PASS Restoring database recovers historical v1
+PASS Revoked clinic membership blocks existing session
+PASS Second authorized nutritionist can read correct historical version
+PASS Same-clinic receptionist denied clinical history without disclosure
+PASS Unauthorized role cannot append clinical version
+PASS Logout denies further clinical access
+49/49 checks passed

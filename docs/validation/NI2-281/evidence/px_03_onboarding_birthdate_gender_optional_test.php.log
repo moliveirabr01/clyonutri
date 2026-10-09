@@ -1,0 +1,35 @@
+
+========================================================================
+>>> CLYONUTRI II — SUÍTE DE TESTES PX-03: ONBOARDING DEMOGRÁFICO (NI2-296) <<<
+    Eliminação de Dados Sintéticos, Persistência NULL & Validação Clínica
+========================================================================
+
+--> [1/7] Provisionando Tenants Reais (Alfa & Beta)...
+  [PASS] [SETUP] Tenants Alfa (#1) e Beta (#2) provisionados
+
+--> [2/7] Testando Passo 4 com apenas Nome (birth_date e gender omitidos)...
+  [PASS] [GATE_1] Paciente criado com birth_date = NULL e gender = NULL no DB ➔ Paciente #1
+
+--> [3/7] Testando Reedição com strings vazias ('', '')...
+  [PASS] [GATE_2] Reedição preserva NULL para birth_date e gender sem fallbacks sintéticos
+
+--> [4/7] Testando Preenchimento com dados válidos reais ('1990-05-15', 'female')...
+  [PASS] [GATE_3] Dados válidos persistidos com fidelidade ➔ Nascimento: 1990-05-15, Gênero: female
+
+--> [5/7] Testando Validação Negativa: Data no Futuro...
+  [PASS] [GATE_4] Data no futuro rejeitada com InvalidArgumentException e DB intacto
+
+--> [6/7] Testando Validação Negativa: Formatos Inválidos ('2025-02-31', 'abc')...
+  [PASS] [GATE_5] Datas malformadas e calendário inexistente rejeitados com sucesso
+
+--> [7/7] Testando Isolamento Multi-Tenant e Renderização da View HTML...
+  [PASS] [GATE_6] Isolamento multi-tenant garantido: pacientes e contextos estritamente segregados
+  [PASS] [GATE_7] View HTML validada: sem hardcoded '1995-04-10', com 'Não informado (opcional)' e atributos seguros
+
+========================================================================
+>>> TODOS OS 7 GATES DO PX-03 (NI2-296) FORAM APROVADOS COM SUCESSO! <<<
+========================================================================
+
+--> [CLEANUP] Limpando dados de teste PX-03...
+  [OK] Teardown concluído.
+

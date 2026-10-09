@@ -4,6 +4,8 @@ storage/logs/*.log
 storage/uploads/*
 storage/*.sqlite
 database/*.sqlite
+database/*.db
+*.db
 storage/backups/*
 storage/*.json
 storage/simulated_deploy/

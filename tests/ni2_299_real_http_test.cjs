@@ -1,0 +1,70 @@
+const {spawn,execFileSync}=require('node:child_process');
+const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
+const {join,resolve}=require('node:path');
+const net=require('node:net');const assert=require('node:assert/strict');
+const root=resolve(__dirname,'..');const dir=mkdtempSync('/tmp/ni2-299-http-');
+const env={...process.env,DB_CONNECTION:'sqlite',DB_DATABASE:join(dir,'test.sqlite'),APP_TIMEZONE:'America/Sao_Paulo'};
+const fixture=mode=>execFileSync('php',['tests/support/ni2_299_fixture.php',mode],{cwd:root,env,encoding:'utf8'});
+const inspect=()=>JSON.parse(fixture('inspect'));const checks=[];let server,log='';
+function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});console.log('PASS '+name);}
+const historical=html=>html.match(/<section[^>]*data-testid="historical-anamnesis"[^>]*>([\s\S]*?)<\/section>/)?.[1]||'';
+(async()=>{
+ const ids=JSON.parse(fixture('prepare'));const baseline=inspect();
+ const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
+ server=spawn('php',['-d','session.name=NI299TEST','-d','session.save_path='+dir,'-S','127.0.0.1:'+port,'-t','public'],{cwd:root,env});
+ server.stdout.on('data',d=>log+=d);server.stderr.on('data',d=>log+=d);const base='http://127.0.0.1:'+port;
+ for(let i=0;i<80;i++){try{if((await fetch(base+'/up')).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+ let cookie='';
+ async function req(url,options={}){const r=await fetch(base+url,{...options,redirect:'manual',headers:{...(cookie?{Cookie:cookie}:{}),...options.headers}});const c=r.headers.get('set-cookie');if(c)cookie=c.split(';')[0];const text=await r.text();if(/Fatal error|Uncaught (?:TypeError|Error|PDOException)/.test(text))throw new Error('Incomplete runtime response: '+url);return{status:r.status,location:r.headers.get('location'),text};}
+ async function login(n,password='AnamneseTeste@2026'){const page=await req('/login');const csrf=page.text.match(/name="_csrf_token" value="([^"]+)"/)[1];return{...await req('/login',{method:'POST',body:new URLSearchParams({_csrf_token:csrf,email:`ni299-${n}@example.test`,password})}),csrf};}
+ const path=`/pacientes/${ids.patient_id}/anamnese`;
+ check('Anonymous historical read denied',(await req(path+'?version=1')).location==='/login');
+ await login(1,'wrong');check('Invalid password cannot open anamnesis',(await req(path)).location==='/login');
+ const auth=await login(1);check('Real owner nutritionist session authenticated',auth.status===302 && auth.location==='/dashboard');
+ let current=await req(path);check('Current collection retains latest v2 editor',current.status===200 && current.text.includes('Objetivo recente NI299 V2') && current.text.includes('method="POST"'));
+ check('Unreported hydration stays empty in current collection instead of fixed default',/name="water_intake_ml" value=""/.test(current.text));
+ check('History table emits canonical version links',current.text.includes('anamnese?version=1') && current.text.includes('anamnese?version=2') && !current.text.includes('view_version='));
+ let v1=await req(path+'?version=1');let doc=historical(v1.text);
+ check('Historical v1 shows its exact content without substituting v2',v1.status===200 && doc.includes('Objetivo histórico NI299 V1') && !doc.includes('Objetivo recente NI299 V2'));
+ check('Historical v1 shows stored date author and finalized state',doc.includes('2026-09-01 09:10:11') && doc.includes('NI299 Autora V1') && doc.includes('Finalizada'));
+ check('Historical v1 preserves zero rather than treating it as absent',/Meta Hídrica \(ml\)<\/dt>\s*<dd[^>]*>\s*0\s*<\/dd>/.test(doc));
+ check('Historical read has no mutation form and exposes separate revision action',!v1.text.includes('method="POST"') && doc.includes('revision_from=1') && doc.includes('Somente leitura'));
+ const v2=await req(path+'?version=2');doc=historical(v2.text);
+ check('Historical v2 shows distinct content date author and draft state',v2.status===200 && doc.includes('Objetivo recente NI299 V2') && !doc.includes('Objetivo histórico NI299 V1') && doc.includes('2026-10-01 10:20:21') && doc.includes('NI299 Autora V2') && doc.includes('Rascunho'));
+ const legacy=await req(path+'?view_version=1');check('Existing bookmark redirects to canonical same-version URL',legacy.status===302 && legacy.location===path+'?version=1');
+ const missing=await req(path+'?version=999');check('Missing historical version returns clear 404 without latest fallback',missing.status===404 && missing.text.includes('Versão de anamnese não encontrada') && !missing.text.includes('Objetivo recente NI299 V2'));
+ for(const query of ['version=0','version=-1','version=1.5','version=abc','version[]=1','version=1%00','version=1000000000','version=1&view_version=2','version=1&revision_from=2']){const bad=await req(path+'?'+query);check('Invalid or ambiguous selector denied: '+query,bad.status===400 && !historical(bad.text));}
+ const comparison=await req(path+'?v1=1&v2=2');check('Comparison executes real distinct version diff with metadata',comparison.status===200 && comparison.text.includes('Comparativo de Versões: v1 vs v2') && comparison.text.includes('Objetivo histórico NI299 V1') && comparison.text.includes('Objetivo recente NI299 V2') && comparison.text.includes('NI299 Autora V1') && comparison.text.includes('NI299 Autora V2'));
+ check('Comparison completes numeric zero and full document',comparison.text.includes('Meta Hídrica (ml)') && comparison.text.includes('</html>'));
+ check('Comparison is read-only without mutation form',!comparison.text.includes('method="POST"') && comparison.text.includes('Comparação somente leitura'));
+ check('Missing comparison version is explicit 404',(await req(path+'?v1=1&v2=999')).status===404);
+ check('Incomplete comparison is explicit 400',(await req(path+'?v1=1')).status===400);
+ const empty=await req(`/pacientes/${ids.empty_id}/anamnese`);check('True empty history has explicit first-collection state',empty.status===200 && empty.text.includes('Nenhuma anamnese registrada') && empty.text.includes('method="POST"'));
+ check('Empty patient cannot fall back when version requested',(await req(`/pacientes/${ids.empty_id}/anamnese?version=1`)).status===404);
+ const cross=await req(`/pacientes/${ids.other_id}/anamnese?version=1`);check('Other tenant document denied without clinical disclosure',cross.status===404 && !cross.text.includes('SEGREDO NI299') && !cross.text.includes('Paciente secreto'));
+ check('All reads and rejected selectors preserve persisted history',JSON.stringify(inspect())===JSON.stringify(baseline));
+ const plan=await req('/planos/'+ids.plan_id);const origin=plan.text.match(new RegExp('href="('+path.replaceAll('/','\\/')+'\\?version=2)"'))?.[1];
+ check('Real plan editor links to its displayed source version',plan.status===200 && origin===path+'?version=2');
+ const revision=await req(path+'?revision_from=1');check('Separate revision editor prefills selected historical content',revision.status===200 && /<textarea name="objectives"[^>]*>Objetivo histórico NI299 V1<\/textarea>/.test(revision.text) && revision.text.includes('name="revision_from" value="1"'));
+ const csrf=revision.text.match(/name="_csrf_token" value="([^"]+)"/)[1];
+ const noCsrf=await req(path,{method:'POST',body:new URLSearchParams({objectives:'DENIED'})});check('CSRF omission denied without mutation',noCsrf.status===403 && JSON.stringify(inspect())===JSON.stringify(baseline));
+ const readPost=await req(path+'?version=1',{method:'POST',body:new URLSearchParams({_csrf_token:csrf,objectives:'DENIED'})});check('Historical URL refuses POST even with valid CSRF',readPost.status===405 && JSON.stringify(inspect())===JSON.stringify(baseline));
+ const crossWrite=await req(`/pacientes/${ids.other_id}/anamnese`,{method:'POST',body:new URLSearchParams({_csrf_token:csrf,objectives:'DENIED'})});check('Cross-tenant write with valid CSRF denied without data disclosure',crossWrite.status===403 && !crossWrite.text.includes('SEGREDO NI299') && JSON.stringify(inspect().versions)===JSON.stringify(baseline.versions));
+ const invalidSource=await req(path,{method:'POST',body:new URLSearchParams({_csrf_token:csrf,revision_from:'999',objectives:'DENIED'})});check('Nonexistent revision source cannot persist a new record',invalidSource.status===302 && invalidSource.location.includes('error=dados_invalidos') && JSON.stringify(inspect())===JSON.stringify(baseline));
+ const saved=await req(path,{method:'POST',body:new URLSearchParams({_csrf_token:csrf,revision_from:'1',objectives:'NI299 V3 revisão de V1',save_mode:'final'})});
+ const after=inspect();const records=after.versions.filter(v=>v.patient_id===ids.patient_id);
+ check('Real revision POST persists new v3 with authenticated author',saved.status===302 && saved.location.includes('success=anamnese_salva') && records.length===3 && records[2].version===3 && records[2].professional_id===1 && records[2].objectives==='NI299 V3 revisão de V1');
+ check('Original historical records remain byte-for-byte unchanged',baseline.versions.every(row=>JSON.stringify(row)===JSON.stringify(after.versions.find(v=>v.id===row.id))));
+ check('New revision audit records source version',after.audit.some(a=>a.resource_id==records[2].id && JSON.parse(a.details).source_version===1));
+ const oldOrigin=await req(origin);check('Plan source bookmark still opens v2 after v3 exists',historical(oldOrigin.text).includes('Objetivo recente NI299 V2') && !historical(oldOrigin.text).includes('NI299 V3 revisão'));
+ check('Current collection advances to persisted v3',(await req(path)).text.includes('NI299 V3 revisão de V1'));
+ fixture('break');const failure=await req(path+'?version=1');check('Actual schema outage returns 503 distinct from empty/missing version',failure.status===503 && failure.text.includes('Não foi possível carregar a anamnese') && !failure.text.includes('no such table') && !failure.text.includes('Nenhuma anamnese registrada'));
+ fixture('restore');check('Restoring database recovers historical v1',historical((await req(path+'?version=1')).text).includes('Objetivo histórico NI299 V1'));
+ fixture('inactive');check('Revoked clinic membership blocks existing session',(await req(path+'?version=1')).status===403);fixture('active');
+ await req('/logout');await login(3);check('Second authorized nutritionist can read correct historical version',historical((await req(path+'?version=1')).text).includes('NI299 Autora V1'));
+ await req('/logout');const roleAuth=await login(4);const receptionist=await req(path+'?version=1');check('Same-clinic receptionist denied clinical history without disclosure',receptionist.status===403 && !receptionist.text.includes('Objetivo histórico'));
+ const deniedWrite=await req(path,{method:'POST',body:new URLSearchParams({_csrf_token:roleAuth.csrf,objectives:'DENIED'})});check('Unauthorized role cannot append clinical version',deniedWrite.status===403 && JSON.stringify(inspect().versions)===JSON.stringify(after.versions));
+ await req('/logout');check('Logout denies further clinical access',(await req(path+'?version=1')).location==='/login');
+ writeFileSync(join(root,'docs/validation/NI2-299/evidence/persistence.json'),JSON.stringify({before:baseline,after},null,2));
+ console.log(checks.length+'/'+checks.length+' checks passed');
+})().catch(e=>{checks.push({name:e.message,status:'FAIL'});console.error(e);process.exitCode=1;}).finally(()=>{if(server)server.kill();writeFileSync(join(root,'docs/validation/NI2-299/evidence/http-results.json'),JSON.stringify({timestamp:new Date().toISOString(),transport:'actual production PHP front controller, HTTP TCP, SQLite and isolated sessions; synthetic fixtures',checks},null,2));writeFileSync(join(root,'docs/validation/NI2-299/evidence/http-server.log'),log);rmSync(dir,{recursive:true,force:true});});

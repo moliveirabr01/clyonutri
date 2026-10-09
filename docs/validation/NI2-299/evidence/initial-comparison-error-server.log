@@ -1,0 +1,164 @@
+[Fri Oct  9 00:08:31 2026] PHP 8.5.10 Development Server (http://127.0.0.1:58520) started
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58522 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58522 [200]: GET /up
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58522 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58523 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58523 [302]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58523 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58524 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58524 [200]: GET /login
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58524 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58525 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58525 [302]: POST /login
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58525 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58528 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58528 [302]: GET /pacientes/1/anamnese
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58528 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58530 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58530 [200]: GET /login
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58530 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58531 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58531 [302]: POST /login
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58531 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58535 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58535 [200]: GET /pacientes/1/anamnese
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58535 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58536 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58536 [200]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58536 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58537 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58537 [200]: GET /pacientes/1/anamnese?version=2
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58537 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58538 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58538 [302]: GET /pacientes/1/anamnese?view_version=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58538 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58539 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58539 [404]: GET /pacientes/1/anamnese?version=999
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58539 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58540 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58540 [400]: GET /pacientes/1/anamnese?version=0
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58540 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58541 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58541 [400]: GET /pacientes/1/anamnese?version=-1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58541 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58542 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58542 [400]: GET /pacientes/1/anamnese?version=1.5
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58542 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58543 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58543 [400]: GET /pacientes/1/anamnese?version=abc
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58543 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58544 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58544 [400]: GET /pacientes/1/anamnese?version[]=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58544 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58545 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58545 [400]: GET /pacientes/1/anamnese?version=1%00
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58545 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58546 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58546 [400]: GET /pacientes/1/anamnese?version=1000000000
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58546 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58547 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58547 [400]: GET /pacientes/1/anamnese?version=1&view_version=2
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58547 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58548 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58548 [400]: GET /pacientes/1/anamnese?version=1&revision_from=2
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58548 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58549 Accepted
+[Fri Oct  9 00:08:31 2026] PHP Fatal error:  Uncaught TypeError: htmlspecialchars(): Argument #1 ($string) must be of type string, int given in /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:1515
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php(1515): htmlspecialchars(0)
+#1 /Users/moliveira/Nutri_II/public/index.php(117): ClyoNutri\Application\Controllers\DashboardController->patientAnamnesis(Array)
+#2 [internal function]: {closure:{closure:/Users/moliveira/Nutri_II/public/index.php:111}:112}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(644): ClyoNutri\Core\Http\Router->dispatch('GET', '/pacientes/1/an...')
+#5 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php on line 1515
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58549 [200]: GET /pacientes/1/anamnese?v1=1&v2=2 - Uncaught TypeError: htmlspecialchars(): Argument #1 ($string) must be of type string, int given in /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:1515
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php(1515): htmlspecialchars(0)
+#1 /Users/moliveira/Nutri_II/public/index.php(117): ClyoNutri\Application\Controllers\DashboardController->patientAnamnesis(Array)
+#2 [internal function]: {closure:{closure:/Users/moliveira/Nutri_II/public/index.php:111}:112}(Array)
+#3 /Users/moliveira/Nutri_II/src/Core/Http/Router.php(53): call_user_func(Object(Closure), Array)
+#4 /Users/moliveira/Nutri_II/public/index.php(644): ClyoNutri\Core\Http\Router->dispatch('GET', '/pacientes/1/an...')
+#5 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php on line 1515
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58549 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58550 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58550 [404]: GET /pacientes/1/anamnese?v1=1&v2=999
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58550 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58553 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58553 [400]: GET /pacientes/1/anamnese?v1=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58553 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58554 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58554 [200]: GET /pacientes/2/anamnese
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58554 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58555 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58555 [404]: GET /pacientes/2/anamnese?version=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58555 Closing
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58556 Accepted
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58556 [404]: GET /pacientes/3/anamnese?version=1
+[Fri Oct  9 00:08:31 2026] 127.0.0.1:58556 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58558 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58558 [200]: GET /planos/1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58558 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58560 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58560 [200]: GET /pacientes/1/anamnese?revision_from=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58560 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58561 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58561 [403]: POST /pacientes/1/anamnese
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58561 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58562 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58562 [405]: POST /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58562 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58563 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58563 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58563 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58564 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58564 [302]: POST /pacientes/1/anamnese
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58564 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58567 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58567 [200]: GET /pacientes/1/anamnese?version=2
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58567 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58568 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58568 [200]: GET /pacientes/1/anamnese
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58568 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58569 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58569 [503]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58569 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58570 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58570 [200]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58570 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58571 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58571 [403]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58571 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58572 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58572 [302]: GET /logout
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58572 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58573 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58573 [200]: GET /login
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58573 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58575 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58575 [302]: POST /login
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58575 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58576 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58576 [200]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58576 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58577 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58577 [302]: GET /logout
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58577 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58578 Accepted
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58578 [200]: GET /login
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58578 Closing
+[Fri Oct  9 00:08:32 2026] 127.0.0.1:58580 Accepted
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58580 [302]: POST /login
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58580 Closing
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58584 Accepted
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58584 [403]: GET /pacientes/1/anamnese?version=1
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58584 Closing
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58585 Accepted
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58585 [403]: POST /pacientes/1/anamnese
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58585 Closing
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58586 Accepted
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58586 [302]: GET /logout
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58586 Closing
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58587 Accepted
+[Fri Oct  9 00:08:33 2026] 127.0.0.1:58587 [302]: GET /pacientes/1/anamnese?version=1

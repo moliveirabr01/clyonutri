@@ -14,6 +14,8 @@ export interface PatientAuthData {
   };
 }
 
+export interface PatientInvitationPreview { patient: { name: string; email: string; phone: string }; clinic_name: string; professional_name: string; }
+
 export interface ProfessionalAuthData {
   token: string;
   expires_at: string;
@@ -175,7 +177,11 @@ export interface EvolutionData {
 }
 
 let currentAuthToken: string | null = null;
-let currentApiBaseUrl: string = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/+$/, '');
+let defaultBaseUrl = 'http://localhost:8080';
+if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+  defaultBaseUrl = window.location.origin;
+}
+let currentApiBaseUrl: string = (process.env.EXPO_PUBLIC_API_URL || defaultBaseUrl).replace(/\/+$/, '');
 let onSessionExpired: (() => void) | null = null;
 
 export function setSessionExpiredHandler(handler: (() => void) | null) {
@@ -203,6 +209,7 @@ export function getAuthToken(): string | null {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const isLogin = endpoint === '/api/v1/auth/patient-login' || endpoint === '/api/v1/auth/professional-login';
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
@@ -221,7 +228,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', 0);
   }
 
-  if (response.status === 401 && currentAuthToken && endpoint !== '/api/v1/auth/patient-login') {
+  if (response.status === 401 && currentAuthToken && !isLogin) {
     setAuthToken(null);
     onSessionExpired?.();
   }
@@ -232,7 +239,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid', response.headers.get('X-Request-ID') || undefined);
   }
   if (!response.ok) {
-    const message = response.status === 401 ? 'Sua sessão expirou. Entre novamente.'
+    const message = response.status === 401 ? (isLogin ? 'E-mail ou senha incorretos.' : 'Sua sessão expirou. Entre novamente.')
       : response.status >= 500 ? 'Não foi possível carregar os dados. Tente novamente.'
       : typeof payload?.error === 'string' ? payload.error : 'Não foi possível concluir a solicitação.';
     throw new ApiError(message, response.status, response.status === 401 ? 'auth' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined);
@@ -244,6 +251,21 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const ApiService = {
+  async previewPatientInvitation(invitation_code: string): Promise<PatientInvitationPreview> {
+    const data = await request<PatientInvitationPreview>('/api/v1/auth/patient-onboarding/preview', { method: 'POST', body: JSON.stringify({ invitation_code }) });
+    if (typeof data.patient?.name !== 'string' || typeof data.patient.email !== 'string' || typeof data.patient.phone !== 'string' || typeof data.clinic_name !== 'string' || typeof data.professional_name !== 'string') throw new ApiError('Resposta do convite inválida. Tente novamente.', 200, 'invalid');
+    return data;
+  },
+  async completePatientOnboarding(input: { invitation_code: string; name: string; email: string; phone: string; password: string; password_confirmation: string }): Promise<PatientAuthData> {
+    const data = await request<PatientAuthData>('/api/v1/auth/patient-onboarding/complete', { method: 'POST', body: JSON.stringify(input) });
+    if (!data.token || !data.patient?.id || !data.expires_at) throw new Error('Resposta de ativação inválida.');
+    setAuthToken(data.token);
+    return data;
+  },
+  async createPatientInvitation(patientId: number): Promise<{ invitation_code: string; expires_at: string }> {
+    return request(`/api/v1/professional/patients/${patientId}/app-invitation`, { method: 'POST' });
+  },
+
   async login(credentials: { email: string; password: string }): Promise<PatientAuthData> {
     const data = await request<PatientAuthData>('/api/v1/auth/patient-login', {
       method: 'POST',

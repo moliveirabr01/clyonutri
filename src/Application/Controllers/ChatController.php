@@ -68,9 +68,15 @@ class ChatController
     public function index(array $params = []): void
     {
         $auth = $this->getAuthInfo();
-        $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
+        $patientId = isset($_GET['patient_id']) ? (int)$_GET['patient_id'] : 0;
+        if ($patientId > 0 && $auth['profId'] > 0) {
+            $activeConvId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
+            $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
+        } else {
+            $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
+            $activeConvId = (int)($_GET['conversa'] ?? ($conversations[0]['id'] ?? 0));
+        }
 
-        $activeConvId = (int)($_GET['conversa'] ?? ($conversations[0]['id'] ?? 0));
         $this->renderChatView($auth, $conversations, $activeConvId);
     }
 

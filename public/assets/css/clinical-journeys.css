@@ -1,0 +1,26 @@
+.skip-clinical-content { position: absolute; left: -9999px; }
+.skip-clinical-content:focus { left: var(--space-4); top: var(--space-3); z-index: 2000; background: var(--neutral-white); padding: var(--space-3); }
+.clinical-mobile-priority, #clinical-menu-toggle { display: none; }
+.badge-success { color: #246443; }
+.app-main { min-width: 0; }
+.app-content { min-width: 0; }
+:focus-visible { outline: 3px solid var(--brand-copper-600); outline-offset: 3px; }
+@media (max-width: 768px) {
+  #clinical-menu-toggle { display: block; min-height: 44px; padding: var(--space-2); color: var(--neutral-white); background: transparent; border: 1px solid currentColor; border-radius: var(--radius-input); }
+  .app-sidebar__logo { margin-bottom: var(--space-2); }
+  .app-sidebar__logo img { width: 180px; height: auto; }
+  #clinical-navigation { display: none; }
+  #clinical-navigation.is-open { display: flex; flex-direction: column; margin-top: var(--space-3); }
+  .clinical-mobile-priority { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .clinical-mobile-priority a { color: var(--neutral-white); min-height: 44px; display: inline-flex; align-items: center; padding: var(--space-2); }
+  .app-sidebar > div:last-of-type { display: none; }
+  .app-header { height: auto; min-height: 64px; flex-shrink: 0; overflow-wrap: anywhere; }
+  .app-header__user { flex-wrap: wrap; min-width: 0; }
+  .app-header__user > svg { flex-shrink: 0; }
+  .app-content input, .app-content select, .app-content textarea { min-width: 0; max-width: 100%; }
+  .app-content table:not(.meal-plan-items) { display: block; max-width: 100%; overflow-x: auto; }
+  .modal-dialog { max-height: 90vh; overflow-y: auto; }
+}
+@media (max-width: 600px) {
+  .app-content div[style*="grid-template-columns"] { grid-template-columns: minmax(0,1fr) !important; }
+}

@@ -1,0 +1,102 @@
+{
+  "issue": "NI2-319",
+  "finding": "PX-26",
+  "checks": [
+    {
+      "name": "Real login and home remain valid",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty diary is valid data",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty evolution is valid data",
+      "status": "PASS"
+    },
+    {
+      "name": "diary SQL failure returns 500 JSON without internals",
+      "status": "PASS"
+    },
+    {
+      "name": "diary correlation matches header",
+      "status": "PASS"
+    },
+    {
+      "name": "diary compiled client classifies server failure",
+      "status": "PASS"
+    },
+    {
+      "name": "Partial SQL failure does not invalidate home",
+      "status": "PASS"
+    },
+    {
+      "name": "evolution SQL failure returns 500 JSON without internals",
+      "status": "PASS"
+    },
+    {
+      "name": "evolution correlation matches header",
+      "status": "PASS"
+    },
+    {
+      "name": "evolution compiled client classifies server failure",
+      "status": "PASS"
+    },
+    {
+      "name": "Partial SQL failure does not invalidate home",
+      "status": "PASS"
+    },
+    {
+      "name": "Response identifiers correlate with restricted server logs",
+      "status": "PASS"
+    },
+    {
+      "name": "Failed reads preserve data",
+      "status": "PASS"
+    },
+    {
+      "name": "Successful mutation still persists",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid JSON/schema cannot become empty data",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid JSON/schema cannot become empty data",
+      "status": "PASS"
+    },
+    {
+      "name": "Transport failure classified offline",
+      "status": "PASS"
+    },
+    {
+      "name": "401 triggers session expiry and auth classification",
+      "status": "PASS"
+    },
+    {
+      "name": "Diary failure has accessible alert and local retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Local retry recovers real empty state",
+      "status": "PASS"
+    },
+    {
+      "name": "Offline retry preserves cached data and marks outdated",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed response produces visible error, not empty state",
+      "status": "PASS"
+    },
+    {
+      "name": "Evolution server failure retains cache, suppresses false empty and marks stale",
+      "status": "PASS"
+    },
+    {
+      "name": "Real UI 401 returns to login without patient data",
+      "status": "PASS"
+    }
+  ]
+}

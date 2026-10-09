@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle ?? 'Termos de Uso — ClyoNutri II') ?></title>
@@ -59,12 +60,7 @@
   <!-- Header -->
   <header class="header">
     <div class="container header__inner">
-      <a href="/" class="logo" aria-label="ClyoNutri Página Inicial">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <span><span class="logo__brand-clyo">Clyo</span>Nutri <small style="font-size: 0.65em; font-weight: 500; color: var(--neutral-gray-500);">II</small></span>
-      </a>
+      <a href="/" class="logo" aria-label="ClyoNutri Página Inicial"><img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64" style="display: block; width: 200px; max-width: 100%; height: auto;"></a>
       <div class="header__actions">
         <a href="/" class="btn-link">Voltar ao Início</a>
         <a href="/login" class="btn-secondary">Entrar</a>
@@ -82,7 +78,7 @@
       <p>O <strong>ClyoNutri II</strong> é uma plataforma de software como serviço (SaaS) voltada ao suporte da prática clínica e gerencial de nutricionistas devidamente habilitados junto aos seus respectivos Conselhos Regionais de Nutricionistas (CRN).</p>
       <p>Ao criar uma conta ou utilizar os serviços do ClyoNutri II, o usuário concorda integralmente com estes Termos de Uso e com a nossa Política de Privacidade.</p>
 
-      <h2>2. Responsabilidade Profissional e Julgamento Clínico</h2>
+      <h2 id="etica">2. Responsabilidade Profissional e Julgamento Clínico</h2>
       <p>O ClyoNutri II disponibiliza ferramentas de cálculo nutricional baseadas em tabelas canônicas (ex.: Tabela Brasileira de Composição de Alimentos - TACO), organização de prontuários e acompanhamento de adesão. <strong>O software constitui exclusivamente uma ferramenta de apoio técnico e operacional.</strong></p>
       <p>A responsabilidade ética, técnica e jurídica pela avaliação nutricional, diagnóstico, prescrição de planos alimentares e orientações clínicas cabe com exclusividade ao nutricionista responsável pelo atendimento, em estrita observância ao Código de Ética e de Conduta do Nutricionista (Resolução CFN).</p>
 

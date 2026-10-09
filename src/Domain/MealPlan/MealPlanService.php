@@ -104,9 +104,10 @@ class MealPlanService
                             $itemNotes = $item['notes'] ?? null;
 
                             // Buscar alimento para calcular macros
-                            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-                            $fStmt->execute(['id' => $foodId]);
+                            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+                            $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
                             $food = $fStmt->fetch();
+                            if (!$food) throw new InvalidArgumentException('Alimento não disponível neste catálogo.');
 
                             $kcal = 0.0;
                             $prot = 0.0;
@@ -154,9 +155,10 @@ class MealPlanService
                                     $subUnit = $sub['measure_unit'] ?? 'g';
                                     $subNotes = $sub['notes'] ?? null;
 
-                                    $sfStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-                                    $sfStmt->execute(['id' => $subFoodId]);
+                                    $sfStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+                                    $sfStmt->execute(['id' => $subFoodId, 'food_clinic' => TenantContext::getClinicId()]);
                                     $subFood = $sfStmt->fetch();
+                                    if (!$subFood) throw new InvalidArgumentException('Substituição não disponível neste catálogo.');
 
                                     $sKcal = 0.0;
                                     $sProt = 0.0;
@@ -360,8 +362,8 @@ class MealPlanService
         $this->assertPlanIsEditable($planId);
 
         // Obter alimento da tabela foods
-        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-        $fStmt->execute(['id' => $foodId]);
+        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+        $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
         $food = $fStmt->fetch();
         if (!$food) {
             throw new InvalidArgumentException("Alimento com ID {$foodId} não encontrado no catálogo.");
@@ -412,47 +414,74 @@ class MealPlanService
         int $itemId,
         float $amount,
         string $measureUnit = 'g',
-        ?string $notes = null
+        ?string $notes = null,
+        ?string $expectedRevision = null,
+        ?int $expectedPlanId = null
     ): bool {
-        if ($amount <= 0) {
+        if (!is_finite($amount) || $amount <= 0) {
             throw new InvalidArgumentException("A quantidade prescrita deve ser maior que zero.");
         }
 
-        $item = $this->findItemWithTenantCheck($itemId);
-        $meal = $this->findMealWithTenantCheck((int)$item['meal_id']);
-        $planId = (int)$meal['meal_plan_id'];
-        $this->assertPlanIsEditable($planId);
+        $this->db->beginTransaction();
+        try {
+            $item = $this->findItemWithTenantCheck($itemId);
+            $meal = $this->findMealWithTenantCheck((int)$item['meal_id']);
+            $planId = (int)$meal['meal_plan_id'];
+            if ($expectedPlanId !== null && $planId !== $expectedPlanId) {
+                throw new InvalidArgumentException('Item não encontrado neste plano.');
+            }
+            $this->assertPlanIsEditable($planId);
+            if ($expectedRevision !== null && !hash_equals(self::itemRevision($item), $expectedRevision)) {
+                throw new \DomainException('Este item foi alterado em outra aba. Confira os dados atuais antes de salvar novamente.');
+            }
 
-        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-        $fStmt->execute(['id' => (int)$item['food_id']]);
-        $food = $fStmt->fetch();
-        if (!$food) {
-            throw new InvalidArgumentException("Alimento associado não encontrado.");
+            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+            $fStmt->execute(['id' => (int)$item['food_id'], 'food_clinic' => TenantContext::getClinicId()]);
+            $food = $fStmt->fetch();
+            if (!$food) {
+                throw new InvalidArgumentException("Alimento associado não encontrado.");
+            }
+
+            $nutrition = $this->calculator->calculateForPortion($food, $amount, $measureUnit, (int)$item['food_id']);
+
+            $stmt = $this->db->prepare("
+                UPDATE meal_plan_items
+                SET amount = :amount, measure_unit = :measure_unit, notes = :notes,
+                    energy_kcal = :energy_kcal, protein_g = :protein_g, carbohydrate_g = :carbohydrate_g,
+                    lipid_g = :lipid_g, fiber_g = :fiber_g
+                WHERE id = :id AND amount = :old_amount AND measure_unit = :old_unit
+                    AND (notes = :old_notes OR (notes IS NULL AND :old_notes IS NULL))
+                    AND EXISTS (SELECT 1 FROM meal_plan_meals m JOIN meal_plans p ON p.id = m.meal_plan_id
+                        WHERE m.id = meal_plan_items.meal_id AND p.id = :plan_id AND p.status = 'draft' AND p.clinic_id = :clinic_id)
+            ");
+            $stmt->execute([
+                'amount' => $amount,
+                'measure_unit' => trim($measureUnit),
+                'notes' => $notes !== null ? trim($notes) : null,
+                'energy_kcal' => $nutrition['energy_kcal'],
+                'protein_g' => $nutrition['protein_g'],
+                'carbohydrate_g' => $nutrition['carbohydrate_g'],
+                'lipid_g' => $nutrition['lipid_g'],
+                'fiber_g' => $nutrition['fiber_g'],
+                'id' => $itemId,
+                'old_amount' => $item['amount'], 'old_unit' => $item['measure_unit'], 'old_notes' => $item['notes'],
+                'plan_id' => $planId, 'clinic_id' => TenantContext::getClinicId(),
+            ]);
+
+            if ($stmt->rowCount() !== 1) throw new \DomainException('O plano ou item mudou. Recarregue antes de salvar.');
+            $this->calculateAndPersistPlanTotals($planId);
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
+    }
 
-        $nutrition = $this->calculator->calculateForPortion($food, $amount, $measureUnit, (int)$item['food_id']);
-
-        $stmt = $this->db->prepare("
-            UPDATE meal_plan_items
-            SET amount = :amount, measure_unit = :measure_unit, notes = :notes,
-                energy_kcal = :energy_kcal, protein_g = :protein_g, carbohydrate_g = :carbohydrate_g,
-                lipid_g = :lipid_g, fiber_g = :fiber_g
-            WHERE id = :id
-        ");
-        $stmt->execute([
-            'amount' => $amount,
-            'measure_unit' => trim($measureUnit),
-            'notes' => $notes !== null ? trim($notes) : null,
-            'energy_kcal' => $nutrition['energy_kcal'],
-            'protein_g' => $nutrition['protein_g'],
-            'carbohydrate_g' => $nutrition['carbohydrate_g'],
-            'lipid_g' => $nutrition['lipid_g'],
-            'fiber_g' => $nutrition['fiber_g'],
-            'id' => $itemId,
-        ]);
-
-        $this->calculateAndPersistPlanTotals($planId);
-        return true;
+    public static function itemRevision(array $item): string
+    {
+        return hash('sha256', json_encode([(int)$item['id'], (float)$item['amount'],
+            $item['measure_unit'], $item['notes']], JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -491,8 +520,8 @@ class MealPlanService
         $planId = (int)$meal['meal_plan_id'];
         $this->assertPlanIsEditable($planId);
 
-        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-        $fStmt->execute(['id' => $foodId]);
+        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+        $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
         $food = $fStmt->fetch();
         if (!$food) {
             throw new InvalidArgumentException("Alimento de substituição com ID {$foodId} não encontrado.");
@@ -645,6 +674,8 @@ class MealPlanService
         if (!$plan) {
             throw new InvalidArgumentException("Plano alimentar não encontrado.");
         }
+
+        $plan['clinical_safety_summary'] = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService($this->db))->getClinicalSummaryForPrescription((int)$plan['patient_id']);
 
         // Validação clínica de alergênicos contra a anamnese do paciente
         $foodIds = [];

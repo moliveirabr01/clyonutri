@@ -40,7 +40,7 @@ class AuthController
     public function login(): void
     {
         $email = trim($_POST['email'] ?? '');
-        $password = trim($_POST['password'] ?? '');
+        $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
 
         if ($email === '' || $password === '') {
             $_SESSION['flash_error'] = 'Preencha todos os campos para continuar.';
@@ -61,6 +61,7 @@ class AuthController
         // Sessão segura inicializada
         session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['auth_version'] = (int)$user['auth_version'];
         $_SESSION['clinic_id'] = $user['clinic_id'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['user_email'] = $user['email'];

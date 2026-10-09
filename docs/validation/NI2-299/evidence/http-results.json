@@ -1,0 +1,202 @@
+{
+  "timestamp": "2026-10-09T06:57:41.864Z",
+  "transport": "actual production PHP front controller, HTTP TCP, SQLite and isolated sessions; synthetic fixtures",
+  "checks": [
+    {
+      "name": "Anonymous historical read denied",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid password cannot open anamnesis",
+      "status": "PASS"
+    },
+    {
+      "name": "Real owner nutritionist session authenticated",
+      "status": "PASS"
+    },
+    {
+      "name": "Current collection retains latest v2 editor",
+      "status": "PASS"
+    },
+    {
+      "name": "Unreported hydration stays empty in current collection instead of fixed default",
+      "status": "PASS"
+    },
+    {
+      "name": "History table emits canonical version links",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical v1 shows its exact content without substituting v2",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical v1 shows stored date author and finalized state",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical v1 preserves zero rather than treating it as absent",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical read has no mutation form and exposes separate revision action",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical v2 shows distinct content date author and draft state",
+      "status": "PASS"
+    },
+    {
+      "name": "Existing bookmark redirects to canonical same-version URL",
+      "status": "PASS"
+    },
+    {
+      "name": "Missing historical version returns clear 404 without latest fallback",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=0",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=-1",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=1.5",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=abc",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version[]=1",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=1%00",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=1000000000",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=1&view_version=2",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid or ambiguous selector denied: version=1&revision_from=2",
+      "status": "PASS"
+    },
+    {
+      "name": "Comparison executes real distinct version diff with metadata",
+      "status": "PASS"
+    },
+    {
+      "name": "Comparison completes numeric zero and full document",
+      "status": "PASS"
+    },
+    {
+      "name": "Comparison is read-only without mutation form",
+      "status": "PASS"
+    },
+    {
+      "name": "Missing comparison version is explicit 404",
+      "status": "PASS"
+    },
+    {
+      "name": "Incomplete comparison is explicit 400",
+      "status": "PASS"
+    },
+    {
+      "name": "True empty history has explicit first-collection state",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty patient cannot fall back when version requested",
+      "status": "PASS"
+    },
+    {
+      "name": "Other tenant document denied without clinical disclosure",
+      "status": "PASS"
+    },
+    {
+      "name": "All reads and rejected selectors preserve persisted history",
+      "status": "PASS"
+    },
+    {
+      "name": "Real plan editor links to its displayed source version",
+      "status": "PASS"
+    },
+    {
+      "name": "Separate revision editor prefills selected historical content",
+      "status": "PASS"
+    },
+    {
+      "name": "CSRF omission denied without mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "Historical URL refuses POST even with valid CSRF",
+      "status": "PASS"
+    },
+    {
+      "name": "Cross-tenant write with valid CSRF denied without data disclosure",
+      "status": "PASS"
+    },
+    {
+      "name": "Nonexistent revision source cannot persist a new record",
+      "status": "PASS"
+    },
+    {
+      "name": "Real revision POST persists new v3 with authenticated author",
+      "status": "PASS"
+    },
+    {
+      "name": "Original historical records remain byte-for-byte unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "New revision audit records source version",
+      "status": "PASS"
+    },
+    {
+      "name": "Plan source bookmark still opens v2 after v3 exists",
+      "status": "PASS"
+    },
+    {
+      "name": "Current collection advances to persisted v3",
+      "status": "PASS"
+    },
+    {
+      "name": "Actual schema outage returns 503 distinct from empty/missing version",
+      "status": "PASS"
+    },
+    {
+      "name": "Restoring database recovers historical v1",
+      "status": "PASS"
+    },
+    {
+      "name": "Revoked clinic membership blocks existing session",
+      "status": "PASS"
+    },
+    {
+      "name": "Second authorized nutritionist can read correct historical version",
+      "status": "PASS"
+    },
+    {
+      "name": "Same-clinic receptionist denied clinical history without disclosure",
+      "status": "PASS"
+    },
+    {
+      "name": "Unauthorized role cannot append clinical version",
+      "status": "PASS"
+    },
+    {
+      "name": "Logout denies further clinical access",
+      "status": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+id_proposto,jornada,cobertura_real,evidencia
+J01,Login profissional,Cobertura indireta,http-results.json
+J02,Recuperar acesso,Não executado nesta entrega,
+J03,Onboarding inicial,Regressão de domínio e autorização HTTP,onboarding_guided_and_activation_e2e_test.php.log
+J04,Retomar onboarding,Regressão de domínio,onboarding_guided_and_activation_e2e_test.php.log
+J05,Cadastrar paciente,HTTP persistência; browser situação inicial,http-results.json
+J06,Editar paciente,Regressão persistência e autorização HTTP,patient_edit_test.php.log
+J07,Consultar Perfil 360,Responsividade parcial,http-results.json
+J08,Registrar consentimento,HTTP positivo/recusa/ausência/falha,http-results.json
+J09,Revogar consentimento,Serviço testado; interface pendente,
+J10,Primeira consulta,Regressão domínio; homologação pendente,canonical_first_consultation_e2e_journey_test.php.log
+J11,Anamnese rascunho/final,HTTP e navegador; cobertura parcial,http-results.json
+J12,Histórico de anamnese,Regressão; recuperação não aplicada a histórico,ni2_6_prontuario_e_anamnese_nutricional_test.php.log
+J13,Avaliação antropométrica,Regressão domínio e responsividade parcial,canonical_first_consultation_e2e_journey_test.php.log
+J14,Prontuário longitudinal,Regressão; aceitação de termos pendente,ni2_6_prontuario_e_anamnese_nutricional_test.php.log
+J15,Criar primeiro plano,Regressão domínio; busca no browser,meal_plan_and_prescription_lifecycle_test.php.log
+J16,Buscar alimento/substituição,HTTP busca e teclado; porção coberta por NI2-310,http-results.json
+J17,Revisar/publicar plano,Regressão domínio e NI2-310/312; homologação pendente,meal_plan_and_prescription_lifecycle_test.php.log
+J18,Editar configurações,HTTP persistência e navegador responsivo,http-results.json
+J19,Navegação e feedback mobile,Teclado e responsividade parciais,http-results.json
+J20,Usabilidade e IA com participantes,Pendente; nenhum participante,

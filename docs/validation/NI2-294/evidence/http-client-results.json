@@ -1,0 +1,143 @@
+{
+  "timestamp": "2026-10-09T06:47:09.188Z",
+  "runtime": "v26.7.0",
+  "transport": "actual TCP HTTP; production front controller; compiled mobile API; dedicated SQLite; synthetic fixtures",
+  "checks": [
+    {
+      "name": "Production front controller reachable over real HTTP",
+      "status": "PASS"
+    },
+    {
+      "name": "Identifier alone rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Wrong password rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Unknown identifier cannot match empty phone rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Inactive patient rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Professional account cannot enter patient API rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed credential type rejected without token",
+      "status": "PASS"
+    },
+    {
+      "name": "Rejected logins persisted no tokens",
+      "status": "PASS"
+    },
+    {
+      "name": "Compiled client sends password and receives patient session",
+      "status": "PASS"
+    },
+    {
+      "name": "Server persists SHA256 token, never plaintext",
+      "status": "PASS"
+    },
+    {
+      "name": "Token expires in 30 days UTC",
+      "status": "PASS"
+    },
+    {
+      "name": "Published plan returned with actual meal and item",
+      "status": "PASS"
+    },
+    {
+      "name": "Caller cannot override patient or tenant using query parameters",
+      "status": "PASS"
+    },
+    {
+      "name": "Patient bearer cannot access professional web session",
+      "status": "PASS"
+    },
+    {
+      "name": "Newer draft excluded",
+      "status": "PASS"
+    },
+    {
+      "name": "Authenticated hydration persisted by patient",
+      "status": "PASS"
+    },
+    {
+      "name": "New request reads persisted hydration",
+      "status": "PASS"
+    },
+    {
+      "name": "Other tenant receives neither plan nor hydration",
+      "status": "PASS"
+    },
+    {
+      "name": "Real empty plan is null rather than request failure",
+      "status": "PASS"
+    },
+    {
+      "name": "Logout clears client token",
+      "status": "PASS"
+    },
+    {
+      "name": "Logout deletes server token",
+      "status": "PASS"
+    },
+    {
+      "name": "Revoked token rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Expired token rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "401 clears client session and dispatches expiry event",
+      "status": "PASS"
+    },
+    {
+      "name": "Token without mandatory expiry rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "Existing token rejected after patient deactivation",
+      "status": "PASS"
+    },
+    {
+      "name": "Existing token rejected after clinic deactivation",
+      "status": "PASS"
+    },
+    {
+      "name": "Inactive clinic cannot issue a token",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-patient token type rejected despite colliding id",
+      "status": "PASS"
+    },
+    {
+      "name": "Ambiguous identity across tenants fails closed",
+      "status": "PASS"
+    },
+    {
+      "name": "Plan records and immutable published history preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "Network outage produces real transport error",
+      "status": "PASS"
+    },
+    {
+      "name": "Logout during network outage reports failure",
+      "status": "PASS"
+    },
+    {
+      "name": "Failed revocation retains token for retry",
+      "status": "PASS"
+    }
+  ]
+}

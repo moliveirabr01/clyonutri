@@ -85,6 +85,36 @@ class PatientRepository
         return true;
     }
 
+    public function inactivate(int $id): bool
+    {
+        $clinicId = TenantContext::getClinicId();
+        if (!$this->findById($id)) {
+            return false;
+        }
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) {
+            $this->db->beginTransaction();
+        }
+        try {
+            $stmt = $this->db->prepare("UPDATE patients SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
+            $stmt->execute(['id' => $id, 'clinic_id' => $clinicId]);
+
+            // Revogar atomicamente tokens móveis e de acesso do paciente (PX-24 / NI2-317)
+            $delTok = $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = :id");
+            $delTok->execute(['id' => $id]);
+
+            if ($ownsTx) {
+                $this->db->commit();
+            }
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function findById(int $id): ?array
     {
         $clinicId = TenantContext::getClinicId();
@@ -103,6 +133,26 @@ class PatientRepository
             SELECT * FROM patients WHERE clinic_id = :clinic_id ORDER BY name ASC
         ");
         $stmt->execute(['clinic_id' => $clinicId]);
+        return $stmt->fetchAll();
+    }
+
+    public function search(int $clinicId, string $query): array
+    {
+        $clean = trim($query);
+        if ($clean === '') {
+            return [];
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT * FROM patients 
+            WHERE clinic_id = :clinic_id 
+              AND (name LIKE :q OR email LIKE :q OR phone LIKE :q)
+            ORDER BY name ASC
+        ");
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'q' => '%' . $clean . '%',
+        ]);
         return $stmt->fetchAll();
     }
 

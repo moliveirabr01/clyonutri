@@ -21,6 +21,17 @@ Env::load(__DIR__ . '/../.env');
 $appTimezone = (string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo');
 date_default_timezone_set($appTimezone);
 
+// Suporte a CORS para Mobile Web e Apps Híbridos (/api/v1/...)
+if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/v1/')) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept');
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
+
 // Inicialização de conexão
 $db = Connection::getInstance();
 
@@ -36,13 +47,37 @@ if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
     session_start();
 }
 
-// Carregar TenantContext a partir da sessão se o usuário estiver autenticado
+// Carregar TenantContext a partir da sessão se o usuário estiver autenticado e vínculo ativo (PX-23 / NI2-316)
 if (!empty($_SESSION['clinic_id']) && !empty($_SESSION['user_id'])) {
-    TenantContext::set((int)$_SESSION['clinic_id'], [
-        'id' => (int)$_SESSION['user_id'],
-        'name' => $_SESSION['user_name'] ?? 'Nutricionista',
-    ]);
+    try {
+        $validMember = $db->prepare("
+            SELECT u.auth_version, cm.status AS member_status, c.status AS clinic_status
+            FROM users u
+            JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
+            JOIN clinics c ON c.id = cm.clinic_id
+            WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
+            LIMIT 1
+        ");
+        $validMember->execute([
+            'clinic_id' => (int)$_SESSION['clinic_id'],
+            'user_id' => (int)$_SESSION['user_id'],
+        ]);
+        $mRow = $validMember->fetch();
+        if ($mRow && (int)$mRow['auth_version'] === (int)($_SESSION['auth_version'] ?? 0)) {
+            TenantContext::set((int)$_SESSION['clinic_id'], [
+                'id' => (int)$_SESSION['user_id'],
+                'name' => $_SESSION['user_name'] ?? 'Nutricionista',
+            ]);
+        } else {
+            $_SESSION = [];
+            TenantContext::clear();
+        }
+    } catch (\Throwable) {
+        $_SESSION = [];
+        TenantContext::clear();
+    }
 }
+
 
 $router = new Router();
 $authCtrl = new AuthController();
@@ -112,19 +147,53 @@ $router->get('/health', function () {
     ]);
 });
 
-// Middleware de proteção: se tentar acessar rotas privadas sem login, redireciona
+// Middleware de proteção: se tentar acessar rotas privadas sem login ou com vínculo revogado, bloqueia e redireciona (PX-23 / NI2-316)
 $requireAuth = function (callable $action) {
     return function ($params = []) use ($action) {
         if (!TenantContext::hasClinic() || empty($_SESSION['user_id'])) {
+            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/') || 
+                str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
+                ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => 'Sessão expirada ou não autenticada.']);
+                exit;
+            }
             header('Location: /login');
             exit;
         }
-        $credential=Connection::getInstance()->prepare("SELECT auth_version FROM users WHERE id=? AND status='active'");
-        $credential->execute([(int)$_SESSION['user_id']]);$version=$credential->fetchColumn();
-        if($version===false||(int)$version!==(int)($_SESSION['auth_version']??0)){$_SESSION=[];TenantContext::clear();header('Location: /login');exit;}
+        $db = Connection::getInstance();
+        $credential = $db->prepare("
+            SELECT u.auth_version, cm.status AS member_status, c.status AS clinic_status
+            FROM users u
+            JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
+            JOIN clinics c ON c.id = cm.clinic_id
+            WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
+            LIMIT 1
+        ");
+        $credential->execute([
+            'user_id' => (int)$_SESSION['user_id'],
+            'clinic_id' => (int)$_SESSION['clinic_id'],
+        ]);
+        $row = $credential->fetch();
+        if (!$row || (int)$row['auth_version'] !== (int)($_SESSION['auth_version'] ?? 0)) {
+            $_SESSION = [];
+            TenantContext::clear();
+            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/') || 
+                str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
+                ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => 'Acesso revogado ou sessão suspensa.']);
+                exit;
+            }
+            header('Location: /login?error=session_revoked');
+            exit;
+        }
         $action($params);
     };
 };
+
 
 // 3. Rotas Públicas & Institucionais (Landing Page & Legal)
 $router->get('/', [$landingCtrl, 'index']);
@@ -142,6 +211,7 @@ $router->post('/pacientes', $requireAuth([$dashCtrl, 'savePatient']));
 $router->get('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
 $router->post('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
 $router->get('/pacientes/{id}', $requireAuth([$dashCtrl, 'profile360']));
+$router->post('/pacientes/{id}/convite-app', $requireAuth([new \ClyoNutri\Application\Controllers\PatientOnboardingController(), 'invite']));
 $router->get('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'patientMedicalRecord']));
 $router->post('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'savePatientMedicalRecord']));
 $router->post('/pacientes/{id}/prontuario/{recId}/retificar', $requireAuth([$dashCtrl, 'revisePatientMedicalRecord']));
@@ -225,6 +295,8 @@ $router->get('/receitas', $requireAuth([$recipeCtrl, 'index']));
 $router->get('/receitas/nova', $requireAuth([$recipeCtrl, 'create']));
 $router->post('/receitas', $requireAuth([$recipeCtrl, 'store']));
 $router->get('/receitas/{id}', $requireAuth([$recipeCtrl, 'show']));
+$router->get('/receitas/{id}/editar', $requireAuth([$recipeCtrl, 'edit']));
+$router->post('/receitas/{id}/editar', $requireAuth([$recipeCtrl, 'update']));
 $router->get('/receitas/{id}/prescrever', $requireAuth([$recipeCtrl, 'prescribeForm']));
 $router->post('/receitas/{id}/prescrever', $requireAuth([$recipeCtrl, 'prescribe']));
 $router->post('/receitas/{id}/duplicar', $requireAuth([$recipeCtrl, 'duplicate']));
@@ -279,6 +351,25 @@ $getJsonInput = function(): array {
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : ($_POST ?? []);
 };
+
+// First access uses a private, single-use invitation, never a patient identifier alone.
+foreach (['preview', 'complete'] as $operation) {
+    $router->post('/api/v1/auth/patient-onboarding/' . $operation, function() use ($db, $getJsonInput, $operation) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        try {
+            $input=$getJsonInput();
+            $service=new \ClyoNutri\Domain\PatientPortal\PatientOnboardingService($db);
+            if ($operation==='preview') {
+                if (!is_string($input['invitation_code']??null)) throw new \DomainException('Informe o código do convite.');
+                $result=$service->preview($input['invitation_code']);
+            } else { $result=$service->complete($input); }
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        } catch (\DomainException $e) {
+            http_response_code(422); echo json_encode(['error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+    });
+}
 
 // Login do Paciente via API (Mobile)
 $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) {
@@ -573,6 +664,7 @@ $router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientA
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
+    $clinicId = (int)$auth['clinic_id'];
     $input = $getJsonInput();
     $convId = (int)($input['conversation_id'] ?? 0);
 
@@ -584,11 +676,28 @@ $router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientA
         }
     }
 
-    if ($convId > 0) {
-        $chatService->markAsRead($convId, 'patient');
+    if ($convId <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Identificador da conversa inválido ou ausente.']);
+        return;
     }
 
-    echo json_encode(['success' => true]);
+    // Validação estrita de participante contra falsificação de recibos (PX-25 / NI2-318)
+    $chk = $db->prepare("SELECT id FROM chat_conversations WHERE id = ? AND clinic_id = ? AND patient_id = ?");
+    $chk->execute([$convId, $clinicId, $patientId]);
+    if (!$chk->fetchColumn()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Acesso não autorizado: conversa não pertence ao paciente autenticado.']);
+        return;
+    }
+
+    try {
+        $chatService->markAsRead($convId, 'patient', $patientId);
+        echo json_encode(['success' => true]);
+    } catch (\ClyoNutri\Core\Security\AuthorizationException $e) {
+        http_response_code(403);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
 });
 
 $router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use ($authenticatePatientApi, $db) {
@@ -700,6 +809,16 @@ $authenticateProfessionalApi = function() use ($db): array {
 
     return $tokenRow;
 };
+
+$router->post('/api/v1/professional/patients/{id}/app-invitation', function(array $params) use ($db, $authenticateProfessionalApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth=$authenticateProfessionalApi();
+    try {
+        $result=(new \ClyoNutri\Domain\PatientPortal\PatientOnboardingService($db))->create((int)$auth['clinic_id'],(int)$auth['user_id'],(int)$params['id']);
+        echo json_encode($result);
+    } catch (\DomainException $e) { http_response_code(422); echo json_encode(['error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE); }
+});
 
 // Login do Nutricionista via API (Mobile)
 $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonInput) {

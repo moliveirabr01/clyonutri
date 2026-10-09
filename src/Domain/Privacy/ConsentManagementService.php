@@ -121,11 +121,12 @@ class ConsentManagementService
 
         // Trilha de auditoria
         $aStmt = $this->db->prepare("
-            INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
-            VALUES (:clinic_id, 'CONSENT_GRANTED', 'patient_consents', :res_id, :details)
+            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details)
+            VALUES (:clinic_id, :user_id, 'CONSENT_GRANTED', 'patient_consents', :res_id, :details)
         ");
         $aStmt->execute([
             'clinic_id' => $clinicId,
+            'user_id' => TenantContext::getUserId(),
             'res_id' => (string)$id,
             'details' => json_encode([
                 'patient_id' => $patientId,

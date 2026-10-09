@@ -175,7 +175,8 @@ class OnboardingService
                     $price = max(0.0, (float)($data['default_price'] ?? 250.00));
                     $interval = max(0, (int)($data['appointment_interval_minutes'] ?? 10));
 
-                    $practicePayload = [
+                    $practicePayload = $progress['practice_preferences'] ?? [];
+                    $practicePayload = array_replace($practicePayload, [
                         'modalities' => $modalities,
                         'default_duration_minutes' => $duration,
                         'working_days' => $workingDays,
@@ -183,7 +184,7 @@ class OnboardingService
                         'appointment_interval_minutes' => $interval,
                         'teleconsultation_enabled' => in_array('online', $modalities, true),
                         'saved_at' => date('c'),
-                    ];
+                    ]);
 
                     $stmt = $this->db->prepare("
                         UPDATE onboarding_progress 

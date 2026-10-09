@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($title ?? 'ClyoNutri') ?> — Sistema do Nutricionista</title>
@@ -8,16 +9,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css">
+  <link rel="stylesheet" href="/assets/css/clinical-journeys.css">
 </head>
 <body>
+  <a class="skip-clinical-content" href="#clinical-main-content">Ir para o conteúdo</a>
   <div class="app-container">
     <!-- Sidebar Navegação Profissional -->
     <aside class="app-sidebar">
       <div class="app-sidebar__logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-500);"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V18a1 1 0 0 1-2 0v-1.07A6 6 0 0 1 7 11V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v5a6 6 0 0 1-4 5.93zM9 7v4a3 3 0 0 0 6 0V7z"/></svg>
-        <span>Clyo</span>Nutri
+        <img src="/assets/clyonutri-logo-dark.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64">
       </div>
-      <nav class="app-nav">
+      <button type="button" id="clinical-menu-toggle" aria-controls="clinical-navigation" aria-expanded="false">Menu</button>
+      <nav class="clinical-mobile-priority" aria-label="Tarefas principais"><a href="/pacientes">Pacientes</a><a href="/agenda">Agenda</a><a href="/planos">Planos</a><a href="/chat">Chat</a></nav>
+      <nav class="app-nav" id="clinical-navigation" aria-label="Navegação do consultório">
         <a href="/dashboard" class="app-nav__item <?= ($activeNav ?? '') === 'dashboard' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
           <span>Dashboard</span>
@@ -42,6 +46,10 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>
           <span>Receitas</span>
         </a>
+        <a href="/chat" class="app-nav__item <?= ($activeNav ?? '') === 'chat' ? 'active' : '' ?>">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Chat</span>
+        </a>
         <a href="/financeiro" class="app-nav__item <?= ($activeNav ?? '') === 'financeiro' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
           <span>Financeiro</span>
@@ -61,7 +69,7 @@
           </a>
         <?php endif; ?>
       </nav>
-      <div style="font-size: 0.8rem; color: #64748B; margin-top: auto; display: flex; align-items: center; gap: 6px;">
+      <div style="font-size: 0.8rem; color: #B7C6D4; margin-top: auto; display: flex; align-items: center; gap: 6px;">
         <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--semantic-success);"></span>
         v1.0.0 • Multi-tenant
       </div>
@@ -84,10 +92,14 @@
         </div>
       </header>
 
-      <section class="app-content">
+      <section class="app-content" id="clinical-main-content" tabindex="-1">
         <?= $content ?? '' ?>
       </section>
     </main>
   </div>
+<?php $recovery=\ClyoNutri\Domain\Clinical\FormRecovery::forCurrentPage(); if($recovery): ?>
+<script type="application/json" id="clinical-form-recovery"><?= json_encode($recovery,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR) ?></script>
+<?php endif; ?>
+<script src="/assets/js/clinical-journeys.js" defer></script>
 </body>
 </html>
