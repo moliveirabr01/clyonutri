@@ -343,7 +343,8 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Cenários de teste:** Varredura de strings renderizadas; cada estado de agenda/plano; traduções e fallbacks.
 
-**Dependências:** Nenhuma.
+**Status da implementação:** Resolvido (NI2-306).
+**Resumo da resolução:** Normalização e tradução sistemática de enums para linguagem clínica (`LabelMap`), remoção de 100% dos códigos de ticket em HTML (`(NI2-64)`, `(NI2-69)`, `(NI2-82)`, etc.), humanização do prontuário eletrônico e contenção de detalhes técnicos criptográficos sob demanda em elemento `<details>`. Aprovado em todos os 8 gates da suíte `tests/px_13_clinical_language_and_enum_sanitization_test.php`.
 
 **Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
 

@@ -1,0 +1,278 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ClyoNutri\Core\I18n;
+
+/**
+ * Mapa central de rótulos, traduções de enums e linguagem clínica em português (PX-13 / NI2-306).
+ *
+ * Elimina o vazamento de jargões de desenvolvimento (enums, ticket IDs como NI2-*,
+ * terminologias técnicas cruas) na interface do profissional e do paciente,
+ * promovendo linguagem clínica humanizada, clara e consistente.
+ */
+class LabelMap
+{
+    /**
+     * Mapeamento de status de agendamento de consultas.
+     */
+    private const APPOINTMENT_STATUSES = [
+        'scheduled' => ['label' => 'Agendada', 'badge' => 'badge-info'],
+        'confirmed' => ['label' => 'Confirmada', 'badge' => 'badge-success'],
+        'in_progress' => ['label' => 'Em Atendimento', 'badge' => 'badge-warning'],
+        'completed' => ['label' => 'Realizada', 'badge' => 'badge-success'],
+        'cancelled' => ['label' => 'Cancelada', 'badge' => 'badge-secondary'],
+        'canceled' => ['label' => 'Cancelada', 'badge' => 'badge-secondary'],
+        'no_show' => ['label' => 'Não compareceu', 'badge' => 'badge-danger'],
+    ];
+
+    /**
+     * Mapeamento de tipos de atendimento / consulta.
+     */
+    private const APPOINTMENT_TYPES = [
+        'first_visit' => 'Primeira Consulta',
+        'follow_up' => 'Retorno / Acompanhamento',
+        'telehealth' => 'Teleconsulta',
+        'teleconsulta' => 'Teleconsulta',
+        'routine' => 'Consulta de Rotina',
+        'emergency' => 'Urgência / Encaixe',
+        'encaixe' => 'Urgência / Encaixe',
+    ];
+
+    /**
+     * Mapeamento de status de planos alimentares.
+     */
+    private const MEAL_PLAN_STATUSES = [
+        'draft' => ['label' => 'Rascunho', 'badge' => 'badge-warning'],
+        'published' => ['label' => 'Publicado', 'badge' => 'badge-success'],
+        'archived' => ['label' => 'Arquivado', 'badge' => 'badge-secondary'],
+    ];
+
+    /**
+     * Mapeamento de status de recebíveis financeiros.
+     */
+    private const RECEIVABLE_STATUSES = [
+        'pending' => ['label' => 'Pendente', 'badge' => 'badge-warning'],
+        'partially_paid' => ['label' => 'Parcial', 'badge' => 'badge-primary'],
+        'paid' => ['label' => 'Recebido', 'badge' => 'badge-success'],
+        'canceled' => ['label' => 'Cancelado', 'badge' => 'badge-secondary'],
+        'cancelled' => ['label' => 'Cancelado', 'badge' => 'badge-secondary'],
+        'overdue' => ['label' => 'Vencido', 'badge' => 'badge-danger'],
+    ];
+
+    /**
+     * Mapeamento de refeições do diário alimentar.
+     */
+    private const MEAL_TYPES = [
+        'breakfast' => 'Café da Manhã',
+        'morning_snack' => 'Lanche da Manhã',
+        'lunch' => 'Almoço',
+        'afternoon_snack' => 'Lanche da Tarde',
+        'dinner' => 'Jantar',
+        'supper' => 'Ceia',
+    ];
+
+    /**
+     * Traduz status de agendamento.
+     */
+    public static function appointmentStatus(?string $status): string
+    {
+        if ($status === null || trim($status) === '') {
+            return '—';
+        }
+        $key = strtolower(trim($status));
+        return self::APPOINTMENT_STATUSES[$key]['label'] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    /**
+     * Retorna array com label e classe CSS de badge para status de agendamento.
+     */
+    public static function appointmentStatusMeta(?string $status): array
+    {
+        if ($status === null || trim($status) === '') {
+            return ['label' => '—', 'badge' => 'badge-secondary'];
+        }
+        $key = strtolower(trim($status));
+        return self::APPOINTMENT_STATUSES[$key] ?? [
+            'label' => ucfirst(str_replace('_', ' ', $status)),
+            'badge' => 'badge-secondary',
+        ];
+    }
+
+    /**
+     * Retorna elemento HTML <span> badge formatado para o status do agendamento.
+     */
+    public static function appointmentStatusBadge(?string $status): string
+    {
+        $meta = self::appointmentStatusMeta($status);
+        $cls = htmlspecialchars($meta['badge']);
+        $label = htmlspecialchars($meta['label']);
+        return "<span class=\"badge {$cls}\">{$label}</span>";
+    }
+
+    /**
+     * Traduz tipo de atendimento.
+     */
+    public static function appointmentType(?string $type): string
+    {
+        if ($type === null || trim($type) === '') {
+            return 'Consulta';
+        }
+        $key = strtolower(trim($type));
+        return self::APPOINTMENT_TYPES[$key] ?? ucfirst(str_replace('_', ' ', $type));
+    }
+
+    /**
+     * Traduz gênero/sexo biológico do paciente para linguagem natural.
+     */
+    public static function patientGender(?string $gender): string
+    {
+        if ($gender === null || trim($gender) === '') {
+            return 'Não informado';
+        }
+
+        $clean = strtolower(trim($gender));
+        return match ($clean) {
+            'male', 'masculino', 'm' => 'Masculino',
+            'female', 'feminino', 'f' => 'Feminino',
+            'other', 'outro' => 'Outro',
+            'uninformed', 'nao_informado', 'não informado' => 'Não informado',
+            default => ucfirst($gender),
+        };
+    }
+
+    /**
+     * Traduz status de plano alimentar.
+     */
+    public static function mealPlanStatus(?string $status): string
+    {
+        if ($status === null || trim($status) === '') {
+            return '—';
+        }
+        $key = strtolower(trim($status));
+        return self::MEAL_PLAN_STATUSES[$key]['label'] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    /**
+     * Retorna array com label e classe CSS de badge para status de plano alimentar.
+     */
+    public static function mealPlanStatusMeta(?string $status): array
+    {
+        if ($status === null || trim($status) === '') {
+            return ['label' => '—', 'badge' => 'badge-secondary'];
+        }
+        $key = strtolower(trim($status));
+        return self::MEAL_PLAN_STATUSES[$key] ?? [
+            'label' => ucfirst(str_replace('_', ' ', $status)),
+            'badge' => 'badge-secondary',
+        ];
+    }
+
+    /**
+     * Retorna elemento HTML <span> badge formatado para o status de plano alimentar.
+     */
+    public static function mealPlanStatusBadge(?string $status): string
+    {
+        $meta = self::mealPlanStatusMeta($status);
+        $cls = htmlspecialchars($meta['badge']);
+        $label = htmlspecialchars($meta['label']);
+        return "<span class=\"badge {$cls}\">{$label}</span>";
+    }
+
+    /**
+     * Traduz status de recebível financeiro, calculando vencimento caso pendente.
+     */
+    public static function receivableStatus(?string $status, bool|string|null $isOverdueOrDueDate = null): string
+    {
+        if ($status === null || trim($status) === '') {
+            return '—';
+        }
+        $key = strtolower(trim($status));
+        $isOverdue = false;
+        if (is_bool($isOverdueOrDueDate)) {
+            $isOverdue = $isOverdueOrDueDate;
+        } elseif (is_string($isOverdueOrDueDate) && $isOverdueOrDueDate !== '') {
+            $isOverdue = ($isOverdueOrDueDate < date('Y-m-d'));
+        }
+
+        if ($key === 'pending' && $isOverdue) {
+            return 'Vencido';
+        }
+        return self::RECEIVABLE_STATUSES[$key]['label'] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    /**
+     * Retorna array com label e classe CSS de badge para status de recebível financeiro.
+     */
+    public static function receivableStatusMeta(?string $status, bool|string|null $isOverdueOrDueDate = null): array
+    {
+        if ($status === null || trim($status) === '') {
+            return ['label' => '—', 'badge' => 'badge-secondary'];
+        }
+        $key = strtolower(trim($status));
+        $isOverdue = false;
+        if (is_bool($isOverdueOrDueDate)) {
+            $isOverdue = $isOverdueOrDueDate;
+        } elseif (is_string($isOverdueOrDueDate) && $isOverdueOrDueDate !== '') {
+            $isOverdue = ($isOverdueOrDueDate < date('Y-m-d'));
+        }
+
+        if ($key === 'pending' && $isOverdue) {
+            return ['label' => 'Vencido', 'badge' => 'badge-danger'];
+        }
+        return self::RECEIVABLE_STATUSES[$key] ?? [
+            'label' => ucfirst(str_replace('_', ' ', $status)),
+            'badge' => 'badge-secondary',
+        ];
+    }
+
+    /**
+     * Retorna elemento HTML <span> badge formatado para o status de recebível financeiro.
+     */
+    public static function receivableStatusBadge(?string $status, bool|string|null $isOverdueOrDueDate = null): string
+    {
+        $meta = self::receivableStatusMeta($status, $isOverdueOrDueDate);
+        $cls = htmlspecialchars($meta['badge']);
+        $label = htmlspecialchars($meta['label']);
+        return "<span class=\"badge {$cls}\">{$label}</span>";
+    }
+
+    /**
+     * Traduz tipo de refeição.
+     */
+    public static function mealType(?string $meal): string
+    {
+        if ($meal === null || trim($meal) === '') {
+            return 'Refeição';
+        }
+        $key = strtolower(trim($meal));
+        return self::MEAL_TYPES[$key] ?? ucfirst(str_replace('_', ' ', $meal));
+    }
+
+    /**
+     * Traduz papéis de usuário.
+     */
+    public static function userRole(?string $role): string
+    {
+        if ($role === null || trim($role) === '') {
+            return '—';
+        }
+        return match (strtolower(trim($role))) {
+            'nutritionist' => 'Nutricionista',
+            'patient' => 'Paciente',
+            'admin' => 'Administrador',
+            'operator', 'support_agent' => 'Suporte / Atendimento',
+            default => ucfirst(str_replace('_', ' ', $role)),
+        };
+    }
+
+    /**
+     * Remove códigos de ticket interno (ex: NI2-64, NI2-69, NI2-82) e jargões técnicos de títulos e textos operacionais.
+     */
+    public static function cleanOperationalText(string $text): string
+    {
+        $cleaned = preg_replace('/\s*\(NI2-\d+\)/i', '', $text);
+        $cleaned = preg_replace('/append-only/i', 'imutável e preservado', (string)$cleaned);
+        return trim($cleaned);
+    }
+}

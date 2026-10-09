@@ -7,6 +7,7 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Core\I18n\LabelMap;
 use ClyoNutri\Domain\Anthropometry\AnthropometryCalculator;
 use ClyoNutri\Domain\Anthropometry\AnthropometryService;
 use ClyoNutri\Domain\Anthropometry\InvalidAnthropometricDataException;
@@ -50,6 +51,51 @@ class DashboardController
 
         header('Location: /pacientes?success=1');
         exit;
+    }
+
+    public function editPatient(array $params): void
+    {
+        $patient = (new PatientRepository())->findById((int)($params['id'] ?? 0));
+        if (!$patient) {
+            http_response_code(404);
+            echo 'Paciente não encontrado.';
+            return;
+        }
+        $errors = [];
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
+                http_response_code(403);
+                echo 'Sessão expirada. Recarregue a página.';
+                return;
+            }
+            $data = [];
+            foreach (['name', 'email', 'phone', 'birth_date', 'gender', 'notes'] as $field) {
+                $data[$field] = is_string($_POST[$field] ?? null) ? trim($_POST[$field]) : '';
+                if ($field !== 'name' && $data[$field] === '') $data[$field] = null;
+            }
+            if ($data['name'] === '') $errors[] = 'Informe o nome completo.';
+            if ($data['email'] !== null && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Informe um e-mail válido.';
+            if ($data['birth_date'] !== null) {
+                $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $data['birth_date']);
+                if (!$date || $date->format('Y-m-d') !== $data['birth_date'] || $date > new \DateTimeImmutable('today')) $errors[] = 'Informe uma data de nascimento válida.';
+            }
+            if ($data['gender'] !== null && !in_array($data['gender'], ['Feminino', 'Masculino', 'Outro', 'female', 'male', 'other'], true)) $errors[] = 'Selecione um gênero válido.';
+            if (!$errors) {
+                (new PatientRepository())->update((int)$patient['id'], $data);
+                header('Location: /pacientes?success=atualizado');
+                return;
+            }
+            http_response_code(422);
+            $patient = array_replace($patient, $data);
+        }
+        $title = 'Editar Paciente';
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? '';
+        ob_start();
+        require __DIR__ . '/../../../views/patients/edit.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     public function profile360(array $params): void
@@ -105,8 +151,9 @@ class DashboardController
             <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary">Editar paciente</a>
             <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-secondary">
-              Prontuário (SHA-256) ➔
+              Prontuário ➔
             </a>
             <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-secondary">
               Anamnese Estruturada ➔
@@ -127,7 +174,7 @@ class DashboardController
             <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
             <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
             <p style="margin-bottom: var(--space-2);"><strong>Nascimento:</strong> <?= $p['birth_date'] ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
-            <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars($p['gender'] ?? '—') ?></p>
+            <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
             <?php if (!empty($p['notes'])): ?>
               <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--border-default);">
                 <strong>Observações:</strong>
@@ -138,15 +185,15 @@ class DashboardController
 
           <!-- Coluna 2: Prontuário, Anamnese, Avaliações e Planos -->
           <div>
-            <!-- Card 1: Prontuário Eletrônico & Evoluções (NI2-60, NI2-63) -->
+            <!-- Card 1: Prontuário Eletrônico & Evoluções -->
             <div class="card" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
                   <h3 style="margin: 0; display: inline-block;">Prontuário Longitudinal</h3>
-                  <?php if ($integrity['is_valid']): ?>
-                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ Cadeia SHA-256 Íntegra (<?= $integrity['total_records'] ?> registros)</span>
-                  <?php else: ?>
-                    <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 0.75rem; margin-left: 8px;">⚠️ Violação de Integridade Detectada</span>
+                  <?php if ($integrity['is_valid'] && (int)$integrity['total_records'] > 0): ?>
+                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ Integridade dos registros verificada</span>
+                  <?php elseif (!$integrity['is_valid']): ?>
+                    <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 0.75rem; margin-left: 8px;">⚠️ Os registros precisam de verificação</span>
                   <?php endif; ?>
                 </div>
                 <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
@@ -173,7 +220,7 @@ class DashboardController
                         <?= htmlspecialchars($cr['content']['text'] ?? $cr['content']['evolution_summary'] ?? json_encode($cr['content'], JSON_UNESCAPED_UNICODE)) ?>
                       </div>
                       <div style="margin-top: 4px; font-size: 0.7rem; color: #94A3B8; font-family: monospace;">
-                        Hash: <?= substr($cr['record_hash'], 0, 16) ?>... | Resp: <?= htmlspecialchars($cr['professional_name']) ?>
+                        Responsável: <?= htmlspecialchars($cr['professional_name']) ?>
                       </div>
                     </div>
                   <?php endforeach; ?>
@@ -181,7 +228,7 @@ class DashboardController
               <?php endif; ?>
             </div>
 
-            <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico (NI2-61, NI2-64) -->
+            <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico -->
             <div class="card" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
@@ -202,7 +249,7 @@ class DashboardController
               <?php if (!$latestAnamnesis): ?>
                 <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhuma anamnese cadastrada para este paciente. Clique acima para coletar objetivos e restrições.</p>
               <?php else: ?>
-                <!-- Destaques Críticos da Anamnese (NI2-64) -->
+                <!-- Destaques Críticos da Anamnese -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
                   <!-- Alergias -->
                   <div style="padding: 8px 12px; border-radius: 6px; background: <?= !empty($latestAnamnesis['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($latestAnamnesis['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>;">
@@ -210,7 +257,7 @@ class DashboardController
                       <?= !empty($latestAnamnesis['allergies']) ? '⚠️ ALERGIAS (CRÍTICO)' : 'ALERGIAS' ?>
                     </span>
                     <span style="font-size: 0.85rem; color: #1E293B;">
-                      <?= htmlspecialchars($latestAnamnesis['allergies'] ?? 'Nenhuma relatada') ?>
+                      <?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?>
                     </span>
                   </div>
 
@@ -258,7 +305,7 @@ class DashboardController
                       <div>
                         <strong style="color: var(--brand-navy-900); font-size: 0.95rem;"><?= htmlspecialchars($mp['title']) ?></strong>
                         <span style="font-size: 0.75rem; color: #64748b; margin-left: 6px;">v<?= $mp['version'] ?></span>
-                        <span class="badge badge-<?= $mp['status'] === 'published' ? 'success' : 'warning' ?>" style="font-size: 0.75rem; margin-left: 6px;"><?= $mp['status'] ?></span>
+                        <span style="margin-left: 6px;"><?= LabelMap::mealPlanStatusBadge($mp['status']) ?></span>
                       </div>
                       <a href="/planos/<?= $mp['id'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
                         Abrir Editor ➔
@@ -293,7 +340,7 @@ class DashboardController
               </div>
             </div>
 
-            <!-- Card de Avaliações Antropométricas com Indicadores OMS (NI2-65, NI2-66, NI2-69) -->
+            <!-- Card de Avaliações Antropométricas com Indicadores OMS -->
             <div class="card">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Avaliações Antropométricas (<?= count($assessments) ?>)</h3>
@@ -372,7 +419,7 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Modal Nova Avaliação Antropométrica (NI2-65) -->
+        <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
           <div class="modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
@@ -455,7 +502,7 @@ class DashboardController
                 <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
                     <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
-                    Liberar imediatamente para o paciente visualizar no aplicativo (NI2-69)
+                    Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
               </div>
@@ -615,7 +662,7 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Alternativa Textual Acessível (NI2-67) -->
+        <!-- Alternativa Textual Acessível -->
         <div class="card" style="border-left: 4px solid var(--brand-copper-500); background: #FAF7F2; margin-bottom: var(--space-6);">
           <div style="display: flex; gap: 12px; align-items: center;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -716,7 +763,7 @@ class DashboardController
           <?php endif; ?>
         </div>
 
-        <!-- Seção: Comparador Clínico de Avaliações (NI2-68) -->
+        <!-- Seção: Comparador Clínico de Avaliações -->
         <div class="card" style="margin-bottom: var(--space-6);">
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
@@ -921,7 +968,7 @@ class DashboardController
                 <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
                     <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
-                    Liberar imediatamente para o paciente visualizar no aplicativo (NI2-69)
+                    Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
               </div>
@@ -1057,7 +1104,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'registro_adicionado' ? 'Evolução clínica adicionada e assinada com hash SHA-256 no prontuário!' : ($_GET['success'] === 'registro_retificado' ? 'Retificação versionada gravada com justificativa formal!' : 'Operação realizada com sucesso!') ?>
+            ✓ <?= $_GET['success'] === 'registro_adicionado' ? 'Evolução clínica registrada no prontuário!' : ($_GET['success'] === 'registro_retificado' ? 'Retificação versionada gravada com justificativa formal!' : 'Operação realizada com sucesso!') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -1072,12 +1119,12 @@ class DashboardController
               <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
             </div>
             <h1>Prontuário Eletrônico & Evolução Clínica</h1>
-            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico Longitudinal Append-Only</p>
+            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico de registros clínicos</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario/exportar" target="_blank" class="btn btn-secondary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Exportar Trilha Auditada (JSON/Hash)
+              Exportar histórico de registros
             </a>
             <a href="/pacientes/<?= $patient['id'] ?>/anamnese" class="btn btn-secondary">
               Ver Anamnese ➔
@@ -1088,7 +1135,8 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Barra de Integridade Criptográfica (NI2-158 / NI2-60) -->
+        <!-- Barra de Integridade e Autenticidade Clínica -->
+        <?php if ((int)$integrity['total_records'] > 0 || !$integrity['is_valid']): ?>
         <div style="background: <?= $integrity['is_valid'] ? '#F0FDF4' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#BBF7D0' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div style="display: flex; align-items: center; gap: 12px;">
             <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#22C55E' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
@@ -1096,22 +1144,29 @@ class DashboardController
             </div>
             <div>
               <strong style="color: <?= $integrity['is_valid'] ? '#166534' : '#991B1B' ?>; font-size: 0.95rem;">
-                <?= $integrity['is_valid'] ? 'Cadeia de Integridade Criptográfica 100% Válida' : 'ALERTA: Adulteração Detectada no Histórico' ?>
+                <?= $integrity['is_valid'] ? 'Histórico Clínico Autêntico e Protegido Contra Adulteração' : 'Atenção: Integridade dos registros precisa de verificação' ?>
               </strong>
-              <div style="font-size: 0.8rem; color: #64748B;">
-                <?= $integrity['message'] ?> (Total: <?= $integrity['total_records'] ?> versões registradas)
-                <?php if (!empty($integrity['latest_hash'])): ?>
-                  • Último Hash Raiz: <code style="font-size: 0.75rem; background: #E2E8F0; padding: 1px 4px; border-radius: 4px;"><?= substr($integrity['latest_hash'], 0, 20) ?>...</code>
-                <?php endif; ?>
+              <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
+                <?= (int)$integrity['total_records'] ?> versões registradas. As versões anteriores são preservadas.
               </div>
+              <?php if (!empty($integrity['latest_hash'])): ?>
+                <details style="font-size: 0.75rem; color: #64748B; margin-top: 6px;">
+                  <summary style="cursor: pointer; color: var(--brand-copper-600); font-weight: 500;">Ver detalhes técnicos de integridade digital</summary>
+                  <div style="margin-top: 4px; font-family: monospace; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; word-break: break-all;">
+                    Assinatura raiz da cadeia: <?= htmlspecialchars($integrity['latest_hash']) ?>
+                  </div>
+                </details>
+              <?php endif; ?>
             </div>
           </div>
         </div>
 
-        <!-- Resumo Clínico para Prescrição (NI2-64) -->
+        <?php endif; ?>
+
+        <!-- Resumo Clínico para Prescrição -->
         <div class="card" style="margin-bottom: var(--space-6); border-left: 4px solid #0284C7;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);">Resumo Crítico da Anamnese para Prescrição (NI2-64)</h3>
+            <h3 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);">Resumo Crítico da Anamnese para Prescrição</h3>
             <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
               <span style="font-size: 0.75rem; color: #64748B;">
                 Fonte: <a href="<?= $clinicalSummary['source']['url'] ?>" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?></a> por <?= htmlspecialchars($clinicalSummary['source']['author']) ?> em <?= date('d/m/Y', strtotime($clinicalSummary['source']['recorded_at'])) ?>
@@ -1125,7 +1180,7 @@ class DashboardController
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px;">
               <div style="padding: 10px; background: <?= !empty($clinicalSummary['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>; border-radius: 6px;">
                 <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; display: block;">ALERGIAS ALIMENTARES</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergies'] ?? '[Não relatado]') ?></span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?></span>
               </div>
               <div style="padding: 10px; background: <?= !empty($clinicalSummary['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>; border-radius: 6px;">
                 <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">RESTRIÇÕES & INTOLERÂNCIAS</span>
@@ -1139,11 +1194,11 @@ class DashboardController
           <?php endif; ?>
         </div>
 
-        <!-- Linha do Tempo Longitudinal (NI2-60, NI2-63) -->
+        <!-- Linha do Tempo Longitudinal -->
         <div class="card">
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Histórico Clínico Append-Only (<?= count($timeline) ?> Registros)</h3>
-            <span style="font-size: 0.8rem; color: #64748B;">Nenhum registro pode ser apagado ou adulterado</span>
+            <h3 style="margin: 0;">Evolução Clínica & Histórico Preservado (<?= count($timeline) ?> Registros)</h3>
+            <span style="font-size: 0.8rem; color: #64748B;">Autoria e integridade asseguradas para cada lançamento</span>
           </div>
 
           <?php if (empty($timeline)): ?>
@@ -1206,22 +1261,27 @@ class DashboardController
                     <?php endif; ?>
                   </div>
 
-                  <!-- Trilha Criptográfica de Bloco (NI2-60) -->
-                  <div style="display: flex; gap: 12px; font-size: 0.72rem; color: #64748B; font-family: monospace; background: #F1F5F9; padding: 6px 10px; border-radius: 4px; overflow-x: auto;">
-                    <div><strong>SHA-256:</strong> <?= htmlspecialchars($rec['record_hash']) ?></div>
-                    <div><strong>Prev-Hash:</strong> <?= htmlspecialchars($rec['previous_hash']) ?></div>
-                  </div>
+                  <!-- Autenticidade e Trilha Criptográfica Sob Demanda (PX-13) -->
+                  <details style="margin-top: 6px; font-size: 0.75rem; color: #64748B;">
+                    <summary style="cursor: pointer; color: var(--brand-teal-700); font-weight: 500; font-size: 0.72rem; outline: none; user-select: none;">
+                      Verificar autenticidade digital (cadeia criptográfica)
+                    </summary>
+                    <div style="display: flex; gap: 12px; font-size: 0.70rem; color: #64748B; font-family: monospace; background: #F1F5F9; padding: 6px 10px; border-radius: 4px; overflow-x: auto; margin-top: 4px;">
+                      <div><strong>Assinatura digital (SHA-256):</strong> <?= htmlspecialchars($rec['record_hash'] ?? '') ?></div>
+                      <div><strong>Elo anterior:</strong> <?= !empty($rec['previous_hash']) ? htmlspecialchars($rec['previous_hash']) : 'Registro inicial' ?></div>
+                    </div>
+                  </details>
                 </div>
               <?php endforeach; ?>
             </div>
           <?php endif; ?>
         </div>
 
-        <!-- Modal Nova Evolução / Observação Clínica (NI2-60, NI2-63) -->
+        <!-- Modal Nova Evolução / Observação Clínica -->
         <div id="modal-new-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
           <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Adicionar Entrada ao Prontuário</h3>
-            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">O registro será datado, assinado e concatenado à cadeia SHA-256 de forma imutável.</p>
+            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">O registro será datado, assinado pelo profissional e preservado com garantia de autenticidade digital.</p>
             <form method="POST" action="/pacientes/<?= $patient['id'] ?>/prontuario">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 12px;">
@@ -1249,7 +1309,7 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Modal Retificação Formal Versionada (NI2-60) -->
+        <!-- Modal Retificação Formal Versionada -->
         <div id="modal-revise-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
           <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Retificação Formal de Registro Clínico</h3>
@@ -1481,7 +1541,7 @@ class DashboardController
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
-              Prontuário (SHA-256) ➔
+              Prontuário ➔
             </a>
             <a href="#historico-versoes" class="btn btn-secondary">
               Ver Histórico (<?= count($history) ?> Versões)
@@ -1489,7 +1549,7 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Se solicitou comparação de versões (NI2-62) -->
+        <!-- Se solicitou comparação de versões -->
         <?php if ($compareData): ?>
           <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid var(--brand-copper-600);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -1532,13 +1592,13 @@ class DashboardController
             <a class="btn btn-secondary" href="/pacientes/<?= (int)$patient['id'] ?>/anamnese">Voltar à coleta atual</a>
           </div>
         <?php else: ?>
-        <!-- Formulário Estruturado da Anamnese (NI2-61) -->
+        <!-- Formulário Estruturado da Anamnese -->
         <div class="card" style="margin-bottom: var(--space-6);">
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <div>
               <h3 style="margin: 0;">Coleta & Atualização da Anamnese</h3>
               <p style="color: #64748B; font-size: 0.85rem; margin-top: 4px;">
-                Preencha as seções clínicas abaixo. Cada gravação cria uma nova versão (append-only) sem apagar as anteriores.
+                Preencha as seções clínicas abaixo. Cada gravação cria uma nova versão preservada sem apagar as anteriores.
               </p>
             </div>
             <?php if ($latest): ?>
@@ -1565,7 +1625,7 @@ class DashboardController
               <textarea id="anamnesis_objectives" name="objectives" aria-labelledby="label_anamnesis_objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
             </div>
 
-            <!-- 2. Alergias & Restrições (Crítico para Prescrição - NI2-64) -->
+            <!-- 2. Alergias & Restrições (Crítico para Prescrição) -->
             <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -1573,6 +1633,12 @@ class DashboardController
                   <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #DC2626;">
                     ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
                   </label>
+                  <label class="form-label" for="allergy-assessment">Avaliação de alergias</label>
+                  <select class="form-control" id="allergy-assessment" name="allergy_assessment">
+                    <?php foreach (['not_assessed' => 'Não avaliado', 'denied' => 'Nega alergias', 'recorded' => 'Alergia registrada'] as $value => $label): ?>
+                    <option value="<?= $value ?>" <?= (($latest['allergy_assessment'] ?? 'not_assessed') === $value) ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach; ?>
+                  </select>
                   <textarea id="anamnesis_allergies" name="allergies" aria-labelledby="label_anamnesis_allergies" aria-describedby="anamnesis_allergies_help" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
                   <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
                 </div>
@@ -1649,7 +1715,7 @@ class DashboardController
               <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
             </div>
 
-            <!-- Botões de Ação com Suporte a Rascunho Parcial (NI2-61) -->
+            <!-- Botões de Ação com Suporte a Rascunho Parcial -->
             <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--neutral-gray-200); padding-top: 16px;">
               <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;">
                 Salvar como Rascunho Parcial
@@ -1663,11 +1729,11 @@ class DashboardController
 
         <?php endif; ?>
 
-        <!-- Seção: Histórico de Versões da Anamnese (NI2-62) -->
+        <!-- Seção: Histórico de Versões da Anamnese -->
         <div id="historico-versoes" class="card">
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h3 style="margin: 0;">Histórico Versionado da Anamnese (<?= count($history) ?> Versões)</h3>
-            <span style="font-size: 0.8rem; color: #64748B;">Imutabilidade garantida por versionamento append-only</span>
+            <span style="font-size: 0.8rem; color: #64748B;">As versões anteriores são preservadas</span>
           </div>
 
           <?php if (empty($history)): ?>
@@ -1712,7 +1778,7 @@ class DashboardController
               </table>
             </div>
 
-            <!-- Formulário para Comparar 2 Versões (NI2-62) -->
+            <!-- Formulário para Comparar 2 Versões -->
             <?php if (count($history) >= 2): ?>
               <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px;">
                 <h4 style="margin: 0 0 8px 0; font-size: 0.875rem; color: var(--brand-navy-900);">Comparar Versões Lado a Lado (Diff Clínico)</h4>
@@ -2034,7 +2100,7 @@ class DashboardController
               <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
               <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
               <p style="margin-bottom: var(--space-2);"><strong>Nascimento:</strong> <?= !empty($p['birth_date']) ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
-              <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars($p['gender'] ?? '—') ?></p>
+              <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
 
               <?php if (!empty($app['notes'])): ?>
                 <div style="margin-top: var(--space-4); padding: var(--space-3); background: #FAF7F2; border-left: 3px solid var(--brand-copper-500); border-radius: 4px;">
@@ -2083,23 +2149,23 @@ class DashboardController
                 <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-sm btn-primary" style="font-size: 0.8rem; text-decoration: none; display: inline-block;">+ Prescrever Plano no Perfil ↗</a>
               <?php else: ?>
                 <?php $plan = $profile['meal_plans'][0]; ?>
-                <div style="margin-bottom: 8px;">
+                <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                   <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($plan['title']) ?> (v<?= $plan['version'] ?>)</strong>
-                  <span class="badge badge-<?= $plan['status'] === 'published' ? 'success' : 'warning' ?>" style="font-size: 0.75rem; margin-left: 6px;"><?= $plan['status'] ?></span>
+                  <?= LabelMap::mealPlanStatusBadge($plan['status'] ?? '') ?>
                 </div>
                 <a href="/planos/<?= $plan['id'] ?>" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Abrir Editor da Prescrição ↗</a>
               <?php endif; ?>
             </div>
           </div>
 
-          <!-- Coluna 2: Formulário de Execução e Conclusão da Consulta (NI2-84) -->
+          <!-- Coluna 2: Formulário de Execução e Conclusão da Consulta -->
           <div>
             <div class="card">
               <h3 style="margin-top: 0; margin-bottom: var(--space-4); color: var(--brand-navy-900);">
                 Evolução Clínica & Conduta do Atendimento
               </h3>
               <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin-bottom: var(--space-4);">
-                Ao concluir a consulta, a evolução será assinada com hash SHA-256 no prontuário eletrônico do paciente, garantindo imutabilidade e conformidade com o CFN.
+                Ao concluir a consulta, a evolução será assinada e registrada de forma autêntica no prontuário eletrônico do paciente, garantindo integridade e conformidade com as diretrizes do CFN.
               </p>
 
               <form action="/consulta/<?= $app['id'] ?>/concluir" method="POST">
@@ -2142,14 +2208,14 @@ class DashboardController
             <?php if (!empty($app['history'])): ?>
               <div class="card" style="margin-top: var(--space-4);">
                 <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">
-                  Trilha de Auditoria Desta Consulta (NI2-82)
+                  Trilha de Auditoria Desta Consulta
                 </h4>
                 <div style="font-size: 0.8125rem; color: var(--neutral-gray-700);">
                   <?php foreach ($app['history'] as $h): ?>
-                    <div style="padding: 6px 0; border-bottom: 1px solid var(--neutral-gray-200); display: flex; justify-content: space-between;">
+                    <div style="padding: 6px 0; border-bottom: 1px solid var(--neutral-gray-200); display: flex; justify-content: space-between; align-items: center;">
                       <div>
-                        <strong><?= htmlspecialchars($h['from_status'] ?? 'Criação') ?></strong> ➔ 
-                        <span class="badge badge-info" style="font-size: 0.75rem;"><?= htmlspecialchars($h['to_status']) ?></span>
+                        <strong><?= htmlspecialchars(!empty($h['from_status']) ? LabelMap::appointmentStatus($h['from_status']) : 'Criação') ?></strong> ➔ 
+                        <?= LabelMap::appointmentStatusBadge($h['to_status'] ?? '') ?>
                         <?php if (!empty($h['notes'])): ?>
                           <span style="color: var(--neutral-gray-500);">— <?= htmlspecialchars($h['notes']) ?></span>
                         <?php endif; ?>
@@ -2284,7 +2350,7 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Cabeçalho & Controles da Agenda (NI2-83) -->
+        <!-- Cabeçalho & Controles da Agenda -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>
             <h1>Agenda de Atendimentos</h1>
@@ -2316,7 +2382,7 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Formulário Retrátil de Novo Agendamento (NI2-81) -->
+        <!-- Formulário Retrátil de Novo Agendamento -->
         <div id="card-novo-agendamento" class="card" style="display: none; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
           <div class="card__header">
             <h3>Agendar Nova Consulta</h3>
@@ -2382,7 +2448,7 @@ class DashboardController
         </div>
 
         <?php if ($view === 'day'): ?>
-          <!-- Visão Diária da Agenda (NI2-83) -->
+          <!-- Visão Diária da Agenda -->
           <div class="card">
             <div class="card__header">
               <h3>Consultas do Dia (<?= date('d/m/Y', strtotime($currentDate)) ?>)</h3>
@@ -2422,17 +2488,9 @@ class DashboardController
                           </a>
                         </td>
                         <td><?= htmlspecialchars($a['patient_phone'] ?? '—') ?></td>
-                        <td><?= htmlspecialchars($a['type']) ?></td>
+                        <td><?= htmlspecialchars(LabelMap::appointmentType($a['type'])) ?></td>
                         <td>
-                          <?php
-                            $badgeClass = 'badge-info';
-                            if ($a['status'] === 'confirmed') $badgeClass = 'badge-success';
-                            if ($a['status'] === 'in_progress') $badgeClass = 'badge-warning';
-                            if ($a['status'] === 'completed') $badgeClass = 'badge-success';
-                            if ($a['status'] === 'cancelled') $badgeClass = 'badge-secondary';
-                            if ($a['status'] === 'no_show') $badgeClass = 'badge-danger';
-                          ?>
-                          <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($a['status']) ?></span>
+                          <?= LabelMap::appointmentStatusBadge($a['status']) ?>
                         </td>
                         <td style="text-align: right;">
                           <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
@@ -2454,12 +2512,12 @@ class DashboardController
                               <a href="/pacientes/<?= $a['patient_id'] ?>" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px;">Prontuário ↗</a>
                             <?php endif; ?>
 
-                            <!-- Menu de Estados da Consulta (NI2-82) -->
+                            <!-- Menu de Estados da Consulta -->
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Deseja marcar como No-Show (não compareceu)?');">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Deseja marcar como Não Compareceu?');">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="no_show">
-                                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #DC2626;" title="Não compareceu">No-Show</button>
+                                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #DC2626;" title="Não compareceu">Não compareceu</button>
                               </form>
                               <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Confirmar cancelamento da consulta?');">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -2477,7 +2535,7 @@ class DashboardController
             </div>
           </div>
         <?php else: ?>
-          <!-- Visão Semanal da Agenda (NI2-83) -->
+          <!-- Visão Semanal da Agenda -->
           <div class="card">
             <div class="card__header">
               <h3>Semana de <?= date('d/m', strtotime($weekData['start_date'])) ?> a <?= date('d/m/Y', strtotime($weekData['end_date'])) ?></h3>
@@ -2502,9 +2560,9 @@ class DashboardController
                     <?php else: ?>
                       <?php foreach ($dayApps as $dApp): ?>
                         <div style="background: #fff; border: 1px solid var(--neutral-gray-200); border-radius: 6px; padding: 6px 8px; font-size: 0.75rem;">
-                          <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--brand-navy-900);">
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--brand-navy-900);">
                             <span><?= date('H:i', strtotime($dApp['scheduled_at'])) ?></span>
-                            <span class="badge badge-info" style="font-size: 0.65rem; padding: 2px 4px;"><?= $dApp['status'] ?></span>
+                            <?= LabelMap::appointmentStatusBadge($dApp['status']) ?>
                           </div>
                           <a href="/consulta/<?= $dApp['id'] ?>" style="display: block; color: var(--brand-navy-900); text-decoration: none; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             <?= htmlspecialchars($dApp['patient_name']) ?>
@@ -2607,13 +2665,7 @@ class DashboardController
                       <td style="padding: 12px;"><?= htmlspecialchars($pl['patient_name']) ?></td>
                       <td style="padding: 12px;" class="tabular-nums">v<?= (int)$pl['version'] ?></td>
                       <td style="padding: 12px;">
-                        <?php if ($pl['status'] === 'published'): ?>
-                          <span class="badge badge-success" style="background: #def7ec; color: #03543f; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Publicado</span>
-                        <?php elseif ($pl['status'] === 'draft'): ?>
-                          <span class="badge badge-warning" style="background: #fef08a; color: #854d0e; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">Rascunho</span>
-                        <?php else: ?>
-                          <span class="badge" style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;"><?= htmlspecialchars($pl['status']) ?></span>
-                        <?php endif; ?>
+                        <?= LabelMap::mealPlanStatusBadge($pl['status'] ?? '') ?>
                       </td>
                       <td style="padding: 12px;" class="tabular-nums"><?= number_format((float)($pl['daily_energy_kcal'] ?? 0), 0, ',', '.') ?> kcal</td>
                       <td style="padding: 12px; color: #64748b; font-size: 0.85rem;"><?= date('d/m/Y H:i', strtotime($pl['updated_at'] ?? $pl['created_at'])) ?></td>
@@ -2696,19 +2748,28 @@ class DashboardController
     {
         $planId = (int)($params['id'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Você não tem permissão para acessar prescrições.';
+            return;
+        }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
             $preview = $service->getPlanPreview($planId);
             $plan = $preview['plan'];
+            $clinicalSummary = $plan['clinical_safety_summary'];
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(403);
+            echo 'Acesso ao plano não autorizado.';
+            return;
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = $e->getMessage();
-            header("Location: /planos");
-            exit;
+            error_log('NI2-312 clinical summary failed: ' . $e->getMessage());
+            http_response_code(503);
+            echo 'Não foi possível carregar o plano e a avaliação de alergias. <a href="/planos">Tentar novamente</a>';
+            return;
         }
 
-        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService($db);
-        $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription((int)$plan['patient_id']);
 
         $fStmt = $db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 250");
         $fStmt->execute();
@@ -2725,6 +2786,7 @@ class DashboardController
         unset($_SESSION['feedback_message'], $_SESSION['error_message']);
 
         $isDraft = ($plan['status'] === 'draft');
+        $canEditItems = $this->canEditPlanItems($db);
 
         ob_start();
         ?>
@@ -2740,10 +2802,12 @@ class DashboardController
             <p style="color: var(--neutral-gray-500); margin-top: 4px;">Paciente: <strong><?= htmlspecialchars($plan['patient_name']) ?></strong> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
+            <?php if ($canEditItems): ?>
             <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;">Duplicar como Rascunho</button>
+              <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;"><?= $isDraft ? 'Duplicar como Rascunho' : 'Criar nova versão para editar' ?></button>
             </form>
+            <?php endif; ?>
             <?php if ($isDraft): ?>
               <button class="btn btn-primary" onclick="document.getElementById('modal-publish-plan').style.display='flex'">
                 Revisar & Publicar
@@ -2764,20 +2828,30 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Resumo Clínico para Prescrição (NI2-64): Dados Críticos com Origem Rastreável -->
+        <style>
+          @media (max-width: 600px) {
+            .meal-plan-items, .meal-plan-items tbody { display: block; width: 100%; }
+            .meal-plan-items tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .meal-plan-items td { display: block; width: auto !important; padding: var(--space-3) !important; overflow-wrap: anywhere; }
+            .meal-plan-items tr:has(details) { display: block; }
+            .meal-plan-items input, .meal-plan-items textarea { min-width: 0; max-width: 100%; }
+          }
+        </style>
+
+        <!-- Resumo Clínico para Prescrição: Dados Críticos com Origem Rastreável -->
         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #0284C7; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <strong style="color: var(--brand-navy-900); font-size: 0.95rem;">📋 Resumo Clínico da Anamnese (NI2-64)</strong>
+            <strong style="color: var(--brand-navy-900); font-size: 0.95rem;">📋 Resumo Clínico da Anamnese</strong>
             <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
               <span style="font-size: 0.75rem; color: #64748B;">
-                Origem: <a href="<?= $clinicalSummary['source']['url'] ?>" target="_blank" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?> ↗</a>
+                Origem: <a href="<?= $clinicalSummary['source']['url'] ?>" target="_blank" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?> ↗</a> · <?= htmlspecialchars($clinicalSummary['source']['recorded_at']) ?><?= $clinicalSummary['is_draft'] ? ' · Rascunho' : ' · Finalizada' ?>
               </span>
             <?php endif; ?>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.85rem;">
             <div>
               <span style="color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">ALERGIAS:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergies'] ?? '[Nenhuma relatada]') ?></span>
+              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?></span>
             </div>
             <div>
               <span style="color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">RESTRIÇÕES:</span>
@@ -2789,6 +2863,13 @@ class DashboardController
             </div>
           </div>
         </div>
+
+        <?php if ($clinicalSummary['allergy_pending']): ?>
+          <div role="status" data-testid="allergy-pending" class="card" style="border-left: 4px solid var(--brand-copper-600); margin-bottom: var(--space-4);">
+            Avaliação de alergias pendente<?= $clinicalSummary['is_draft'] ? ': a anamnese está em rascunho' : '' ?>. A ausência de informação não confirma ausência de alergias.
+            <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Revisar anamnese</a>
+          </div>
+        <?php endif; ?>
 
         <!-- Alertas de Segurança Clínica e Alérgenos -->
         <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
@@ -2888,7 +2969,7 @@ class DashboardController
                     Nenhum alimento cadastrado nesta refeição.
                   </div>
                 <?php else: ?>
-                  <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                  <table class="meal-plan-items" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                      <tbody>
                       <?php foreach ($m['items'] as $it): ?>
                         <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
@@ -2916,6 +2997,25 @@ class DashboardController
                             <?php endif; ?>
                           </td>
                         </tr>
+
+                        <?php if ($isDraft && $canEditItems): ?>
+                        <tr><td colspan="4" style="padding: var(--space-3) var(--space-4);">
+                          <details data-testid="edit-plan-item-<?= (int)$it['id'] ?>">
+                            <summary style="cursor: pointer; color: var(--brand-navy-900); font-weight: 600;">Editar porção e orientação</summary>
+                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').textContent='Salvando…';">
+                              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                              <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
+                              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);">
+                                <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="number" min="0.001" step="any" required value="<?= htmlspecialchars((string)$it['amount'], ENT_QUOTES) ?>"></div>
+                                <div class="form-group"><label class="form-label" for="item-unit-<?= (int)$it['id'] ?>">Unidade ou medida caseira</label><input class="form-control" id="item-unit-<?= (int)$it['id'] ?>" name="measure_unit" required value="<?= htmlspecialchars($it['measure_unit'], ENT_QUOTES) ?>"></div>
+                              </div>
+                              <div class="form-group"><label class="form-label" for="item-notes-<?= (int)$it['id'] ?>">Orientação</label><textarea class="form-control" id="item-notes-<?= (int)$it['id'] ?>" name="notes"><?= htmlspecialchars($it['notes'] ?? '', ENT_QUOTES) ?></textarea></div>
+                              <button type="submit" class="btn btn-primary">Salvar alterações</button>
+                              <button type="button" class="btn btn-secondary" onclick="this.form.reset(); this.closest('details').open=false">Cancelar</button>
+                            </form>
+                          </details>
+                        </td></tr>
+                        <?php endif; ?>
 
                         <!-- Substituições Vinculadas (Opções Alternativas - Não Cumulativas) -->
                         <?php if (!empty($it['substitutions'])): ?>
@@ -3091,6 +3191,14 @@ class DashboardController
               </div>
             <?php endif; ?>
 
+            <div data-testid="publication-allergy-review" style="margin-bottom: var(--space-4);">
+              <strong>Alergias: <?= htmlspecialchars($clinicalSummary['allergy_label']) ?></strong>
+              <?php if ($clinicalSummary['allergy_pending']): ?>
+              <p>Avaliação pendente. Revise a anamnese antes de publicar; este plano não confirma ausência de alergias.</p>
+              <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Revisar anamnese</a>
+              <?php endif; ?>
+              <?php if ($clinicalSummary['source']): ?><p>Origem: anamnese v<?= (int)$clinicalSummary['source']['version'] ?> · <?= htmlspecialchars($clinicalSummary['source']['recorded_at']) ?></p><?php endif; ?>
+            </div>
             <form method="POST" action="/planos/<?= $planId ?>/publicar">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
@@ -3189,6 +3297,44 @@ class DashboardController
         exit;
     }
 
+    private function canEditPlanItems(\PDO $db): bool
+    {
+        $access = $db->prepare("SELECT 1 FROM clinic_members cm JOIN users u ON u.id = cm.user_id
+            JOIN professionals pr ON pr.user_id = u.id
+            WHERE cm.clinic_id = ? AND cm.user_id = ? AND cm.status = 'active'
+            AND cm.role IN ('owner', 'admin', 'nutritionist')
+            AND u.status = 'active' AND u.role = 'nutritionist'");
+        $access->execute([TenantContext::getClinicId(), TenantContext::getUserId()]);
+        return (bool)$access->fetchColumn();
+    }
+
+    public function updatePlanItem(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $db = Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Você não tem permissão para editar prescrições.';
+            return;
+        }
+        try {
+            foreach (['amount', 'measure_unit', 'notes', 'revision'] as $field) {
+                if (!isset($_POST[$field]) || !is_string($_POST[$field])) throw new \InvalidArgumentException('Confira os campos do item.');
+            }
+            if (!is_numeric($_POST['amount']) || $_POST['revision'] === '') throw new \InvalidArgumentException('Informe uma quantidade válida e recarregue o formulário.');
+            (new MealPlanService($db))->updateItem((int)($params['itemId'] ?? 0),
+                (float)$_POST['amount'], trim($_POST['measure_unit']), trim($_POST['notes']), $_POST['revision'], $planId);
+            $_SESSION['feedback_message'] = 'Item atualizado e totais nutricionais recalculados. As substituições foram preservadas.';
+        } catch (\InvalidArgumentException | \DomainException $e) {
+            $_SESSION['error_message'] = $e->getMessage();
+        } catch (\Throwable $e) {
+            error_log('NI2-310 update item failed: ' . $e->getMessage());
+            $_SESSION['error_message'] = 'Não foi possível salvar o item. Nenhuma alteração foi gravada. Tente novamente.';
+        }
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
     public function deleteItemFromPlanMeal(array $params): void
     {
         $planId = (int)($params['id'] ?? 0);
@@ -3271,6 +3417,11 @@ class DashboardController
     {
         $planId = (int)($params['id'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Você não tem permissão para editar prescrições.';
+            return;
+        }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
@@ -3449,18 +3600,6 @@ class DashboardController
                   $today = date('Y-m-d');
                   foreach ($receivables as $rc): 
                     $isOverdue = ($rc['status'] === 'pending' && $rc['due_date'] < $today);
-                    $statusLabel = match($rc['status']) {
-                        'paid' => 'Recebido',
-                        'canceled', 'cancelled' => 'Cancelado',
-                        'partially_paid' => 'Parcial',
-                        default => ($isOverdue ? 'Vencido' : 'Pendente')
-                    };
-                    $badgeClass = match($rc['status']) {
-                        'paid' => 'badge-success',
-                        'canceled', 'cancelled' => 'badge-secondary',
-                        'partially_paid' => 'badge-primary',
-                        default => ($isOverdue ? 'badge-danger' : 'badge-warning')
-                    };
                   ?>
                     <tr>
                       <td>
@@ -3479,7 +3618,7 @@ class DashboardController
                         </span>
                       </td>
                       <td>
-                        <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($statusLabel) ?></span>
+                        <?= LabelMap::receivableStatusBadge($rc['status'], $isOverdue) ?>
                         <?php if ($rc['status'] === 'paid' && !empty($rc['receipt_code'])): ?>
                           <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 2px;">
                             Recibo: <?= htmlspecialchars($rc['receipt_code']) ?>
@@ -3904,7 +4043,7 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Cards de Métricas Reais (NI2-85) -->
+        <!-- Cards de Métricas Consolidadas -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
           <div class="card" style="margin-bottom: 0;">
             <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS HOJE</div>
@@ -3951,7 +4090,7 @@ class DashboardController
           </div>
         </div>
 
-        <!-- Seção: Pacientes e Prioridades que Exigem Atenção (NI2-85) -->
+        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
         <div class="card" style="margin-bottom: var(--space-8); border-left: 4px solid var(--brand-copper-500);">
           <div class="card__header">
             <h3>Pacientes & Prioridades que Exigem Atenção</h3>
@@ -4013,16 +4152,9 @@ class DashboardController
                             <?= htmlspecialchars($app['patient_name']) ?>
                           </a>
                         </td>
-                        <td><?= htmlspecialchars($app['type']) ?></td>
+                        <td><?= htmlspecialchars(LabelMap::appointmentType($app['type'])) ?></td>
                         <td>
-                          <?php
-                            $stClass = 'badge-info';
-                            if ($app['status'] === 'confirmed') $stClass = 'badge-success';
-                            if ($app['status'] === 'in_progress') $stClass = 'badge-warning';
-                            if ($app['status'] === 'completed') $stClass = 'badge-success';
-                            if ($app['status'] === 'no_show') $stClass = 'badge-danger';
-                          ?>
-                          <span class="badge <?= $stClass ?>"><?= htmlspecialchars($app['status']) ?></span>
+                          <?= LabelMap::appointmentStatusBadge($app['status']) ?>
                         </td>
                         <td style="text-align: right;">
                           <?php if ($app['status'] === 'completed'): ?>
@@ -4079,7 +4211,7 @@ class DashboardController
         ?>
         <?php if (!empty($_GET['success'])): ?>
           <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(24, 121, 78, 0.2);">
-            ✓ Paciente cadastrado com sucesso! Prontuário e Perfil 360 iniciados.
+            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado com sucesso! Prontuário e Perfil 360 iniciados.' ?>
           </div>
         <?php endif; ?>
 
@@ -4118,6 +4250,7 @@ class DashboardController
                       <td><span class="badge badge-success"><?= htmlspecialchars($p['status']) ?></span></td>
                       <td>
                         <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver Perfil 360</a>
+                        <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
                       </td>
                     </tr>
                   <?php endforeach; ?>

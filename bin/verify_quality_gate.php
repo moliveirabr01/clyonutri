@@ -101,6 +101,7 @@ $criticalPhpFiles = [
     'src/Domain/Onboarding/OnboardingService.php',
     'src/Application/Controllers/OnboardingController.php',
     'src/Domain/Finance/FinanceService.php',
+    'src/Core/I18n/LabelMap.php',
     'src/Core/Database/DemoSeeder.php',
     'bin/seed.php',
 ];
@@ -308,6 +309,13 @@ if (str_contains($px12Output, 'TODOS OS 8 GATES DE HOMOLOGAÇÃO PX-12 (NI2-305)
     recordCheck('E2E_JOURNEYS', 'Financeiro Vazio & Operações Reais (NI2-305 / PX-12)', 'PASS', 'Estado vazio explicativo com CTA, persistência de recebíveis, baixa real com recibo REC-..., pagamentos parciais, cancelamento e 403 multi-tenant');
 } else {
     recordCheck('E2E_JOURNEYS', 'Financeiro Vazio & Operações Reais (NI2-305 / PX-12)', 'FAIL', 'Falha no teste PX-12: ' . substr($px12Output, 0, 200));
+}
+
+$px13Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_13_clinical_language_and_enum_sanitization_test.php') . " 2>&1");
+if (str_contains($px13Output, 'TODOS OS 8 GATES DE HOMOLOGAÇÃO PX-13 (NI2-306) FORAM APROVADOS (PASS)')) {
+    recordCheck('E2E_JOURNEYS', 'Linguagem Clínica & Higienização de Enums e Jargões (NI2-306 / PX-13)', 'PASS', 'LabelMap centralizado, enums e códigos NI2 eliminados de telas operacionais, hashes criptográficos acessíveis sob demanda em details');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Linguagem Clínica & Higienização de Enums e Jargões (NI2-306 / PX-13)', 'FAIL', 'Falha no teste PX-13: ' . substr($px13Output, 0, 200));
 }
 
 // Browser Físico / Playwright

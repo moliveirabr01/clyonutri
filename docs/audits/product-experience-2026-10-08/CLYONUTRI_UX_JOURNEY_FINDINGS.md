@@ -236,7 +236,8 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Nutricionista e paciente.
 - **Descrição:** Jargão técnico e enums chegam ao usuário.
 - **Evidência verificável:** [src/Application/Controllers/DashboardController.php:1072](/Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:1072); first_visit/completed/male/published; NI2-64 e hashes em headings observados.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-306).
+- **Resolução implementada:** Criação do mapa centralizado de internacionalização e apresentação `ClyoNutri\Core\I18n\LabelMap` com normalização resiliente de enums (`appointmentStatus`, `appointmentType`, `patientGender`, `mealPlanStatus`, `receivableStatus`, `mealType`, `userRole`) e sanitização de jargões técnicos (`cleanOperationalText`). Erradicação completa de tags internas de tickets (`(NI2-64)`, `(NI2-69)`, `(NI2-82)`, etc.) de títulos, botões e comentários de templates. Prontuário clínico humanizado com cabeçalho 'Evolução Clínica & Histórico Preservado' e mensagem acolhedora de integridade; hashes SHA-256 e detalhes criptográficos preservados sob demanda via elemento nativo `<details>` ('Verificar autenticidade digital'). 100% comprovado com 8 gates na suíte de testes `tests/px_13_clinical_language_and_enum_sanitization_test.php`.
 - **Causa provável:** Modelo de implementação usado diretamente como conteúdo de interface.
 - **Severidade de produto:** P2.
 - **Impacto na experiência:** Eleva carga cognitiva, parece ambiente de desenvolvimento e enfraquece profissionalismo.
