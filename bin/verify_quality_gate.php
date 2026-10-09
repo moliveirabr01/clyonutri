@@ -295,6 +295,13 @@ if (str_contains($px20Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO PASSARAM COM SU
     recordCheck('E2E_JOURNEYS', 'Meta Hídrica Prescrita & Empty State (NI2-313 / PX-20)', 'FAIL', 'Falha no teste PX-20: ' . substr($px20Output, 0, 200));
 }
 
+$px07Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_07_accessible_clinical_fields_dom_test.php') . " 2>&1");
+if (str_contains($px07Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO PASSARAM COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Campos Clínicos Acessíveis & DOM Semântico (NI2-300 / PX-07)', 'PASS', '10 campos de coleta com id e label for, 2 selects comparativos acessíveis, fieldsets/legends e aria-describedby auditados');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Campos Clínicos Acessíveis & DOM Semântico (NI2-300 / PX-07)', 'FAIL', 'Falha no teste PX-07: ' . substr($px07Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

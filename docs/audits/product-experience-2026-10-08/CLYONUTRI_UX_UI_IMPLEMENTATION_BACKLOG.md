@@ -190,6 +190,8 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Dependências:** Componente de formulário.
 
+**Status de implementação:** Resolvido (NI2-300) · Suíte `tests/px_07_accessible_clinical_fields_dom_test.php` (7/7 gates aprovados) integrada ao quality gate e release pipeline.
+
 **Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
 
 ## PX-08 — Modais clínicos não gerenciam foco de modo consistente

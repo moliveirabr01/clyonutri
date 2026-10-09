@@ -139,7 +139,7 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Nutricionista.
 - **Descrição:** Campos clínicos sem nome acessível associado.
 - **Evidência verificável:** [src/Application/Controllers/DashboardController.php:1493](/Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:1493); inspeção DOM: dez campos de coleta e dois selects comparativos sem labels associados nem aria-label.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-300) — Associação semântica completa: todos os 10 campos de coleta da anamnese com id único e label for/aria-labelledby correspondente; instruções descritivas via aria-describedby nos campos críticos; agrupamento de seções com fieldset e legend; selects de comparação de versões com id, label for e aria-label explícitos; alertas com role="alert" e role="status"; 100% comprovado com 7 gates na suíte tests/px_07_accessible_clinical_fields_dom_test.php.
 - **Causa provável:** Rótulos visuais sem for/id; sem associação semântica.
 - **Severidade de produto:** P1.
 - **Impacto na experiência:** Leitor de tela não identifica campo; preenchimento clínico depende de contexto visual.

@@ -727,7 +727,8 @@ class DashboardController
             <?php if (count($assessments) >= 2): ?>
               <form method="GET" action="/pacientes/<?= $patient['id'] ?>/antropometria" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <input type="hidden" name="metric" value="<?= htmlspecialchars($metric) ?>">
-                <select name="eval_a" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                <label for="eval_a_select" id="label_eval_a" class="sr-only">Avaliação Baseline</label>
+                <select id="eval_a_select" name="eval_a" aria-labelledby="label_eval_a" aria-label="Avaliação baseline para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalAId === (int)$opt['id'] ? 'selected' : '' ?>>
                       Baseline: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
@@ -735,9 +736,10 @@ class DashboardController
                   <?php endforeach; ?>
                 </select>
 
-                <span style="font-weight: 600; color: var(--neutral-gray-500);">vs</span>
+                <span style="font-weight: 600; color: var(--neutral-gray-500);" aria-hidden="true">vs</span>
 
-                <select name="eval_b" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                <label for="eval_b_select" id="label_eval_b" class="sr-only">Avaliação Comparada</label>
+                <select id="eval_b_select" name="eval_b" aria-labelledby="label_eval_b" aria-label="Avaliação comparada para evolução" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalBId === (int)$opt['id'] ? 'selected' : '' ?>>
                       Comparar: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
@@ -745,7 +747,7 @@ class DashboardController
                   <?php endforeach; ?>
                 </select>
 
-                <button type="submit" class="btn btn-secondary" style="min-height: 34px;">Comparar</button>
+                <button type="submit" class="btn btn-secondary" style="min-height: 34px;" aria-label="Comparar avaliações selecionadas">Comparar</button>
               </form>
             <?php endif; ?>
           </div>
@@ -1459,12 +1461,12 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div role="status" aria-live="polite" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
             ✓ Anamnese gravada com sucesso! Nova versão versionada e preservada no histórico longitudinal.
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
-          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
+          <div role="alert" aria-live="assertive" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
             <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro ao salvar a anamnese.' ?>
           </div>
         <?php endif; ?>
@@ -1557,84 +1559,94 @@ class DashboardController
 
             <!-- 1. Objetivos & Metas -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+              <label for="anamnesis_objectives" id="label_anamnesis_objectives" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 1. Objetivos & Metas do Paciente
               </label>
-              <textarea name="objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
+              <textarea id="anamnesis_objectives" name="objectives" aria-labelledby="label_anamnesis_objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
             </div>
 
             <!-- 2. Alergias & Restrições (Crítico para Prescrição - NI2-64) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-              <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #DC2626;">
-                  ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
-                </label>
-                <textarea name="allergies" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
-                <span style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
+            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
+                  <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #DC2626;">
+                    ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
+                  </label>
+                  <textarea id="anamnesis_allergies" name="allergies" aria-labelledby="label_anamnesis_allergies" aria-describedby="anamnesis_allergies_help" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
+                  <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
+                </div>
+                <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
+                  <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #D97706;">
+                    ⚠️ 3. Restrições Alimentares & Intolerâncias
+                  </label>
+                  <textarea id="anamnesis_restrictions" name="restrictions" aria-labelledby="label_anamnesis_restrictions" aria-describedby="anamnesis_restrictions_help" rows="3" placeholder="Ex: Intolerância à lactose, doença celíaca / glúten, dieta vegetariana estrita..." style="width: 100%; padding: 8px; border: 1px solid #FCD34D; border-radius: 6px;"><?= htmlspecialchars($latest['restrictions'] ?? '') ?></textarea>
+                  <span id="anamnesis_restrictions_help" style="font-size: 0.75rem; color: #92400E; display: block; margin-top: 4px;">Informações essenciais para formulação do plano alimentar.</span>
+                </div>
               </div>
-              <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #D97706;">
-                  ⚠️ 3. Restrições Alimentares & Intolerâncias
-                </label>
-                <textarea name="restrictions" rows="3" placeholder="Ex: Intolerância à lactose, doença celíaca / glúten, dieta vegetariana estrita..." style="width: 100%; padding: 8px; border: 1px solid #FCD34D; border-radius: 6px;"><?= htmlspecialchars($latest['restrictions'] ?? '') ?></textarea>
-                <span style="font-size: 0.75rem; color: #92400E; display: block; margin-top: 4px;">Informações essenciais para formulação do plano alimentar.</span>
-              </div>
-            </div>
+            </fieldset>
 
             <!-- 3. Preferências & Aversões -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+              <label for="anamnesis_food_preferences" id="label_anamnesis_food_preferences" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 4. Preferências Alimentares & Aversões
               </label>
-              <textarea name="food_preferences" rows="2" placeholder="Alimentos preferidos, alimentos rejeitados, hábitos regionais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['food_preferences'] ?? '') ?></textarea>
+              <textarea id="anamnesis_food_preferences" name="food_preferences" aria-labelledby="label_anamnesis_food_preferences" rows="2" placeholder="Alimentos preferidos, alimentos rejeitados, hábitos regionais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['food_preferences'] ?? '') ?></textarea>
             </div>
 
             <!-- 4. Sinais & Sintomas Clínicos -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+              <label for="anamnesis_symptoms" id="label_anamnesis_symptoms" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 5. Sinais & Sintomas Gastrointestinais / Gerais
               </label>
-              <textarea name="symptoms" rows="2" placeholder="Pirose, constipação, distensão abdominal, diarreia, cefaleia, indisposição..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['symptoms'] ?? '') ?></textarea>
+              <textarea id="anamnesis_symptoms" name="symptoms" aria-labelledby="label_anamnesis_symptoms" rows="2" placeholder="Pirose, constipação, distensão abdominal, diarreia, cefaleia, indisposição..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['symptoms'] ?? '') ?></textarea>
             </div>
 
             <!-- 5. Rotina & Hábitos -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-              <div class="form-group">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                  6. Rotina Diária & Horários
-                </label>
-                <textarea name="routine" rows="3" placeholder="Horário de acordar, dormir, trabalho, pausas de refeições, atividade física..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['routine'] ?? '') ?></textarea>
+            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Rotina Diária & Hábitos de Vida</legend>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label for="anamnesis_routine" id="label_anamnesis_routine" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                    6. Rotina Diária & Horários
+                  </label>
+                  <textarea id="anamnesis_routine" name="routine" aria-labelledby="label_anamnesis_routine" rows="3" placeholder="Horário de acordar, dormir, trabalho, pausas de refeições, atividade física..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['routine'] ?? '') ?></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="anamnesis_habits" id="label_anamnesis_habits" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                    7. Hábitos de Vida & Consumo
+                  </label>
+                  <textarea id="anamnesis_habits" name="habits" aria-labelledby="label_anamnesis_habits" rows="3" placeholder="Consumo de álcool, tabagismo, cafeína, mastigação rápida, beliscos..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['habits'] ?? '') ?></textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                  7. Hábitos de Vida & Consumo
-                </label>
-                <textarea name="habits" rows="3" placeholder="Consumo de álcool, tabagismo, cafeína, mastigação rápida, beliscos..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['habits'] ?? '') ?></textarea>
-              </div>
-            </div>
+            </fieldset>
 
             <!-- 6. Histórico Clínico & Hidratação -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
-              <div class="form-group">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                  8. Histórico Clínico, Patologias & Medicamentos
-                </label>
-                <textarea name="clinical_history" rows="2" placeholder="Hipertensão, DM2, dislipidemia, cirurgias prévias, histórico familiar, medicamentos atuais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['clinical_history'] ?? '') ?></textarea>
+            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Histórico Clínico & Meta Hídrica Prescrita</legend>
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label for="anamnesis_clinical_history" id="label_anamnesis_clinical_history" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                    8. Histórico Clínico, Patologias & Medicamentos
+                  </label>
+                  <textarea id="anamnesis_clinical_history" name="clinical_history" aria-labelledby="label_anamnesis_clinical_history" rows="2" placeholder="Hipertensão, DM2, dislipidemia, cirurgias prévias, histórico familiar, medicamentos atuais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['clinical_history'] ?? '') ?></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="anamnesis_water_intake_ml" id="label_anamnesis_water_intake_ml" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+                    9. Meta Hídrica (ml/dia)
+                  </label>
+                  <input type="number" step="50" min="0" max="10000" id="anamnesis_water_intake_ml" name="water_intake_ml" aria-labelledby="label_anamnesis_water_intake_ml" aria-describedby="anamnesis_water_help" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <span id="anamnesis_water_help" style="font-size: 0.75rem; color: var(--neutral-gray-500); display: block; margin-top: 4px;">Meta prescrita em ml exibida na Home do paciente.</span>
+                </div>
               </div>
-              <div class="form-group">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                  9. Meta Hídrica (ml/dia)
-                </label>
-                <input type="number" step="50" min="0" max="10000" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-              </div>
-            </div>
+            </fieldset>
 
             <!-- 7. Anotações Adicionais -->
             <div class="form-group" style="margin-bottom: 24px;">
-              <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
+              <label for="anamnesis_notes" id="label_anamnesis_notes" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 10. Notas & Conduta Inicial do Nutricionista
               </label>
-              <textarea name="notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
+              <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
             </div>
 
             <!-- Botões de Ação com Suporte a Rascunho Parcial (NI2-61) -->
@@ -1706,22 +1718,22 @@ class DashboardController
                 <h4 style="margin: 0 0 8px 0; font-size: 0.875rem; color: var(--brand-navy-900);">Comparar Versões Lado a Lado (Diff Clínico)</h4>
                 <form method="GET" action="/pacientes/<?= $patient['id'] ?>/anamnese" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                   <div>
-                    <label style="font-size: 0.8rem; color: #64748B;">Versão A:</label>
-                    <select name="v1" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                    <label for="compare_version_1" id="label_compare_version_1" style="font-size: 0.8rem; color: #64748B; display: block; margin-bottom: 2px;">Versão A (base):</label>
+                    <select id="compare_version_1" name="v1" aria-labelledby="label_compare_version_1" aria-label="Versão A para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                       <?php foreach ($history as $h): ?>
                         <option value="<?= $h['version'] ?>">v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
                       <?php endforeach; ?>
                     </select>
                   </div>
                   <div>
-                    <label style="font-size: 0.8rem; color: #64748B;">Versão B:</label>
-                    <select name="v2" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                    <label for="compare_version_2" id="label_compare_version_2" style="font-size: 0.8rem; color: #64748B; display: block; margin-bottom: 2px;">Versão B (comparada):</label>
+                    <select id="compare_version_2" name="v2" aria-labelledby="label_compare_version_2" aria-label="Versão B para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                       <?php foreach (array_reverse($history) as $h): ?>
                         <option value="<?= $h['version'] ?>" <?= $h['version'] === $history[0]['version'] ? 'selected' : '' ?>>v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
                       <?php endforeach; ?>
                     </select>
                   </div>
-                  <button type="submit" class="btn btn-secondary" style="margin-top: 16px; font-size: 0.85rem;">
+                  <button type="submit" class="btn btn-secondary" style="margin-top: 16px; font-size: 0.85rem;" aria-label="Comparar versões selecionadas">
                     Comparar Versões Selecionadas ➔
                   </button>
                 </form>
