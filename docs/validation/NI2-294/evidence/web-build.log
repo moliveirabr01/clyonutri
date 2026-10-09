@@ -1,5 +1,5 @@
 Starting Metro Bundler
-Web Bundled 1160ms node_modules/expo/AppEntry.js (185 modules)
+Web Bundled 83ms node_modules/expo/AppEntry.js (1 module)
 
 Exporting 1 bundle for web:
 _expo/static/js/web/AppEntry-1418f719aa8648ee2365110998b40ee8.js (364 kB)
