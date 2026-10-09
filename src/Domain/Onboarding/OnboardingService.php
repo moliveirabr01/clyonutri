@@ -28,6 +28,11 @@ class OnboardingService
      */
     public function getOrCreateProgress(int $userId, int $clinicId): array
     {
+        $ctxUser = TenantContext::getUserId();
+        $ctxClinic = TenantContext::hasClinic() ? TenantContext::getClinicId() : (int)($_SESSION['clinic_id'] ?? 0);
+        if (($ctxUser !== null && $userId !== $ctxUser) || ($ctxClinic > 0 && $clinicId !== $ctxClinic)) {
+            throw new TenantSecurityException('Progresso de configuração fora do contexto autorizado.');
+        }
         if ($userId <= 0 || $clinicId <= 0) {
             throw new InvalidArgumentException("User ID e Clinic ID devem ser estritamente positivos.");
         }
@@ -210,7 +215,7 @@ class OnboardingService
                     if (!empty($data['birth_date'])) {
                         $rawBirthDate = trim((string)$data['birth_date']);
                         if ($rawBirthDate !== '') {
-                            $parsedDate = \DateTime::createFromFormat('Y-m-d', $rawBirthDate);
+                            $parsedDate = \DateTime::createFromFormat('!Y-m-d', $rawBirthDate);
                             $today = new \DateTime('today');
                             if (!$parsedDate || $parsedDate->format('Y-m-d') !== $rawBirthDate || $parsedDate > $today) {
                                 throw new InvalidArgumentException("A data de nascimento informada é inválida ou está no futuro.");
@@ -252,7 +257,8 @@ class OnboardingService
                             'birth_date' => $birthDate,
                             'gender' => $gender,
                             'notes' => !empty($data['notes']) ? trim((string)$data['notes']) : 'Primeiro paciente cadastrado no onboarding de ativação.',
-                            'lgpd_consent' => 1,
+                            'consent_choice' => $data['consent_choice'] ?? 'not_collected',
+                            'consent_term_id' => $data['consent_term_id'] ?? null,
                         ]);
                         $patientId = (int)$patientRecord['id'];
 

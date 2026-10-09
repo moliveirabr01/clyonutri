@@ -40,6 +40,15 @@ class TenantContext
         return self::$currentClinicId !== null;
     }
 
+    public static function setUserId(int $userId): void
+    {
+        if (self::$currentUser === null) {
+            self::$currentUser = ['id' => $userId];
+        } else {
+            self::$currentUser['id'] = $userId;
+        }
+    }
+
     public static function getUser(): ?array
     {
         return self::$currentUser;
@@ -47,7 +56,13 @@ class TenantContext
 
     public static function getUserId(): ?int
     {
-        return isset(self::$currentUser['id']) ? (int)self::$currentUser['id'] : null;
+        if (isset(self::$currentUser['id'])) {
+            return (int)self::$currentUser['id'];
+        }
+        if (!empty($_SESSION['user_id'])) {
+            return (int)$_SESSION['user_id'];
+        }
+        return null;
     }
 
     public static function clear(): void

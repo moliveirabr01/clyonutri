@@ -102,6 +102,8 @@ $criticalPhpFiles = [
     'src/Application/Controllers/OnboardingController.php',
     'src/Domain/Finance/FinanceService.php',
     'src/Core/I18n/LabelMap.php',
+    'src/Core/Auth/PasswordResetService.php',
+    'src/Application/Controllers/AuthController.php',
     'src/Core/Database/DemoSeeder.php',
     'bin/seed.php',
 ];
@@ -316,6 +318,13 @@ if (str_contains($px13Output, 'TODOS OS 8 GATES DE HOMOLOGAÇÃO PX-13 (NI2-306)
     recordCheck('E2E_JOURNEYS', 'Linguagem Clínica & Higienização de Enums e Jargões (NI2-306 / PX-13)', 'PASS', 'LabelMap centralizado, enums e códigos NI2 eliminados de telas operacionais, hashes criptográficos acessíveis sob demanda em details');
 } else {
     recordCheck('E2E_JOURNEYS', 'Linguagem Clínica & Higienização de Enums e Jargões (NI2-306 / PX-13)', 'FAIL', 'Falha no teste PX-13: ' . substr($px13Output, 0, 200));
+}
+
+$px29Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_29_password_reset_and_access_recovery_test.php') . " 2>&1");
+if (str_contains($px29Output, 'TODOS OS 9 GATES DE HOMOLOGAÇÃO PX-29 (NI2-322) FORAM APROVADOS (PASS)')) {
+    recordCheck('E2E_JOURNEYS', 'Recuperação de Acesso & Redefinição de Senha Segura (NI2-322 / PX-29)', 'PASS', 'Recuperação não-enumerável, token seguro 64 hex com janela de 30m, rate limiting 5req/15m, single-use, revogação de sessões antigas e eliminação do mailto');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Recuperação de Acesso & Redefinição de Senha Segura (NI2-322 / PX-29)', 'FAIL', 'Falha no teste PX-29: ' . substr($px29Output, 0, 200));
 }
 
 // Browser Físico / Playwright

@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace ClyoNutri\Application\Controllers;
 
 use ClyoNutri\Core\Auth\AuthService;
+use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Security\Csrf;
 
 class AuthController
 {
     private AuthService $authService;
+    private PasswordResetService $resetService;
 
-    public function __construct()
+    public function __construct(?AuthService $authService = null, ?PasswordResetService $resetService = null)
     {
-        $this->authService = new AuthService();
+        $this->authService = $authService ?? new AuthService();
+        $this->resetService = $resetService ?? new PasswordResetService();
     }
 
     public function showLogin(): void
@@ -27,8 +30,9 @@ class AuthController
 
         $csrfToken = Csrf::token();
         $error = $_SESSION['flash_error'] ?? null;
+        $success = $_SESSION['flash_success'] ?? null;
         $oldEmail = $_SESSION['old_email'] ?? null;
-        unset($_SESSION['flash_error'], $_SESSION['old_email']);
+        unset($_SESSION['flash_error'], $_SESSION['flash_success'], $_SESSION['old_email']);
 
         require __DIR__ . '/../../../views/auth/login.php';
     }
@@ -152,6 +156,143 @@ class AuthController
             $_SESSION['flash_error'] = $e->getMessage();
             $_SESSION['old_input'] = $_POST;
             header('Location: /cadastro');
+            exit;
+        }
+    }
+
+    /**
+     * Exibe a tela de solicitação de recuperação de senha (PX-29 / NI2-322).
+     */
+    public function showForgotPassword(): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            header('Location: /dashboard');
+            exit;
+        }
+
+        $csrfToken = Csrf::token();
+        $error = $_SESSION['flash_error'] ?? null;
+        $success = $_SESSION['flash_success'] ?? null;
+        $oldEmail = $_SESSION['old_email'] ?? null;
+        unset($_SESSION['flash_error'], $_SESSION['flash_success'], $_SESSION['old_email']);
+
+        require __DIR__ . '/../../../views/auth/forgot-password.php';
+    }
+
+    /**
+     * Processa a solicitação de envio do link de recuperação (não-enumerável).
+     */
+    public function sendResetLink(): void
+    {
+        $token = $_POST['_csrf_token'] ?? '';
+        if (!Csrf::validate($token)) {
+            $_SESSION['flash_error'] = 'Token de segurança expirado. Tente novamente.';
+            header('Location: /recuperar-senha');
+            exit;
+        }
+
+        $email = trim((string)($_POST['email'] ?? ''));
+        if ($email === '') {
+            $_SESSION['flash_error'] = 'Por favor, informe seu endereço de e-mail.';
+            header('Location: /recuperar-senha');
+            exit;
+        }
+
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $res = $this->resetService->requestReset($email, $ip, $ua);
+
+            $_SESSION['flash_success'] = $res['message'];
+            header('Location: /recuperar-senha');
+            exit;
+        } catch (\InvalidArgumentException $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+            $_SESSION['old_email'] = $email;
+            header('Location: /recuperar-senha');
+            exit;
+        } catch (\RuntimeException $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+            $_SESSION['old_email'] = $email;
+            header('Location: /recuperar-senha');
+            exit;
+        } catch (\Throwable $e) {
+            $_SESSION['flash_error'] = 'Ocorreu uma instabilidade ao processar a solicitação. Tente novamente.';
+            header('Location: /recuperar-senha');
+            exit;
+        }
+    }
+
+    /**
+     * Exibe o formulário para criação da nova senha com base no token.
+     */
+    public function showResetPassword(array $params = []): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            header('Location: /dashboard');
+            exit;
+        }
+
+        $token = trim((string)($params['token'] ?? $_GET['token'] ?? ''));
+        $csrfToken = Csrf::token();
+        $error = $_SESSION['flash_error'] ?? null;
+        unset($_SESSION['flash_error']);
+
+        $tokenData = $this->resetService->validateToken($token);
+        $isValidToken = ($tokenData !== null);
+
+        require __DIR__ . '/../../../views/auth/reset-password.php';
+    }
+
+    /**
+     * Redefine a senha do usuário e revoga sessões anteriores.
+     */
+    public function resetPassword(array $params = []): void
+    {
+        $tokenParam = trim((string)($params['token'] ?? $_POST['token'] ?? ''));
+        $csrf = $_POST['_csrf_token'] ?? '';
+        if (!Csrf::validate($csrf)) {
+            $_SESSION['flash_error'] = 'Token de segurança expirado. Tente novamente.';
+            header("Location: /recuperar-senha/{$tokenParam}");
+            exit;
+        }
+
+        $password = (string)($_POST['password'] ?? '');
+        $passwordConfirmation = (string)($_POST['password_confirmation'] ?? '');
+
+        if ($password === '' || $passwordConfirmation === '') {
+            $_SESSION['flash_error'] = 'Preencha a nova senha e a confirmação.';
+            header("Location: /recuperar-senha/{$tokenParam}");
+            exit;
+        }
+
+        if ($password !== $passwordConfirmation) {
+            $_SESSION['flash_error'] = 'A confirmação de senha não coincide com a nova senha.';
+            header("Location: /recuperar-senha/{$tokenParam}");
+            exit;
+        }
+
+        if (strlen($password) < 8) {
+            $_SESSION['flash_error'] = 'A senha deve possuir pelo menos 8 dígitos.';
+            header("Location: /recuperar-senha/{$tokenParam}");
+            exit;
+        }
+
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua);
+
+            $_SESSION['flash_success'] = 'Sua senha foi redefinida com sucesso! Você já pode entrar com a nova senha.';
+            header('Location: /login');
+            exit;
+        } catch (\InvalidArgumentException $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+            header("Location: /recuperar-senha/{$tokenParam}");
+            exit;
+        } catch (\Throwable $e) {
+            $_SESSION['flash_error'] = 'Falha ao redefinir a credencial. Solicite um novo link de recuperação.';
+            header('Location: /recuperar-senha');
             exit;
         }
     }

@@ -489,14 +489,15 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 
 ### PX-29 — Recuperação de acesso depende de e-mail ao suporte
 
-- **Rota/módulo:** /login.
+- **Rota/módulo:** /login, /recuperar-senha e /recuperar-senha/{token}.
 - **Perfil impactado:** Nutricionista.
 - **Descrição:** Recuperação de acesso depende de e-mail ao suporte.
 - **Evidência verificável:** [views/auth/login.php:100](/Users/moliveira/Nutri_II/views/auth/login.php:100); login inspecionado oferece Ajuda com acesso por mailto; nenhuma rota de recuperação no inventário runtime.
-- **Estado da evidência:** Confirmado.
-- **Causa provável:** password_resets existe como tabela sem jornada HTTP operacional identificada.
+- **Estado da evidência:** Resolvido (NI2-322).
+- **Resolução implementada:** Implementado o serviço canônico `ClyoNutri\Core\Auth\PasswordResetService` e rotas completas de redefinição de acesso (`GET/POST /recuperar-senha` e `GET/POST /recuperar-senha/{token}`). Resposta uniforme e não-enumerável para prevenir varredura de contas; tokens criptográficos unívocos de 64 hexadecimais com validade limite de 30 minutos; rate limiting anti-abuso (5 req/15m por e-mail e 10 req/15m por IP); consumo atômico de token único (Single-Use); revogação imediata de sessões anteriores web e tokens de API; eliminação do link `mailto` na tela de login, substituído por fluxo de autosserviço com fallback para suporte. Homologado com 100% de sucesso nos 9 gates da suíte `tests/px_29_password_reset_and_access_recovery_test.php`.
+- **Causa provável:** password_resets existia como tabela sem jornada HTTP operacional identificada.
 - **Severidade de produto:** P1.
-- **Impacto na experiência:** Bloqueio de trabalho depende de atendimento humano e prazo desconhecido.
+- **Impacto na experiência:** Bloqueio de trabalho dependia de atendimento humano e prazo desconhecido.
 - **Impacto na produtividade:** o efeito operacional descrito acima é qualitativo; minutos perdidos e impacto em retenção ainda não medidos.
 - **Solução recomendada e orientação técnica:** Recuperação segura por token expirável, com mensagens não enumeráveis e retorno ao login; suporte é alternativa.
 - **Critérios de aceite:** Usuário com acesso ao canal cadastrado redefine credencial; token único/expirado não funciona; sessões antigas tratadas conforme política.

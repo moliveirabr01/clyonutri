@@ -32,12 +32,21 @@ class DashboardController
             exit;
         }
 
-        $name = trim((string)($_POST['name'] ?? ''));
-        if ($name === '') {
-            header('Location: /pacientes?error=nome_obrigatorio');
-            exit;
+        $name = is_string($_POST['name'] ?? null) ? trim($_POST['name']) : '';
+        if (!$this->canEditPlanItems(Connection::getInstance())) { http_response_code(403); echo 'Cadastro não autorizado.'; return; }
+        $submission = $_POST['_submission_id'] ?? '';
+        if (!is_string($submission) || !isset($_SESSION['patient_submissions'][$submission])) { http_response_code(422); echo 'Recarregue o formulário antes de cadastrar.'; return; }
+        if ($_SESSION['patient_submissions'][$submission] === 'completed') { header('Location: /pacientes?success=1'); return; }
+        $_SESSION['patient_form'] = array_filter(array_intersect_key($_POST, array_flip(['name','email','phone','birth_date','gender','notes'])), 'is_string');
+        try {
+        if ($name === '' || mb_strlen($name) > 150) throw new \InvalidArgumentException('Informe um nome válido.');
+        foreach (['email','phone','birth_date','gender','notes','consent_choice','consent_term_id'] as $field) if (isset($_POST[$field]) && !is_string($_POST[$field])) throw new \InvalidArgumentException('Confira os campos do cadastro.');
+        if (!empty($_POST['email']) && !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Informe um e-mail válido.');
+        if (!empty($_POST['birth_date'])) {
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $_POST['birth_date']);
+            if (!$date || $date->format('Y-m-d') !== $_POST['birth_date'] || $date > new \DateTimeImmutable('today')) throw new \InvalidArgumentException('Informe uma data de nascimento válida.');
         }
-
+        if (!empty($_POST['gender']) && !in_array($_POST['gender'], ['Feminino','Masculino','Outro','female','male','other'], true)) throw new \InvalidArgumentException('Selecione um gênero válido.');
         $repo = new PatientRepository();
         $repo->create([
             'name' => $name,
@@ -46,15 +55,28 @@ class DashboardController
             'birth_date' => !empty($_POST['birth_date']) ? $_POST['birth_date'] : null,
             'gender' => !empty($_POST['gender']) ? $_POST['gender'] : null,
             'notes' => !empty($_POST['notes']) ? trim((string)$_POST['notes']) : null,
-            'lgpd_consent' => 1,
+            'consent_choice' => $_POST['consent_choice'] ?? 'not_collected',
+            'consent_term_id' => $_POST['consent_term_id'] ?? null,
         ]);
 
+        $_SESSION['patient_submissions'][$submission] = 'completed';
+        unset($_SESSION['patient_form']);
+        } catch (\InvalidArgumentException $e) {
+            $_SESSION['patient_error'] = $e->getMessage();
+            header('Location: /pacientes?error=cadastro');
+            return;
+        } catch (\Throwable $e) {
+            $_SESSION['patient_error'] = 'Não foi possível cadastrar o paciente. Os dados foram mantidos. Confira o termo e tente novamente.';
+            header('Location: /pacientes?error=cadastro');
+            return;
+        }
         header('Location: /pacientes?success=1');
         exit;
     }
 
     public function editPatient(array $params): void
     {
+        if (!$this->canEditPlanItems(Connection::getInstance())) { http_response_code(403); echo 'Edição não autorizada.'; return; }
         $patient = (new PatientRepository())->findById((int)($params['id'] ?? 0));
         if (!$patient) {
             http_response_code(404);
@@ -679,7 +701,7 @@ class DashboardController
             <h3>Série Histórica Ponto a Ponto</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
               <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
-              <select onchange="location.href='/pacientes/<?= $patient['id'] ?>/antropometria?metric='+this.value" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
+              <select aria-label="Medida da evolução antropométrica" onchange="location.href='/pacientes/<?= $patient['id'] ?>/antropometria?metric='+this.value" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
                 <option value="weight_kg" <?= $metric === 'weight_kg' ? 'selected' : '' ?>>Peso Corporal (kg)</option>
                 <option value="bmi" <?= $metric === 'bmi' ? 'selected' : '' ?>>IMC (kg/m²)</option>
                 <option value="waist_cm" <?= $metric === 'waist_cm' ? 'selected' : '' ?>>Cintura (cm)</option>
@@ -997,6 +1019,7 @@ class DashboardController
 
     public function saveAnthropometry(array $params): void
     {
+        if (!$this->canEditPlanItems(Connection::getInstance())) { http_response_code(403); echo 'Avaliação não autorizada.'; return; }
         $token = $_POST['_csrf_token'] ?? '';
         if (!Csrf::validate($token)) {
             $patientId = (int)($params['id'] ?? $_POST['patient_id'] ?? 0);
@@ -1010,19 +1033,22 @@ class DashboardController
             exit;
         }
 
+        if (!(new PatientRepository())->findById($patientId)) { http_response_code(404); echo 'Paciente não encontrado.'; return; }
+        \ClyoNutri\Domain\Clinical\FormRecovery::remember($patientId,'antropometria',$_POST);
         $profId = $this->getActiveProfessionalId();
         $userId = TenantContext::getUserId();
         $service = new AnthropometryService();
 
         try {
             $service->recordAssessment($patientId, $profId, $_POST, $userId);
+            \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'antropometria');
             header("Location: /pacientes/{$patientId}/antropometria?success=avaliacao_registrada");
             exit;
         } catch (InvalidAnthropometricDataException $e) {
             header("Location: /pacientes/{$patientId}/antropometria?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode($e->getMessage()));
+            header("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
             exit;
         }
     }
@@ -1099,6 +1125,9 @@ class DashboardController
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
 
+        $auditAccess = Connection::getInstance()->prepare("SELECT 1 FROM clinic_members WHERE clinic_id=? AND user_id=? AND status='active'");
+        $auditAccess->execute([TenantContext::getClinicId(), TenantContext::getUserId()]);
+        $canSeeAudit = (bool)$auditAccess->fetchColumn();
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
@@ -1149,7 +1178,7 @@ class DashboardController
               <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
                 <?= (int)$integrity['total_records'] ?> versões registradas. As versões anteriores são preservadas.
               </div>
-              <?php if (!empty($integrity['latest_hash'])): ?>
+              <?php if ($canSeeAudit && !empty($integrity['latest_hash'])): ?>
                 <details style="font-size: 0.75rem; color: #64748B; margin-top: 6px;">
                   <summary style="cursor: pointer; color: var(--brand-copper-600); font-weight: 500;">Ver detalhes técnicos de integridade digital</summary>
                   <div style="margin-top: 4px; font-family: monospace; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; word-break: break-all;">
@@ -1262,7 +1291,7 @@ class DashboardController
                   </div>
 
                   <!-- Autenticidade e Trilha Criptográfica Sob Demanda (PX-13) -->
-                  <details style="margin-top: 6px; font-size: 0.75rem; color: #64748B;">
+                  <?php if ($canSeeAudit): ?><details style="margin-top: 6px; font-size: 0.75rem; color: #64748B;">
                     <summary style="cursor: pointer; color: var(--brand-teal-700); font-weight: 500; font-size: 0.72rem; outline: none; user-select: none;">
                       Verificar autenticidade digital (cadeia criptográfica)
                     </summary>
@@ -1270,7 +1299,7 @@ class DashboardController
                       <div><strong>Assinatura digital (SHA-256):</strong> <?= htmlspecialchars($rec['record_hash'] ?? '') ?></div>
                       <div><strong>Elo anterior:</strong> <?= !empty($rec['previous_hash']) ? htmlspecialchars($rec['previous_hash']) : 'Registro inicial' ?></div>
                     </div>
-                  </details>
+                  </details><?php endif; ?>
                 </div>
               <?php endforeach; ?>
             </div>
@@ -1630,7 +1659,7 @@ class DashboardController
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
-                  <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #DC2626;">
+                  <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #B91C1C;">
                     ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
                   </label>
                   <label class="form-label" for="allergy-assessment">Avaliação de alergias</label>
@@ -1643,7 +1672,7 @@ class DashboardController
                   <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
                 </div>
                 <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
-                  <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #D97706;">
+                  <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #92400E;">
                     ⚠️ 3. Restrições Alimentares & Intolerâncias
                   </label>
                   <textarea id="anamnesis_restrictions" name="restrictions" aria-labelledby="label_anamnesis_restrictions" aria-describedby="anamnesis_restrictions_help" rows="3" placeholder="Ex: Intolerância à lactose, doença celíaca / glúten, dieta vegetariana estrita..." style="width: 100%; padding: 8px; border: 1px solid #FCD34D; border-radius: 6px;"><?= htmlspecialchars($latest['restrictions'] ?? '') ?></textarea>
@@ -1869,24 +1898,27 @@ class DashboardController
             return;
         }
 
+        if (!(new PatientRepository())->findById($patientId)) { $this->anamnesisError(404,'Paciente não encontrado.'); return; }
+        \ClyoNutri\Domain\Clinical\FormRecovery::remember($patientId,'anamnese',$_POST);
         $isDraft = ($_POST['save_mode'] ?? '') === 'draft';
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
 
         try {
             $anamnesisService->saveAnamnesis($patientId, $profId, $_POST, $isDraft);
+            \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'anamnese');
             header("Location: /pacientes/{$patientId}/anamnese?success=anamnese_salva");
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
             return;
         } catch (\PDOException $e) {
-            $this->anamnesisError(503, 'Não foi possível salvar a nova revisão. Tente novamente.');
+            $this->anamnesisError(503, 'Não foi possível salvar a nova revisão. O preenchimento foi mantido nesta sessão por uma hora. Volte à coleta atual e tente novamente.');
             return;
         } catch (\InvalidArgumentException $e) {
             header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/anamnese?error=falha&msg=" . urlencode($e->getMessage()));
+            header("Location: /pacientes/{$patientId}/anamnese?error=falha&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
             exit;
         }
     }
@@ -2771,8 +2803,8 @@ class DashboardController
         }
 
 
-        $fStmt = $db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 250");
-        $fStmt->execute();
+        $fStmt = $db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods WHERE clinic_id IS NULL OR clinic_id = :catalog_clinic ORDER BY name ASC LIMIT 250");
+        $fStmt->execute(['catalog_clinic' => TenantContext::getClinicId()]);
         $foodsCatalog = $fStmt->fetchAll();
 
         $title = "Plano Alimentar: " . htmlspecialchars($plan['title']);
@@ -2793,7 +2825,7 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <a href="/planos" style="text-decoration: none; color: #64748b; font-size: 0.9rem;">← Voltar para lista</a>
+              <a href="/planos" style="text-decoration: none; color: #475569; font-size: 0.9rem;">← Voltar para lista</a>
               <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#def7ec' ?>; color: <?= $isDraft ? '#854d0e' : '#03543f' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
                 <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (Imutável v' . (int)$plan['version'] . ')' ?>
               </span>
@@ -2858,7 +2890,7 @@ class DashboardController
               <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['restrictions'] ?? '[Nenhuma relatada]') ?></span>
             </div>
             <div>
-              <span style="color: #0284C7; font-weight: 600; display: block; font-size: 0.75rem;">OBJETIVOS:</span>
+              <span style="color: #0369A1; font-weight: 600; display: block; font-size: 0.75rem;">OBJETIVOS:</span>
               <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['objectives'] ?? '[Não informado]') ?></span>
             </div>
           </div>
@@ -2950,7 +2982,7 @@ class DashboardController
                     <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>')" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
                     <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
                       <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                      <button type="submit" class="btn btn-sm" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
+                      <button type="submit" class="btn btn-sm" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
                     </form>
                   <?php endif; ?>
                 </div>
@@ -2992,7 +3024,7 @@ class DashboardController
                               </button>
                               <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                <button type="submit" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
+                                <button type="submit" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
                               </form>
                             <?php endif; ?>
                           </td>
@@ -3093,12 +3125,20 @@ class DashboardController
               <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento (Base TACO / Catálogo) *</label>
-                <select name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <div data-food-picker>
+                <label class="form-label" for="item-food-search">Buscar por nome (com ou sem acentos)</label>
+                <input class="form-control" id="item-food-search" data-food-query type="search" maxlength="80" placeholder="Digite o nome do alimento">
+                <p role="status" aria-live="polite">Digite para pesquisar no catálogo.</p>
+                <label class="form-label" for="item-food-select">Resultados da busca</label>
+                <select id="item-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o alimento...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
                     <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?> (<?= number_format((float)$fc['energy_kcal'], 0) ?> kcal/100g)</option>
                   <?php endforeach; ?>
                 </select>
+                <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>
+                <button type="button" class="btn btn-secondary" data-food-retry hidden>Tentar busca novamente</button>
+                </div>
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
@@ -3140,12 +3180,20 @@ class DashboardController
               <input type="hidden" name="item_id" id="add-sub-item-id" value="">
               <div style="margin-bottom: 16px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento Substituto *</label>
-                <select name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <div data-food-picker>
+                <label class="form-label" for="sub-food-search">Buscar por nome (com ou sem acentos)</label>
+                <input class="form-control" id="sub-food-search" data-food-query type="search" maxlength="80" placeholder="Digite o nome do alimento">
+                <p role="status" aria-live="polite">Digite para pesquisar no catálogo.</p>
+                <label class="form-label" for="sub-food-select">Resultados da busca</label>
+                <select id="sub-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o alimento alternativo...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
                     <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?></option>
                   <?php endforeach; ?>
                 </select>
+                <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>
+                <button type="button" class="btn btn-secondary" data-food-retry hidden>Tentar busca novamente</button>
+                </div>
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
@@ -3218,6 +3266,7 @@ class DashboardController
           </div>
         </div>
 
+        <script src="/assets/js/food-picker.js" defer></script>
         <script>
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
@@ -3926,28 +3975,7 @@ class DashboardController
 
     public function settings(): void
     {
-        $title = 'Configurações do Consultório';
-        $activeNav = 'configuracoes';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
-        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
-
-        ob_start();
-        ?>
-        <div style="margin-bottom: var(--space-6);">
-          <h1>Configurações da Clínica</h1>
-          <p style="color: var(--neutral-gray-500);">Preferências da clínica, perfil do profissional e governança LGPD.</p>
-        </div>
-
-        <div class="card" style="max-width: 600px;">
-          <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Perfil do Consultório</h3>
-          <p><strong>Nome da Clínica:</strong> <?= htmlspecialchars($clinicName) ?></p>
-          <p><strong>Responsável Técnico:</strong> <?= htmlspecialchars($userName) ?></p>
-          <p><strong>Padrão de Cores:</strong> Design System Premium (Navy #0F2747 / Copper #E67A3F)</p>
-          <p><strong>Governança de Dados:</strong> LGPD Ativa com Auditoria Criptográfica</p>
-        </div>
-        <?php
-        $content = ob_get_clean();
-        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+        (new SettingsController())->show();
     }
     private function scheduleError(int $status, string $message, string $activeNav): void
     {
@@ -4202,6 +4230,13 @@ class DashboardController
         $patientRepo = new PatientRepository();
         $patients = $patientRepo->listAll();
 
+        $submissionId = bin2hex(random_bytes(16));
+        $_SESSION['patient_submissions'] = array_slice($_SESSION['patient_submissions'] ?? [], -20, null, true);
+        $_SESSION['patient_submissions'][$submissionId] = 'pending';
+        $term = Connection::getInstance()->query("SELECT * FROM consent_terms WHERE purpose_code = 'clinical_care' AND is_active = 1 ORDER BY id DESC LIMIT 1")->fetch();
+        $patientForm = $_SESSION['patient_form'] ?? [];
+        $patientError = $_SESSION['patient_error'] ?? null;
+        unset($_SESSION['patient_error']);
         $title = 'Pacientes';
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
@@ -4215,6 +4250,7 @@ class DashboardController
           </div>
         <?php endif; ?>
 
+        <?php if ($patientError): ?><div role="alert" class="card"><?= htmlspecialchars($patientError) ?></div><?php endif; ?>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1>Gestão de Pacientes</h1>
@@ -4247,7 +4283,7 @@ class DashboardController
                       <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($p['name']) ?></td>
                       <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
-                      <td><span class="badge badge-success"><?= htmlspecialchars($p['status']) ?></span></td>
+                      <td><span class="badge badge-success"><?= $p['status'] === 'active' ? 'Ativo' : 'Inativo' ?></span></td>
                       <td>
                         <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver Perfil 360</a>
                         <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
@@ -4271,6 +4307,7 @@ class DashboardController
             </div>
             <form method="POST" action="/pacientes">
               <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+              <input type="hidden" name="_submission_id" value="<?= $submissionId ?>">
               <div class="modal-body">
                 <div class="form-group">
                   <label class="form-label" for="p_name">Nome completo *</label>
@@ -4307,6 +4344,7 @@ class DashboardController
                   <label class="form-label" for="p_notes">Observações iniciais</label>
                   <textarea id="p_notes" name="notes" class="form-control" style="min-height: 70px;" placeholder="Objetivo clínico, alergias ou queixa principal..."></textarea>
                 </div>
+                <?php require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closePatientModal()">Cancelar</button>
@@ -4327,6 +4365,9 @@ class DashboardController
           document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') closePatientModal();
           });
+          const patientForm = <?= json_encode($patientForm, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+          Object.entries(patientForm).forEach(([key,value]) => { const input=document.querySelector('#patientModal [name="'+key+'"]'); if(input)input.value=value; });
+          <?php if ($patientError): ?>openPatientModal();<?php endif; ?>
         </script>
         <?php
         $content = ob_get_clean();

@@ -19,9 +19,14 @@ class PatientRepository
 
     public function create(array $data): array
     {
+        $choice = $data['consent_choice'] ?? 'not_collected';
+        if (!in_array($choice, ['not_collected','granted','declined'], true)) throw new \InvalidArgumentException('Selecione uma situação válida de consentimento.');
         $clinicId = TenantContext::getClinicId();
         $uuid = bin2hex(random_bytes(16));
 
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) $this->db->beginTransaction();
+        try {
         $stmt = $this->db->prepare("
             INSERT INTO patients (clinic_id, uuid, name, email, phone, birth_date, gender, status, notes)
             VALUES (:clinic_id, :uuid, :name, :email, :phone, :birth_date, :gender, :status, :notes)
@@ -41,16 +46,43 @@ class PatientRepository
 
         $id = (int)$this->db->lastInsertId();
 
-        // Registrar consentimento LGPD inicial se fornecido
-        if (!empty($data['lgpd_consent'])) {
-            $cStmt = $this->db->prepare("
-                INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted)
-                VALUES (:clinic_id, :patient_id, 'dados_clinicos_nutricao', 1)
-            ");
-            $cStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $id]);
+        // A legacy flag cannot establish explicit consent.
+        if (($data['consent_choice'] ?? '') === 'granted') {
+            (new \ClyoNutri\Domain\Privacy\ConsentManagementService($this->db))->recordConsent(
+                $id, 'clinical_care', (int)($data['consent_term_id'] ?? 0), 'professional_attestation');
+        } elseif (($data['consent_choice'] ?? '') === 'declined') {
+            $term = $this->db->prepare("SELECT id FROM consent_terms WHERE id = ? AND purpose_code = 'clinical_care' AND is_active = 1");
+            $term->execute([(int)($data['consent_term_id'] ?? 0)]);
+            if (!$term->fetchColumn()) throw new \InvalidArgumentException('O termo foi alterado. Confira a versão vigente.');
+            $this->db->prepare("INSERT INTO patient_consents(clinic_id, patient_id, consent_type, granted, term_id, source_channel) VALUES(?,?,'clinical_care',0,?,'professional_attestation')")
+                ->execute([$clinicId, $id, (int)$data['consent_term_id']]);
+            $this->db->prepare("INSERT INTO audit_logs(clinic_id,user_id,action,resource,resource_id,details) VALUES(?,?,'CONSENT_DECLINED','patient_consents',?,?)")
+                ->execute([$clinicId, TenantContext::getUserId(), (string)$this->db->lastInsertId(), json_encode(['term_id'=>(int)$data['consent_term_id'], 'channel'=>'professional_attestation'])]);
         }
 
-        return $this->findById($id);
+        $patient = $this->findById($id);
+        if ($ownsTransaction) $this->db->commit();
+        return $patient;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    public function update(int $id, array $data): bool
+    {
+        if (!$this->findById($id)) {
+            return false;
+        }
+        $stmt = $this->db->prepare("UPDATE patients SET name = :name, email = :email,
+            phone = :phone, birth_date = :birth_date, gender = :gender, notes = :notes
+            WHERE id = :id AND clinic_id = :clinic_id");
+        $stmt->execute([
+            'id' => $id, 'clinic_id' => TenantContext::getClinicId(),
+            'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'],
+            'birth_date' => $data['birth_date'], 'gender' => $data['gender'], 'notes' => $data['notes'],
+        ]);
+        return true;
     }
 
     public function findById(int $id): ?array

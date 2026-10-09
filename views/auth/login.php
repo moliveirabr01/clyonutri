@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar — ClyoNutri</title>
@@ -15,7 +16,7 @@
       align-items: center;
       justify-content: center;
       padding: var(--space-6);
-      background: linear-gradient(135deg, #FAF7F2 0%, #F4F5F6 100%);
+      background: linear-gradient(135deg, #F8F4ED 0%, #F8F4ED 100%);
     }
     .auth-card {
       width: 100%;
@@ -54,6 +55,15 @@
       margin-bottom: var(--space-5);
       border: 1px solid rgba(180, 35, 24, 0.2);
     }
+    .alert-success {
+      background-color: var(--semantic-success-light, #E8F5E9);
+      color: var(--semantic-success, #18794E);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-input);
+      font-size: 0.9rem;
+      margin-bottom: var(--space-5);
+      border: 1px solid rgba(24, 121, 78, 0.2);
+    }
     .auth-footer {
       margin-top: var(--space-6);
       text-align: center;
@@ -74,8 +84,7 @@
   <div class="auth-wrapper">
     <div class="auth-card">
       <div class="auth-logo">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-500);"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V18a1 1 0 0 1-2 0v-1.07A6 6 0 0 1 7 11V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v5a6 6 0 0 1-4 5.93zM9 7v4a3 3 0 0 0 6 0V7z"/></svg>
-        <span>Clyo</span>Nutri
+        <img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64" style="display: block; width: 100%; max-width: 260px; height: auto;">
       </div>
 
       <p class="auth-subtitle">Acesse o sistema operacional do seu consultório</p>
@@ -83,6 +92,12 @@
       <?php if (!empty($error)): ?>
         <div class="alert-error">
           ⚠️ <?= htmlspecialchars($error) ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if (!empty($success)): ?>
+        <div class="alert-success">
+          ✓ <?= htmlspecialchars($success) ?>
         </div>
       <?php endif; ?>
 
@@ -97,7 +112,7 @@
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
             <label class="form-label" for="password" style="margin-bottom: 0;">Senha de acesso</label>
-            <a href="#" style="font-size: 0.8rem; color: var(--neutral-gray-500); text-decoration: none;">Esqueceu?</a>
+            <a href="/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600); text-decoration: none; font-weight: 500;">Esqueci minha senha</a>
           </div>
           <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required>
         </div>
@@ -109,7 +124,10 @@
       </form>
 
       <div class="auth-footer" style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: var(--border-default);">
-        Ainda não tem conta? <a href="/cadastro">Cadastre-se</a>
+        <div>Ainda não tem conta? <a href="/cadastro">Cadastre-se</a></div>
+        <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-400);">
+          Precisa de suporte? <a href="mailto:suporte@clyonutri.com.br" style="color: var(--neutral-gray-500); text-decoration: underline;">suporte@clyonutri.com.br</a>
+        </div>
       </div>
     </div>
   </div>

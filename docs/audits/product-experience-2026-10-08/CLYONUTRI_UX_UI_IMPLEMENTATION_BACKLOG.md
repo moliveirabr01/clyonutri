@@ -727,7 +727,7 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 ## PX-29 — Recuperação de acesso depende de e-mail ao suporte
 
-**Project:** NI2 · **Issue type:** Story · **Prioridade:** P1 · **Labels sugeridas:** product-experience, audit-2026-10, px-29
+**Project:** NI2 · **Issue type:** Story · **Prioridade:** P1 · **Labels sugeridas:** product-experience, audit-2026-10, px-29 · **Status da implementação:** Resolvido (NI2-322)
 
 **Contexto e problema:** Bloqueio de trabalho depende de atendimento humano e prazo desconhecido. password_resets existe como tabela sem jornada HTTP operacional identificada.
 
@@ -736,6 +736,14 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 **Evidência:** [views/auth/login.php:100](/Users/moliveira/Nutri_II/views/auth/login.php:100); login inspecionado oferece Ajuda com acesso por mailto; nenhuma rota de recuperação no inventário runtime.
 
 **Solução / orientação técnica:** Recuperação segura por token expirável, com mensagens não enumeráveis e retorno ao login; suporte é alternativa.
+
+**Resumo da resolução (NI2-322):**
+- Implementado `PasswordResetService` (`src/Core/Auth/PasswordResetService.php`) com geração de token criptográfico (64 hex chars), expiração estrita de 30 minutos, invalidação de tokens anteriores em novas solicitações e respostas não enumeráveis para impedir enumeração de usuários.
+- Rate limiting anti-abuso implementado por e-mail (máx. 5 requisições/15min) e por IP (máx. 10 requisições/15min).
+- Consumo estrito de uso único com exclusão física imediata do registro em `password_resets` e revogação em cascata de sessões ativas (`sessions`) e tokens de API (`personal_access_tokens`).
+- Rotas HTTP registradas em `routes/web.php` e `public/index.php`: `GET/POST /recuperar-senha` e `GET/POST /recuperar-senha/{token}`.
+- Telas responsivas integradas com paleta e identidade visual clínica: `views/auth/forgot-password.php` e `views/auth/reset-password.php`. Link "Esqueci minha senha" integrado na tela de login (`views/auth/login.php`).
+- Bateria de testes E2E com 9 gates de homologação em `tests/px_29_password_reset_and_access_recovery_test.php` aprovada com 100% PASS. Integrado na suíte do Quality Gate (`bin/verify_quality_gate.php`).
 
 **Critérios de aceite verificáveis:**
 
@@ -748,5 +756,5 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Dependências:** Serviço de e-mail homologado e política de credenciais.
 
-**Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
+**Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira. (Atendido: `tests/px_29_password_reset_and_access_recovery_test.php` - 9 gates PASS; Quality Gate matriz 44 PASS / 1 BLOCKED / 1 NOT TESTED / 0 FAIL).
 

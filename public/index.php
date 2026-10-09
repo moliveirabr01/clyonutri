@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
+\ClyoNutri\Core\Http\ApiErrorBoundary::register();
 
 use ClyoNutri\Application\Controllers\AuthController;
 use ClyoNutri\Application\Controllers\DashboardController;
@@ -53,12 +54,16 @@ $chatCtrl = new \ClyoNutri\Application\Controllers\ChatController($db);
 $recipeCtrl = new \ClyoNutri\Application\Controllers\RecipeController($db);
 $onboardingCtrl = new \ClyoNutri\Application\Controllers\OnboardingController($db);
 
-// 1. Rotas de Autenticação
+// 1. Rotas de Autenticação & Recuperação de Acesso (PX-29 / NI2-322)
 $router->get('/login', [$authCtrl, 'showLogin']);
 $router->post('/login', [$authCtrl, 'login']);
 $router->get('/cadastro', [$authCtrl, 'showRegister']);
 $router->post('/cadastro', [$authCtrl, 'register']);
 $router->get('/logout', [$authCtrl, 'logout']);
+$router->get('/recuperar-senha', [$authCtrl, 'showForgotPassword']);
+$router->post('/recuperar-senha', [$authCtrl, 'sendResetLink']);
+$router->get('/recuperar-senha/{token}', [$authCtrl, 'showResetPassword']);
+$router->post('/recuperar-senha/{token}', [$authCtrl, 'resetPassword']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
 $router->get('/up', function () {
@@ -131,6 +136,8 @@ $router->get('/api/v1/onboarding/status', $requireAuth([$onboardingCtrl, 'apiSta
 $router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
 $router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));
 $router->post('/pacientes', $requireAuth([$dashCtrl, 'savePatient']));
+$router->get('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
+$router->post('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
 $router->get('/pacientes/{id}', $requireAuth([$dashCtrl, 'profile360']));
 $router->get('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'patientMedicalRecord']));
 $router->post('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'savePatientMedicalRecord']));
@@ -143,6 +150,7 @@ $router->get('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'patientA
 $router->post('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'saveAnthropometry']));
 $router->post('/pacientes/{id}/antropometria/{evalId}/compartilhar', $requireAuth([$dashCtrl, 'shareAnthropometry']));
 $router->get('/pacientes/{id}/antropometria/comparar', $requireAuth([$dashCtrl, 'compareAnthropometry']));
+$router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'search']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
 $router->post('/agenda', $requireAuth([$dashCtrl, 'saveAppointment']));
@@ -170,6 +178,7 @@ $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
 $router->post('/planos/{id}/refeicoes', $requireAuth([$dashCtrl, 'addMealToPlan']));
 $router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl, 'deleteMealFromPlan']));
 $router->post('/planos/{id}/itens', $requireAuth([$dashCtrl, 'addItemToPlanMeal']));
+$router->post('/planos/{id}/itens/{itemId}/editar', $requireAuth([$dashCtrl, 'updatePlanItem']));
 $router->post('/planos/{id}/itens/{itemId}/remover', $requireAuth([$dashCtrl, 'deleteItemFromPlanMeal']));
 $router->post('/planos/{id}/substituicoes', $requireAuth([$dashCtrl, 'addSubstitutionToPlanItem']));
 $router->post('/planos/{id}/substituicoes/{subId}/remover', $requireAuth([$dashCtrl, 'deleteSubstitutionFromPlan']));
@@ -180,6 +189,7 @@ $router->post('/financeiro/recebiveis/novo', $requireAuth([$dashCtrl, 'createRec
 $router->post('/financeiro/recebiveis/{id}/pagar', $requireAuth([$dashCtrl, 'payReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/cancelar', $requireAuth([$dashCtrl, 'cancelReceivableAction']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
+$router->post('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 
 // 3.2 Central de Ajuda & Service Desk (NI2-195 a NI2-208)
 $router->get('/ajuda', $requireAuth([$helpCtrl, 'index']));
@@ -443,15 +453,10 @@ $router->get('/api/v1/patient/evolution', function() use ($authenticatePatientAp
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
 
-    try {
-        $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-        $data = $apiCtrl->portal()->getEvolutionTimeline($patientId);
-        http_response_code(200);
-        echo json_encode($data);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Falha ao consultar evolução do paciente: ' . $e->getMessage()]);
-    }
+    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
+    $data = $apiCtrl->portal()->getEvolutionTimeline($patientId);
+    http_response_code(200);
+    echo json_encode($data);
 });
 
 // Registrar Autorrelato de Métrica (Evolução)
@@ -481,7 +486,7 @@ $router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatie
         $res = $apiCtrl->portal()->recordSelfMetric($patientId, $metricType, $value, $unit, $notes);
         http_response_code(201);
         echo json_encode($res);
-    } catch (\Throwable $e) {
+    } catch (\InvalidArgumentException $e) {
         http_response_code(400);
         echo json_encode(['error' => $e->getMessage()]);
     }

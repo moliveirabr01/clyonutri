@@ -7,6 +7,7 @@ declare(strict_types=1);
  * Mapeamento das rotas canônicas da plataforma clínica e profissional.
  */
 
+use ClyoNutri\Application\Controllers\AuthController;
 use ClyoNutri\Application\Controllers\DashboardController;
 use ClyoNutri\Application\Controllers\LandingController;
 
@@ -14,9 +15,13 @@ use ClyoNutri\Application\Controllers\LandingController;
 $router->get('/', [LandingController::class, 'index'])->name('home');
 $router->get('/termos', [LandingController::class, 'terms'])->name('terms');
 $router->get('/privacidade', [LandingController::class, 'privacy'])->name('privacy');
-$router->get('/login', [DashboardController::class, 'loginForm'])->name('login');
-$router->post('/login', [DashboardController::class, 'processLogin']);
-$router->get('/logout', [DashboardController::class, 'logout'])->name('logout');
+$router->get('/login', [AuthController::class, 'showLogin'])->name('login');
+$router->post('/login', [AuthController::class, 'login']);
+$router->get('/logout', [AuthController::class, 'logout'])->name('logout');
+$router->get('/recuperar-senha', [AuthController::class, 'showForgotPassword'])->name('password.request');
+$router->post('/recuperar-senha', [AuthController::class, 'sendResetLink'])->name('password.email');
+$router->get('/recuperar-senha/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+$router->post('/recuperar-senha/{token}', [AuthController::class, 'resetPassword'])->name('password.update');
 
 // 2. Rotas Protegidas do Profissional / Clínica
 $router->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -24,6 +29,8 @@ $router->get('/dashboard', [DashboardController::class, 'index'])->name('dashboa
 // Gestão de Pacientes e Perfil 360
 $router->get('/pacientes', [DashboardController::class, 'patients'])->name('patients.index');
 $router->post('/pacientes', [DashboardController::class, 'savePatient'])->name('patients.store');
+$router->get('/pacientes/{id}/editar', [DashboardController::class, 'editPatient'])->name('patients.edit');
+$router->post('/pacientes/{id}/editar', [DashboardController::class, 'editPatient'])->name('patients.update');
 $router->get('/pacientes/{id}', [DashboardController::class, 'profile360'])->name('patients.show');
 
 // Antropometria e Avaliação Clínica (NI2-7)
