@@ -219,7 +219,8 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Nutricionista empreendedor.
 - **Descrição:** Financeiro vazio não explica como começar.
 - **Evidência verificável:** [src/Application/Controllers/DashboardController.php:3143](/Users/moliveira/Nutri_II/src/Application/Controllers/DashboardController.php:3143); estado Nenhum recebível financeiro registrado sem CTA.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-305).
+- **Resolução implementada:** Estado vazio reformulado com Design System oficial explicando a origem dos recebíveis (gerados de consultas ou lançamentos manuais), CTA operacional primário '+ Novo Lançamento Financeiro', link secundário para '/agenda', e guia didático dos 4 passos. Operações reais de cadastro, quitação com geração de recibo ('REC-...'), pagamentos parciais, cancelamento e isolamento 403 multi-tenant implementados em produção e homologados pela suíte E2E tests/px_12_financial_empty_state_and_operations_test.php.
 - **Causa provável:** Listagem sem entrada operacional no runtime web.
 - **Severidade de produto:** P2.
 - **Impacto na experiência:** Profissional não consegue converter atendimento em operação financeira pela tela; valor percebido inferior ao título.

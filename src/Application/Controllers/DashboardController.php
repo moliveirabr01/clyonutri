@@ -3289,61 +3289,500 @@ class DashboardController
     {
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $clinicId = TenantContext::getClinicId();
+        
         $stmt = $db->prepare("
-            SELECT r.*, p.name AS patient_name
+            SELECT r.*, p.name AS patient_name,
+                   (SELECT COALESCE(SUM(py.amount_cents), 0) FROM payments py WHERE py.receivable_id = r.id) AS total_paid_cents,
+                   (SELECT py.receipt_code FROM payments py WHERE py.receivable_id = r.id ORDER BY py.id DESC LIMIT 1) AS receipt_code
             FROM receivables r
             JOIN patients p ON p.id = r.patient_id
             WHERE r.clinic_id = :clinic_id
-            ORDER BY r.id DESC
+            ORDER BY r.due_date DESC, r.id DESC
         ");
         $stmt->execute(['clinic_id' => $clinicId]);
         $receivables = $stmt->fetchAll();
 
-        $title = 'Financeiro Essencial';
+        // Pacientes da clínica para seleção no novo lançamento
+        $patStmt = $db->prepare("
+            SELECT id, name, email 
+            FROM patients 
+            WHERE clinic_id = :clinic_id AND status = 'active'
+            ORDER BY name ASC
+        ");
+        $patStmt->execute(['clinic_id' => $clinicId]);
+        $patients = $patStmt->fetchAll();
+
+        // Agendamentos recentes da clínica (opcional para vincular)
+        $appStmt = $db->prepare("
+            SELECT a.id, a.scheduled_at, p.name AS patient_name
+            FROM appointments a
+            JOIN patients p ON p.id = a.patient_id
+            WHERE a.clinic_id = :clinic_id
+            ORDER BY a.scheduled_at DESC
+            LIMIT 30
+        ");
+        $appStmt->execute(['clinic_id' => $clinicId]);
+        $appointments = $appStmt->fetchAll();
+
+        $financeService = new \ClyoNutri\Domain\Finance\FinanceService($db);
+        $summary = $financeService->getReceivablesSummary();
+
+        $title = 'Gestão Financeira & Honorários';
         $activeNav = 'financeiro';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $csrfToken = $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
+
+        $feedbackMessage = $_SESSION['finance_success'] ?? $_SESSION['success_message'] ?? null;
+        $errorMessage = $_SESSION['finance_error'] ?? $_SESSION['error_message'] ?? null;
+        unset($_SESSION['finance_success'], $_SESSION['success_message'], $_SESSION['finance_error'], $_SESSION['error_message']);
 
         ob_start();
         ?>
-        <div style="margin-bottom: var(--space-6);">
-          <h1>Gestão Financeira</h1>
-          <p style="color: var(--neutral-gray-500);">Recebíveis, pagamentos e recibos de consultas.</p>
-        </div>
-
-        <div class="card">
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Descrição</th>
-                  <th>Paciente</th>
-                  <th class="tabular-nums">Valor</th>
-                  <th>Vencimento</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php if (empty($receivables)): ?>
-                  <tr><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum recebível financeiro registrado.</td></tr>
-                <?php else: ?>
-                  <?php foreach ($receivables as $rc): ?>
-                    <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($rc['description']) ?></td>
-                      <td><?= htmlspecialchars($rc['patient_name']) ?></td>
-                      <td class="tabular-nums" style="font-weight: 600;">R$ <?= number_format($rc['amount_cents'] / 100, 2, ',', '.') ?></td>
-                      <td><?= date('d/m/Y', strtotime($rc['due_date'])) ?></td>
-                      <td><span class="badge badge-<?= $rc['status'] === 'paid' ? 'success' : 'warning' ?>"><?= htmlspecialchars($rc['status']) ?></span></td>
-                    </tr>
-                  <?php endforeach; ?>
-                <?php endif; ?>
-              </tbody>
-            </table>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h1 style="color: var(--brand-navy-900); font-family: var(--font-display, serif); margin-bottom: 4px;">Gestão Financeira</h1>
+            <p style="color: var(--neutral-gray-600); margin: 0;">Recebíveis de consultas, controle de honorários, baixas e emissão de recibos.</p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'" style="display: inline-flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>+ Novo Lançamento Financeiro</span>
+            </button>
           </div>
         </div>
+
+        <?php if (!empty($feedbackMessage)): ?>
+          <div class="alert alert-success" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #ecfdf5; border: 1px solid #10b981; color: #065f46; display: flex; align-items: center; gap: 10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span><?= htmlspecialchars($feedbackMessage) ?></span>
+          </div>
+        <?php endif; ?>
+
+        <?php if (!empty($errorMessage)): ?>
+          <div class="alert alert-danger" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; display: flex; align-items: center; gap: 10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span><?= htmlspecialchars($errorMessage) ?></span>
+          </div>
+        <?php endif; ?>
+
+        <!-- Cards de Resumo de Indicadores Financeiros -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: var(--space-6);">
+          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-warning, #f59e0b);">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total a Receber (Pendente)</div>
+            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900);">
+              R$ <?= number_format($summary['total_pending_cents'] / 100, 2, ',', '.') ?>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Aguardando baixa de pagamento</div>
+          </div>
+
+          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-success, #10b981);">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Recebido (Quitado)</div>
+            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--semantic-success, #10b981);">
+              R$ <?= number_format($summary['total_paid_cents'] / 100, 2, ',', '.') ?>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Baixas confirmadas no sistema</div>
+          </div>
+
+          <div class="card" style="padding: 20px; border-left: 4px solid var(--brand-copper-500, #E67A3F);">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total de Lançamentos</div>
+            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900);">
+              <?= (int)$summary['total_count'] ?>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Honorários cadastrados nesta clínica</div>
+          </div>
+        </div>
+
+        <?php if (empty($receivables)): ?>
+          <!-- Estado Vazio Explicativo com Design System Ratificado e CTA Operacional Real (PX-12) -->
+          <div class="card" style="padding: 48px 32px; text-align: center; border: 1.5px dashed var(--neutral-gray-300); background: #ffffff; border-radius: var(--radius-lg, 12px);">
+            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(230, 122, 63, 0.12); display: flex; align-items: center; justify-content: center; color: var(--brand-copper-600);">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                <line x1="2" x2="22" y1="10" y2="10"></line>
+              </svg>
+            </div>
+            <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 8px;">Nenhum recebível financeiro registrado</h2>
+            <p style="color: var(--neutral-gray-600); max-width: 640px; margin: 0 auto 24px; line-height: 1.6; font-size: 0.95rem;">
+              Os recebíveis financeiros representam honorários de consultas clínicas e planos de acompanhamento nutricional. Eles são gerados a partir dos agendamentos na agenda ou registrados manualmente aqui para qualquer paciente da sua clínica.
+            </p>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 32px;">
+              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'">
+                + Novo Lançamento Financeiro
+              </button>
+              <a href="/agenda" class="btn btn-outline" style="text-decoration: none;">
+                Ver Agenda de Atendimentos &rarr;
+              </a>
+            </div>
+            
+            <!-- Guia informativo / Próximos passos operacionais -->
+            <div style="background: var(--neutral-gray-50); border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 20px; max-width: 680px; margin: 0 auto; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Como funciona o fluxo financeiro do ClyoNutri:
+              </div>
+              <ul style="margin: 0; padding-left: 20px; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.6;">
+                <li><strong>1. Registro de Honorários:</strong> Cadastre cobranças pontuais ou pacotes vinculando a um paciente cadastrado.</li>
+                <li><strong>2. Baixa com Recibo:</strong> Ao receber via PIX, Cartão ou Dinheiro, confirme a baixa para registrar a transação e emitir código de recibo comprobatório.</li>
+                <li><strong>3. Integração com Atendimentos:</strong> Vincule o recebível diretamente a uma consulta agendada quando desejar rastreabilidade completa.</li>
+                <li><strong>4. Isolamento Seguro:</strong> Todos os dados de faturamento e recibos são estritamente isolados e protegidos por clínica.</li>
+              </ul>
+            </div>
+          </div>
+        <?php else: ?>
+          <!-- Tabela de Recebíveis com Operações Reais -->
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+              <table class="table" style="margin-bottom: 0;">
+                <thead style="background: var(--neutral-gray-50);">
+                  <tr>
+                    <th>Descrição</th>
+                    <th>Paciente</th>
+                    <th class="tabular-nums">Valor</th>
+                    <th>Vencimento</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php 
+                  $today = date('Y-m-d');
+                  foreach ($receivables as $rc): 
+                    $isOverdue = ($rc['status'] === 'pending' && $rc['due_date'] < $today);
+                    $statusLabel = match($rc['status']) {
+                        'paid' => 'Recebido',
+                        'canceled', 'cancelled' => 'Cancelado',
+                        'partially_paid' => 'Parcial',
+                        default => ($isOverdue ? 'Vencido' : 'Pendente')
+                    };
+                    $badgeClass = match($rc['status']) {
+                        'paid' => 'badge-success',
+                        'canceled', 'cancelled' => 'badge-secondary',
+                        'partially_paid' => 'badge-primary',
+                        default => ($isOverdue ? 'badge-danger' : 'badge-warning')
+                    };
+                  ?>
+                    <tr>
+                      <td>
+                        <div style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($rc['description']) ?></div>
+                        <?php if (!empty($rc['appointment_id'])): ?>
+                          <span style="font-size: 0.75rem; color: var(--neutral-gray-500);">Consulta #<?= (int)$rc['appointment_id'] ?></span>
+                        <?php endif; ?>
+                      </td>
+                      <td><?= htmlspecialchars($rc['patient_name']) ?></td>
+                      <td class="tabular-nums" style="font-weight: 600; color: var(--brand-navy-900);">
+                        R$ <?= number_format($rc['amount_cents'] / 100, 2, ',', '.') ?>
+                      </td>
+                      <td>
+                        <span style="<?= $isOverdue ? 'color: var(--semantic-error); font-weight: 600;' : '' ?>">
+                          <?= date('d/m/Y', strtotime($rc['due_date'])) ?>
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($statusLabel) ?></span>
+                        <?php if ($rc['status'] === 'paid' && !empty($rc['receipt_code'])): ?>
+                          <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 2px;">
+                            Recibo: <?= htmlspecialchars($rc['receipt_code']) ?>
+                          </div>
+                        <?php endif; ?>
+                      </td>
+                      <td style="text-align: right;">
+                        <?php if (in_array($rc['status'], ['pending', 'partially_paid'], true)): ?>
+                          <div style="display: inline-flex; align-items: center; gap: 8px;">
+                            <button type="button" class="btn btn-sm btn-outline" style="color: var(--semantic-success); border-color: var(--semantic-success);"
+                                    onclick="openPayModal(<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, '<?= htmlspecialchars(addslashes($rc['description'])) ?>')">
+                              Dar Baixa
+                            </button>
+                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" onsubmit="return confirm('Deseja realmente cancelar este recebível?');">
+                              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                              <button type="submit" class="btn btn-sm" style="color: var(--neutral-gray-500); background: transparent; border: none; cursor: pointer; text-decoration: underline; font-size: 0.8rem;">
+                                Cancelar
+                              </button>
+                            </form>
+                          </div>
+                        <?php elseif ($rc['status'] === 'paid'): ?>
+                          <span style="font-size: 0.85rem; color: var(--semantic-success); font-weight: 600;">✓ Quitado</span>
+                        <?php else: ?>
+                          <span style="font-size: 0.85rem; color: var(--neutral-gray-400);">Cancelado</span>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <!-- Modal: Novo Lançamento Financeiro -->
+        <div id="modal-novo-recebivel" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+          <div class="card" style="width: 100%; max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Novo Lançamento Financeiro</h3>
+              <button type="button" onclick="document.getElementById('modal-novo-recebivel').style.display='none'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+            </div>
+            
+            <form method="POST" action="/financeiro/recebiveis/novo">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Paciente *</label>
+                <?php if (empty($patients)): ?>
+                  <div style="padding: 10px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 6px; font-size: 0.85rem; color: #991b1b;">
+                    Nenhum paciente ativo cadastrado nesta clínica. <a href="/pacientes/novo" style="font-weight: 600; color: #991b1b; text-decoration: underline;">Cadastre um paciente primeiro</a>.
+                  </div>
+                <?php else: ?>
+                  <select name="patient_id" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                    <option value="">Selecione o paciente...</option>
+                    <?php foreach ($patients as $p): ?>
+                      <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['name']) ?><?= !empty($p['email']) ? ' (' . htmlspecialchars($p['email']) . ')' : '' ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php endif; ?>
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Descrição do Lançamento *</label>
+                <input type="text" name="description" required placeholder="Ex: Consulta Nutricional Inicial, Plano Trimestral" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div>
+                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor (R$) *</label>
+                  <input type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                </div>
+                <div>
+                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Data de Vencimento *</label>
+                  <input type="date" name="due_date" value="<?= date('Y-m-d') ?>" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                </div>
+              </div>
+
+              <?php if (!empty($appointments)): ?>
+                <div style="margin-bottom: 20px;">
+                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Vincular à Consulta (Opcional)</label>
+                  <select name="appointment_id" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                    <option value="">Nenhuma consulta vinculada</option>
+                    <?php foreach ($appointments as $a): ?>
+                      <option value="<?= (int)$a['id'] ?>">#<?= (int)$a['id'] ?> - <?= htmlspecialchars($a['patient_name']) ?> (<?= date('d/m/Y H:i', strtotime($a['scheduled_at'])) ?>)</option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+              <?php endif; ?>
+
+              <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-novo-recebivel').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary" <?= empty($patients) ? 'disabled' : '' ?>>Salvar Lançamento</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal: Dar Baixa / Registrar Pagamento -->
+        <div id="modal-dar-baixa" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+          <div class="card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Dar Baixa no Recebível</h3>
+              <button type="button" onclick="document.getElementById('modal-dar-baixa').style.display='none'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+            </div>
+            
+            <form id="form-dar-baixa" method="POST" action="">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+
+              <div style="margin-bottom: 16px; background: var(--neutral-gray-50); padding: 12px; border-radius: 6px; border: 1px solid var(--neutral-gray-200);">
+                <div style="font-size: 0.8rem; color: var(--neutral-gray-500); text-transform: uppercase; font-weight: 600;">Lançamento</div>
+                <div id="pay-modal-description" style="font-weight: 600; color: var(--brand-navy-900); font-size: 1rem; margin-top: 2px;"></div>
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Forma de Pagamento *</label>
+                <select name="payment_method" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <option value="pix">PIX (Transferência Instantânea)</option>
+                  <option value="credit_card">Cartão de Crédito</option>
+                  <option value="debit_card">Cartão de Débito</option>
+                  <option value="cash">Dinheiro em Espécie</option>
+                  <option value="transfer">Transferência Bancária / TED</option>
+                </select>
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor Recebido (R$) *</label>
+                <input id="pay-modal-amount" type="number" step="0.01" min="0.01" name="amount" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-dar-baixa').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #10b981); border-color: var(--semantic-success, #10b981);">Confirmar Recebimento</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+        function openPayModal(id, amountCents, description) {
+          var form = document.getElementById('form-dar-baixa');
+          form.action = '/financeiro/recebiveis/' + id + '/pagar';
+          document.getElementById('pay-modal-description').textContent = description;
+          document.getElementById('pay-modal-amount').value = (amountCents / 100).toFixed(2);
+          document.getElementById('modal-dar-baixa').style.display = 'flex';
+        }
+        </script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function createReceivableAction(): void
+    {
+        $patientId = (int)($_POST['patient_id'] ?? 0);
+        $description = trim((string)($_POST['description'] ?? ''));
+        $rawAmount = (string)($_POST['amount'] ?? '');
+        $dueDate = trim((string)($_POST['due_date'] ?? ''));
+        $appointmentId = !empty($_POST['appointment_id']) ? (int)$_POST['appointment_id'] : null;
+
+        $cleanAmount = str_replace(['R$', ' ', '.'], '', $rawAmount);
+        $cleanAmount = str_replace(',', '.', $cleanAmount);
+        $amountCents = (int)round(((float)$cleanAmount) * 100);
+
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\Finance\FinanceService($db);
+
+        $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+               || (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json'));
+
+        try {
+            $created = $service->createReceivable($patientId, $description, $amountCents, $dueDate, $appointmentId);
+            if ($isJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'receivable' => $created]);
+                exit;
+            }
+            $_SESSION['finance_success'] = "Lançamento financeiro cadastrado com sucesso!";
+            header("Location: /financeiro");
+            exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            if ($isJson) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Acesso negado: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        } catch (\Throwable $e) {
+            if ($isJson) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Erro ao criar lançamento: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        }
+    }
+
+    public function payReceivableAction(array $params): void
+    {
+        $receivableId = (int)($params['id'] ?? $_POST['receivable_id'] ?? 0);
+        $method = trim((string)($_POST['payment_method'] ?? 'pix'));
+        $rawAmount = (string)($_POST['amount'] ?? '');
+
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\Finance\FinanceService($db);
+
+        $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+               || (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json'));
+
+        try {
+            $clinicId = TenantContext::getClinicId();
+            $rec = \ClyoNutri\Core\Security\TenantGuard::assertReceivableBelongsToClinic($receivableId, $clinicId, $db);
+
+            if ($rawAmount !== '') {
+                $cleanAmount = str_replace(['R$', ' ', '.'], '', $rawAmount);
+                $cleanAmount = str_replace(',', '.', $cleanAmount);
+                $amountCents = (int)round(((float)$cleanAmount) * 100);
+            } else {
+                $totStmt = $db->prepare("SELECT SUM(amount_cents) FROM payments WHERE receivable_id = :id");
+                $totStmt->execute(['id' => $receivableId]);
+                $paid = (int)$totStmt->fetchColumn();
+                $amountCents = max(0, (int)$rec['amount_cents'] - $paid);
+            }
+
+            $res = $service->recordPayment($receivableId, $amountCents, $method);
+
+            if ($isJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'payment' => $res]);
+                exit;
+            }
+            $valorFormatado = number_format($amountCents / 100, 2, ',', '.');
+            $_SESSION['finance_success'] = "Pagamento de R$ {$valorFormatado} registrado com sucesso! Recibo: {$res['receipt_code']}";
+            header("Location: /financeiro");
+            exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            if ($isJson) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Acesso negado: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        } catch (\Throwable $e) {
+            if ($isJson) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Erro ao registrar pagamento: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        }
+    }
+
+    public function cancelReceivableAction(array $params): void
+    {
+        $receivableId = (int)($params['id'] ?? $_POST['receivable_id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\Finance\FinanceService($db);
+
+        $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+               || (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json'));
+
+        try {
+            $res = $service->cancelReceivable($receivableId);
+            if ($isJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'canceled' => $res]);
+                exit;
+            }
+            $_SESSION['finance_success'] = "Lançamento financeiro cancelado com sucesso.";
+            header("Location: /financeiro");
+            exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            if ($isJson) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Acesso negado: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        } catch (\Throwable $e) {
+            if ($isJson) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['finance_error'] = "Erro ao cancelar recebível: " . $e->getMessage();
+            header("Location: /financeiro");
+            exit;
+        }
     }
 
     public function settings(): void

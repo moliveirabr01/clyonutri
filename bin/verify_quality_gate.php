@@ -100,6 +100,7 @@ $criticalPhpFiles = [
     'src/Domain/Engagement/EngagementService.php',
     'src/Domain/Onboarding/OnboardingService.php',
     'src/Application/Controllers/OnboardingController.php',
+    'src/Domain/Finance/FinanceService.php',
     'src/Core/Database/DemoSeeder.php',
     'bin/seed.php',
 ];
@@ -300,6 +301,13 @@ if (str_contains($px07Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO PASSARAM COM SU
     recordCheck('E2E_JOURNEYS', 'Campos Clínicos Acessíveis & DOM Semântico (NI2-300 / PX-07)', 'PASS', '10 campos de coleta com id e label for, 2 selects comparativos acessíveis, fieldsets/legends e aria-describedby auditados');
 } else {
     recordCheck('E2E_JOURNEYS', 'Campos Clínicos Acessíveis & DOM Semântico (NI2-300 / PX-07)', 'FAIL', 'Falha no teste PX-07: ' . substr($px07Output, 0, 200));
+}
+
+$px12Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_12_financial_empty_state_and_operations_test.php') . " 2>&1");
+if (str_contains($px12Output, 'TODOS OS 8 GATES DE HOMOLOGAÇÃO PX-12 (NI2-305) PASSARAM COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Financeiro Vazio & Operações Reais (NI2-305 / PX-12)', 'PASS', 'Estado vazio explicativo com CTA, persistência de recebíveis, baixa real com recibo REC-..., pagamentos parciais, cancelamento e 403 multi-tenant');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Financeiro Vazio & Operações Reais (NI2-305 / PX-12)', 'FAIL', 'Falha no teste PX-12: ' . substr($px12Output, 0, 200));
 }
 
 // Browser Físico / Playwright

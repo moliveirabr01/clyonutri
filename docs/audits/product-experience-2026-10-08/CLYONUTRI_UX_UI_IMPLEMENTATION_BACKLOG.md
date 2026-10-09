@@ -317,6 +317,9 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Dependências:** Decisão do escopo financeiro; nenhum pagamento real nesta auditoria.
 
+**Status da implementação:** Resolvido (NI2-305).
+**Resumo da resolução:** Estado vazio com Design System oficial explicando origem de honorários clínicos, CTA operacional primário '+ Novo Lançamento Financeiro', link secundário para '/agenda' e guia explicativo em 4 passos. Operações reais de cadastro, quitação com geração de recibo ('REC-...'), pagamentos parciais, cancelamento e isolamento 403 multi-tenant implementados em produção e homologados pela suíte E2E tests/px_12_financial_empty_state_and_operations_test.php.
+
 **Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
 
 ## PX-13 — Jargão técnico e enums chegam ao usuário

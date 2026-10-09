@@ -25,6 +25,18 @@ class FinanceService
             \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
         }
 
+        $description = trim($description);
+        if ($description === '') {
+            throw new \InvalidArgumentException("A descrição do lançamento financeiro é obrigatória.");
+        }
+        if ($amountCents <= 0) {
+            throw new \InvalidArgumentException("O valor do recebível deve ser maior que zero.");
+        }
+        $dueDate = trim($dueDate);
+        if ($dueDate === '') {
+            throw new \InvalidArgumentException("A data de vencimento é obrigatória.");
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO receivables (clinic_id, patient_id, appointment_id, description, amount_cents, due_date, status)
             VALUES (:clinic_id, :patient_id, :appointment_id, :description, :amount_cents, :due_date, 'pending')
@@ -34,7 +46,7 @@ class FinanceService
             'clinic_id' => $clinicId,
             'patient_id' => $patientId,
             'appointment_id' => $appointmentId,
-            'description' => trim($description),
+            'description' => $description,
             'amount_cents' => $amountCents,
             'due_date' => $dueDate,
         ]);
@@ -43,6 +55,9 @@ class FinanceService
 
         return [
             'id' => $id,
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
+            'appointment_id' => $appointmentId,
             'description' => $description,
             'amount_cents' => $amountCents,
             'status' => 'pending',
@@ -50,10 +65,25 @@ class FinanceService
         ];
     }
 
-    public function recordPayment(int $receivableId, int $amountCents, string $method): array
+    public function recordPayment(int $receivableId, int $amountCents, string $method = 'pix'): array
     {
         $clinicId = TenantContext::getClinicId();
         $receivable = \ClyoNutri\Core\Security\TenantGuard::assertReceivableBelongsToClinic($receivableId, $clinicId, $this->db);
+
+        if ($receivable['status'] === 'paid') {
+            throw new \InvalidArgumentException("Este recebível já está totalmente quitado.");
+        }
+        if ($receivable['status'] === 'canceled' || $receivable['status'] === 'cancelled') {
+            throw new \InvalidArgumentException("Não é possível registrar pagamento em um recebível cancelado.");
+        }
+        if ($amountCents <= 0) {
+            throw new \InvalidArgumentException("O valor do pagamento deve ser maior que zero.");
+        }
+
+        $method = trim($method);
+        if ($method === '') {
+            $method = 'pix';
+        }
 
         $receiptCode = 'REC-' . strtoupper(bin2hex(random_bytes(4)));
 
@@ -88,11 +118,63 @@ class FinanceService
                 'receipt_code' => $receiptCode,
                 'status' => $newStatus,
                 'amount_paid_cents' => $amountCents,
+                'total_paid_cents' => $totalPaid,
             ];
         } catch (\Throwable $e) {
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    public function cancelReceivable(int $receivableId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        $receivable = \ClyoNutri\Core\Security\TenantGuard::assertReceivableBelongsToClinic($receivableId, $clinicId, $this->db);
+
+        if ($receivable['status'] === 'paid') {
+            throw new \InvalidArgumentException("Não é possível cancelar um recebível já quitado.");
+        }
+        if ($receivable['status'] === 'canceled' || $receivable['status'] === 'cancelled') {
+            return $receivable;
+        }
+
+        $stmt = $this->db->prepare("UPDATE receivables SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+        $stmt->execute(['id' => $receivableId]);
+
+        $receivable['status'] = 'canceled';
+        return $receivable;
+    }
+
+    public function getReceivablesSummary(): array
+    {
+        $clinicId = TenantContext::getClinicId();
+
+        $stmt = $this->db->prepare("
+            SELECT
+                COUNT(*) as total_count,
+                COALESCE(SUM(CASE WHEN status IN ('pending', 'partially_paid') THEN amount_cents ELSE 0 END), 0) as total_pending_cents,
+                COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_cents ELSE 0 END), 0) as total_paid_cents,
+                COALESCE(SUM(amount_cents), 0) as total_amount_cents
+            FROM receivables
+            WHERE clinic_id = :clinic_id
+        ");
+        $stmt->execute(['clinic_id' => $clinicId]);
+        $summary = $stmt->fetch() ?: [];
+
+        $stmtPay = $this->db->prepare("
+            SELECT COALESCE(SUM(amount_cents), 0)
+            FROM payments
+            WHERE clinic_id = :clinic_id
+        ");
+        $stmtPay->execute(['clinic_id' => $clinicId]);
+        $actualPayments = (int)$stmtPay->fetchColumn();
+
+        return [
+            'total_count' => (int)($summary['total_count'] ?? 0),
+            'total_pending_cents' => (int)($summary['total_pending_cents'] ?? 0),
+            'total_paid_cents' => max((int)($summary['total_paid_cents'] ?? 0), $actualPayments),
+            'total_amount_cents' => (int)($summary['total_amount_cents'] ?? 0),
+        ];
     }
 
     public function generateReceipt(string $receiptCode): ?array

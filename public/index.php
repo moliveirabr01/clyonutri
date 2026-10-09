@@ -176,6 +176,9 @@ $router->post('/planos/{id}/substituicoes/{subId}/remover', $requireAuth([$dashC
 $router->post('/planos/{id}/publicar', $requireAuth([$dashCtrl, 'publishMealPlan']));
 $router->post('/planos/{id}/duplicar', $requireAuth([$dashCtrl, 'duplicateMealPlan']));
 $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
+$router->post('/financeiro/recebiveis/novo', $requireAuth([$dashCtrl, 'createReceivableAction']));
+$router->post('/financeiro/recebiveis/{id}/pagar', $requireAuth([$dashCtrl, 'payReceivableAction']));
+$router->post('/financeiro/recebiveis/{id}/cancelar', $requireAuth([$dashCtrl, 'cancelReceivableAction']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 
 // 3.2 Central de Ajuda & Service Desk (NI2-195 a NI2-208)
