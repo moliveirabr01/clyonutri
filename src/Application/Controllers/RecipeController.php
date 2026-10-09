@@ -41,6 +41,11 @@ class RecipeController
         $stmt->execute(['uid' => $userId]);
         $profId = (int)$stmt->fetchColumn();
 
+        // Buscar Nome da Clínica
+        $cStmt = $this->db->prepare("SELECT name FROM clinics WHERE id = :cid LIMIT 1");
+        $cStmt->execute(['cid' => $clinicId]);
+        $clinicName = (string)($cStmt->fetchColumn() ?: ($_SESSION['clinic_name'] ?? 'Clínica Principal'));
+
         TenantContext::setClinicId($clinicId);
         TenantContext::set($clinicId, [
             'id' => $userId,
@@ -52,12 +57,13 @@ class RecipeController
             'userId' => $userId,
             'clinicId' => $clinicId,
             'userName' => $userName,
+            'clinicName' => $clinicName,
             'profId' => $profId > 0 ? $profId : 1,
         ];
     }
 
     /**
-     * Biblioteca e Catálogo de Receitas Culinárias
+     * Biblioteca e Catálogo de Receitas Culinárias (Design System ClyoNutri)
      */
     public function index(array $params = []): void
     {
@@ -83,242 +89,169 @@ class RecipeController
         }
 
         $recipes = $this->recipeService->searchRecipes($filters, $auth['clinicId']);
-        $csrfToken = Csrf::generateToken();
 
-        header('Content-Type: text/html; charset=utf-8');
+        // Parâmetros para o layout padrão ClyoNutri
+        $title = 'Receitas Culinárias & Composição Nutricional';
+        $activeNav = 'receitas';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+        $csrfToken = Csrf::token();
+
+        ob_start();
         ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receitas Culinárias & Composição Nutricional — ClyoNutri II</title>
-    <style>
-        :root {
-            --primary: #059669;
-            --primary-hover: #047857;
-            --primary-light: #ecfdf5;
-            --surface: #ffffff;
-            --bg: #f8fafc;
-            --border: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --blue: #2563eb;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background: var(--bg); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; }
-        
-        .header {
-            background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.85rem 1.75rem;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .logo-area { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.15rem; color: var(--primary); }
-        .logo-area span.badge { background: var(--primary-light); color: var(--primary); font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; }
-        .nav-links { display: flex; gap: 1rem; list-style: none; }
-        .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.65rem; border-radius: 6px; }
-        .nav-links a:hover, .nav-links a.active { color: var(--primary); background: var(--primary-light); }
-        
-        .main-container { flex: 1; overflow-y: auto; padding: 1.75rem; max-width: 1300px; margin: 0 auto; width: 100%; }
-        
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-        .top-bar h1 { font-size: 1.6rem; font-weight: 800; color: #064e3b; }
-        .top-bar p { font-size: 0.9rem; color: var(--text-muted); margin-top: 0.2rem; }
-        
-        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.1rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: background 0.15s; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: #f1f5f9; }
-        .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
-        
-        .filter-panel { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
-        .filter-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-        .filter-group input, .filter-group select { padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; min-width: 160px; }
-        
-        .recipes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
-        .recipe-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.15s, box-shadow 0.15s; }
-        .recipe-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.06); }
-        
-        .recipe-card-header { padding: 1.1rem 1.25rem 0.75rem; border-bottom: 1px solid #f1f5f9; }
-        .recipe-badge-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-        .pill { font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
-        .pill-meal { background: #e0f2fe; color: #0284c7; }
-        .pill-difficulty { background: #fef3c7; color: #d97706; }
-        .pill-variant { background: #f3e8ff; color: #7e22ce; }
-        
-        .recipe-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; text-decoration: none; line-height: 1.3; }
-        .recipe-title:hover { color: var(--primary); }
-        .recipe-summary { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        
-        .recipe-macros { background: #f8fafc; padding: 0.75rem 1.25rem; display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; border-bottom: 1px solid #f1f5f9; }
-        .macro-item span { display: block; }
-        .macro-val { font-size: 0.95rem; font-weight: 700; color: #0f172a; }
-        .macro-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
-        
-        .recipe-card-body { padding: 0.85rem 1.25rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem; }
-        .recipe-meta-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); }
-        
-        .allergens-list { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-        .allergen-tag { font-size: 0.7rem; background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-        
-        .card-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-        .card-actions .btn { flex: 1; justify-content: center; }
-        
-        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); background: #fff; border-radius: 12px; border: 1px dashed var(--border); grid-column: 1 / -1; }
-    </style>
-</head>
-<body>
-    <header class="header">
-        <div class="logo-area">
-            🥗 ClyoNutri II <span class="badge">SaaS Real</span>
-        </div>
-        <ul class="nav-links">
-            <li><a href="/dashboard">📊 Dashboard</a></li>
-            <li><a href="/agenda">📅 Agenda</a></li>
-            <li><a href="/pacientes">👥 Pacientes</a></li>
-            <li><a href="/planos">🥗 Planos Alimentares</a></li>
-            <li><a href="/receitas" class="active">🍳 Receitas Culinárias</a></li>
-            <li><a href="/chat">💬 Chat & Mensagens</a></li>
-            <li><a href="/ajuda">❓ Central de Ajuda</a></li>
-            <li><a href="/logout">🚪 Sair</a></li>
-        </ul>
-    </header>
+        <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['prescrito'])): ?>
+          <div style="background: var(--semantic-success-light); border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: var(--radius-input); margin-bottom: var(--space-4); color: var(--semantic-success); font-weight: 500;">
+            ✓ Receita prescrita com sucesso ao paciente!
+          </div>
+        <?php endif; ?>
 
-    <main class="main-container">
-        <div class="top-bar">
-            <div>
-                <h1>Biblioteca de Receitas Culinárias</h1>
-                <p>Receitas padronizadas, cálculos nutricionais oficiais TACO, medidas caseiras e prescrição direta ao plano alimentar.</p>
-            </div>
-            <div>
-                <a href="/receitas/nova" class="btn btn-primary">➕ Nova Receita</a>
-            </div>
+        <!-- Cabeçalho do Design System ClyoNutri -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h1 style="font-family: var(--font-editorial); font-size: 1.85rem; color: var(--brand-navy-900); margin-bottom: var(--space-1);">Biblioteca de Receitas Culinárias</h1>
+            <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.95rem;">Receitas padronizadas, cálculos nutricionais oficiais TACO, medidas caseiras e prescrição ao paciente.</p>
+          </div>
+          <div>
+            <a href="/receitas/nova" class="btn btn-accent">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nova Receita
+            </a>
+          </div>
         </div>
 
-        <form method="GET" action="/receitas" class="filter-panel">
-            <div class="filter-group" style="flex: 2;">
-                <label>Buscar Receita ou Ingrediente</label>
-                <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Ex: Panqueca de Aveia, Omelete...">
+        <!-- Painel de Filtros e Busca -->
+        <div class="card" style="padding: var(--space-4); margin-bottom: var(--space-6);">
+          <form method="GET" action="/receitas" style="display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 2; min-width: 220px; display: flex; flex-direction: column; gap: var(--space-1);">
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Buscar Receita ou Ingrediente</label>
+              <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Ex: Omelete, Mingau de Aveia, Frango..." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
             </div>
-            <div class="filter-group">
-                <label>Refeição / Categoria</label>
-                <select name="meal_type">
-                    <option value="">Todas as refeições</option>
-                    <option value="Café da Manhã" <?= $mealType === 'Café da Manhã' ? 'selected' : '' ?>>Café da Manhã</option>
-                    <option value="Almoço" <?= $mealType === 'Almoço' ? 'selected' : '' ?>>Almoço</option>
-                    <option value="Lanche da Tarde" <?= $mealType === 'Lanche da Tarde' ? 'selected' : '' ?>>Lanche da Tarde</option>
-                    <option value="Jantar" <?= $mealType === 'Jantar' ? 'selected' : '' ?>>Jantar</option>
-                    <option value="Ceia" <?= $mealType === 'Ceia' ? 'selected' : '' ?>>Ceia</option>
-                    <option value="Pré-Treino" <?= $mealType === 'Pré-Treino' ? 'selected' : '' ?>>Pré-Treino</option>
-                    <option value="Pós-Treino" <?= $mealType === 'Pós-Treino' ? 'selected' : '' ?>>Pós-Treino</option>
-                    <option value="Sobremesa" <?= $mealType === 'Sobremesa' ? 'selected' : '' ?>>Sobremesa</option>
-                </select>
+            <div style="flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: var(--space-1);">
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Refeição</label>
+              <select name="meal_type" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
+                <option value="">Todas as refeições</option>
+                <option value="Café da Manhã" <?= $mealType === 'Café da Manhã' ? 'selected' : '' ?>>Café da Manhã</option>
+                <option value="Almoço" <?= $mealType === 'Almoço' ? 'selected' : '' ?>>Almoço</option>
+                <option value="Lanche da Tarde" <?= $mealType === 'Lanche da Tarde' ? 'selected' : '' ?>>Lanche da Tarde</option>
+                <option value="Jantar" <?= $mealType === 'Jantar' ? 'selected' : '' ?>>Jantar</option>
+                <option value="Ceia" <?= $mealType === 'Ceia' ? 'selected' : '' ?>>Ceia</option>
+                <option value="Pré-Treino" <?= $mealType === 'Pré-Treino' ? 'selected' : '' ?>>Pré-Treino</option>
+                <option value="Pós-Treino" <?= $mealType === 'Pós-Treino' ? 'selected' : '' ?>>Pós-Treino</option>
+                <option value="Sobremesa" <?= $mealType === 'Sobremesa' ? 'selected' : '' ?>>Sobremesa</option>
+              </select>
             </div>
-            <div class="filter-group">
-                <label>Dificuldade</label>
-                <select name="difficulty">
-                    <option value="">Qualquer dificuldade</option>
-                    <option value="fácil" <?= $difficulty === 'fácil' ? 'selected' : '' ?>>Fácil</option>
-                    <option value="média" <?= $difficulty === 'média' ? 'selected' : '' ?>>Média</option>
-                    <option value="difícil" <?= $difficulty === 'difícil' ? 'selected' : '' ?>>Difícil</option>
-                </select>
+            <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: var(--space-1);">
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Dificuldade</label>
+              <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
+                <option value="">Qualquer dificuldade</option>
+                <option value="fácil" <?= $difficulty === 'fácil' ? 'selected' : '' ?>>Fácil</option>
+                <option value="média" <?= $difficulty === 'média' ? 'selected' : '' ?>>Média</option>
+                <option value="difícil" <?= $difficulty === 'difícil' ? 'selected' : '' ?>>Difícil</option>
+              </select>
             </div>
-            <div class="filter-group">
-                <label>Kcal Máxima / Porção</label>
-                <input type="number" step="10" name="max_kcal" value="<?= $maxKcal !== null ? (int)$maxKcal : '' ?>" placeholder="Ex: 400">
+            <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: var(--space-1);">
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Kcal Máxima / Porção</label>
+              <input type="number" step="10" name="max_kcal" value="<?= $maxKcal !== null ? (int)$maxKcal : '' ?>" placeholder="Ex: 400" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
             </div>
-            <div class="filter-group">
-                <button type="submit" class="btn btn-outline">Filtrar</button>
+            <div>
+              <button type="submit" class="btn btn-secondary" style="min-height: 42px;">Filtrar</button>
             </div>
-        </form>
+          </form>
+        </div>
 
-        <div class="recipes-grid">
-            <?php if (empty($recipes)): ?>
-                <div class="empty-state">
-                    <h3>Nenhuma receita encontrada</h3>
-                    <p>Crie sua primeira receita culinária personalizada com cálculo automático por porção.</p>
-                    <div style="margin-top: 1rem;">
-                        <a href="/receitas/nova" class="btn btn-primary">Criar Receita Agora</a>
-                    </div>
+        <!-- Grade de Receitas -->
+        <?php if (empty($recipes)): ?>
+          <div class="card" style="text-align: center; padding: var(--space-12) var(--space-4);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-500); margin: 0 auto var(--space-3);"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>
+            <h3 style="color: var(--brand-navy-900); margin-bottom: var(--space-2);">Nenhuma receita encontrada</h3>
+            <p style="color: var(--neutral-gray-500); margin-bottom: var(--space-4); max-width: 480px; margin-left: auto; margin-right: auto;">
+              Crie receitas culinárias personalizadas com cálculo automatizado de macronutrientes da Tabela TACO e medidas caseiras.
+            </p>
+            <a href="/receitas/nova" class="btn btn-accent">Criar Primeira Receita</a>
+          </div>
+        <?php else: ?>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-6);">
+            <?php foreach ($recipes as $r): ?>
+              <div class="card" style="display: flex; flex-direction: column; padding: 0; overflow: hidden; margin-bottom: 0;">
+                <div style="padding: var(--space-5); border-bottom: 1px solid var(--neutral-gray-200);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #EAD8C7; padding: 2px 8px; border-radius: var(--radius-pill);">
+                      <?= htmlspecialchars($r['meal_type'] ?: $r['category']) ?>
+                    </span>
+                    <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; color: var(--neutral-gray-500);">
+                      <?= htmlspecialchars($r['difficulty'] ?? 'fácil') ?>
+                    </span>
+                  </div>
+                  <h3 style="font-size: 1.15rem; color: var(--brand-navy-900); margin-bottom: var(--space-1); line-height: 1.3;">
+                    <a href="/receitas/<?= (int)$r['id'] ?>" style="color: inherit; text-decoration: none;">
+                      <?= htmlspecialchars($r['title']) ?>
+                    </a>
+                  </h3>
+                  <?php if (!empty($r['summary'])): ?>
+                    <p style="font-size: 0.85rem; color: var(--neutral-gray-500); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                      <?= htmlspecialchars($r['summary']) ?>
+                    </p>
+                  <?php endif; ?>
                 </div>
-            <?php else: ?>
-                <?php foreach ($recipes as $r): ?>
-                    <div class="recipe-card">
-                        <div class="recipe-card-header">
-                            <div class="recipe-badge-row">
-                                <span class="pill pill-meal"><?= htmlspecialchars($r['meal_type'] ?: $r['category']) ?></span>
-                                <span class="pill pill-difficulty"><?= htmlspecialchars($r['difficulty'] ?? 'fácil') ?></span>
-                                <?php if (!empty($r['parent_recipe_id'])): ?>
-                                    <span class="pill pill-variant" title="Receita variante adaptada">Variante</span>
-                                <?php endif; ?>
-                            </div>
-                            <a href="/receitas/<?= (int)$r['id'] ?>" class="recipe-title">
-                                <?= htmlspecialchars($r['title']) ?>
-                            </a>
-                            <?php if (!empty($r['summary'])): ?>
-                                <p class="recipe-summary"><?= htmlspecialchars($r['summary']) ?></p>
-                            <?php endif; ?>
-                        </div>
 
-                        <div class="recipe-macros">
-                            <div class="macro-item">
-                                <span class="macro-val"><?= (int)round((float)$r['energy_kcal_per_serving']) ?></span>
-                                <span class="macro-label">kcal</span>
-                            </div>
-                            <div class="macro-item">
-                                <span class="macro-val"><?= round((float)$r['protein_g_per_serving'], 1) ?>g</span>
-                                <span class="macro-label">Proteína</span>
-                            </div>
-                            <div class="macro-item">
-                                <span class="macro-val"><?= round((float)$r['carbs_g_per_serving'], 1) ?>g</span>
-                                <span class="macro-label">Carbo</span>
-                            </div>
-                            <div class="macro-item">
-                                <span class="macro-val"><?= round((float)$r['fat_g_per_serving'], 1) ?>g</span>
-                                <span class="macro-label">Gordura</span>
-                            </div>
-                        </div>
+                <!-- Painel de Macronutrientes por Porção -->
+                <div style="background: var(--neutral-warm-50); padding: var(--space-3) var(--space-4); display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; border-bottom: 1px solid var(--neutral-gray-200);">
+                  <div>
+                    <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= (int)round((float)$r['energy_kcal_per_serving']) ?></span>
+                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">kcal</span>
+                  </div>
+                  <div>
+                    <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['protein_g_per_serving'], 1) ?>g</span>
+                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Prot</span>
+                  </div>
+                  <div>
+                    <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['carbs_g_per_serving'], 1) ?>g</span>
+                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Carb</span>
+                  </div>
+                  <div>
+                    <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['fat_g_per_serving'], 1) ?>g</span>
+                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Gord</span>
+                  </div>
+                </div>
 
-                        <div class="recipe-card-body">
-                            <div class="recipe-meta-row">
-                                <span>⏱️ <?= (int)$r['prep_time_minutes'] ?> min preparo</span>
-                                <span>🍽️ <?= (int)$r['servings'] ?> porção(ões)</span>
-                            </div>
+                <div style="padding: var(--space-4); flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-3);">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--neutral-gray-500);">
+                    <span>⏱️ <?= (int)$r['prep_time_minutes'] ?> min preparo</span>
+                    <span>🍽️ <?= (int)$r['servings'] ?> porção(ões)</span>
+                  </div>
 
-                            <?php
-                            // Alergênicos
-                            $alStmt = $this->db->prepare("SELECT allergen_group FROM recipe_allergens WHERE recipe_id = :rid");
-                            $alStmt->execute(['rid' => (int)$r['id']]);
-                            $alList = $alStmt->fetchAll(PDO::FETCH_COLUMN);
-                            ?>
-                            <?php if (!empty($alList)): ?>
-                                <div class="allergens-list">
-                                    <?php foreach ($alList as $alg): ?>
-                                        <span class="allergen-tag">⚠️ <?= htmlspecialchars($alg) ?></span>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-
-                            <div class="card-actions">
-                                <a href="/receitas/<?= (int)$r['id'] ?>" class="btn btn-outline btn-sm">Ver Detalhes</a>
-                                <a href="/receitas/<?= (int)$r['id'] ?>/prescrever" class="btn btn-primary btn-sm">Prescrever</a>
-                            </div>
-                        </div>
+                  <?php
+                  $alStmt = $this->db->prepare("SELECT allergen_group FROM recipe_allergens WHERE recipe_id = :rid");
+                  $alStmt->execute(['rid' => (int)$r['id']]);
+                  $alList = $alStmt->fetchAll(PDO::FETCH_COLUMN);
+                  ?>
+                  <?php if (!empty($alList)): ?>
+                    <div style="display: flex; gap: var(--space-1); flex-wrap: wrap;">
+                      <?php foreach ($alList as $alg): ?>
+                        <span style="font-size: 0.7rem; background: var(--semantic-error-light); color: var(--semantic-error); padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                          ⚠️ <?= htmlspecialchars($alg) ?>
+                        </span>
+                      <?php endforeach; ?>
                     </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </main>
-</body>
-</html>
+                  <?php endif; ?>
+
+                  <div style="display: flex; gap: var(--space-2); margin-top: var(--space-2);">
+                    <a href="/receitas/<?= (int)$r['id'] ?>" class="btn btn-secondary" style="flex: 1; min-height: 38px; font-size: 0.85rem;">Detalhes</a>
+                    <a href="/receitas/<?= (int)$r['id'] ?>/prescrever" class="btn btn-primary" style="flex: 1; min-height: 38px; font-size: 0.85rem;">Prescrever</a>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
         <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     /**
-     * Visualização Detalhada da Receita com Composição Nutricional e Passos
+     * Visualização Detalhada da Receita (Design System ClyoNutri)
      */
     public function show(array $params = []): void
     {
@@ -329,456 +262,296 @@ class RecipeController
             $recipe = $this->recipeService->getRecipeDetails($recipeId, $auth['clinicId']);
         } catch (\Throwable $e) {
             http_response_code(404);
-            echo "<h1>Receita não encontrada ou sem permissão.</h1>";
+            echo "<h1>Receita não encontrada ou sem permissão de acesso.</h1>";
             return;
         }
 
-        $csrfToken = Csrf::generateToken();
-        header('Content-Type: text/html; charset=utf-8');
+        $title = $recipe['title'] . ' — Receita';
+        $activeNav = 'receitas';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+        $csrfToken = Csrf::token();
+
+        ob_start();
         ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($recipe['title']) ?> — ClyoNutri II</title>
-    <style>
-        :root {
-            --primary: #059669;
-            --primary-hover: #047857;
-            --primary-light: #ecfdf5;
-            --surface: #ffffff;
-            --bg: #f8fafc;
-            --border: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background: var(--bg); color: var(--text-main); line-height: 1.5; }
-        
-        .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.85rem 1.75rem; display: flex; align-items: center; justify-content: space-between; }
-        .logo-area { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.15rem; color: var(--primary); }
-        .nav-links { display: flex; gap: 1rem; list-style: none; }
-        .nav-links a { text-decoration: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; padding: 0.4rem 0.65rem; border-radius: 6px; }
-        .nav-links a.active { color: var(--primary); background: var(--primary-light); }
-        
-        .container { max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; }
-        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; font-weight: 600; }
-        .back-link:hover { color: var(--primary); }
-        
-        .recipe-header-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem; }
-        .header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-        .recipe-title { font-size: 1.85rem; font-weight: 800; color: #064e3b; }
-        .recipe-summary { color: var(--text-muted); margin-top: 0.5rem; font-size: 1rem; }
-        
-        .badges-bar { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
-        .badge { font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #e2e8f0; color: #334155; }
-        .badge-green { background: var(--primary-light); color: var(--primary); }
-        
-        .actions-bar { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
-        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-outline:hover { background: #f1f5f9; }
-        
-        .grid-details { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
-        @media (max-width: 768px) { .grid-details { grid-template-columns: 1fr; } }
-        
-        .section-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .section-title { font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem; }
-        
-        .ingredients-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        .ingredients-table th, .ingredients-table td { padding: 0.6rem 0.5rem; text-align: left; border-bottom: 1px solid #f1f5f9; }
-        .ingredients-table th { font-weight: 600; color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; }
-        
-        .steps-list { list-style: none; counter-reset: step-counter; }
-        .step-item { display: flex; gap: 1rem; margin-bottom: 1rem; }
-        .step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
-        .step-content { flex: 1; font-size: 0.92rem; }
-        .step-tip { font-size: 0.8rem; color: #d97706; background: #fffbeb; padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: inline-block; }
-        
-        .nutrition-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem; }
-        .nutrition-row { display: flex; justify-content: space-between; padding: 0.45rem 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.88rem; }
-        .nutrition-row.total-kcal { font-size: 1.05rem; font-weight: 800; color: #064e3b; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
-        
-        .allergens-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
-        .allergens-box h4 { color: #991b1b; font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .allergen-pill { background: #fee2e2; color: #991b1b; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; display: inline-block; margin-right: 4px; margin-bottom: 4px; }
-    </style>
-</head>
-<body>
-    <header class="header">
-        <div class="logo-area">
-            🥗 ClyoNutri II <span class="badge badge-green">Receitas</span>
+        <!-- Breadcrumb / Voltar -->
+        <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: var(--space-4);">
+          <a href="/receitas" style="color: var(--brand-copper-600); text-decoration: none; font-weight: 600;">← Voltar à Biblioteca de Receitas</a>
         </div>
-        <ul class="nav-links">
-            <li><a href="/dashboard">📊 Dashboard</a></li>
-            <li><a href="/planos">🥗 Planos Alimentares</a></li>
-            <li><a href="/receitas" class="active">🍳 Receitas Culinárias</a></li>
-            <li><a href="/chat">💬 Chat</a></li>
-            <li><a href="/logout">🚪 Sair</a></li>
-        </ul>
-    </header>
 
-    <div class="container">
-        <a href="/receitas" class="back-link">← Voltar à Biblioteca de Receitas</a>
+        <!-- Cartão Superior de Apresentação -->
+        <div class="card" style="margin-bottom: var(--space-6);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-4);">
+            <div>
+              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #EAD8C7; padding: 3px 10px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: var(--space-2);">
+                <?= htmlspecialchars($recipe['meal_type'] ?: $recipe['category']) ?>
+              </span>
+              <h1 style="font-family: var(--font-editorial); font-size: 2rem; color: var(--brand-navy-900); margin-bottom: var(--space-2);"><?= htmlspecialchars($recipe['title']) ?></h1>
+              <?php if (!empty($recipe['summary'])): ?>
+                <p style="color: var(--neutral-gray-500); font-size: 1rem; margin-bottom: var(--space-3);"><?= htmlspecialchars($recipe['summary']) ?></p>
+              <?php endif; ?>
 
-        <div class="recipe-header-card">
-            <div class="header-top">
-                <div>
-                    <h1 class="recipe-title"><?= htmlspecialchars($recipe['title']) ?></h1>
-                    <?php if (!empty($recipe['summary'])): ?>
-                        <p class="recipe-summary"><?= htmlspecialchars($recipe['summary']) ?></p>
-                    <?php endif; ?>
-                    <div class="badges-bar">
-                        <span class="badge badge-green"><?= htmlspecialchars($recipe['meal_type'] ?: $recipe['category']) ?></span>
-                        <span class="badge">Dificuldade: <?= htmlspecialchars($recipe['difficulty']) ?></span>
-                        <span class="badge">Preparo: <?= (int)$recipe['prep_time_minutes'] ?> min</span>
-                        <?php if ((int)$recipe['cook_time_minutes'] > 0): ?>
-                            <span class="badge">Cozimento: <?= (int)$recipe['cook_time_minutes'] ?> min</span>
+              <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: 0.8rem; color: var(--neutral-gray-500);">
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Dificuldade: <strong><?= htmlspecialchars($recipe['difficulty']) ?></strong></span>
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Preparo: <strong><?= (int)$recipe['prep_time_minutes'] ?> min</strong></span>
+                <?php if ((int)$recipe['cook_time_minutes'] > 0): ?>
+                  <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Cozimento: <strong><?= (int)$recipe['cook_time_minutes'] ?> min</strong></span>
+                <?php endif; ?>
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Rendimento: <strong><?= (int)$recipe['servings'] ?> <?= htmlspecialchars($recipe['serving_size_name']) ?></strong></span>
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Versão: <strong>v<?= (int)$recipe['current_version'] ?></strong></span>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: var(--space-3); align-items: center;">
+              <a href="/receitas/<?= (int)$recipe['id'] ?>/prescrever" class="btn btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                Prescrever ao Paciente
+              </a>
+              <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" onsubmit="return confirm('Deseja criar uma variante supervisionada desta receita?');">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <button type="submit" class="btn btn-secondary">Duplicar Variante</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grade Detalhada: Ingredientes vs Informação Nutricional -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6);">
+          <div>
+            <!-- Ingredientes & Medidas Caseiras -->
+            <div class="card" style="margin-bottom: var(--space-6);">
+              <div class="card__header">
+                <h3 style="margin: 0; color: var(--brand-navy-900);">Ingredientes & Medidas Caseiras</h3>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--neutral-gray-200); text-align: left;">
+                    <th style="padding: 10px 8px; color: var(--neutral-gray-500); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">Alimento (Tabela TACO)</th>
+                    <th style="padding: 10px 8px; color: var(--neutral-gray-500); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">Medida Caseira</th>
+                    <th style="padding: 10px 8px; color: var(--neutral-gray-500); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">Peso Líquido</th>
+                    <th style="padding: 10px 8px; color: var(--neutral-gray-500); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($recipe['ingredients'] as $ing): ?>
+                    <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
+                      <td style="padding: 12px 8px; font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($ing['food_name']) ?></td>
+                      <td style="padding: 12px 8px; color: var(--neutral-ink-900);"><?= (float)$ing['amount'] ?> <?= htmlspecialchars($ing['measure_unit']) ?></td>
+                      <td style="padding: 12px 8px; color: var(--neutral-gray-500);"><?= round((float)$ing['net_weight_g'], 1) ?> g</td>
+                      <td style="padding: 12px 8px; color: var(--neutral-gray-500); font-size: 0.85rem;"><?= htmlspecialchars($ing['notes'] ?? '-') ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Modo de Preparo Passo a Passo -->
+            <div class="card">
+              <div class="card__header">
+                <h3 style="margin: 0; color: var(--brand-navy-900);">Modo de Preparo Passo a Passo</h3>
+              </div>
+              <?php if (!empty($recipe['steps'])): ?>
+                <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+                  <?php foreach ($recipe['steps'] as $st): ?>
+                    <div style="display: flex; gap: var(--space-4);">
+                      <div style="width: 32px; height: 32px; border-radius: var(--radius-pill); background: var(--brand-navy-900); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0;">
+                        <?= (int)$st['step_number'] ?>
+                      </div>
+                      <div style="flex-grow: 1;">
+                        <p style="margin-bottom: 4px; font-size: 0.95rem; color: var(--neutral-ink-900); line-height: 1.5;"><?= nl2br(htmlspecialchars($st['instruction'])) ?></p>
+                        <?php if (!empty($st['tip'])): ?>
+                          <div style="font-size: 0.8rem; background: var(--semantic-warning-light); color: var(--semantic-warning); padding: 4px 10px; border-radius: var(--radius-input); display: inline-block;">
+                            💡 <strong>Dica do Chef:</strong> <?= htmlspecialchars($st['tip']) ?>
+                          </div>
                         <?php endif; ?>
-                        <span class="badge">Rendimento: <?= (int)$recipe['servings'] ?> <?= htmlspecialchars($recipe['serving_size_name']) ?></span>
-                        <span class="badge">Versão: v<?= (int)$recipe['current_version'] ?></span>
+                      </div>
                     </div>
+                  <?php endforeach; ?>
                 </div>
+              <?php else: ?>
+                <p style="white-space: pre-line; color: var(--neutral-ink-900);"><?= htmlspecialchars($recipe['instructions']) ?></p>
+              <?php endif; ?>
             </div>
+          </div>
 
-            <div class="actions-bar">
-                <a href="/receitas/<?= (int)$recipe['id'] ?>/prescrever" class="btn btn-primary">📋 Prescrever ao Paciente</a>
-                <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" onsubmit="return confirm('Deseja criar uma variante supervisionada desta receita?');">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    <button type="submit" class="btn btn-outline">📑 Duplicar / Criar Variante</button>
-                </form>
+          <!-- Coluna Direita: Informação Nutricional e Alérgenos -->
+          <div>
+            <div class="card" style="margin-bottom: var(--space-6);">
+              <div class="card__header">
+                <h3 style="margin: 0; color: var(--brand-navy-900);">Informação Nutricional</h3>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-bottom: var(--space-3);">
+                Valores calculados <strong>por porção</strong> (<?= round((float)$recipe['serving_size_g'], 1) ?> g):
+              </p>
+
+              <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-4);">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); border-bottom: 2px solid var(--brand-navy-900); margin-bottom: var(--space-2);">
+                  <strong style="color: var(--brand-navy-900); font-size: 1.1rem;">Valor Energético</strong>
+                  <strong style="color: var(--brand-copper-600); font-size: 1.3rem;"><?= round((float)$recipe['energy_kcal_per_serving'], 1) ?> kcal</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
+                  <span>Proteínas</span>
+                  <strong><?= round((float)$recipe['protein_g_per_serving'], 1) ?> g</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
+                  <span>Carboidratos</span>
+                  <strong><?= round((float)$recipe['carbs_g_per_serving'], 1) ?> g</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
+                  <span>Lipídios Totais</span>
+                  <strong><?= round((float)$recipe['fat_g_per_serving'], 1) ?> g</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
+                  <span>Fibras Alimentares</span>
+                  <strong><?= round((float)$recipe['fiber_g_per_serving'], 1) ?> g</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem;">
+                  <span>Sódio</span>
+                  <strong><?= round((float)$recipe['sodium_mg_per_serving'], 1) ?> mg</strong>
+                </div>
+              </div>
+
+              <?php if (!empty($recipe['allergens'])): ?>
+                <div style="background: var(--semantic-error-light); border: 1px solid #FECACA; border-radius: var(--radius-input); padding: var(--space-3); margin-bottom: var(--space-4);">
+                  <strong style="color: var(--semantic-error); font-size: 0.85rem; display: block; margin-bottom: 6px;">⚠️ Alergênicos & Restrições</strong>
+                  <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                    <?php foreach ($recipe['allergens'] as $alg): ?>
+                      <span style="background: #FEE2E2; color: var(--semantic-error); font-size: 0.75rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 600;">
+                        <?= htmlspecialchars($alg['allergen_group']) ?> (<?= htmlspecialchars($alg['risk_level']) ?>)
+                      </span>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endif; ?>
+
+              <?php if (!empty($recipe['tags'])): ?>
+                <div>
+                  <span style="font-size: 0.75rem; color: var(--neutral-gray-500); font-weight: 700; text-transform: uppercase;">Tags:</span>
+                  <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">
+                    <?php foreach ($recipe['tags'] as $tg): ?>
+                      <span style="font-size: 0.75rem; background: var(--neutral-gray-100); color: var(--neutral-gray-500); padding: 2px 8px; border-radius: var(--radius-input);">#<?= htmlspecialchars($tg['tag_name']) ?></span>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endif; ?>
             </div>
+          </div>
         </div>
-
-        <div class="grid-details">
-            <div>
-                <!-- Ingredientes e Medidas Caseiras -->
-                <div class="section-box">
-                    <h3 class="section-title">Ingredientes & Medidas Caseiras</h3>
-                    <table class="ingredients-table">
-                        <thead>
-                            <tr>
-                                <th>Alimento (Tabela TACO)</th>
-                                <th>Medida Caseira</th>
-                                <th>Peso Líquido</th>
-                                <th>Observações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($recipe['ingredients'] as $ing): ?>
-                                <tr>
-                                    <td><strong><?= htmlspecialchars($ing['food_name']) ?></strong></td>
-                                    <td><?= (float)$ing['amount'] ?> <?= htmlspecialchars($ing['measure_unit']) ?></td>
-                                    <td><?= round((float)$ing['net_weight_g'], 1) ?> g</td>
-                                    <td style="color: var(--text-muted); font-size: 0.8rem;"><?= htmlspecialchars($ing['notes'] ?? '-') ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Modo de Preparo Passo a Passo -->
-                <div class="section-box">
-                    <h3 class="section-title">Modo de Preparo Passo a Passo</h3>
-                    <?php if (!empty($recipe['steps'])): ?>
-                        <div class="steps-list">
-                            <?php foreach ($recipe['steps'] as $st): ?>
-                                <div class="step-item">
-                                    <div class="step-num"><?= (int)$st['step_number'] ?></div>
-                                    <div class="step-content">
-                                        <p><?= nl2br(htmlspecialchars($st['instruction'])) ?></p>
-                                        <?php if (!empty($st['tip'])): ?>
-                                            <span class="step-tip">💡 Dica: <?= htmlspecialchars($st['tip']) ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php else: ?>
-                        <p style="white-space: pre-line;"><?= htmlspecialchars($recipe['instructions']) ?></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div>
-                <!-- Composição Nutricional por Porção -->
-                <div class="section-box">
-                    <h3 class="section-title">Informação Nutricional</h3>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-                        Valores médios calculados <strong>por porção</strong> (<?= round((float)$recipe['serving_size_g'], 1) ?> g):
-                    </p>
-
-                    <div class="nutrition-card">
-                        <div class="nutrition-row total-kcal">
-                            <span>Energia</span>
-                            <span><?= round((float)$recipe['energy_kcal_per_serving'], 1) ?> kcal</span>
-                        </div>
-                        <div class="nutrition-row">
-                            <span>Proteínas</span>
-                            <span><?= round((float)$recipe['protein_g_per_serving'], 1) ?> g</span>
-                        </div>
-                        <div class="nutrition-row">
-                            <span>Carboidratos</span>
-                            <span><?= round((float)$recipe['carbs_g_per_serving'], 1) ?> g</span>
-                        </div>
-                        <div class="nutrition-row">
-                            <span>Lipídios Totais</span>
-                            <span><?= round((float)$recipe['fat_g_per_serving'], 1) ?> g</span>
-                        </div>
-                        <div class="nutrition-row">
-                            <span>Fibras Alimentares</span>
-                            <span><?= round((float)$recipe['fiber_g_per_serving'], 1) ?> g</span>
-                        </div>
-                        <div class="nutrition-row">
-                            <span>Sódio</span>
-                            <span><?= round((float)$recipe['sodium_mg_per_serving'], 1) ?> mg</span>
-                        </div>
-                    </div>
-
-                    <?php if (!empty($recipe['allergens'])): ?>
-                        <div class="allergens-box">
-                            <h4>⚠️ Alergênicos & Restrições</h4>
-                            <div>
-                                <?php foreach ($recipe['allergens'] as $alg): ?>
-                                    <span class="allergen-pill"><?= htmlspecialchars($alg['allergen_group']) ?> (<?= htmlspecialchars($alg['risk_level']) ?>)</span>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($recipe['tags'])): ?>
-                        <div style="margin-top: 1rem;">
-                            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Tags:</span>
-                            <div style="margin-top: 0.35rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                                <?php foreach ($recipe['tags'] as $tg): ?>
-                                    <span style="font-size: 0.75rem; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; color: #475569;">#<?= htmlspecialchars($tg['tag_name']) ?></span>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
         <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     /**
-     * Formulário de Criação de Receita
+     * Formulário de Criação de Receita (Design System ClyoNutri)
      */
     public function create(array $params = []): void
     {
         $auth = $this->getAuthInfo();
 
-        // Buscar alimentos do catálogo para seleção rápida
+        // Buscar alimentos do catálogo TACO oficial para autocomplete/select
         $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
         $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $csrfToken = Csrf::generateToken();
-        header('Content-Type: text/html; charset=utf-8');
+        $title = 'Nova Receita Culinária';
+        $activeNav = 'receitas';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+        $csrfToken = Csrf::token();
+
+        ob_start();
         ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Receita Culinária — ClyoNutri II</title>
-    <style>
-        :root {
-            --primary: #059669;
-            --primary-hover: #047857;
-            --primary-light: #ecfdf5;
-            --surface: #ffffff;
-            --bg: #f8fafc;
-            --border: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background: var(--bg); color: var(--text-main); }
-        .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.85rem 1.75rem; display: flex; align-items: center; justify-content: space-between; }
-        .logo-area { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.15rem; color: var(--primary); }
-        .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
-        .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
-        .card h2 { font-size: 1.5rem; color: #064e3b; margin-bottom: 1.5rem; }
-        
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-        @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
-        .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
-        .form-group label { font-size: 0.85rem; font-weight: 600; color: #334155; }
-        .form-group input, .form-group select, .form-group textarea {
-            padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
-        }
-        
-        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
-        
-        .item-row { display: grid; grid-template-columns: 3fr 1fr 1.5fr auto; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
-        .btn-del { background: #fee2e2; color: #b91c1c; border: none; border-radius: 6px; padding: 0.5rem 0.75rem; cursor: pointer; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <header class="header">
-        <div class="logo-area">🥗 ClyoNutri II <span style="font-size: 0.8rem; background: var(--primary-light); padding: 2px 8px; border-radius: 999px;">Criador</span></div>
-        <a href="/receitas" class="btn btn-outline">Cancelar</a>
-    </header>
-
-    <div class="container">
-        <div class="card">
-            <h2>Criar Nova Receita Culinária</h2>
-
-            <form method="POST" action="/receitas" id="recipeForm">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-
-                <div class="form-group">
-                    <label>Título da Receita *</label>
-                    <input type="text" name="title" required placeholder="Ex: Crepioca Funcional de Frango com Queijo Branco">
-                </div>
-
-                <div class="form-group">
-                    <label>Resumo / Apresentação</label>
-                    <input type="text" name="summary" placeholder="Ex: Opção prática, rica em proteínas e fibras para café da manhã ou lanche.">
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Categoria / Refeição *</label>
-                        <select name="meal_type" required>
-                            <option value="Café da Manhã">Café da Manhã</option>
-                            <option value="Almoço">Almoço</option>
-                            <option value="Lanche da Tarde">Lanche da Tarde</option>
-                            <option value="Jantar">Jantar</option>
-                            <option value="Ceia">Ceia</option>
-                            <option value="Pré-Treino">Pré-Treino</option>
-                            <option value="Pós-Treino">Pós-Treino</option>
-                            <option value="Sobremesa">Sobremesa</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Dificuldade</label>
-                        <select name="difficulty">
-                            <option value="fácil">Fácil</option>
-                            <option value="média">Média</option>
-                            <option value="difícil">Difícil</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Rendimento (Porções) *</label>
-                        <input type="number" name="servings" min="1" value="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Nome da Porção</label>
-                        <input type="text" name="serving_size_name" value="porção" placeholder="Ex: porção, unidade, fatia">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tempo de Preparo (min)</label>
-                        <input type="number" name="prep_time_minutes" min="1" value="15">
-                    </div>
-                    <div class="form-group">
-                        <label>Tempo de Cozimento / Fogo (min)</label>
-                        <input type="number" name="cook_time_minutes" min="0" value="10">
-                    </div>
-                </div>
-
-                <!-- Lista Dinâmica de Ingredientes -->
-                <div style="margin: 1.5rem 0; border-top: 1px solid var(--border); padding-top: 1.25rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <label style="font-weight: 700; font-size: 1rem; color: #064e3b;">Ingredientes Oficiais (Tabela TACO) *</label>
-                        <button type="button" class="btn btn-outline" onclick="addIngredientRow()">➕ Adicionar Ingrediente</button>
-                    </div>
-                    
-                    <div id="ingredientsContainer">
-                        <div class="item-row">
-                            <select name="ingredients[0][food_id]" required>
-                                <option value="">Selecione o alimento...</option>
-                                <?php foreach ($foods as $f): ?>
-                                    <option value="<?= (int)$f['id'] ?>"><?= htmlspecialchars($f['name']) ?> (<?= htmlspecialchars($f['category'] ?? '') ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
-                            <input type="number" step="0.1" name="ingredients[0][amount]" placeholder="Qtd" value="100" required>
-                            <select name="ingredients[0][measure_unit]">
-                                <option value="g">g (gramas)</option>
-                                <option value="colher de sopa">colher de sopa</option>
-                                <option value="colher de chá">colher de chá</option>
-                                <option value="xícara de chá">xícara de chá</option>
-                                <option value="unidade">unidade</option>
-                                <option value="fatia">fatia</option>
-                                <option value="ml">ml</option>
-                            </select>
-                            <button type="button" class="btn-del" onclick="this.parentElement.remove()">✕</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Passos de Preparo -->
-                <div style="margin: 1.5rem 0; border-top: 1px solid var(--border); padding-top: 1.25rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <label style="font-weight: 700; font-size: 1rem; color: #064e3b;">Modo de Preparo (Passos)</label>
-                        <button type="button" class="btn btn-outline" onclick="addStepRow()">➕ Adicionar Passo</button>
-                    </div>
-                    <div id="stepsContainer">
-                        <div style="margin-bottom: 0.5rem; display: flex; gap: 0.5rem;">
-                            <input type="text" name="steps[]" placeholder="Passo 1: Em uma tigela, misture todos os ingredientes..." style="flex: 1;" required>
-                            <button type="button" class="btn-del" onclick="this.parentElement.remove()">✕</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tags & Visibilidade -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tags (separadas por vírgula)</label>
-                        <input type="text" name="tags" placeholder="Ex: proteico, rápido, sem glúten, funcional">
-                    </div>
-                    <div class="form-group">
-                        <label>Visibilidade</label>
-                        <select name="visibility">
-                            <option value="clinic">Privada da Clínica</option>
-                            <option value="public">Pública / Compartilhada</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
-                    <a href="/receitas" class="btn btn-outline">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">Salvar & Calcular Receita</button>
-                </div>
-            </form>
+        <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: var(--space-4);">
+          <a href="/receitas" style="color: var(--brand-copper-600); text-decoration: none; font-weight: 600;">← Voltar à Biblioteca</a>
         </div>
-    </div>
 
-    <script>
-        let ingredientIndex = 1;
-        const foodOptionsHtml = `<?php
-            foreach ($foods as $f) {
-                echo '<option value="' . (int)$f['id'] . '">' . htmlspecialchars(addslashes($f['name'])) . '</option>';
-            }
-        ?>`;
+        <div class="card" style="max-width: 960px; margin: 0 auto;">
+          <div class="card__header">
+            <div>
+              <h2 style="font-family: var(--font-editorial); color: var(--brand-navy-900); margin-bottom: 4px;">Criar Nova Receita Culinária</h2>
+              <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin: 0;">Cadastre os ingredientes da Tabela TACO e o modo de preparo. O sistema calculará automaticamente o valor nutricional por porção.</p>
+            </div>
+          </div>
 
-        function addIngredientRow() {
-            const container = document.getElementById('ingredientsContainer');
-            const row = document.createElement('div');
-            row.className = 'item-row';
-            row.innerHTML = `
-                <select name="ingredients[${ingredientIndex}][food_id]" required>
-                    <option value="">Selecione o alimento...</option>
-                    ${foodOptionsHtml}
+          <form method="POST" action="/receitas" id="recipeForm" style="margin-top: var(--space-4);">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
+              <input type="text" name="title" required placeholder="Ex: Crepioca Funcional de Frango com Queijo Minas" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+            </div>
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
+              <input type="text" name="summary" placeholder="Ex: Opção prática e rica em proteínas para pré-treino ou café da manhã." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
+                <select name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                  <option value="Café da Manhã">Café da Manhã</option>
+                  <option value="Almoço">Almoço</option>
+                  <option value="Lanche da Tarde">Lanche da Tarde</option>
+                  <option value="Jantar">Jantar</option>
+                  <option value="Ceia">Ceia</option>
+                  <option value="Pré-Treino">Pré-Treino</option>
+                  <option value="Pós-Treino">Pós-Treino</option>
+                  <option value="Sobremesa">Sobremesa</option>
                 </select>
-                <input type="number" step="0.1" name="ingredients[${ingredientIndex}][amount]" placeholder="Qtd" value="100" required>
-                <select name="ingredients[${ingredientIndex}][measure_unit]">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
+                <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                  <option value="fácil">Fácil</option>
+                  <option value="média">Média</option>
+                  <option value="difícil">Difícil</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
+                <input type="number" name="servings" min="1" value="1" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
+                <input type="text" name="serving_size_name" value="porção" placeholder="Ex: fatia, unidade, tigela" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
+                <input type="number" name="prep_time_minutes" min="1" value="15" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
+                <input type="number" name="cook_time_minutes" min="0" value="10" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+            </div>
+
+            <!-- Lista Dinâmica de Ingredientes TACO -->
+            <div style="border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4); margin-bottom: var(--space-6);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                <div>
+                  <h4 style="color: var(--brand-navy-900); margin: 0;">Ingredientes Oficiais (Tabela TACO) *</h4>
+                  <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Selecione os alimentos e a medida caseira correspondente.</span>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="addIngredientRow()">+ Adicionar Ingrediente</button>
+              </div>
+
+              <div id="ingredientsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="item-row" style="display: grid; grid-template-columns: 3fr 1fr 1.5fr auto; gap: 8px; align-items: center;">
+                  <select name="ingredients[0][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
+                    <option value="">Selecione o alimento TACO...</option>
+                    <?php foreach ($foods as $f): ?>
+                      <option value="<?= (int)$f['id'] ?>"><?= htmlspecialchars($f['name']) ?> (<?= htmlspecialchars($f['category'] ?? '') ?>)</option>
+                    <?php endforeach; ?>
+                  </select>
+                  <input type="number" step="0.1" name="ingredients[0][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
+                  <select name="ingredients[0][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
                     <option value="g">g (gramas)</option>
                     <option value="colher de sopa">colher de sopa</option>
                     <option value="colher de chá">colher de chá</option>
@@ -786,30 +559,101 @@ class RecipeController
                     <option value="unidade">unidade</option>
                     <option value="fatia">fatia</option>
                     <option value="ml">ml</option>
-                </select>
-                <button type="button" class="btn-del" onclick="this.parentElement.remove()">✕</button>
-            `;
-            container.appendChild(row);
-            ingredientIndex++;
-        }
+                  </select>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                </div>
+              </div>
+            </div>
 
-        function addStepRow() {
-            const container = document.getElementById('stepsContainer');
-            const stepNum = container.children.length + 1;
-            const row = document.createElement('div');
-            row.style.marginBottom = '0.5rem';
-            row.style.display = 'flex';
-            row.style.gap = '0.5rem';
-            row.innerHTML = `
-                <input type="text" name="steps[]" placeholder="Passo ${stepNum}: ..." style="flex: 1;" required>
-                <button type="button" class="btn-del" onclick="this.parentElement.remove()">✕</button>
-            `;
-            container.appendChild(row);
-        }
-    </script>
-</body>
-</html>
+            <!-- Passos de Preparo -->
+            <div style="border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4); margin-bottom: var(--space-6);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                <div>
+                  <h4 style="color: var(--brand-navy-900); margin: 0;">Modo de Preparo (Passos Ordenados)</h4>
+                  <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Descreva as etapas para orientação do paciente.</span>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="addStepRow()">+ Adicionar Passo</button>
+              </div>
+
+              <div id="stepsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" name="steps[]" placeholder="Passo 1: Em uma tigela, misture os ingredientes até homogenizar..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tags e Visibilidade -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tags (separadas por vírgula)</label>
+                <input type="text" name="tags" placeholder="Ex: rico em proteínas, rápido, low carb, sem lactose" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Visibilidade</label>
+                <select name="visibility" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                  <option value="clinic">Privada da Clínica</option>
+                  <option value="public">Pública / Compartilhada</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
+              <a href="/receitas" class="btn btn-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-accent">Salvar & Calcular Receita</button>
+            </div>
+          </form>
+        </div>
+
+        <script>
+          let ingredientIndex = 1;
+          const foodOptionsHtml = `<?php
+              foreach ($foods as $f) {
+                  echo '<option value="' . (int)$f['id'] . '">' . htmlspecialchars(addslashes($f['name'])) . '</option>';
+              }
+          ?>`;
+
+          function addIngredientRow() {
+              const container = document.getElementById('ingredientsContainer');
+              const row = document.createElement('div');
+              row.className = 'item-row';
+              row.style.cssText = 'display: grid; grid-template-columns: 3fr 1fr 1.5fr auto; gap: 8px; align-items: center;';
+              row.innerHTML = `
+                  <select name="ingredients[${ingredientIndex}][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
+                      <option value="">Selecione o alimento TACO...</option>
+                      ${foodOptionsHtml}
+                  </select>
+                  <input type="number" step="0.1" name="ingredients[${ingredientIndex}][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
+                  <select name="ingredients[${ingredientIndex}][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
+                      <option value="g">g (gramas)</option>
+                      <option value="colher de sopa">colher de sopa</option>
+                      <option value="colher de chá">colher de chá</option>
+                      <option value="xícara de chá">xícara de chá</option>
+                      <option value="unidade">unidade</option>
+                      <option value="fatia">fatia</option>
+                      <option value="ml">ml</option>
+                  </select>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+              `;
+              container.appendChild(row);
+              ingredientIndex++;
+          }
+
+          function addStepRow() {
+              const container = document.getElementById('stepsContainer');
+              const stepNum = container.children.length + 1;
+              const row = document.createElement('div');
+              row.style.cssText = 'display: flex; gap: 8px;';
+              row.innerHTML = `
+                  <input type="text" name="steps[]" placeholder="Passo ${stepNum}: ..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+              `;
+              container.appendChild(row);
+          }
+        </script>
         <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     /**
@@ -820,9 +664,9 @@ class RecipeController
         $auth = $this->getAuthInfo();
 
         $csrfToken = (string)($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
-        if (!Csrf::validateToken($csrfToken)) {
+        if (!Csrf::validate($csrfToken)) {
             http_response_code(403);
-            echo "Token CSRF inválido.";
+            echo "Token CSRF inválido ou expirado.";
             return;
         }
 
@@ -844,7 +688,7 @@ class RecipeController
 
         if (empty($ingredients)) {
             http_response_code(400);
-            echo "A receita precisa de ao menos um ingrediente.";
+            echo "A receita precisa de ao menos um ingrediente da Tabela TACO.";
             return;
         }
 
@@ -887,7 +731,7 @@ class RecipeController
     }
 
     /**
-     * Formulário de Prescrição ao Paciente
+     * Formulário de Prescrição ao Paciente (Design System ClyoNutri)
      */
     public function prescribeForm(array $params = []): void
     {
@@ -929,125 +773,95 @@ class RecipeController
             }
         }
 
-        $csrfToken = Csrf::generateToken();
-        header('Content-Type: text/html; charset=utf-8');
+        $title = 'Prescrever Receita — ' . $recipe['title'];
+        $activeNav = 'receitas';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+        $csrfToken = Csrf::token();
+
+        ob_start();
         ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prescrever Receita — <?= htmlspecialchars($recipe['title']) ?></title>
-    <style>
-        :root {
-            --primary: #059669;
-            --primary-hover: #047857;
-            --primary-light: #ecfdf5;
-            --surface: #ffffff;
-            --bg: #f8fafc;
-            --border: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background: var(--bg); color: var(--text-main); }
-        .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.85rem 1.75rem; display: flex; align-items: center; justify-content: space-between; }
-        .logo-area { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.15rem; color: var(--primary); }
-        .container { max-width: 700px; margin: 2rem auto; padding: 0 1.5rem; }
-        .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 2rem; }
-        .card h2 { font-size: 1.4rem; color: #064e3b; margin-bottom: 0.5rem; }
-        .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1.1rem; }
-        .form-group label { font-size: 0.85rem; font-weight: 600; color: #334155; }
-        .form-group input, .form-group select, .form-group textarea {
-            padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
-        }
-        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
-        .warning-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; color: #991b1b; font-size: 0.85rem; }
-    </style>
-</head>
-<body>
-    <header class="header">
-        <div class="logo-area">🥗 ClyoNutri II <span style="font-size: 0.8rem; background: var(--primary-light); padding: 2px 8px; border-radius: 999px;">Prescrição</span></div>
-        <a href="/receitas/<?= (int)$recipe['id'] ?>" class="btn btn-outline">Cancelar</a>
-    </header>
-
-    <div class="container">
-        <div class="card">
-            <h2>Prescrever Receita ao Paciente</h2>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                Receita selecionada: <strong><?= htmlspecialchars($recipe['title']) ?></strong> (<?= (int)$recipe['energy_kcal_per_serving'] ?> kcal/porção)
-            </p>
-
-            <?php if (!empty($patientAllergies)): ?>
-                <div class="warning-box">
-                    <strong>⚠️ Alerta Clínico de Alergias do Paciente:</strong>
-                    <p>O prontuário deste paciente registra: <?= htmlspecialchars(implode(', ', $patientAllergies)) ?>.</p>
-                </div>
-            <?php endif; ?>
-
-            <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/prescrever">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-
-                <div class="form-group">
-                    <label>Paciente *</label>
-                    <select name="patient_id" required onchange="window.location.href='/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=' + this.value">
-                        <?php foreach ($patients as $p): ?>
-                            <option value="<?= (int)$p['id'] ?>" <?= ((int)$p['id'] === $selectedPatientId) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($p['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Plano Alimentar de Destino *</label>
-                    <select name="meal_plan_id" required>
-                        <?php if (empty($plans)): ?>
-                            <option value="0">Plano Ativo Padrão</option>
-                        <?php else: ?>
-                            <?php foreach ($plans as $pl): ?>
-                                <option value="<?= (int)$pl['id'] ?>"><?= htmlspecialchars($pl['title']) ?></option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Refeição Prescrita *</label>
-                    <select name="meal_name" required>
-                        <option value="Café da Manhã" <?= ($recipe['meal_type'] === 'Café da Manhã') ? 'selected' : '' ?>>Café da Manhã</option>
-                        <option value="Colação">Colação</option>
-                        <option value="Almoço" <?= ($recipe['meal_type'] === 'Almoço') ? 'selected' : '' ?>>Almoço</option>
-                        <option value="Lanche da Tarde" <?= ($recipe['meal_type'] === 'Lanche da Tarde') ? 'selected' : '' ?>>Lanche da Tarde</option>
-                        <option value="Jantar" <?= ($recipe['meal_type'] === 'Jantar') ? 'selected' : '' ?>>Jantar</option>
-                        <option value="Ceia" <?= ($recipe['meal_type'] === 'Ceia') ? 'selected' : '' ?>>Ceia</option>
-                        <option value="Pré-Treino" <?= ($recipe['meal_type'] === 'Pré-Treino') ? 'selected' : '' ?>>Pré-Treino</option>
-                        <option value="Pós-Treino" <?= ($recipe['meal_type'] === 'Pós-Treino') ? 'selected' : '' ?>>Pós-Treino</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Quantidade de Porções a Consumir *</label>
-                    <input type="number" step="0.5" name="servings" value="1.0" min="0.5" max="10.0" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Orientações Específicas / Observações Clínicas</label>
-                    <textarea name="instructions" rows="3" placeholder="Ex: Consumir morno. Pode substituir queijo minas por cottage se preferir."></textarea>
-                </div>
-
-                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem;">
-                    <a href="/receitas/<?= (int)$recipe['id'] ?>" class="btn btn-outline">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">Confirmar Prescrição</button>
-                </div>
-            </form>
+        <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: var(--space-4);">
+          <a href="/receitas/<?= (int)$recipe['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none; font-weight: 600;">← Voltar à Receita</a>
         </div>
-    </div>
-</body>
-</html>
+
+        <div class="card" style="max-width: 680px; margin: 0 auto;">
+          <div class="card__header">
+            <div>
+              <h2 style="font-family: var(--font-editorial); color: var(--brand-navy-900); margin-bottom: 4px;">Prescrever Receita ao Paciente</h2>
+              <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin: 0;">
+                Receita selecionada: <strong><?= htmlspecialchars($recipe['title']) ?></strong> (<?= (int)$recipe['energy_kcal_per_serving'] ?> kcal/porção)
+              </p>
+            </div>
+          </div>
+
+          <?php if (!empty($patientAllergies)): ?>
+            <div style="background: var(--semantic-error-light); border: 1px solid #FECACA; border-radius: var(--radius-input); padding: var(--space-3); margin-top: var(--space-4); margin-bottom: var(--space-4); color: var(--semantic-error); font-size: 0.85rem;">
+              <strong>⚠️ Alerta Clínico de Incompatibilidade Alérgica:</strong>
+              <p style="margin: 4px 0 0 0;">O prontuário deste paciente registra: <?= htmlspecialchars(implode(', ', $patientAllergies)) ?>.</p>
+            </div>
+          <?php endif; ?>
+
+          <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/prescrever" style="margin-top: var(--space-4);">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Paciente *</label>
+              <select name="patient_id" required onchange="window.location.href='/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=' + this.value" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <?php foreach ($patients as $p): ?>
+                  <option value="<?= (int)$p['id'] ?>" <?= ((int)$p['id'] === $selectedPatientId) ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($p['name']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Plano Alimentar de Destino *</label>
+              <select name="meal_plan_id" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <?php if (empty($plans)): ?>
+                  <option value="0">Plano Ativo Padrão</option>
+                <?php else: ?>
+                  <?php foreach ($plans as $pl): ?>
+                    <option value="<?= (int)$pl['id'] ?>"><?= htmlspecialchars($pl['title']) ?></option>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </select>
+            </div>
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição Prescrita *</label>
+              <select name="meal_name" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <option value="Café da Manhã" <?= ($recipe['meal_type'] === 'Café da Manhã') ? 'selected' : '' ?>>Café da Manhã</option>
+                <option value="Colação">Colação</option>
+                <option value="Almoço" <?= ($recipe['meal_type'] === 'Almoço') ? 'selected' : '' ?>>Almoço</option>
+                <option value="Lanche da Tarde" <?= ($recipe['meal_type'] === 'Lanche da Tarde') ? 'selected' : '' ?>>Lanche da Tarde</option>
+                <option value="Jantar" <?= ($recipe['meal_type'] === 'Jantar') ? 'selected' : '' ?>>Jantar</option>
+                <option value="Ceia" <?= ($recipe['meal_type'] === 'Ceia') ? 'selected' : '' ?>>Ceia</option>
+                <option value="Pré-Treino" <?= ($recipe['meal_type'] === 'Pré-Treino') ? 'selected' : '' ?>>Pré-Treino</option>
+                <option value="Pós-Treino" <?= ($recipe['meal_type'] === 'Pós-Treino') ? 'selected' : '' ?>>Pós-Treino</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom: var(--space-4);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Quantidade de Porções a Consumir *</label>
+              <input type="number" step="0.5" name="servings" value="1.0" min="0.5" max="10.0" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+            </div>
+
+            <div style="margin-bottom: var(--space-6);">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Orientações Clínicas Personalizadas</label>
+              <textarea name="instructions" rows="3" placeholder="Ex: Consumir morno. Substituir sal por ervas finas desidratadas." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
+              <a href="/receitas/<?= (int)$recipe['id'] ?>" class="btn btn-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-accent">Confirmar Prescrição</button>
+            </div>
+          </form>
+        </div>
         <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     /**
@@ -1059,9 +873,9 @@ class RecipeController
         $recipeId = (int)($params['id'] ?? 0);
 
         $csrfToken = (string)($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
-        if (!Csrf::validateToken($csrfToken)) {
+        if (!Csrf::validate($csrfToken)) {
             http_response_code(403);
-            echo "Token CSRF inválido.";
+            echo "Token CSRF inválido ou expirado.";
             return;
         }
 
@@ -1078,7 +892,6 @@ class RecipeController
             $mealPlanId = (int)$stmt->fetchColumn();
 
             if ($mealPlanId <= 0) {
-                // Criar plano automático
                 $cStmt = $this->db->prepare("
                     INSERT INTO meal_plans (clinic_id, patient_id, professional_id, title, status, created_at, updated_at)
                     VALUES (:cid, :pid, :prid, 'Plano Alimentar Individualizado', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -1104,7 +917,7 @@ class RecipeController
                 $mealName
             );
 
-            header('Location: /receitas/' . $recipeId . '?prescrito=sucesso');
+            header('Location: /receitas?prescrito=1');
             exit;
         } catch (\Throwable $e) {
             http_response_code(400);
@@ -1121,9 +934,9 @@ class RecipeController
         $recipeId = (int)($params['id'] ?? 0);
 
         $csrfToken = (string)($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
-        if (!Csrf::validateToken($csrfToken)) {
+        if (!Csrf::validate($csrfToken)) {
             http_response_code(403);
-            echo "Token CSRF inválido.";
+            echo "Token CSRF inválido ou expirado.";
             return;
         }
 
