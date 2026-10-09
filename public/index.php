@@ -119,6 +119,9 @@ $requireAuth = function (callable $action) {
             header('Location: /login');
             exit;
         }
+        $credential=Connection::getInstance()->prepare("SELECT auth_version FROM users WHERE id=? AND status='active'");
+        $credential->execute([(int)$_SESSION['user_id']]);$version=$credential->fetchColumn();
+        if($version===false||(int)$version!==(int)($_SESSION['auth_version']??0)){$_SESSION=[];TenantContext::clear();header('Location: /login');exit;}
         $action($params);
     };
 };
@@ -265,10 +268,22 @@ $authenticatePatientApi = function() use ($db): array {
     return $tokenRow;
 };
 
+$getJsonInput = function(): array {
+    if (!empty($_POST)) {
+        return $_POST;
+    }
+    if (PHP_SAPI === 'cli') {
+        return [];
+    }
+    $raw = (string)file_get_contents('php://input');
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : ($_POST ?? []);
+};
+
 // Login do Paciente via API (Mobile)
-$router->post('/api/v1/auth/patient-login', function() use ($db) {
+$router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
     if (!is_array($input)) {
         http_response_code(400);
         echo json_encode(['error' => 'Requisição inválida.']);
@@ -393,11 +408,11 @@ $router->get('/api/v1/patient/home', function() use ($authenticatePatientApi, $d
 });
 
 // Registrar Hidratação
-$router->post('/api/v1/patient/hydration', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/hydration', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
     $amount = (int)($input['amount_ml'] ?? 250);
 
     $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
@@ -412,11 +427,11 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
 });
 
 // Confirmar Próxima Consulta
-$router->post('/api/v1/patient/appointment/confirm', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/appointment/confirm', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
     $appointmentId = (int)($input['appointment_id'] ?? 0);
 
     $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
@@ -436,11 +451,11 @@ $router->get('/api/v1/patient/food-diary', function() use ($authenticatePatientA
 });
 
 // Registrar Refeição no Diário
-$router->post('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
 
     $foodDiary = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
     $res = $foodDiary->logMeal($patientId, $input);
@@ -460,12 +475,11 @@ $router->get('/api/v1/patient/evolution', function() use ($authenticatePatientAp
 });
 
 // Registrar Autorrelato de Métrica (Evolução)
-$router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $raw = (string)file_get_contents('php://input');
-    $input = json_decode($raw, true) ?: $_POST;
+    $input = $getJsonInput();
 
     $metricType = trim((string)($input['metric_type'] ?? ''));
     if ($metricType === '') {
@@ -511,11 +525,11 @@ $router->get('/api/v1/patient/chat/messages', function() use ($authenticatePatie
     echo json_encode($data);
 });
 
-$router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
 
     $message = trim((string)($input['message'] ?? ''));
     $idempotencyKey = trim((string)($input['idempotency_key'] ?? ''));
@@ -555,11 +569,11 @@ $router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientA
     }
 });
 
-$router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientApi, $db) {
+$router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $input = $getJsonInput();
     $convId = (int)($input['conversation_id'] ?? 0);
 
     $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
@@ -646,6 +660,229 @@ $router->get('/api/v1/patient/recipes-shopping-list', function() use ($authentic
     $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
     $list = $recipeService->generateShoppingListFromRecipes($patientId, [], $days);
     echo json_encode(['data' => $list]);
+});
+
+// 5. API Móvel do Nutricionista / Profissional (/api/v1/professional/... — NI2-292)
+$authenticateProfessionalApi = function() use ($db): array {
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (!str_starts_with($authHeader, 'Bearer ')) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Não autorizado. Token Bearer ausente ou inválido.']);
+        exit;
+    }
+    $plainToken = substr($authHeader, 7);
+    $hashed = hash('sha256', $plainToken);
+
+    $stmt = $db->prepare("
+        SELECT t.*, u.id AS user_id, u.name AS user_name, u.email AS user_email, u.role AS user_role, cm.clinic_id, c.name AS clinic_name
+        FROM personal_access_tokens t
+        JOIN users u ON u.id = t.tokenable_id
+        JOIN clinic_members cm ON cm.user_id = u.id AND cm.status = 'active'
+        JOIN clinics c ON c.id = cm.clinic_id AND c.status = 'active'
+        WHERE t.tokenable_type = 'professional' AND u.status = 'active'
+          AND t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
+        LIMIT 1
+    ");
+    $stmt->execute(['hash' => $hashed]);
+    $tokenRow = $stmt->fetch();
+
+    if (!$tokenRow) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Token de acesso profissional inválido ou expirado.']);
+        exit;
+    }
+
+    \ClyoNutri\Core\Auth\TenantContext::set((int)$tokenRow['clinic_id'], [
+        'id' => (int)$tokenRow['user_id'],
+        'role' => $tokenRow['user_role'],
+        'name' => $tokenRow['user_name'],
+    ]);
+
+    return $tokenRow;
+};
+
+// Login do Nutricionista via API (Mobile)
+$router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonInput) {
+    header('Content-Type: application/json; charset=utf-8');
+    $input = $getJsonInput();
+    if (!is_array($input)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Requisição inválida.']);
+        return;
+    }
+    $email = trim((string)($input['email'] ?? ''));
+    $password = (string)($input['password'] ?? '');
+
+    if (empty($email) || empty($password)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Informe e-mail e senha de acesso profissional.']);
+        return;
+    }
+
+    $stmt = $db->prepare("
+        SELECT u.*, cm.clinic_id, c.name AS clinic_name
+        FROM users u
+        JOIN clinic_members cm ON cm.user_id = u.id AND cm.status = 'active'
+        JOIN clinics c ON c.id = cm.clinic_id AND c.status = 'active'
+        WHERE u.email = :email AND u.status = 'active'
+        LIMIT 1
+    ");
+    $stmt->execute(['email' => $email]);
+    $user = $stmt->fetch();
+
+    if (!$user || !password_verify($password, $user['password_hash'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Credencial profissional inválida ou acesso indisponível.']);
+        return;
+    }
+
+    // Validação de papel clínico (RBAC)
+    if (!in_array($user['role'], ['nutritionist', 'admin', 'owner'], true)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Conta sem autorização clínica ou profissional.']);
+        return;
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $hashed = hash('sha256', $token);
+    $expiresAt = gmdate('Y-m-d H:i:s', time() + 30 * 86400);
+
+    $ins = $db->prepare("
+        INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
+        VALUES ('professional', :uid, 'mobile_app_professional', :token, :expires_at, CURRENT_TIMESTAMP)
+    ");
+    $ins->execute([
+        'uid' => $user['id'],
+        'token' => $hashed,
+        'expires_at' => $expiresAt,
+    ]);
+
+    echo json_encode([
+        'token' => $token,
+        'expires_at' => $expiresAt,
+        'professional' => [
+            'id' => (int)$user['id'],
+            'clinic_id' => (int)$user['clinic_id'],
+            'clinic_name' => $user['clinic_name'],
+            'name' => $user['name'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+        ],
+    ]);
+});
+
+// Logout do Nutricionista via API (Mobile)
+$router->post('/api/v1/auth/professional-logout', function() use ($authenticateProfessionalApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticateProfessionalApi();
+    $tokenId = (int)$auth['id'];
+    $stmt = $db->prepare("DELETE FROM personal_access_tokens WHERE id = :id");
+    $stmt->execute(['id' => $tokenId]);
+    echo json_encode(['message' => 'Token profissional revogado com sucesso.']);
+});
+
+// Dashboard do Nutricionista no Mobile
+$router->get('/api/v1/professional/dashboard', function() use ($authenticateProfessionalApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticateProfessionalApi();
+    $clinicId = (int)$auth['clinic_id'];
+    $userId = (int)$auth['user_id'];
+
+    $apptService = new \ClyoNutri\Domain\Appointment\AppointmentService($db);
+    $today = date('Y-m-d');
+    $todayStats = $apptService->getTodayStats($today);
+    $todayAppointments = $apptService->listByDay($today, $userId);
+
+    $foodDiaryService = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
+    $pendingDiariesCount = $foodDiaryService->countPendingDiaries($clinicId);
+
+    $stmtPatients = $db->prepare("SELECT COUNT(*) AS total FROM patients WHERE clinic_id = :cid AND status = 'active'");
+    $stmtPatients->execute(['cid' => $clinicId]);
+    $activePatientsCount = (int)($stmtPatients->fetch()['total'] ?? 0);
+
+    echo json_encode([
+        'professional_name' => $auth['user_name'],
+        'clinic_name' => $auth['clinic_name'],
+        'clinic_id' => $clinicId,
+        'today_stats' => $todayStats,
+        'today_appointments' => $todayAppointments,
+        'pending_diaries_count' => $pendingDiariesCount,
+        'active_patients_count' => $activePatientsCount,
+    ]);
+});
+
+// Lista de Pacientes do Nutricionista no Mobile
+$router->get('/api/v1/professional/patients', function() use ($authenticateProfessionalApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticateProfessionalApi();
+    $clinicId = (int)$auth['clinic_id'];
+
+    $stmt = $db->prepare("
+        SELECT id, name, email, phone, status, created_at
+        FROM patients
+        WHERE clinic_id = :cid
+        ORDER BY name ASC
+        LIMIT 100
+    ");
+    $stmt->execute(['cid' => $clinicId]);
+    $patients = $stmt->fetchAll();
+
+    echo json_encode(['patients' => $patients]);
+});
+
+// Linha do tempo de diários alimentares dos pacientes da clínica
+$router->get('/api/v1/professional/food-diaries', function() use ($authenticateProfessionalApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticateProfessionalApi();
+    $clinicId = (int)$auth['clinic_id'];
+
+    $foodDiaryService = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
+    $diaries = $foodDiaryService->getClinicDiaries($clinicId, 50);
+
+    echo json_encode(['diaries' => $diaries]);
+});
+
+// Envio de feedback contextual em diário alimentar pelo nutricionista
+$router->post('/api/v1/professional/food-diary/{id}/feedback', function($params = []) use ($authenticateProfessionalApi, $db, $getJsonInput) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticateProfessionalApi();
+    $clinicId = (int)$auth['clinic_id'];
+    $entryId = (int)($params['id'] ?? 0);
+
+    $input = $getJsonInput();
+    $feedback = trim((string)($input['feedback'] ?? ''));
+
+    if ($entryId <= 0 || $feedback === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Identificador da refeição e mensagem de feedback clínico são obrigatórios.']);
+        return;
+    }
+
+    $foodDiaryService = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
+    $success = $foodDiaryService->addProfessionalFeedback($entryId, $feedback);
+
+    if ($success) {
+        $stmtAudit = $db->prepare("
+            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
+            VALUES (:cid, :uid, 'FOOD_DIARY_FEEDBACK_GIVEN', 'food_diary_entry', :eid, :val, CURRENT_TIMESTAMP)
+        ");
+        $stmtAudit->execute([
+            'cid' => $clinicId,
+            'uid' => (int)$auth['user_id'],
+            'eid' => (string)$entryId,
+            'val' => json_encode(['feedback_length' => strlen($feedback)]),
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'entry_id' => $entryId,
+            'feedback' => $feedback,
+            'reviewed_at' => date('Y-m-d H:i:s'),
+        ]);
+    } else {
+        http_response_code(404);
+        echo json_encode(['error' => 'Registro no diário não encontrado ou não pertence a esta clínica.']);
+    }
 });
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

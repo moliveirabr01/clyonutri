@@ -327,6 +327,13 @@ if (str_contains($px29Output, 'TODOS OS 9 GATES DE HOMOLOGAÇÃO PX-29 (NI2-322)
     recordCheck('E2E_JOURNEYS', 'Recuperação de Acesso & Redefinição de Senha Segura (NI2-322 / PX-29)', 'FAIL', 'Falha no teste PX-29: ' . substr($px29Output, 0, 200));
 }
 
+$ni2292Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/ni2_292_mobile_app_patient_and_professional_e2e_test.php') . " 2>&1");
+if (str_contains($ni2292Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO NI2-292 FORAM APROVADOS COM SUCESSO (PASS)')) {
+    recordCheck('E2E_JOURNEYS', 'App Mobile Paciente & Nutricionista — Engajamento, Retenção e Feedback (NI2-292)', 'PASS', '7/7 gates aprovados: login segregado profissional/paciente, tokens Sanctum SHA-256 30d, dashboard do nutricionista, agenda, roster de pacientes, fila de diários e feedback contextual');
+} else {
+    recordCheck('E2E_JOURNEYS', 'App Mobile Paciente & Nutricionista — Engajamento, Retenção e Feedback (NI2-292)', 'FAIL', 'Falha no teste NI2-292: ' . substr($ni2292Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

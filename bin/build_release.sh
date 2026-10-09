@@ -86,6 +86,7 @@ TEST_FILES=(
     "tests/px_12_financial_empty_state_and_operations_test.php"
     "tests/px_13_clinical_language_and_enum_sanitization_test.php"
     "tests/px_29_password_reset_and_access_recovery_test.php"
+    "tests/ni2_292_mobile_app_patient_and_professional_e2e_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

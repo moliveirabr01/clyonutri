@@ -14,6 +14,70 @@ export interface PatientAuthData {
   };
 }
 
+export interface ProfessionalAuthData {
+  token: string;
+  expires_at: string;
+  professional: {
+    id: number;
+    clinic_id: number;
+    clinic_name: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+export interface ProfessionalDashboardData {
+  professional_name: string;
+  clinic_name: string;
+  clinic_id: number;
+  today_stats: {
+    total: number;
+    completed: number;
+    in_progress: number;
+    scheduled: number;
+    confirmed: number;
+    cancelled: number;
+    no_show: number;
+  };
+  today_appointments: Array<{
+    id: number;
+    scheduled_at: string;
+    status: string;
+    patient_name?: string;
+    patient_id?: number;
+    notes?: string;
+  }>;
+  pending_diaries_count: number;
+  active_patients_count: number;
+}
+
+export interface ProfessionalPatientItem {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  status: string;
+  created_at: string;
+}
+
+export interface ProfessionalFoodDiaryItem {
+  id: number;
+  clinic_id: number;
+  patient_id: number;
+  patient_name: string;
+  patient_email: string;
+  meal_name: string;
+  consumed_at: string;
+  photo_path?: string;
+  description?: string;
+  hunger_level?: number;
+  satiety_level?: number;
+  symptoms?: string;
+  feedback_from_professional?: string;
+  reviewed_at?: string;
+}
+
 export interface MealPlanItemSubstitution {
   id: number;
   item_id: number;
@@ -119,7 +183,7 @@ export function setSessionExpiredHandler(handler: (() => void) | null) {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) { super(message); }
+  constructor(message: string, public status: number, public kind: 'offline' | 'server' | 'invalid' | 'auth' = status === 0 ? 'offline' : status === 401 ? 'auth' : 'server', public requestId?: string) { super(message); }
 }
 
 export function setApiBaseUrl(url: string) {
@@ -162,24 +226,21 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     onSessionExpired?.();
   }
 
+  let payload: any;
+  try { payload = await response.json(); }
+  catch (_) {
+    throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid', response.headers.get('X-Request-ID') || undefined);
+  }
   if (!response.ok) {
-    let errorDetail = `HTTP ${response.status} ${response.statusText}`;
-    try {
-      const errJson = await response.json();
-      if (errJson?.error) {
-        errorDetail = errJson.error;
-      }
-    } catch (_) {
-      // Falha ao parsear corpo de erro JSON
-    }
-    throw new ApiError(errorDetail, response.status);
+    const message = response.status === 401 ? 'Sua sessão expirou. Entre novamente.'
+      : response.status >= 500 ? 'Não foi possível carregar os dados. Tente novamente.'
+      : typeof payload?.error === 'string' ? payload.error : 'Não foi possível concluir a solicitação.';
+    throw new ApiError(message, response.status, response.status === 401 ? 'auth' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined);
   }
-
-  try {
-    return await response.json() as T;
-  } catch (_) {
-    throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status);
+  if (!payload || typeof payload !== 'object' || payload.error) {
+    throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid');
   }
+  return payload as T;
 }
 
 export const ApiService = {
@@ -213,7 +274,9 @@ export const ApiService = {
   },
 
   async getHome(): Promise<PatientHomeData> {
-    return request<PatientHomeData>('/api/v1/patient/home');
+    const data = await request<PatientHomeData>('/api/v1/patient/home');
+    if (typeof data.patient_name !== 'string' || typeof data.water_ml_today !== 'number' || !('active_plan' in data)) throw new ApiError('Resposta do resumo inválida. Tente novamente.', 200, 'invalid');
+    return data;
   },
 
   async logHydration(amountMl: number): Promise<{ id: number; amount_ml: number; total_water_today: number }> {
@@ -231,7 +294,9 @@ export const ApiService = {
   },
 
   async getFoodDiary(): Promise<{ entries: FoodDiaryEntry[] }> {
-    return request<{ entries: FoodDiaryEntry[] }>('/api/v1/patient/food-diary');
+    const data = await request<{ entries: FoodDiaryEntry[] }>('/api/v1/patient/food-diary');
+    if (!Array.isArray(data.entries)) throw new ApiError('Resposta do diário inválida. Tente novamente.', 200, 'invalid');
+    return data;
   },
 
   async logMeal(entry: { meal_name: string; description?: string; consumed_at?: string }): Promise<FoodDiaryEntry> {
@@ -242,13 +307,63 @@ export const ApiService = {
   },
 
   async getEvolution(): Promise<EvolutionData> {
-    return request<EvolutionData>('/api/v1/patient/evolution');
+    const data = await request<EvolutionData>('/api/v1/patient/evolution');
+    if (!Array.isArray(data.clinical_records) || !Array.isArray(data.self_reports)) throw new ApiError('Resposta da evolução inválida. Tente novamente.', 200, 'invalid');
+    return data;
   },
 
   async logSelfMetric(metric: { metric_type: string; value: number; unit?: string; notes?: string }) {
     return request('/api/v1/patient/self-metrics', {
       method: 'POST',
       body: JSON.stringify(metric),
+    });
+  },
+
+  // --- Métodos da Jornada do Nutricionista / Profissional (NI2-292) ---
+  async loginProfessional(credentials: { email: string; password: string }): Promise<ProfessionalAuthData> {
+    const data = await request<ProfessionalAuthData>('/api/v1/auth/professional-login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    if (!data.token || !data.professional?.id || !data.expires_at) {
+      throw new Error('Resposta de autenticação profissional inválida.');
+    }
+    setAuthToken(data.token);
+    return data;
+  },
+
+  async logoutProfessional(): Promise<{ message: string }> {
+    try {
+      const res = await request<{ message: string }>('/api/v1/auth/professional-logout', {
+        method: 'POST',
+      });
+      setAuthToken(null);
+      return res;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthToken(null);
+        return { message: 'Sessão profissional já encerrada ou expirada.' };
+      }
+      throw error;
+    }
+  },
+
+  async getProfessionalDashboard(): Promise<ProfessionalDashboardData> {
+    return request<ProfessionalDashboardData>('/api/v1/professional/dashboard');
+  },
+
+  async getProfessionalPatients(): Promise<{ patients: ProfessionalPatientItem[] }> {
+    return request<{ patients: ProfessionalPatientItem[] }>('/api/v1/professional/patients');
+  },
+
+  async getProfessionalFoodDiaries(): Promise<{ diaries: ProfessionalFoodDiaryItem[] }> {
+    return request<{ diaries: ProfessionalFoodDiaryItem[] }>('/api/v1/professional/food-diaries');
+  },
+
+  async submitFoodDiaryFeedback(entryId: number, feedback: string): Promise<{ success: boolean; entry_id: number; feedback: string; reviewed_at: string }> {
+    return request<{ success: boolean; entry_id: number; feedback: string; reviewed_at: string }>(`/api/v1/professional/food-diary/${entryId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ feedback }),
     });
   },
 };

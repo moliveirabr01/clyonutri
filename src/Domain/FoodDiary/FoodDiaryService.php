@@ -70,11 +70,13 @@ class FoodDiaryService
             WHERE id = :id AND clinic_id = :clinic_id
         ");
 
-        return $stmt->execute([
+        $stmt->execute([
             'feedback' => trim($feedback),
             'id' => $entryId,
             'clinic_id' => $clinicId,
         ]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
@@ -101,5 +103,42 @@ class FoodDiaryService
         $stmt->execute($params);
 
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Linha do tempo de diários da clínica com dados do paciente para o nutricionista
+     */
+    public function getClinicDiaries(int $clinicId, int $limit = 50): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT f.*, p.name AS patient_name, p.email AS patient_email
+            FROM food_diary_entries f
+            JOIN patients p ON p.id = f.patient_id
+            WHERE f.clinic_id = :clinic_id
+            ORDER BY f.consumed_at DESC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':clinic_id', $clinicId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Total de registros no diário pendentes de feedback do nutricionista
+     */
+    public function countPendingDiaries(int $clinicId): int
+    {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) AS total
+            FROM food_diary_entries
+            WHERE clinic_id = :clinic_id
+              AND (feedback_from_professional IS NULL OR feedback_from_professional = '')
+        ");
+        $stmt->execute(['clinic_id' => $clinicId]);
+        $row = $stmt->fetch();
+
+        return (int)($row['total'] ?? 0);
     }
 }
