@@ -17,6 +17,7 @@ use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Finance\FinanceService;
 use ClyoNutri\Domain\Food\FoodCatalogService;
 use ClyoNutri\Domain\MealPlan\MealPlanService;
+use ClyoNutri\Domain\Onboarding\OnboardingService;
 use ClyoNutri\Domain\Patient\PatientRepository;
 
 class DashboardController
@@ -3247,6 +3248,13 @@ class DashboardController
         $avgAdh = $stmtAdh->fetchColumn();
         $adherenceText = $avgAdh !== null ? number_format((float)$avgAdh, 1) . '%' : '94.0%';
 
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $onboardingProgress = null;
+        if ($userId > 0 && $clinicId > 0) {
+            $onboardingService = new OnboardingService($db);
+            $onboardingProgress = $onboardingService->getOrCreateProgress($userId, $clinicId);
+        }
+
         $title = 'Dashboard';
         $activeNav = 'dashboard';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
@@ -3258,6 +3266,36 @@ class DashboardController
           <h1>Painel Geral</h1>
           <p style="color: var(--neutral-gray-500);">Visão operacional e prioridades clínicas em tempo real.</p>
         </div>
+
+        <?php if (!empty($_GET['onboarding']) && $_GET['onboarding'] === 'concluido'): ?>
+          <div class="card" style="background: #F0FDF4; border: 1px solid #BBF7D0; margin-bottom: var(--space-6); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div>
+              <div style="font-weight: 700; color: #166534; font-size: 0.95rem;">Consultório ativado com sucesso!</div>
+              <div style="font-size: 0.85rem; color: #15803D;">Suas preferências profissionais e rotinas clínicas foram salvas. Você já pode cadastrar novos pacientes e iniciar consultas.</div>
+            </div>
+          </div>
+        <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed']): ?>
+          <div class="card" style="background: linear-gradient(135deg, rgba(198,90,57,0.06) 0%, rgba(26,54,68,0.05) 100%); border: 1px solid rgba(198,90,57,0.25); margin-bottom: var(--space-6); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-4) var(--space-5);">
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+              <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--brand-copper-500); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 1rem; box-shadow: 0 2px 4px rgba(198,90,57,0.25);">
+                <?= (int)$onboardingProgress['current_step'] ?>/5
+              </div>
+              <div>
+                <div style="font-weight: 700; color: var(--brand-navy-900); font-size: 1rem;">
+                  Configuração do seu consultório em andamento (<?= (int)$onboardingProgress['progress_pct'] ?>% concluído)
+                </div>
+                <div style="font-size: 0.875rem; color: var(--neutral-gray-600); margin-top: 2px;">
+                  Complete os 5 passos para personalizar totalmente suas preferências de atendimento, especialidades e seu primeiro paciente.
+                </div>
+              </div>
+            </div>
+            <a href="/onboarding" class="btn btn-accent" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+              Continuar Onboarding
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </div>
+        <?php endif; ?>
 
         <!-- Cards de Métricas Reais (NI2-85) -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">

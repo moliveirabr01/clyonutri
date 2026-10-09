@@ -51,13 +51,13 @@ $teleCtrl = new \ClyoNutri\Application\Controllers\TeleconsultationController($d
 $helpCtrl = new \ClyoNutri\Application\Controllers\HelpdeskController($db);
 $chatCtrl = new \ClyoNutri\Application\Controllers\ChatController($db);
 $recipeCtrl = new \ClyoNutri\Application\Controllers\RecipeController($db);
+$onboardingCtrl = new \ClyoNutri\Application\Controllers\OnboardingController($db);
 
-// 1. Rotas de Autenticação e Onboarding
+// 1. Rotas de Autenticação
 $router->get('/login', [$authCtrl, 'showLogin']);
 $router->post('/login', [$authCtrl, 'login']);
 $router->get('/cadastro', [$authCtrl, 'showRegister']);
 $router->post('/cadastro', [$authCtrl, 'register']);
-$router->get('/onboarding', [$authCtrl, 'showRegister']);
 $router->get('/logout', [$authCtrl, 'logout']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
@@ -122,6 +122,11 @@ $requireAuth = function (callable $action) {
 $router->get('/', [$landingCtrl, 'index']);
 $router->get('/termos', [$landingCtrl, 'terms']);
 $router->get('/privacidade', [$landingCtrl, 'privacy']);
+
+// Onboarding Guiado e Ativação do Consultório (NI2-282)
+$router->get('/onboarding', $requireAuth([$onboardingCtrl, 'show']));
+$router->post('/onboarding/passo', $requireAuth([$onboardingCtrl, 'submitStep']));
+$router->get('/api/v1/onboarding/status', $requireAuth([$onboardingCtrl, 'apiStatus']));
 
 $router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
 $router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));

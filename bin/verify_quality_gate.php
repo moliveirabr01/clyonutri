@@ -98,6 +98,8 @@ $criticalPhpFiles = [
     'src/Domain/PatientPortal/PatientPortalService.php',
     'src/Domain/FoodDiary/FoodDiaryService.php',
     'src/Domain/Engagement/EngagementService.php',
+    'src/Domain/Onboarding/OnboardingService.php',
+    'src/Application/Controllers/OnboardingController.php',
     'src/Core/Database/DemoSeeder.php',
     'bin/seed.php',
 ];
@@ -256,6 +258,13 @@ if (str_contains($recipeOutput, 'TODOS OS 9 CRITÉRIOS DE ACEITE DE RECEITAS (NI
     recordCheck('E2E_JOURNEYS', 'Receitas Culinárias, Composição Nutricional & Prescrição E2E (NI2-268: NI2-269 a NI2-280)', 'PASS', 'Composição TACO oficial, snapshot v1 imutável, medidas caseiras, busca com filtros, variantes com parent_id, alertas de alergênicos, favoritos do paciente e lista de compras por gôndolas');
 } else {
     recordCheck('E2E_JOURNEYS', 'Receitas Culinárias, Composição Nutricional & Prescrição E2E (NI2-268: NI2-269 a NI2-280)', 'FAIL', 'Falha no módulo de Receitas Culinárias: ' . substr($recipeOutput, 0, 200));
+}
+
+$onboardingOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/onboarding_guided_and_activation_e2e_test.php') . " 2>&1");
+if (str_contains($onboardingOutput, 'TODOS OS 9 GATES DE ONBOARDING & ATIVAÇÃO (NI2-282) FORAM APROVADOS')) {
+    recordCheck('E2E_JOURNEYS', 'Onboarding Guiado & Ativação do Consultório E2E (NI2-282)', 'PASS', 'Fluxo progressivo em 5 passos no Design System ClyoNutri, persistência em professionals e patients, resiliência na retomada e multi-tenant fail-closed');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Onboarding Guiado & Ativação do Consultório E2E (NI2-282)', 'FAIL', 'Falha no Onboarding Guiado: ' . substr($onboardingOutput, 0, 200));
 }
 
 // Browser Físico / Playwright

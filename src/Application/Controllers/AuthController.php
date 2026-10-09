@@ -146,7 +146,7 @@ class AuthController
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['clinic_name'] = $clinicName;
 
-            header('Location: /dashboard');
+            header('Location: /onboarding');
             exit;
         } catch (\Throwable $e) {
             $_SESSION['flash_error'] = $e->getMessage();

@@ -99,7 +99,7 @@ $stmtPatientB = $db->prepare("INSERT INTO patients (uuid, clinic_id, name, email
 $stmtPatientB->execute(['uuid' => $patientUuidB]);
 $patientIdB = (int)$db->lastInsertId();
 
-$db->exec("DELETE FROM appointments WHERE patient_id IN ({$patientA1['id']}, {$patientA2['id']})");
+$db->exec("DELETE FROM appointments WHERE patient_id IN ({$patientA1['id']}, {$patientA2['id']}) OR (professional_id = {$profIdA} AND scheduled_at LIKE '" . date('Y-m-d') . "%')");
 
 $service = new AppointmentService($db);
 
