@@ -215,6 +215,7 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
         $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
         $plan = $apiCtrl->getDailyMealPlan($patientId);
         $nextApp = $apiCtrl->portal()->getNextAppointment($patientId);
+        $waterGoal = $apiCtrl->portal()->getPrescribedWaterGoal($patientId);
 
         $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND date(logged_at) = date('now')");
         $hStmt->execute(['pid' => $patientId]);
@@ -223,7 +224,7 @@ function dispatchRequest(string $method, string $uri, ?array $body = null, ?stri
         $respond(200, [
             'patient_name' => $auth['patient_name'],
             'water_ml_today' => $waterToday,
-            'water_goal_ml' => 2500,
+            'water_goal_ml' => $waterGoal,
             'next_appointment' => $nextApp,
             'active_plan' => $plan,
         ]);
@@ -322,6 +323,7 @@ $homeData = dispatchRequest('GET', '/api/v1/patient/home', null, $token);
 assertContract($homeData['status'] === 200, "Acesso a /patient/home com Bearer token retorna HTTP 200");
 assertContract($homeData['body']['active_plan'] === null, "Empty state real: active_plan é estritamente null sem simulação");
 assertContract($homeData['body']['water_ml_today'] === 0, "Consumo inicial de água hoje é 0 ml");
+assertContract($homeData['body']['water_goal_ml'] === null, "Empty state real de meta hídrica: water_goal_ml é estritamente null sem fallback falso (PX-20 / NI2-313)");
 assertContract($homeData['body']['next_appointment']['id'] === 9551, "Próxima consulta é retornada da tabela appointments (#9551)");
 
 // -----------------------------------------------------------------------------

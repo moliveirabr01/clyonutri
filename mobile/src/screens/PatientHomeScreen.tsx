@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {
   ApiService,
+  PatientAuthData,
   PatientHomeData,
   FoodDiaryEntry,
   EvolutionData,
@@ -19,7 +20,7 @@ import {
 
 export type NavigationTab = 'Hoje' | 'Plano' | 'Diario' | 'Evolucao' | 'Perfil';
 
-export default function PatientHomeScreen() {
+export default function PatientHomeScreen({ session, onLogout }: { session: PatientAuthData; onLogout: () => void }) {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('Hoje');
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -30,6 +31,10 @@ export default function PatientHomeScreen() {
   const [homeData, setHomeData] = useState<PatientHomeData | null>(null);
   const [diaryEntries, setDiaryEntries] = useState<FoodDiaryEntry[]>([]);
   const [evolutionData, setEvolutionData] = useState<EvolutionData | null>(null);
+  const [diaryError, setDiaryError] = useState<string | null>(null);
+  const [evolutionError, setEvolutionError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   // Carregamento principal
@@ -44,12 +49,14 @@ export default function PatientHomeScreen() {
       try {
         const diary = await ApiService.getFoodDiary();
         setDiaryEntries(diary.entries || []);
-      } catch (_) {}
+        setDiaryError(null);
+      } catch (_) { setDiaryError('Não foi possível carregar o diário. Tente atualizar.'); }
 
       try {
         const evo = await ApiService.getEvolution();
         setEvolutionData(evo);
-      } catch (_) {}
+        setEvolutionError(null);
+      } catch (_) { setEvolutionError('Não foi possível carregar a evolução. Tente atualizar.'); }
     } catch (err: any) {
       setIsOffline(true);
       setErrorMessage(err.message || 'Falha na comunicação com o servidor');
@@ -126,9 +133,15 @@ export default function PatientHomeScreen() {
     );
   }
 
-  const patientName = homeData?.patient_name || 'Paciente';
+  if (!homeData) return <SafeAreaView style={styles.centerContainer}>
+    <Text accessibilityRole="alert" style={styles.errorAlertText}>{errorMessage || 'Não foi possível carregar seus dados.'}</Text>
+    <TouchableOpacity onPress={fetchAllData} accessibilityRole="button" accessibilityLabel="Tentar novamente"><Text>Tentar novamente</Text></TouchableOpacity>
+    <TouchableOpacity onPress={async () => { try { await ApiService.logout(); onLogout(); } catch (_) { setErrorMessage('Falha ao encerrar sessão. Tente novamente.'); } }} accessibilityRole="button"><Text>Encerrar sessão</Text></TouchableOpacity>
+  </SafeAreaView>;
+
+  const patientName = homeData.patient_name;
   const waterMl = homeData?.water_ml_today ?? 0;
-  const waterGoal = homeData?.water_goal_ml ?? 2500;
+  const waterGoal = homeData?.water_goal_ml ?? null;
   const nextApp = homeData?.next_appointment;
   const activePlan = homeData?.active_plan;
 
@@ -142,13 +155,13 @@ export default function PatientHomeScreen() {
         accessibilityLabel={
           isOffline
             ? 'Atenção: Modo offline ou falha de conexão com o servidor'
-            : 'Status: Dados sincronizados em tempo real com seu consultório'
+            : 'Resumo atualizado com seu consultório'
         }
       >
         <Text style={[styles.syncText, isOffline && styles.syncTextOffline]}>
           {isOffline
             ? '⚠️ Conexão indisponível — dados podem estar desatualizados'
-            : '✓ Conectado e sincronizado em tempo real'}
+            : '✓ Resumo atualizado com seu consultório'}
         </Text>
       </View>
 
@@ -223,23 +236,35 @@ export default function PatientHomeScreen() {
               )}
             </View>
 
-            {/* Card de Hidratação Diária com persistência no servidor (Critério 3) */}
+            {/* Card de Hidratação Diária com persistência no servidor (Critério 3 e PX-20 / NI2-313) */}
             <View
               style={styles.card}
               accessible={true}
-              accessibilityLabel={`Meta de hidratação: ${waterMl} ml de ${waterGoal} ml`}
+              accessibilityLabel={
+                waterGoal !== null && waterGoal > 0
+                  ? `Meta de hidratação: ${waterMl} ml de ${waterGoal} ml`
+                  : `Hidratação registrada: ${waterMl} ml. Nenhuma meta hídrica prescrita.`
+              }
             >
               <Text style={styles.cardTitle}>💧 Hidratação Diária</Text>
-              <Text style={styles.waterValue}>{waterMl} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
-              
-              <View style={styles.progressBarBackground}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${Math.min(100, Math.round((waterMl / waterGoal) * 100))}%` },
-                  ]}
-                />
-              </View>
+              {waterGoal !== null && waterGoal > 0 ? (
+                <>
+                  <Text style={styles.waterValue}>{waterMl} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
+                  <View style={styles.progressBarBackground}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${Math.min(100, Math.round((waterMl / waterGoal) * 100))}%` },
+                      ]}
+                    />
+                  </View>
+                </>
+              ) : (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.waterValue}>{waterMl} ml</Text>
+                  <Text style={styles.metaLabel}>Meta hídrica não definida pelo nutricionista</Text>
+                </View>
+              )}
 
               <View style={styles.buttonRow}>
                 <TouchableOpacity
@@ -355,7 +380,7 @@ export default function PatientHomeScreen() {
             <Text style={styles.sectionTitle} accessibilityRole="header">Diário Alimentar</Text>
             <Text style={styles.helperText}>Histórico com distinção clara entre planejado e realizado</Text>
 
-            {diaryEntries.length > 0 ? (
+            {diaryError ? <Text accessibilityRole="alert" style={styles.errorAlertText}>{diaryError}</Text> : diaryEntries.length > 0 ? (
               diaryEntries.map((entry) => (
                 <View key={entry.id} style={styles.card}>
                   <Text style={styles.cardTitle}>
@@ -388,7 +413,7 @@ export default function PatientHomeScreen() {
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle} accessibilityRole="header">Evolução & Metas</Text>
 
-            {evolutionData?.clinical_records && evolutionData.clinical_records.length > 0 ? (
+            {evolutionError ? <Text accessibilityRole="alert" style={styles.errorAlertText}>{evolutionError}</Text> : evolutionData?.clinical_records && evolutionData.clinical_records.length > 0 ? (
               evolutionData.clinical_records.map((c) => (
                 <View key={c.id} style={styles.card}>
                   <Text style={styles.cardTitle}>📊 Medição Clínica Oficial • {c.date}</Text>
@@ -423,18 +448,25 @@ export default function PatientHomeScreen() {
             <Text style={styles.sectionTitle} accessibilityRole="header">Perfil & Privacidade</Text>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{patientName}</Text>
-              <Text style={styles.mealItem}>Status de Autenticação: Token Revogável Ativo</Text>
-              <Text style={styles.mealItem}>Consentimento LGPD: V1 Ativo e Auditado</Text>
+              <Text style={styles.mealItem}>Paciente: {session.patient.email}</Text>
+              {logoutError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{logoutError}</Text>}
               <TouchableOpacity
                 style={[styles.copperButton, { marginTop: 16 }]}
                 onPress={async () => {
-                  await ApiService.logout();
-                  Alert.alert('Desconectado', 'Sua sessão foi encerrada e o token de acesso revogado com segurança.');
+                  setLoggingOut(true);
+                  setLogoutError(null);
+                  try {
+                    await ApiService.logout();
+                    onLogout();
+                  } catch (_) {
+                    setLogoutError('Não foi possível revogar a sessão no servidor. Verifique sua conexão e tente sair novamente.');
+                  } finally { setLoggingOut(false); }
                 }}
                 accessibilityRole="button"
+                disabled={loggingOut}
                 accessibilityLabel="Encerrar sessão e revogar token"
               >
-                <Text style={styles.copperButtonText}>Encerrar Sessão (Logout)</Text>
+                <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar Sessão (Logout)'}</Text>
               </TouchableOpacity>
             </View>
           </View>

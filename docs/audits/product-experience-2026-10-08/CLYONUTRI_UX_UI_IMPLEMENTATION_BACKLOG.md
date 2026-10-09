@@ -515,6 +515,8 @@ P0 deve ser resolvido antes de anunciar disponibilidade do app paciente. P1 clí
 
 **Dependências:** Decisão clínica sobre semântica do campo.
 
+**Status de implementação:** Resolvido (NI2-313) · Suíte `tests/px_20_prescribed_water_goal_and_empty_state_test.php` (7/7 gates aprovados) e `tests/patient_mobile_http_contract_test.php` integradas ao quality gate e release pipeline.
+
 **Evidência de conclusão exigida:** resultado do teste na fronteira real afetada, captura quando houver interface, verificação de persistência quando houver mutação, e vínculo com finding. Não encerrar pela presença de código ou por teste de domínio de outra fronteira.
 
 ## PX-21 — Tokens e variantes divergem da referência e entre módulos

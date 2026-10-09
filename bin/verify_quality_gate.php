@@ -288,6 +288,13 @@ if (str_contains($px04Output, 'TODOS OS 7 GATES DO PX-04 (NI2-297) FORAM APROVAD
     recordCheck('E2E_JOURNEYS', 'Adesão Real no Dashboard & Estado de Vazio (NI2-297 / PX-04)', 'FAIL', 'Falha no teste PX-04: ' . substr($px04Output, 0, 200));
 }
 
+$px20Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_20_prescribed_water_goal_and_empty_state_test.php') . " 2>&1");
+if (str_contains($px20Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO PASSARAM COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Meta Hídrica Prescrita & Empty State (NI2-313 / PX-20)', 'PASS', 'Eliminação do fallback fixo de 2500ml, fonte única na anamnese clínica, empty state null fidedigno e versionamento v1->v2 aprovados');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Meta Hídrica Prescrita & Empty State (NI2-313 / PX-20)', 'FAIL', 'Falha no teste PX-20: ' . substr($px20Output, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

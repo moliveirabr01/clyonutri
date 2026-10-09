@@ -5,6 +5,7 @@
 
 export interface PatientAuthData {
   token: string;
+  expires_at: string;
   patient: {
     id: number;
     clinic_id: number;
@@ -68,7 +69,7 @@ export interface Appointment {
 export interface PatientHomeData {
   patient_name: string;
   water_ml_today: number;
-  water_goal_ml: number;
+  water_goal_ml: number | null;
   next_appointment: Appointment | null;
   active_plan: ActiveMealPlan | null;
 }
@@ -110,7 +111,16 @@ export interface EvolutionData {
 }
 
 let currentAuthToken: string | null = null;
-let currentApiBaseUrl: string = 'http://localhost:8080';
+let currentApiBaseUrl: string = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/+$/, '');
+let onSessionExpired: (() => void) | null = null;
+
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  onSessionExpired = handler;
+}
+
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
 
 export function setApiBaseUrl(url: string) {
   currentApiBaseUrl = url.replace(/\/+$/, '');
@@ -140,10 +150,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   const url = `${currentApiBaseUrl}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (_) {
+    throw new ApiError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', 0);
+  }
+
+  if (response.status === 401 && currentAuthToken && endpoint !== '/api/v1/auth/patient-login') {
+    setAuthToken(null);
+    onSessionExpired?.();
+  }
 
   if (!response.ok) {
     let errorDetail = `HTTP ${response.status} ${response.statusText}`;
@@ -155,30 +172,43 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     } catch (_) {
       // Falha ao parsear corpo de erro JSON
     }
-    throw new Error(errorDetail);
+    throw new ApiError(errorDetail, response.status);
   }
 
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as T;
+  } catch (_) {
+    throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status);
+  }
 }
 
 export const ApiService = {
-  async login(credentials: { email?: string; cpf?: string }): Promise<PatientAuthData> {
+  async login(credentials: { email: string; password: string }): Promise<PatientAuthData> {
     const data = await request<PatientAuthData>('/api/v1/auth/patient-login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
+    if (!data.token || !data.patient?.id || !data.expires_at) {
+      throw new Error('Resposta de autenticação inválida.');
+    }
     setAuthToken(data.token);
     return data;
   },
 
   async logout(): Promise<{ message: string }> {
+    // Keep the token on transport failure so the patient can retry server revocation.
     try {
       const res = await request<{ message: string }>('/api/v1/auth/patient-logout', {
         method: 'POST',
       });
-      return res;
-    } finally {
       setAuthToken(null);
+      return res;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthToken(null);
+        return { message: 'Sessão já encerrada ou expirada.' };
+      }
+      throw error;
     }
   },
 

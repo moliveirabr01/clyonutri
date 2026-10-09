@@ -1,16 +1,16 @@
 {
   "product": "ClyoNutri II",
   "version": "1.0.0",
-  "build_timestamp": "20261009_001043",
-  "git_commit": "92c21a8",
+  "build_timestamp": "20261009_002439",
+  "git_commit": "87c9a0f",
   "release_gate": {
     "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
     "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",
     "is_production_approved": false,
     "fail_closed_enforced": true,
     "health_check": "PASSED",
-    "total_test_suites": 38,
-    "passed_test_suites": 38,
+    "total_test_suites": 39,
+    "passed_test_suites": 39,
     "zero_failures_verified": true,
     "audit_360_layers": {
       "syntax_static": "PASSED (Zero erros em php -l)",

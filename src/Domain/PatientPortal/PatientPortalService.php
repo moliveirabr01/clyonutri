@@ -579,4 +579,44 @@ class PatientPortalService
             'items' => $results,
         ];
     }
+
+    /**
+     * Retorna a meta hídrica prescrita para o paciente na anamnese clínica vigente (PX-20 / NI2-313).
+     *
+     * Regras clínicas e de integridade:
+     * - Fonte única da verdade: anamnese clínica mais recente do paciente no tenant.
+     * - "Ausência é ausência": se nenhuma anamnese existe ou o campo não foi preenchido,
+     *   retorna estritamente null (sem valores fictícios como 2500ml).
+     * - Prioriza anamneses finalizadas sobre rascunhos.
+     * - Isolamento multi-tenant estrito via TenantGuard.
+     *
+     * @param int $patientId
+     * @return int|null Meta prescrita em ml ou null se ausente/não definida
+     */
+    public function getPrescribedWaterGoal(int $patientId): ?int
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $stmt = $this->db->prepare("
+            SELECT water_intake_ml
+            FROM anamneses
+            WHERE clinic_id = :clinic_id AND patient_id = :patient_id
+            ORDER BY COALESCE(is_draft, 0) ASC, version DESC, id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
+        ]);
+
+        $val = $stmt->fetchColumn();
+        if ($val === false || $val === null || trim((string)$val) === '') {
+            return null;
+        }
+
+        $intVal = (int)$val;
+        return $intVal > 0 ? $intVal : null;
+    }
 }
+

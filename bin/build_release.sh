@@ -81,6 +81,7 @@ TEST_FILES=(
     "tests/px_02_patient_evolution_and_clean_install_test.php"
     "tests/px_03_onboarding_birthdate_gender_optional_test.php"
     "tests/px_04_adherence_real_calculation_and_empty_state_test.php"
+    "tests/px_20_prescribed_water_goal_and_empty_state_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

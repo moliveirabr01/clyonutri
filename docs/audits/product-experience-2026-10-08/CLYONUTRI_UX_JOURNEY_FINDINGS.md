@@ -347,7 +347,7 @@ Contagem manual a partir das ações registradas; clique de confirmação e subm
 - **Perfil impactado:** Paciente e nutricionista.
 - **Descrição:** Meta hídrica exibida ao paciente diverge da coleta clínica.
 - **Evidência verificável:** [public/index.php:357](/Users/moliveira/Nutri_II/public/index.php:357); [persistência](evidence/persistence-final.json): water_intake_ml=2000; [API](evidence/runtime-api-and-persistence.json): water_goal_ml=2500.
-- **Estado da evidência:** Confirmado.
+- **Estado da evidência:** Resolvido (NI2-313) — Eliminação do fallback fixo de 2500 ml em /api/v1/patient/home e no client mobile; unificação da fonte da verdade na anamnese clínica vigente (water_intake_ml); regra de 'ausência é ausência' retornando estritamente null quando não prescrito; empty state informativo e acessível no app mobile sem divisões artificiais; comprovado com 7 gates na suíte tests/px_20_prescribed_water_goal_and_empty_state_test.php e bateria de contratos mobile tests/patient_mobile_http_contract_test.php.
 - **Causa provável:** Valor fixo no payload de home, sem referência ao plano/objetivo clínico.
 - **Severidade de produto:** P1.
 - **Impacto na experiência:** Orientações conflitantes entre consultório e paciente; quebra continuidade de cuidado.

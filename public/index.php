@@ -363,16 +363,17 @@ $router->get('/api/v1/patient/home', function() use ($authenticatePatientApi, $d
     $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
     $plan = $apiCtrl->getDailyMealPlan($patientId);
     $nextApp = $apiCtrl->portal()->getNextAppointment($patientId);
+    $waterGoal = $apiCtrl->portal()->getPrescribedWaterGoal($patientId);
 
     // Hidratação de hoje
-    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND date(logged_at) = date('now')");
-    $hStmt->execute(['pid' => $patientId]);
+    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = date('now')");
+    $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id']]);
     $waterToday = (int)$hStmt->fetchColumn();
 
     echo json_encode([
         'patient_name' => $auth['patient_name'],
         'water_ml_today' => $waterToday,
-        'water_goal_ml' => 2500,
+        'water_goal_ml' => $waterGoal,
         'next_appointment' => $nextApp,
         'active_plan' => $plan,
     ]);
