@@ -1,0 +1,10 @@
+{
+  "public/index.php": "3a4b67dadaded8be522311b1414e25018d642f30ecc4e2b5a2d9ae4f476c1d34",
+  "src/Application/Controllers/DashboardController.php": "f86ace4f2ae84921f3b767a114327706b3ec0431cac2f4e1d2fbbe1568bbf0ab",
+  "src/Domain/Appointment/AppointmentService.php": "ed4d65ed4aa0e06c94547371725399e8ac04c9380262253f95ccf6ac5c4177c0",
+  "src/Domain/PatientPortal/PatientPortalService.php": "b25d7efe879040d62c039ced3ae11f6c8f08ab877956ae57dee49d9b3ce46728",
+  "mobile/src/services/api.ts": "e170596265e3cf8d4f9d4379d7f411d52aa66d2709148b831dea7bfe3a159877",
+  "mobile/src/screens/PatientHomeScreen.tsx": "17bcee70e936aba2b6fc827dbcd0fcfe718db37057e6960ad409696a857dcf64",
+  "public/assets/css/clinical-botanical.css": "10b895b4f5420466ad3d559c5cb267ea2aa5ed36a286599b77439937ef20ae93",
+  "views/layouts/professional-shell.php": "7ef304d107e2a0a714596055743d0128de99b2890b63730719bdb3c0a51c64e8"
+}

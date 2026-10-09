@@ -187,6 +187,18 @@ class PatientPortalService
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
+        $metricType = trim($metricType);
+        $unit = trim($unit);
+        if ($metricType === '') {
+            throw new \InvalidArgumentException("O tipo de métrica (metric_type) é obrigatório.");
+        }
+        if ($unit === '') {
+            throw new \InvalidArgumentException("A unidade de medida (unit) é obrigatória.");
+        }
+        if (!is_finite($value) || $value <= 0) {
+            throw new \InvalidArgumentException("O valor da métrica deve ser um número positivo e finito.");
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO patient_self_metrics (
                 clinic_id, patient_id, metric_type, value, unit, source, notes, recorded_at
@@ -203,14 +215,28 @@ class PatientPortalService
             'notes' => $notes,
         ]);
 
+        $id = (int)$this->db->lastInsertId();
+
         return [
-            'id' => (int)$this->db->lastInsertId(),
+            'id' => $id,
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
             'metric_type' => $metricType,
             'value' => $value,
             'unit' => $unit,
             'source' => 'patient_self_report',
+            'notes' => $notes,
             'is_clinical' => false,
+            'recorded_at' => date('Y-m-d H:i:s'),
         ];
+    }
+
+    /**
+     * Alias canônico para recordSelfReportedMetric
+     */
+    public function recordSelfMetric(int $patientId, string $metricType, float $value, string $unit, ?string $notes = null): array
+    {
+        return $this->recordSelfReportedMetric($patientId, $metricType, $value, $unit, $notes);
     }
 
     public function getEvolutionTimeline(int $patientId): array
@@ -240,10 +266,19 @@ class PatientPortalService
         $sStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
         $selfReports = $sStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $clinicalCount = count($clinical);
+        $selfReportCount = count($selfReports);
+
         return [
             'patient_id' => $patientId,
             'clinical_records' => $clinical,
             'self_reports' => $selfReports,
+            'summary' => [
+                'clinical_count' => $clinicalCount,
+                'self_report_count' => $selfReportCount,
+                'total_entries' => $clinicalCount + $selfReportCount,
+                'has_data' => ($clinicalCount + $selfReportCount) > 0,
+            ],
         ];
     }
 

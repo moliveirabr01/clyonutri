@@ -229,7 +229,9 @@ $authenticatePatientApi = function() use ($db): array {
         SELECT t.*, p.id AS patient_id, p.clinic_id, p.name AS patient_name
         FROM personal_access_tokens t
         JOIN patients p ON p.id = t.tokenable_id
-        WHERE t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
+        JOIN clinics c ON c.id = p.clinic_id
+        WHERE t.tokenable_type = 'patient' AND p.status = 'active' AND c.status = 'active'
+          AND t.token = :hash AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
         LIMIT 1
     ");
     $stmt->execute(['hash' => $hashed]);
@@ -254,6 +256,18 @@ $authenticatePatientApi = function() use ($db): array {
 $router->post('/api/v1/auth/patient-login', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    if (!is_array($input)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Requisição inválida.']);
+        return;
+    }
+    foreach (['email', 'phone', 'cpf', 'password', 'pin', 'otp'] as $field) {
+        if (isset($input[$field]) && !is_string($input[$field])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Requisição inválida.']);
+            return;
+        }
+    }
     $email = trim($input['email'] ?? '');
     $phone = trim($input['phone'] ?? $input['cpf'] ?? '');
     $password = (string)($input['password'] ?? $input['pin'] ?? '');
@@ -266,15 +280,19 @@ $router->post('/api/v1/auth/patient-login', function() use ($db) {
         return;
     }
 
-    $stmt = $db->prepare("SELECT * FROM patients WHERE (email = :email OR phone = :phone) AND status = 'active' LIMIT 1");
-    $stmt->execute(['email' => $email, 'phone' => $phone]);
-    $patient = $stmt->fetch();
-
-    if (!$patient) {
+    // Never match an omitted identifier against another patient's empty field.
+    // Ambiguous identifiers fail closed until the clinic can be selected explicitly.
+    $stmt = $db->prepare("SELECT p.* FROM patients p JOIN clinics c ON c.id = p.clinic_id
+        WHERE ((:email_present <> '' AND p.email = :email) OR (:phone_present <> '' AND p.phone = :phone))
+          AND p.status = 'active' AND c.status = 'active' LIMIT 2");
+    $stmt->execute(['email_present' => $email, 'email' => $email, 'phone_present' => $phone, 'phone' => $phone]);
+    $patients = $stmt->fetchAll();
+    if (count($patients) !== 1) {
         http_response_code(401);
-        echo json_encode(['error' => 'Paciente não encontrado ou inativo.']);
+        echo json_encode(['error' => 'Credencial inválida ou acesso indisponível.']);
         return;
     }
+    $patient = $patients[0];
 
     // 2. Validação da credencial
     $authenticated = false;
@@ -295,14 +313,14 @@ $router->post('/api/v1/auth/patient-login', function() use ($db) {
 
     if (!$authenticated) {
         http_response_code(401);
-        echo json_encode(['error' => 'Credencial inválida: senha, PIN ou código OTP incorreto ou expirado.']);
+        echo json_encode(['error' => 'Credencial inválida ou acesso indisponível.']);
         return;
     }
 
     // 3. Emissão com expiração explícita obrigatória
     $token = bin2hex(random_bytes(32));
     $hashed = hash('sha256', $token);
-    $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+    $expiresAt = gmdate('Y-m-d H:i:s', time() + 30 * 86400);
 
     $ins = $db->prepare("
         INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, expires_at, created_at)
@@ -421,9 +439,15 @@ $router->get('/api/v1/patient/evolution', function() use ($authenticatePatientAp
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
 
-    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-    $data = $apiCtrl->portal()->getEvolutionTimeline($patientId);
-    echo json_encode($data);
+    try {
+        $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
+        $data = $apiCtrl->portal()->getEvolutionTimeline($patientId);
+        http_response_code(200);
+        echo json_encode($data);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Falha ao consultar evolução do paciente: ' . $e->getMessage()]);
+    }
 });
 
 // Registrar Autorrelato de Métrica (Evolução)
@@ -431,16 +455,32 @@ $router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatie
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-    $input = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
+    $raw = (string)file_get_contents('php://input');
+    $input = json_decode($raw, true) ?: $_POST;
 
-    $metricType = $input['metric_type'] ?? 'weight_kg';
-    $value = (float)($input['value'] ?? 0);
-    $unit = $input['unit'] ?? 'kg';
-    $notes = $input['notes'] ?? null;
+    $metricType = trim((string)($input['metric_type'] ?? ''));
+    if ($metricType === '') {
+        $metricType = 'weight_kg';
+    }
+    $value = isset($input['value']) ? (float)$input['value'] : 0.0;
+    $unit = trim((string)($input['unit'] ?? 'kg'));
+    $notes = isset($input['notes']) && trim((string)$input['notes']) !== '' ? trim((string)$input['notes']) : null;
 
-    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-    $res = $apiCtrl->portal()->recordSelfMetric($patientId, $metricType, $value, $unit, $notes);
-    echo json_encode($res);
+    if ($value <= 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'O valor da métrica deve ser um número positivo e válido.']);
+        return;
+    }
+
+    try {
+        $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
+        $res = $apiCtrl->portal()->recordSelfMetric($patientId, $metricType, $value, $unit, $notes);
+        http_response_code(201);
+        echo json_encode($res);
+    } catch (\Throwable $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
 });
 
 // 4.1 Chat Seguro do Paciente (NI2-189)

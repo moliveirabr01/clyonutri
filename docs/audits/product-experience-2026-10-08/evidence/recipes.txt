@@ -1,0 +1,42 @@
+
+========================================================================
+>>> CLYONUTRI II — SUÍTE DE TESTES E2E DE RECEITAS CULINÁRIAS (NI2-268) <<<
+    Biblioteca, Composição TACO, Variantes, Alergênicos & Prescrição Real
+========================================================================
+
+--> [1/9] Provisionando Clínicas Alfa e Beta com Nutricionistas e Pacientes Reais...
+  [PASS] [SETUP] Tenants Alfa (#3) e Beta (#4), profissionais e pacientes provisionados com sucesso
+
+--> [2/9] Testando Motor de Cálculo Nutricional TACO e Snapshot Imutável (NI2-270, NI2-271)...
+  [PASS] [CALCULO_TACO] Receita #1 criada com 158 kcal/porção e snapshot v1 imutável
+
+--> [3/9] Testando Conversão de Medidas Caseiras e Escalonamento (NI2-272)...
+  [PASS] [MEDIDAS_CASEIRAS] Medida caseira de 2 colheres de sopa convertida para 50g reais
+
+--> [4/9] Testando Biblioteca, Filtros e Isolamento Multi-Tenant (NI2-273)...
+  [PASS] [BIBLIOTECA_ISOLAMENTO] Busca e filtros validados com isolamento estrito entre Tenant Alfa (#3) e Beta (#4)
+
+--> [5/9] Testando Duplicação como Variante Supervisionada (NI2-276)...
+  [PASS] [VARIANTES] Variante #4 criada com rastreabilidade de parentesco para #1
+
+--> [6/9] Testando Prescrição Supervisionada e Alertas de Alergênicos (NI2-274, NI2-275)...
+  [PASS] [PRESCRICAO_ALERGENICOS] Prescrição #1 escalonou 1.5 porções (237 kcal) com aviso de alergia a Glúten
+
+--> [7/9] Testando Experiência do Paciente e Sistema de Favoritos (NI2-277)...
+  [PASS] [FAVORITOS_PACIENTE] Toggle de favoritos persistido e verificado no banco
+
+--> [8/9] Testando Lista de Compras Agrupada por Gôndolas do Supermercado (NI2-278)...
+  [PASS] [LISTA_COMPRAS_RECEITAS] Lista de compras gerada com 2 itens consolidados por gôndolas para 7 dias
+
+--> [9/9] Executando Pen-Test Ofensivo de Segurança Multi-Tenant (NI2-280)...
+  [PASS] [PEN_TEST_LEITURA] Acesso cruzado de leitura bloqueado com TenantSecurityException (Fail-Closed)
+  [PASS] [PEN_TEST_PRESCRICAO] Prescrição cruzada não autorizada bloqueada com TenantSecurityException
+  [PASS] [PEN_TEST_VALIDACAO] Validação estrita de ingredientes vazios acionada com InvalidArgumentException
+
+========================================================================
+>>> TODOS OS 9 CRITÉRIOS DE ACEITE DE RECEITAS (NI2-268) HOMOLOGADOS! <<<
+========================================================================
+
+--> Executando Teardown e Limpeza de Fixtures...
+  [TEARDOWN] Base de dados limpa com sucesso.
+

@@ -78,6 +78,7 @@ TEST_FILES=(
     "tests/chat_secure_communication_and_engagement_e2e_test.php"
     "tests/recipe_culinary_domain_and_prescription_e2e_test.php"
     "tests/onboarding_guided_and_activation_e2e_test.php"
+    "tests/px_02_patient_evolution_and_clean_install_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

@@ -1,0 +1,6 @@
+========================================================================
+   CLYONUTRI II — DATABASE SEED RUNNER
+========================================================================
+Modo Solicitado: CATÁLOGO DE REFERÊNCIA NUTRICIONAL (TACO)
+✓ CatalogSeeder executado com sucesso: 12 alimentos inseridos/atualizados.
+========================================================================

@@ -1,0 +1,21 @@
+
+========================================================================
+>>> SUÍTE E2E: CONSULTÓRIO ONLINE CLYONUTRI II (TELECONSULTA REAL) <<<
+========================================================================
+
+[BLOCKED] NI2-234 / NI2-242: Provedor WebRTC de Mídia Externa — DAILY_API_KEY não injetada em ambiente local; fail-closed ativo, proibido gerar link mock.
+[PASS] NI2-235 / NI2-243: Modelo de Teleconsulta e Vínculo Obrigatório — Sessão criada e vinculada a appointment, patient, professional e clinic.
+[PASS] NI2-235: Prevenção de Sessões Duplicadas — Regra de unicidade de agendamento por sessão respeitada.
+[PASS] NI2-236 / NI2-244: Segurança Cross-Tenant e Proteção Anti-IDOR — Tenant B e profissionais não autorizados bloqueados com 403 / TenantSecurityException.
+[PASS] NI2-238 / NI2-248: Preparação Pré-Consulta — Validação de hardware WebRTC e consentimento versionado auditados.
+[PASS] NI2-237 / NI2-247: Sala de Espera e Presença — Paciente ingressou no lobby e aguarda autorização do nutricionista.
+[PASS] NI2-237 / NI2-247: Admissão pelo Nutricionista — Nutricionista admitiu paciente com autorização verificada.
+[PASS] NI2-249: Evolução Clínica Durante Teleconsulta — Prontuário salvo de forma imutável com encadeamento SHA-256 e isolamento de notas privadas.
+[PASS] NI2-237: Encerramento e Invalidação de Sessão — Sessão finalizada, agenda sincronizada e tokens invalidados.
+[PASS] Governança e Auditoria (CFN / LGPD) — Todos os 7 eventos da jornada da teleconsulta registrados na trilha de auditoria.
+[PASS] NI2-245: Provedor WebRTC Ativo e Provisionamento — Integração funcional com Daily Video API comprovada.
+
+========================================================================
+>>> TODOS OS GATES DA TELECONSULTA FORAM EXECUTADOS COM SUCESSO! <<<
+========================================================================
+

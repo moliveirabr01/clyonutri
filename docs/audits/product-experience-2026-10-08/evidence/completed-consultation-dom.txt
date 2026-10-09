@@ -1,0 +1,95 @@
+- complementary:
+  - img "Clyo Nutri — Nutrição que transforma"
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+    - link "Agenda":
+      - /url: /agenda
+      - generic: Agenda
+    - link "Pacientes":
+      - /url: /pacientes
+      - generic: Pacientes
+    - link "Base de Alimentos":
+      - /url: /alimentos
+      - generic: Base de Alimentos
+    - link "Planos Alimentares":
+      - /url: /planos
+      - generic: Planos Alimentares
+    - link "Receitas":
+      - /url: /receitas
+      - generic: Receitas
+    - link "Financeiro":
+      - /url: /financeiro
+      - generic: Financeiro
+    - link "Configurações":
+      - /url: /configuracoes
+      - generic: Configurações
+    - link "Central de Ajuda":
+      - /url: /ajuda
+      - generic: Central de Ajuda
+  - generic: v1.0.0 • Multi-tenant
+- main:
+  - generic: Ambiente isolado de auditoria
+  - text: Olá,
+  - strong: Auditoria de Produto
+  - link "Sair":
+    - /url: /logout
+    - text: Sair
+  - generic: ✓ Operação realizada com sucesso!
+  - link "← Voltar para Pacientes":
+    - /url: /pacientes
+  - heading "Paciente de Auditoria — Teste" [level=1]
+  - paragraph: Perfil Clínico 360 • Acompanhamento Longitudinal
+  - link "Prontuário (SHA-256) ➔":
+    - /url: /pacientes/1/prontuario
+  - link "Anamnese Estruturada ➔":
+    - /url: /pacientes/1/anamnese
+  - link "Antropometria ➔":
+    - /url: /pacientes/1/antropometria
+  - button "+ Nova Avaliação"
+  - heading "Dados Essenciais" [level=3]
+  - paragraph:
+    - strong: "E-mail:"
+    - text: paciente-auditoria@example.test
+  - paragraph:
+    - strong: "Telefone:"
+    - text: —
+  - paragraph:
+    - strong: "Nascimento:"
+    - text: 10/04/1995
+  - paragraph:
+    - strong: "Gênero:"
+    - text: male
+  - strong: "Observações:"
+  - paragraph: Primeiro paciente cadastrado no onboarding de ativação.
+  - heading "Prontuário Longitudinal" [level=3]
+  - generic: ✓ Cadeia SHA-256 Íntegra (1 registros)
+  - link "Abrir Prontuário Completo ➔":
+    - /url: /pacientes/1/prontuario
+  - strong: "Evolução Clínica — Consulta #1 (08/10/2026)"
+  - generic: v1 • 08/10/2026 23:03
+  - generic: Conclusão de teste funcional de auditoria. Sem atendimento ou conduta clínica real.
+  - generic: "Hash: 1d482c0b9d51c3f8... | Resp: Auditoria de Produto"
+  - heading "Anamnese Nutricional" [level=3]
+  - generic: v2 (Vigente) • 08/10/2026
+  - link "Atualizar / Ver Histórico ➔":
+    - /url: /pacientes/1/anamnese
+  - generic: ⚠️ ALERGIAS (CRÍTICO)
+  - text: Não avaliadas — teste de auditoria
+  - generic: ⚠️ RESTRIÇÕES ALIMENTARES
+  - text: Não avaliadas — teste de auditoria
+  - generic: OBJETIVOS & METAS
+  - text: Registro de teste de usabilidade, sem finalidade clínica.
+  - heading "Planos Alimentares (1)" [level=3]
+  - button "+ Novo Plano"
+  - strong: Plano de teste de auditoria — sem uso clínico
+  - text: v1
+  - generic: published
+  - link "Abrir Editor ➔":
+    - /url: /planos/1
+  - heading "Avaliações Antropométricas (0)" [level=3]
+  - link "Análise Completa ➔":
+    - /url: /pacientes/1/antropometria
+  - paragraph: Nenhuma avaliação antropométrica registrada ainda para este paciente.
+  - button "Registrar 1ª Avaliação"

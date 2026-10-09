@@ -1,0 +1,89 @@
+- complementary:
+  - img "Clyo Nutri — Nutrição que transforma"
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+    - link "Agenda":
+      - /url: /agenda
+      - generic: Agenda
+    - link "Pacientes":
+      - /url: /pacientes
+      - generic: Pacientes
+    - link "Base de Alimentos":
+      - /url: /alimentos
+      - generic: Base de Alimentos
+    - link "Planos Alimentares":
+      - /url: /planos
+      - generic: Planos Alimentares
+    - link "Receitas":
+      - /url: /receitas
+      - generic: Receitas
+    - link "Financeiro":
+      - /url: /financeiro
+      - generic: Financeiro
+    - link "Configurações":
+      - /url: /configuracoes
+      - generic: Configurações
+    - link "Central de Ajuda":
+      - /url: /ajuda
+      - generic: Central de Ajuda
+  - generic: v1.0.0 • Multi-tenant
+- main:
+  - generic: Ambiente isolado de auditoria
+  - text: Olá,
+  - strong: Auditoria de Produto
+  - link "Sair":
+    - /url: /logout
+    - text: Sair
+  - heading "Painel Geral" [level=1]
+  - paragraph: Visão operacional e prioridades clínicas em tempo real.
+  - generic: CONSULTAS HOJE
+  - generic: "0"
+  - generic: 0 confirmada(s) • 0 realizada(s)
+  - generic: PACIENTES ATIVOS
+  - generic: "1"
+  - generic: Carteira regular
+  - generic: ADESÃO MÉDIA
+  - generic: 94.0%
+  - generic: Baseada em check-ins
+  - generic: PLANOS A REVISAR
+  - generic: "0"
+  - generic: Todos publicados
+  - heading "Pacientes & Prioridades que Exigem Atenção" [level=3]
+  - generic: 0 item(ns) identificado(s)
+  - generic: ✓
+  - text: Nenhuma pendência crítica ou paciente faltoso identificado no momento. Todas as rotinas estão regulares.
+  - heading "Consultas do Dia" [level=3]
+  - link "Ver agenda completa":
+    - /url: /agenda
+  - table:
+    - rowgroup:
+      - row "Horário Paciente Tipo Status Ação":
+        - columnheader "Horário"
+        - columnheader "Paciente"
+        - columnheader "Tipo"
+        - columnheader "Status"
+        - columnheader "Ação"
+    - rowgroup:
+      - row "09:00 Paciente de Auditoria — Teste first_visit completed Prontuário":
+        - cell "09:00"
+        - cell "Paciente de Auditoria — Teste":
+          - link "Paciente de Auditoria — Teste":
+            - /url: /pacientes/1
+        - cell "first_visit"
+        - cell "completed":
+          - generic: completed
+        - cell "Prontuário":
+          - link "Prontuário":
+            - /url: /pacientes/1
+  - heading "Ações Rápidas" [level=3]
+  - link "Novo Paciente":
+    - /url: /pacientes
+    - generic: Novo Paciente
+  - link "Criar Plano Alimentar":
+    - /url: /planos
+    - generic: Criar Plano Alimentar
+  - link "Consultar Tabela TACO":
+    - /url: /alimentos
+    - generic: Consultar Tabela TACO

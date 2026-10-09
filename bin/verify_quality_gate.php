@@ -267,6 +267,13 @@ if (str_contains($onboardingOutput, 'TODOS OS 9 GATES DE ONBOARDING & ATIVAÇÃO
     recordCheck('E2E_JOURNEYS', 'Onboarding Guiado & Ativação do Consultório E2E (NI2-282)', 'FAIL', 'Falha no Onboarding Guiado: ' . substr($onboardingOutput, 0, 200));
 }
 
+$evolutionOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/px_02_patient_evolution_and_clean_install_test.php') . " 2>&1");
+if (str_contains($evolutionOutput, 'TODOS OS 7 GATES DE EVOLUÇÃO E INSTALAÇÃO LIMPA (PX-02) APROVADOS')) {
+    recordCheck('E2E_JOURNEYS', 'Evolução do Paciente & Instalação Limpa (NI2-295 / PX-02)', 'PASS', 'Migração limpa de 22 etapas, tabela patient_self_metrics oficial, empty state validado, persistência de autorrelato e segregação de origem');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Evolução do Paciente & Instalação Limpa (NI2-295 / PX-02)', 'FAIL', 'Falha na evolução do paciente: ' . substr($evolutionOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',

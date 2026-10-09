@@ -1,0 +1,159 @@
+- complementary:
+  - img "Clyo Nutri — Nutrição que transforma"
+  - navigation:
+    - link "Dashboard":
+      - /url: /dashboard
+      - generic: Dashboard
+    - link "Agenda":
+      - /url: /agenda
+      - generic: Agenda
+    - link "Pacientes":
+      - /url: /pacientes
+      - generic: Pacientes
+    - link "Base de Alimentos":
+      - /url: /alimentos
+      - generic: Base de Alimentos
+    - link "Planos Alimentares":
+      - /url: /planos
+      - generic: Planos Alimentares
+    - link "Receitas":
+      - /url: /receitas
+      - generic: Receitas
+    - link "Financeiro":
+      - /url: /financeiro
+      - generic: Financeiro
+    - link "Configurações":
+      - /url: /configuracoes
+      - generic: Configurações
+    - link "Central de Ajuda":
+      - /url: /ajuda
+      - generic: Central de Ajuda
+  - generic: v1.0.0 • Multi-tenant
+- main:
+  - generic: Ambiente isolado de auditoria
+  - text: Olá,
+  - strong: Auditoria de Produto
+  - link "Sair":
+    - /url: /logout
+    - text: Sair
+  - heading "Tabela de Alimentos (TACO)" [level=1]
+  - paragraph: Referência nutricional para montagem e cálculo de planos alimentares.
+  - table:
+    - rowgroup:
+      - row "Alimento Categoria Porção Energia (kcal) Proteína (g) Carboidratos (g) Lipídios (g)":
+        - columnheader "Alimento"
+        - columnheader "Categoria"
+        - columnheader "Porção"
+        - columnheader "Energia (kcal)"
+        - columnheader "Proteína (g)"
+        - columnheader "Carboidratos (g)"
+        - columnheader "Lipídios (g)"
+    - rowgroup:
+      - row "Alface americana crua Verduras e Hortaliças 50 porção 9 0.9 1.7 0.1":
+        - cell "Alface americana crua"
+        - cell "Verduras e Hortaliças":
+          - generic: Verduras e Hortaliças
+        - cell "50 porção"
+        - cell "9"
+        - cell "0.9"
+        - cell "1.7"
+        - cell "0.1"
+      - row "Arroz branco cozido Cereais 100 g 128 2.5 28.1 0.2":
+        - cell "Arroz branco cozido"
+        - cell "Cereais":
+          - generic: Cereais
+        - cell "100 g"
+        - cell "128"
+        - cell "2.5"
+        - cell "28.1"
+        - cell "0.2"
+      - row "Arroz integral cozido Cereais 100 g 124 2.6 25.8 1":
+        - cell "Arroz integral cozido"
+        - cell "Cereais":
+          - generic: Cereais
+        - cell "100 g"
+        - cell "124"
+        - cell "2.6"
+        - cell "25.8"
+        - cell "1"
+      - row "Aveia em flocos Cereais 30 colher de sopa 394 13.9 66.6 8.5":
+        - cell "Aveia em flocos"
+        - cell "Cereais":
+          - generic: Cereais
+        - cell "30 colher de sopa"
+        - cell "394"
+        - cell "13.9"
+        - cell "66.6"
+        - cell "8.5"
+      - row "Azeite de oliva extravirgem Óleos e Gorduras 13 colher de sopa 884 0 0 100":
+        - cell "Azeite de oliva extravirgem"
+        - cell "Óleos e Gorduras":
+          - generic: Óleos e Gorduras
+        - cell "13 colher de sopa"
+        - cell "884"
+        - cell "0"
+        - cell "0"
+        - cell "100"
+      - row "Banana prata crua Frutas 100 unidade 98 1.3 26 0.1":
+        - cell "Banana prata crua"
+        - cell "Frutas":
+          - generic: Frutas
+        - cell "100 unidade"
+        - cell "98"
+        - cell "1.3"
+        - cell "26"
+        - cell "0.1"
+      - row "Castanha-do-Pará Oleaginosas 15 unidades 643 14.5 15.1 63.5":
+        - cell "Castanha-do-Pará"
+        - cell "Oleaginosas":
+          - generic: Oleaginosas
+        - cell "15 unidades"
+        - cell "643"
+        - cell "14.5"
+        - cell "15.1"
+        - cell "63.5"
+      - row "Feijão carioca cozido Leguminosas 100 g 76 4.8 13.6 0.5":
+        - cell "Feijão carioca cozido"
+        - cell "Leguminosas":
+          - generic: Leguminosas
+        - cell "100 g"
+        - cell "76"
+        - cell "4.8"
+        - cell "13.6"
+        - cell "0.5"
+      - row "Leite desnatado Leites e Derivados 200 ml 35 3.4 4.9 0.1":
+        - cell "Leite desnatado"
+        - cell "Leites e Derivados":
+          - generic: Leites e Derivados
+        - cell "200 ml"
+        - cell "35"
+        - cell "3.4"
+        - cell "4.9"
+        - cell "0.1"
+      - row "Ovo de galinha cozido Ovos 50 unidade 146 13.3 0.6 9.5":
+        - cell "Ovo de galinha cozido"
+        - cell "Ovos":
+          - generic: Ovos
+        - cell "50 unidade"
+        - cell "146"
+        - cell "13.3"
+        - cell "0.6"
+        - cell "9.5"
+      - row "Peito de frango grelhado Carnes e Aves 100 g 159 32 0 2.5":
+        - cell "Peito de frango grelhado"
+        - cell "Carnes e Aves":
+          - generic: Carnes e Aves
+        - cell "100 g"
+        - cell "159"
+        - cell "32"
+        - cell "0"
+        - cell "2.5"
+      - row "Tomate com semente cru Verduras e Hortaliças 100 unidade 15 1.1 3.1 0.2":
+        - cell "Tomate com semente cru"
+        - cell "Verduras e Hortaliças":
+          - generic: Verduras e Hortaliças
+        - cell "100 unidade"
+        - cell "15"
+        - cell "1.1"
+        - cell "3.1"
+        - cell "0.2"

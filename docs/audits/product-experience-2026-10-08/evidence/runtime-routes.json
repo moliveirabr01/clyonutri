@@ -1,0 +1,522 @@
+[
+  {
+    "method": "GET",
+    "path": "/login",
+    "line": 57
+  },
+  {
+    "method": "POST",
+    "path": "/login",
+    "line": 58
+  },
+  {
+    "method": "GET",
+    "path": "/cadastro",
+    "line": 59
+  },
+  {
+    "method": "POST",
+    "path": "/cadastro",
+    "line": 60
+  },
+  {
+    "method": "GET",
+    "path": "/logout",
+    "line": 61
+  },
+  {
+    "method": "GET",
+    "path": "/up",
+    "line": 64
+  },
+  {
+    "method": "GET",
+    "path": "/health",
+    "line": 100
+  },
+  {
+    "method": "GET",
+    "path": "/",
+    "line": 122
+  },
+  {
+    "method": "GET",
+    "path": "/termos",
+    "line": 123
+  },
+  {
+    "method": "GET",
+    "path": "/privacidade",
+    "line": 124
+  },
+  {
+    "method": "GET",
+    "path": "/onboarding",
+    "line": 127
+  },
+  {
+    "method": "POST",
+    "path": "/onboarding/passo",
+    "line": 128
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/onboarding/status",
+    "line": 129
+  },
+  {
+    "method": "GET",
+    "path": "/dashboard",
+    "line": 131
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes",
+    "line": 132
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes",
+    "line": 133
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}",
+    "line": 134
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/prontuario",
+    "line": 135
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes/{id}/prontuario",
+    "line": 136
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes/{id}/prontuario/{recId}/retificar",
+    "line": 137
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/prontuario/exportar",
+    "line": 138
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/anamnese",
+    "line": 139
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes/{id}/anamnese",
+    "line": 140
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/resumo-prescricao",
+    "line": 141
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/antropometria",
+    "line": 142
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes/{id}/antropometria",
+    "line": 143
+  },
+  {
+    "method": "POST",
+    "path": "/pacientes/{id}/antropometria/{evalId}/compartilhar",
+    "line": 144
+  },
+  {
+    "method": "GET",
+    "path": "/pacientes/{id}/antropometria/comparar",
+    "line": 145
+  },
+  {
+    "method": "GET",
+    "path": "/alimentos",
+    "line": 146
+  },
+  {
+    "method": "GET",
+    "path": "/agenda",
+    "line": 147
+  },
+  {
+    "method": "POST",
+    "path": "/agenda",
+    "line": 148
+  },
+  {
+    "method": "POST",
+    "path": "/agenda/{id}/editar",
+    "line": 149
+  },
+  {
+    "method": "POST",
+    "path": "/agenda/{id}/status",
+    "line": 150
+  },
+  {
+    "method": "GET",
+    "path": "/consulta/{id}",
+    "line": 151
+  },
+  {
+    "method": "POST",
+    "path": "/consulta/{id}/concluir",
+    "line": 152
+  },
+  {
+    "method": "GET",
+    "path": "/teleconsulta/sessao-agenda/{appointmentId}",
+    "line": 155
+  },
+  {
+    "method": "GET",
+    "path": "/teleconsulta/{id}/atendimento",
+    "line": 156
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/{id}/admitir",
+    "line": 157
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/{id}/rejeitar",
+    "line": 158
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/{id}/evoluir",
+    "line": 159
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/{id}/encerrar",
+    "line": 160
+  },
+  {
+    "method": "GET",
+    "path": "/teleconsulta/sala-espera/{token}",
+    "line": 161
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/sala-espera/{token}/dispositivo",
+    "line": 162
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/sala-espera/{token}/consentir",
+    "line": 163
+  },
+  {
+    "method": "POST",
+    "path": "/teleconsulta/sala-espera/{token}/entrar",
+    "line": 164
+  },
+  {
+    "method": "GET",
+    "path": "/teleconsulta/sala-espera/{token}/status",
+    "line": 165
+  },
+  {
+    "method": "GET",
+    "path": "/teleconsulta/sala/{token}",
+    "line": 166
+  },
+  {
+    "method": "GET",
+    "path": "/planos",
+    "line": 167
+  },
+  {
+    "method": "POST",
+    "path": "/planos/novo",
+    "line": 168
+  },
+  {
+    "method": "GET",
+    "path": "/planos/{id}",
+    "line": 169
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/refeicoes",
+    "line": 170
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/refeicoes/{mealId}/remover",
+    "line": 171
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/itens",
+    "line": 172
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/itens/{itemId}/remover",
+    "line": 173
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/substituicoes",
+    "line": 174
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/substituicoes/{subId}/remover",
+    "line": 175
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/publicar",
+    "line": 176
+  },
+  {
+    "method": "POST",
+    "path": "/planos/{id}/duplicar",
+    "line": 177
+  },
+  {
+    "method": "GET",
+    "path": "/financeiro",
+    "line": 178
+  },
+  {
+    "method": "GET",
+    "path": "/configuracoes",
+    "line": 179
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda",
+    "line": 182
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/categoria/{slug}",
+    "line": 183
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/artigo/{slug}",
+    "line": 184
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/abrir-chamado",
+    "line": 185
+  },
+  {
+    "method": "POST",
+    "path": "/ajuda/abrir-chamado",
+    "line": 186
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/meus-chamados",
+    "line": 187
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/chamado/{protocol}",
+    "line": 188
+  },
+  {
+    "method": "POST",
+    "path": "/ajuda/chamado/{protocol}/responder",
+    "line": 189
+  },
+  {
+    "method": "POST",
+    "path": "/ajuda/chamado/{protocol}/resolver",
+    "line": 190
+  },
+  {
+    "method": "POST",
+    "path": "/ajuda/chamado/{protocol}/csat",
+    "line": 191
+  },
+  {
+    "method": "GET",
+    "path": "/ajuda/anexo/{id}",
+    "line": 192
+  },
+  {
+    "method": "GET",
+    "path": "/suporte/fila",
+    "line": 195
+  },
+  {
+    "method": "GET",
+    "path": "/suporte/chamado/{id}",
+    "line": 196
+  },
+  {
+    "method": "POST",
+    "path": "/suporte/chamado/{id}/responder",
+    "line": 197
+  },
+  {
+    "method": "POST",
+    "path": "/suporte/chamado/{id}/status",
+    "line": 198
+  },
+  {
+    "method": "GET",
+    "path": "/chat",
+    "line": 201
+  },
+  {
+    "method": "GET",
+    "path": "/chat/{id}",
+    "line": 202
+  },
+  {
+    "method": "POST",
+    "path": "/chat/{id}/enviar",
+    "line": 203
+  },
+  {
+    "method": "GET",
+    "path": "/chat/{id}/poll",
+    "line": 204
+  },
+  {
+    "method": "GET",
+    "path": "/chat/anexo/{id}",
+    "line": 205
+  },
+  {
+    "method": "GET",
+    "path": "/receitas",
+    "line": 208
+  },
+  {
+    "method": "GET",
+    "path": "/receitas/nova",
+    "line": 209
+  },
+  {
+    "method": "POST",
+    "path": "/receitas",
+    "line": 210
+  },
+  {
+    "method": "GET",
+    "path": "/receitas/{id}",
+    "line": 211
+  },
+  {
+    "method": "GET",
+    "path": "/receitas/{id}/prescrever",
+    "line": 212
+  },
+  {
+    "method": "POST",
+    "path": "/receitas/{id}/prescrever",
+    "line": 213
+  },
+  {
+    "method": "POST",
+    "path": "/receitas/{id}/duplicar",
+    "line": 214
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/patient-login",
+    "line": 254
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/patient-logout",
+    "line": 330
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/home",
+    "line": 340
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/hydration",
+    "line": 364
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/appointment/confirm",
+    "line": 383
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/food-diary",
+    "line": 396
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/food-diary",
+    "line": 407
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/evolution",
+    "line": 419
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/self-metrics",
+    "line": 430
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/chat/messages",
+    "line": 447
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/chat/send",
+    "line": 465
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/chat/read",
+    "line": 509
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/chat/attachment/{id}",
+    "line": 531
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/recipes",
+    "line": 555
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/recipes/{id}",
+    "line": 565
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/patient/recipes/{id}/favorite",
+    "line": 580
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/patient/recipes-shopping-list",
+    "line": 591
+  }
+]

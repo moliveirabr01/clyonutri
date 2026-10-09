@@ -1,0 +1,60 @@
+{
+  "patients": [
+    {
+      "id": 1,
+      "birth_date": "1995-04-10",
+      "gender": "male"
+    }
+  ],
+  "anamneses": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "version": 1,
+      "is_draft": 1,
+      "water_intake_ml": 2000
+    },
+    {
+      "id": 2,
+      "patient_id": 1,
+      "version": 2,
+      "is_draft": 0,
+      "water_intake_ml": 2000
+    }
+  ],
+  "meal_plans": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "status": "published",
+      "version": 1
+    }
+  ],
+  "appointments": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "status": "completed",
+      "scheduled_at": "2026-10-08 09:00:00"
+    }
+  ],
+  "clinical_records": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "title": "Evolução Clínica — Consulta #1 (08/10/2026)"
+    }
+  ],
+  "hydration_logs": [
+    {
+      "id": 1,
+      "patient_id": 1,
+      "amount_ml": 250
+    },
+    {
+      "id": 2,
+      "patient_id": 1,
+      "amount_ml": 250
+    }
+  ]
+}
