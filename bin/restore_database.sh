@@ -13,7 +13,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="$ROOT_DIR/storage/backups"
-PASS_PHRASE="${BACKUP_ENCRYPTION_KEY:-clyonutri_secret_encryption_key_2026}"
+if [ -z "${BACKUP_ENCRYPTION_KEY:-}" ]; then
+    echo "ERRO: defina BACKUP_ENCRYPTION_KEY (a mesma usada no backup) para decifrar." >&2
+    exit 1
+fi
+PASS_PHRASE="$BACKUP_ENCRYPTION_KEY"
 REHEARSAL_DIR="$ROOT_DIR/storage/rehearsal_restore"
 
 echo "========================================================================"

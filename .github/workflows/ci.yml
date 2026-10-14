@@ -1,4 +1,4 @@
-name: ClyoNutri II — CI / Quality & Release Gate
+name: ClyoNutri II — CI / Gate de homologação (NI2-409)
 
 on:
   push:
@@ -7,64 +7,96 @@ on:
     branches: [ main ]
 
 jobs:
-  test-and-build:
-    name: Build, Quality Gate & Release Packaging
+  homologation-gate:
+    name: Gate real — MySQL 8, HTTP, navegador, app e deploy/rollback
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: clyonutri_test
-          MYSQL_USER: clyonutri_user
-          MYSQL_PASSWORD: clyonutri_password
+          MYSQL_ROOT_PASSWORD: gate-root
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: --health-cmd="mysqladmin ping -pgate-root" --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      GATE_DB_HOST: 127.0.0.1
+      GATE_DB_PORT: '3306'
+      GATE_DB_USER: root
+      GATE_DB_PASS: gate-root
+      APP_TIMEZONE: America/Sao_Paulo
+      # Evidência do app compilado em dispositivo/emulador Android (opcional no perfil web;
+      # obrigatória no perfil mobile).
+      # Perfil web: release do sistema na HostGator. O app nativo (lojas) usa o perfil mobile.
+      GATE_RELEASE_PROFILE: web
+      GATE_MOBILE_NATIVE_EVIDENCE: ${{ vars.GATE_MOBILE_NATIVE_EVIDENCE_PATH }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup PHP 8.3
+      - name: PHP 8.3 com PDO MySQL e SQLite
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, pdo, pdo_mysql, pdo_sqlite, openssl, json, ctype, xml, fileinfo, dom, intl, zip, gd
+          extensions: mbstring, pdo, pdo_mysql, pdo_sqlite, openssl, json, ctype, fileinfo, curl, intl
+          ini-values: zend.assertions=1, assert.exception=1
           coverage: none
 
-      - name: Validate Composer Configuration
-        run: composer validate --strict
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
-      - name: Install Dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Syntax Linting (PHP Lint)
+      - name: Dependências
         run: |
-          find src tests bin views -name "*.php" -print0 | xargs -0 -n1 php -l
+          composer validate --strict
+          composer dump-autoload --optimize --no-interaction   # sem dependências; não cria composer.lock (árvore precisa ficar limpa)
+          npm ci --prefix tests/homologation --no-audit --no-fund
+          npm ci --prefix mobile --no-audit --no-fund
+          (cd tests/homologation && npx playwright install --with-deps chromium)
+          sudo apt-get install -y --no-install-recommends mysql-client rsync
 
-      - name: System Health & Observability Check
-        run: php bin/healthcheck.php
+      - name: Gate de homologação (fail closed)
+        id: gate
+        run: |
+          set +e
+          bin/homologation_gate.sh "release/evidence/ci_${GITHUB_RUN_ID}"
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          cat "release/evidence/ci_${GITHUB_RUN_ID}/GATE_REPORT.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: HostGator Compatibility Spike Audit
-        run: php bin/hostgator_spike.php
+      - name: Publicar evidências (logs, screenshots, relatório, schema)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homologation-evidence-${{ github.sha }}
+          path: |
+            release/evidence/ci_${{ github.run_id }}
+            !release/evidence/ci_${{ github.run_id }}/.work
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Execute Automated Test Suite & Release Gate
+      - name: Empacotar release (somente com gate APPROVED)
+        if: steps.gate.outputs.rc == '0'
         env:
-          APP_ENV: testing
-          DB_CONNECTION: sqlite
-          DB_DATABASE: ":memory:"
+          GATE_REPORT_FILE: release/evidence/ci_${{ github.run_id }}/GATE_REPORT.json
         run: ./bin/build_release.sh "1.0.0-${GITHUB_SHA::7}"
 
-      - name: Verify Secret Isolation (Zero Credentials in Artifact)
-        run: |
-          ! tar -ztvf release/*.tar.gz | grep -E '\.env$|\.git/'
-          echo "✓ Verificado: nenhum segredo ou pasta .git vazada no pacote de release."
-
-      - name: Upload Release Artifact
+      - name: Publicar pacote da release
+        if: steps.gate.outputs.rc == '0'
         uses: actions/upload-artifact@v4
         with:
           name: clyonutri-release-${{ github.sha }}
           path: release/*.tar.gz
           if-no-files-found: error
+
+      - name: Resultado do gate
+        run: |
+          if [ "${{ steps.gate.outputs.rc }}" != "0" ]; then
+            echo "::error::Gate de homologação BLOCKED — veja o resumo e o artefato homologation-evidence."
+            exit 1
+          fi

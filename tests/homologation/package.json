@@ -1,0 +1,13 @@
+{
+  "name": "clyonutri-homologation-gate",
+  "private": true,
+  "description": "Gate real de homologação do ClyoNutri II (NI2-409): contrato HTTP, segurança, jornadas web e app mobile (build web) contra MySQL real.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.56.0"
+  }
+}

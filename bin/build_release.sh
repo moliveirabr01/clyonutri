@@ -3,10 +3,11 @@
 # ClyoNutri II — Script Oficial de Geração de Release (Release Gate & Packager)
 # ==============================================================================
 # Este script:
-#  1. Executa rigorosamente toda a bateria de testes automatizados e health check.
-#  2. Valida critérios de qualidade e release gate (zero falhas aceitas).
-#  3. Gera manifesto de release com hash git, timestamp e sumário de testes.
-#  4. Empacota a release em tar.gz com código de produção, migrations E testes.
+#  1. Executa o gate real de homologação (bin/homologation_gate.sh — NI2-409).
+#  2. Bloqueia a release se algum check P0 não estiver em PASS, se o relatório for
+#     de outro commit ou de árvore não commitada (FAIL CLOSED).
+#  3. Gera RELEASE_INFO.json a partir do relatório de evidências (nada fixo no texto).
+#  4. Empacota a release em tar.gz.
 # ==============================================================================
 
 set -euo pipefail
@@ -31,168 +32,80 @@ echo "========================================================================"
 echo ""
 
 # ------------------------------------------------------------------------------
-# ETAPA 1: Verificação de Pré-requisitos & Health Check do Sistema
+# ETAPAS 1-3: Gate real de homologação (NI2-409) — FAIL CLOSED
 # ------------------------------------------------------------------------------
-echo "==> [1/4] Executando Health Check do Sistema..."
-php bin/healthcheck.php
-echo "  ✓ Health check aprovado."
-echo ""
+# Antes, este script rodava suítes com a saída descartada e escrevia um manifesto
+# com camadas "PASSED" fixas no texto. Agora a release só é empacotada quando o gate
+# de homologação (MySQL real, HTTP real, navegador, app, deploy/rollback) aprova
+# TODOS os checks P0, e o manifesto é derivado do relatório de evidências.
+#
+# Reaproveitar um relatório já gerado (ex.: no CI): GATE_REPORT_FILE=<GATE_REPORT.json>
+# — aceito somente se for do mesmo commit e do mesmo conteúdo (fingerprint).
+# Perfil da release: web (padrão — sistema web na HostGator) ou mobile (lojas; exige app nativo em dispositivo).
+export GATE_RELEASE_PROFILE="${GATE_RELEASE_PROFILE:-web}"
+echo "==> [1/3] Gate de homologação (NI2-409) — perfil ${GATE_RELEASE_PROFILE}..."
+if [ -n "${GATE_REPORT_FILE:-}" ]; then
+    GATE_REPORT="$GATE_REPORT_FILE"
+    echo "  ➔ Reaproveitando relatório: $GATE_REPORT"
+else
+    EVID_DIR="$RELEASE_DIR/evidence/${BUILD_ID}_${COMMIT_HASH}"
+    bin/homologation_gate.sh "$EVID_DIR" || true
+    GATE_REPORT="$EVID_DIR/GATE_REPORT.json"
+fi
+if [ ! -f "$GATE_REPORT" ]; then
+    echo "  ❌ Relatório do gate ausente. Release bloqueada."
+    exit 1
+fi
 
-# ------------------------------------------------------------------------------
-# ETAPA 2: Execução de TODA a Bateria de Testes Automatizados (Release Gate)
-# ------------------------------------------------------------------------------
-echo "==> [2/4] Executando Suíte Completa de Testes Automatizados..."
-
-TEMP_DB_TEST="$ROOT_DIR/storage/clyonutri_release_test_$$.sqlite"
-cp "$ROOT_DIR/storage/database.sqlite" "$TEMP_DB_TEST"
-export DB_DATABASE="$TEMP_DB_TEST"
-trap "rm -f '$TEMP_DB_TEST'" EXIT
-
-TEST_FILES=(
-    "tests/foundation_test.php"
-    "tests/golden_path_test.php"
-    "tests/phases_4_5_6_test.php"
-    "tests/security_lgpd_test.php"
-    "tests/onda_1_benchmark_test.php"
-    "tests/onda_2_benchmark_test.php"
-    "tests/onda_3_benchmark_test.php"
-    "tests/onda_4_benchmark_test.php"
-    "tests/replatform_infrastructure_test.php"
-    "tests/cross_tenant_offensive_test.php"
-    "tests/clinical_safety_and_precision_test.php"
-    "tests/privacy_and_lgpd_governance_test.php"
-    "tests/delivery_e2e_and_contracts_test.php"
-    "tests/patient_portal_e2e_suite_test.php"
-    "tests/verifiable_multilateral_audit_suite_test.php"
-    "tests/patient_mobile_api_integration_test.php"
-    "tests/patient_mobile_http_contract_test.php"
-    "tests/anthropometry_lifecycle_and_evaluation_test.php"
-    "tests/agenda_and_consultation_lifecycle_test.php"
-    "tests/agenda_operational_and_concurrency_test.php"
-    "tests/meal_plan_and_prescription_lifecycle_test.php"
-    "tests/canonical_first_consultation_e2e_journey_test.php"
-    "tests/meal_plan_web_csrf_and_form_test.php"
-    "tests/demo_seeder_and_runtime_seed_protection_test.php"
-    "tests/cross_tenant_end_to_end_security_test.php"
-    "tests/laravel_replatform_verification_test.php"
-    "tests/ni2_209_remediation_and_go_live_gate_test.php"
-    "tests/ni2_6_prontuario_e_anamnese_nutricional_test.php"
-    "tests/teleconsultation_online_clinic_e2e_test.php"
-    "tests/helpdesk_and_service_desk_e2e_test.php"
-    "tests/benchmark_360_competitive_suite_test.php"
-    "tests/chat_secure_communication_and_engagement_e2e_test.php"
-    "tests/recipe_culinary_domain_and_prescription_e2e_test.php"
-    "tests/onboarding_guided_and_activation_e2e_test.php"
-    "tests/px_02_patient_evolution_and_clean_install_test.php"
-    "tests/px_03_onboarding_birthdate_gender_optional_test.php"
-    "tests/px_04_adherence_real_calculation_and_empty_state_test.php"
-    "tests/px_20_prescribed_water_goal_and_empty_state_test.php"
-    "tests/px_07_accessible_clinical_fields_dom_test.php"
-    "tests/px_12_financial_empty_state_and_operations_test.php"
-    "tests/px_13_clinical_language_and_enum_sanitization_test.php"
-    "tests/px_29_password_reset_and_access_recovery_test.php"
-    "tests/ni2_292_mobile_app_patient_and_professional_e2e_test.php"
-    "tests/ni2_256_f01_auth_roles_servicedesk_test.php"
-    "tests/ni2_347_admin_console_e2e_test.php"
-    "tests/trust_subscription_and_cancellation_e2e_test.php"
-    "tests/aud_remediation_360_security_and_backoffice_test.php"
-    "tests/patient_otp_concurrency_and_security_test.php"
-    "tests/mysql8_migrations_and_ddl_validation_test.php"
-    "tests/runtime_platform_settings_and_commercial_metrics_test.php"
-    "tests/helpdesk_indicators_performance_benchmark_test.php"
-    "tests/release_gate_and_fail_closed_test.php"
-)
-
-TOTAL_TESTS=${#TEST_FILES[@]}
-PASSED_TESTS=0
-
-for test_file in "${TEST_FILES[@]}"; do
-    if [ -f "$test_file" ]; then
-        echo " ➔ Executando: $test_file"
-        php "$test_file" > /dev/null
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-        echo "   ✓ Passou: $test_file"
-    else
-        echo " ⚠️ Arquivo de teste não encontrado: $test_file"
-        exit 1
-    fi
-done
-
-echo ""
-echo "  ✓ Suíte completa de testes aprovada: $PASSED_TESTS de $TOTAL_TESTS arquivos com 100% de sucesso."
-echo ""
-
-# ------------------------------------------------------------------------------
-# ETAPA 3: Execução da Matriz de Qualidade em 6 Camadas (NI2-178)
-# ------------------------------------------------------------------------------
-echo "==> [3/5] Executando Validação da Matriz de Qualidade Multicamada..."
-php bin/verify_quality_gate.php
-echo "  ✓ Matriz de qualidade avaliada com sucesso."
-echo ""
-
-# ------------------------------------------------------------------------------
-# ETAPA 4: Geração do Manifesto da Release com Princípio FAIL CLOSED
-# ------------------------------------------------------------------------------
-echo "==> [4/5] Gerando Manifesto de Release (RELEASE_INFO.json)..."
-
-mkdir -p "$RELEASE_DIR"
-
-MANIFEST_FILE="$RELEASE_DIR/RELEASE_INFO.json"
-cat <<EOF > "$MANIFEST_FILE"
-{
-  "product": "ClyoNutri II",
-  "version": "${VERSION}",
-  "build_timestamp": "${BUILD_ID}",
-  "git_commit": "${COMMIT_HASH}",
-  "release_gate": {
-    "status": "APPROVED_LOCAL_CI_GATES_ONLY (PRODUCTION_DEPLOY_BLOCKED)",
-    "production_deployment_status": "BLOCKED (Credenciais remotas não injetadas)",
-    "is_production_approved": false,
-    "fail_closed_enforced": true,
-    "health_check": "PASSED",
-    "total_test_suites": ${TOTAL_TESTS},
-    "passed_test_suites": ${PASSED_TESTS},
-    "zero_failures_verified": true,
-    "audit_360_layers": {
-      "syntax_static": "PASSED (Zero erros em php -l)",
-      "domain_services": "PASSED (Cálculo 100g e hash SHA-256)",
-      "http_web": "PASSED (CSRF e isolamento de sessão)",
-      "mobile_api": "PASSED (Sanctum tokens e persistência)",
-      "e2e_journeys": "PASSED (HTTP E2E Harness)",
-      "browser_playwright_e2e": "NOT TESTED (Playwright não configurado neste ambiente CI)",
-      "remote_hostgator_ssh": "BLOCKED (Credenciais remotas não injetadas no ambiente local)"
-    }
-  },
-  "modules_included": [
-    "app",
-    "src",
-    "public",
-    "views",
-    "config",
-    "database",
-    "tests",
-    "bin",
-    "mobile",
-    "docs",
-    "vendor",
-    "replatform",
-    "artisan"
-  ],
-  "replatform_laravel13": {
-    "framework": "Laravel 13.35.0",
-    "sanctum": "present",
-    "fortify": "present",
-    "pest": "present (Pest 4.7.8)",
-    "artisan_cli": "present"
-  },
-  "runtime_requirements": {
-    "php": ">=8.1",
-    "mysql": ">=8.0 ou sqlite3",
-    "extensions": ["pdo", "pdo_mysql", "pdo_sqlite", "mbstring", "json", "openssl"]
-  }
+echo "==> [2/3] Validando decisão e vínculo do relatório com o código..."
+read -r NOW_DIRTY NOW_SHA < <(bin/homologation/source_fingerprint.sh)
+NOW_DIRTY="$NOW_DIRTY" NOW_SHA="$NOW_SHA" php -r '
+$r = json_decode(file_get_contents($argv[1]), true) ?: [];
+$head = trim((string)shell_exec("git rev-parse HEAD 2>/dev/null"));
+$errors = [];
+if (($r["source"]["commit"] ?? "") !== $head) $errors[] = "relatório é do commit " . ($r["source"]["commit"] ?? "?") . ", HEAD é $head";
+if (!empty($r["source"]["dirty"])) $errors[] = "relatório gerado com árvore não commitada";
+if ((int)getenv("NOW_DIRTY") > 0) $errors[] = getenv("NOW_DIRTY") . " arquivo(s) alterado(s) desde o commit: o pacote não corresponderia ao código homologado";
+if (($r["source"]["content_sha256"] ?? "") !== getenv("NOW_SHA")) $errors[] = "conteúdo atual difere do homologado (fingerprint " . substr((string)getenv("NOW_SHA"), 0, 16) . " ≠ " . substr((string)($r["source"]["content_sha256"] ?? "?"), 0, 16) . ")";
+if (($r["release_profile"] ?? "") !== getenv("GATE_RELEASE_PROFILE")) $errors[] = "relatório do perfil " . ($r["release_profile"] ?? "?") . ", release pedida no perfil " . getenv("GATE_RELEASE_PROFILE");
+if (($r["decision"] ?? "") !== "APPROVED") {
+    $errors[] = "decisão do gate: " . ($r["decision"] ?? "ausente");
+    foreach ($r["blocking"] ?? [] as $b) $errors[] = "  P0 {$b["id"]} ({$b["status"]}): {$b["reason"]}";
 }
-EOF
+if ($errors) { fwrite(STDERR, "  ❌ RELEASE BLOQUEADA:\n  - " . implode("\n  - ", $errors) . "\n"); exit(1); }
+echo "  ✓ Gate APPROVED para o commit $head\n";
+' "$GATE_REPORT"
 
+echo "==> [3/3] Gerando manifesto a partir das evidências (RELEASE_INFO.json)..."
+mkdir -p "$RELEASE_DIR"
+MANIFEST_FILE="$RELEASE_DIR/RELEASE_INFO.json"
+php -r '
+$r = json_decode(file_get_contents($argv[1]), true);
+$manifest = [
+    "product" => "ClyoNutri II",
+    "version" => $argv[2],
+    "build_timestamp" => $argv[3],
+    "git_commit" => $r["source"]["commit"],
+    "content_sha256" => $r["source"]["content_sha256"],
+    "release_gate" => [
+        "source" => "bin/homologation_gate.sh (NI2-409)",
+        "release_profile" => $r["release_profile"],
+        "decision" => $r["decision"],
+        "is_production_approved" => $r["is_production_approved"],
+        "fail_closed_enforced" => true,
+        "generated_at" => $r["generated_at"],
+        "checks" => array_map(fn($c) => ["id" => $c["id"], "priority" => $c["priority"], "status" => $c["status"], "detail" => $c["detail"]], $r["checks"]),
+        "features_not_homologated" => $r["features_not_homologated"],
+        "findings" => $r["findings"],
+        "evidence_report" => $argv[1],
+    ],
+    "schema" => $r["schema"],
+    "environment" => $r["environment"],
+    "modules_included" => array_values(array_filter(["app", "src", "public", "views", "config", "database", "tests", "bin", "mobile", "docs", "vendor", "replatform", "artisan"], "file_exists")),
+    "runtime_requirements" => ["php" => ">=8.1", "mysql" => ">=8.0", "extensions" => ["pdo", "pdo_mysql", "mbstring", "fileinfo", "curl", "json", "openssl"]],
+];
+file_put_contents($argv[4], json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+' "$GATE_REPORT" "$VERSION" "$BUILD_ID" "$MANIFEST_FILE"
 echo "  ✓ Manifesto gerado em: $MANIFEST_FILE"
 echo ""
 
@@ -218,8 +131,9 @@ mkdir -p "$TEMP_STAGE/mobile"
 rsync -a --exclude='node_modules' --exclude='.expo' --exclude='.test-build' mobile/ "$TEMP_STAGE/mobile/"
 cp -R docs "$TEMP_STAGE/"
 cp -R vendor "$TEMP_STAGE/"
-cp -R replatform "$TEMP_STAGE/"
-cp artisan "$TEMP_STAGE/"
+# Replataforma Laravel 13 (experimental) só entra se existir com dependências instaladas.
+if [ -d replatform/laravel13/vendor ]; then cp -R replatform "$TEMP_STAGE/"; fi
+if [ -f artisan ]; then cp artisan "$TEMP_STAGE/"; fi
 cp composer.json "$TEMP_STAGE/"
 cp .env.example "$TEMP_STAGE/"
 cp "$MANIFEST_FILE" "$TEMP_STAGE/"
@@ -252,16 +166,13 @@ else
     exit 1
 fi
 
-if [ -f "$TEST_EXTRACT_DIR/replatform/laravel13/composer.lock" ] && [ -f "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" ]; then
-    echo "    ✓ replatform/laravel13 presente com composer.lock e artisan no pacote distribuível."
+php -r "require '$TEST_EXTRACT_DIR/vendor/autoload.php'; echo '    ✓ Autoloader executado com sucesso no pacote isolado.', PHP_EOL;"
+# A replataforma Laravel 13 é experimental e exige PHP >= 8.4.1; não roda em produção (public/index.php).
+if [ -f "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" ] && php -r 'exit(PHP_VERSION_ID >= 80401 ? 0 : 1);'; then
+    php "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" --version > /dev/null && echo "    ✓ Laravel 13 artisan executa a partir do pacote extraído."
 else
-    echo "    ❌ ERRO: replatform/laravel13 incompleto no pacote distribuível!"
-    rm -rf "$TEST_EXTRACT_DIR"
-    exit 1
+    echo "    ℹ Replataforma Laravel 13 não verificada (ausente ou PHP < 8.4.1); não faz parte do runtime de produção."
 fi
-
-php -r "require '$TEST_EXTRACT_DIR/vendor/autoload.php'; echo '    ✓ Autoloader executado com sucesso no pacote isolado.\n';"
-php "$TEST_EXTRACT_DIR/replatform/laravel13/artisan" --version > /dev/null && echo "    ✓ Laravel 13 artisan executado com sucesso a partir do pacote extraído."
 rm -rf "$TEST_EXTRACT_DIR"
 
 echo "========================================================================"
@@ -270,6 +181,6 @@ echo "========================================================================"
 echo " Arquivo : $RELEASE_DIR/$PACKAGE_NAME"
 echo " Tamanho : $PACKAGE_SIZE"
 echo " Versão  : $VERSION"
-echo " Status  : APPROVED_LOCAL_CI_GATES_ONLY (FAIL CLOSED - PRODUCTION BLOCKED)"
-echo " Testes  : 100% Executados, Autossuficiente com Vendor Incluído"
+echo " Status  : APPROVED pelo gate de homologação (NI2-409) — ver release_gate em RELEASE_INFO.json"
+echo " Evidência: $GATE_REPORT"
 echo "========================================================================"

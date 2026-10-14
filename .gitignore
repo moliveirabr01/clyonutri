@@ -37,3 +37,10 @@ bin/release.log
 *.sqlite
 *.sqlite-*
 *.sqlite3
+
+# Gate de homologação (NI2-409): evidências por execução e dependências dos testes
+release/evidence/
+storage/homologation-local/
+tests/homologation/node_modules/
+mobile/node_modules/
+mobile/dist/

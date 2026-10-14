@@ -18,7 +18,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="$ROOT_DIR/storage/backups"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_NAME="clyonutri_backup_${TIMESTAMP}"
-PASS_PHRASE="${BACKUP_ENCRYPTION_KEY:-clyonutri_secret_encryption_key_2026}"
+# Sem chave padrão: uma senha gravada no código protege nada (NI2-409). Falha fechada.
+if [ -z "${BACKUP_ENCRYPTION_KEY:-}" ] || [ "${#BACKUP_ENCRYPTION_KEY}" -lt 16 ]; then
+    echo "ERRO: defina BACKUP_ENCRYPTION_KEY (mínimo 16 caracteres) para cifrar o backup." >&2
+    exit 1
+fi
+PASS_PHRASE="$BACKUP_ENCRYPTION_KEY"
 
 mkdir -p "$BACKUP_DIR"
 

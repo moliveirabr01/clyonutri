@@ -3,129 +3,98 @@
 declare(strict_types=1);
 
 /**
- * ==============================================================================
- * CLYONUTRI II — TESTE DE VERIFICAÇÃO DO RELEASE GATE & FAIL CLOSED (NI2-178)
- * ==============================================================================
- * Comprova rigorosamente os 5 critérios de aceite de NI2-178:
- *  1. Gate só aprova quando todos requisitos P0 têm evidência PASS reproduzível.
- *  2. PASS exige execução real e artefato/log associado ao commit.
- *  3. NOT TESTED e BLOCKED impedem release APPROVED para requisitos obrigatórios (FAIL CLOSED).
- *  4. Relatório distingue sintaxe, teste de serviço, HTTP, browser, mobile e produção.
- *  5. Pacote distribuível contém vendor/autoload.php e executa de forma autônoma.
- * ==============================================================================
+ * ClyoNutri II — Contrato do release gate FAIL CLOSED (NI2-409 / AUD-07, substitui NI2-178).
+ *
+ * Prova positiva e negativa da regra de decisão do gate de homologação:
+ *  - APPROVED somente com todos os checks P0 em PASS;
+ *  - P0 em FAIL, SKIPPED, BLOCKED, NOT_TESTED, inválido ou ausente => BLOCKED;
+ *  - P1/INFO entram como achados, sem bloquear;
+ *  - build_release.sh não contém resultados fixos e empacota só com relatório APPROVED do mesmo commit.
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../bin/homologation/GateReport.php';
 
-echo "====================================================================\n";
-echo "   CLYONUTRI II — RELEASE GATE & FAIL CLOSED TEST SUITE (NI2-178)\n";
-echo "   Comprovação de Governança Estrita e Ausência de Falsos Aprovados\n";
-echo "====================================================================\n\n";
-
-$rootDir = dirname(__DIR__);
-$passed = 0;
-$failed = 0;
-
-function assertCondition(string $desc, bool $cond): void {
-    global $passed, $failed;
-    if ($cond) {
-        echo "  [PASS] {$desc}\n";
-        $passed++;
-    } else {
-        echo "  [FAIL] {$desc}\n";
-        $failed++;
+$failures = 0;
+function check(string $desc, bool $cond): void
+{
+    global $failures;
+    echo ($cond ? "  [PASS] " : "  [FAIL] ") . $desc . "\n";
+    if (!$cond) {
+        $failures++;
     }
 }
 
-// -----------------------------------------------------------------------------
-// [1] Execução da Matriz em 6 Camadas
-// -----------------------------------------------------------------------------
-echo "[1] Testando Execução da Matriz de Qualidade (bin/verify_quality_gate.php)...\n";
-
-$matrixFile = $rootDir . '/docs/delivery/QUALITY_GATE_MATRIX.json';
-if (!file_exists($matrixFile)) {
-    shell_exec("php " . escapeshellarg($rootDir . '/bin/verify_quality_gate.php') . " > /dev/null 2>&1");
-}
-assertCondition("Arquivo QUALITY_GATE_MATRIX.json existe", file_exists($matrixFile));
-
-$matrixData = json_decode((string)file_get_contents($matrixFile), true);
-assertCondition("Matriz JSON é válida e estruturada", is_array($matrixData) && isset($matrixData['layers']));
-
-$expectedLayers = ['SYNTAX_STATIC', 'DOMAIN_SERVICES', 'HTTP_WEB', 'MOBILE_API', 'E2E_JOURNEYS', 'INFRA_PRODUCTION'];
-foreach ($expectedLayers as $layer) {
-    assertCondition("Camada '{$layer}' está presente no relatório multicamada", isset($matrixData['layers'][$layer]) && count($matrixData['layers'][$layer]) > 0);
+function p0All(array $override = []): array
+{
+    $checks = [];
+    foreach (GateReport::REQUIRED_P0 as $id) {
+        $checks[$id] = ['id' => $id, 'priority' => 'P0', 'status' => 'PASS', 'detail' => 'ok'];
+    }
+    foreach ($override as $id => $status) {
+        if ($status === null) {
+            unset($checks[$id]);
+        } else {
+            $checks[$id]['status'] = $status;
+        }
+    }
+    return array_values($checks);
 }
 
-// -----------------------------------------------------------------------------
-// [2] Filosofia FAIL CLOSED (BLOCKED impede APPROVED irrestrito para produção)
-// -----------------------------------------------------------------------------
-echo "\n[2] Testando Princípio FAIL CLOSED...\n";
+echo "==============================================\n";
+echo "  RELEASE GATE FAIL CLOSED — NI2-409\n";
+echo "==============================================\n\n";
 
-$summary = $matrixData['summary'] ?? [];
-assertCondition("Resumo da matriz contabiliza PASS, BLOCKED, NOT_TESTED e FAIL", isset($summary['pass'], $summary['blocked'], $summary['not_tested'], $summary['fail']));
-assertCondition("Zero falhas em testes funcionais obrigatórios", ($summary['fail'] ?? 1) === 0);
-assertCondition("Pelo menos 1 check BLOCKED registrado para credenciais remotas", ($summary['blocked'] ?? 0) >= 1);
-assertCondition("Pelo menos 1 check NOT_TESTED registrado para browser físico", ($summary['not_tested'] ?? 0) >= 1);
-
-// Decisão deve ser restrita e NÃO "APPROVED_FOR_PRODUCTION"
-$decision = $matrixData['release_gate_decision'] ?? '';
-assertCondition("Decisão do Release Gate respeita FAIL CLOSED (não emite APPROVED irrestrito de produção)", str_contains($decision, 'PRODUCTION_DEPLOY_BLOCKED') || !str_contains($decision, 'APPROVED_FOR_PRODUCTION'));
-
-// -----------------------------------------------------------------------------
-// [3] Validação do Manifesto de Release (release/RELEASE_INFO.json)
-// -----------------------------------------------------------------------------
-echo "\n[3] Testando Manifesto de Release (RELEASE_INFO.json)...\n";
-
-$manifestFile = $rootDir . '/release/RELEASE_INFO.json';
-assertCondition("Manifesto RELEASE_INFO.json existe", file_exists($manifestFile));
-
-$manifestData = json_decode((string)file_get_contents($manifestFile), true);
-assertCondition("Manifesto contém commit SHA", !empty($manifestData['git_commit']));
-assertCondition("Manifesto declara fail_closed_enforced = true", ($manifestData['release_gate']['fail_closed_enforced'] ?? false) === true);
-assertCondition("Manifesto declara is_production_approved = false (bloqueio transparente de deploy)", ($manifestData['release_gate']['is_production_approved'] ?? true) === false);
-assertCondition("Manifesto lista 'vendor' nos módulos incluídos no pacote", in_array('vendor', $manifestData['modules_included'] ?? [], true));
-
-// -----------------------------------------------------------------------------
-// [4] Validação de Autossuficiência do Pacote (.tar.gz)
-// -----------------------------------------------------------------------------
-echo "\n[4] Testando Autossuficiência do Pacote Distribuível (.tar.gz)...\n";
-
-$releaseTarballs = glob($rootDir . '/release/*.tar.gz');
-assertCondition("Pelo menos um pacote tar.gz gerado em release/", !empty($releaseTarballs));
-
-$latestTarball = end($releaseTarballs);
-$tarContents = (string)shell_exec("tar -tzf " . escapeshellarg($latestTarball));
-
-assertCondition("Pacote contém vendor/autoload.php para execução autônoma (Finding resolvido)", str_contains($tarContents, 'vendor/autoload.php'));
-assertCondition("Pacote contém pasta tests/ para verificação pós-extração", str_contains($tarContents, 'tests/'));
-assertCondition("Pacote contém database/migrations/ para subida de schema", str_contains($tarContents, 'database/migrations/'));
-assertCondition("Pacote contém RELEASE_INFO.json", str_contains($tarContents, 'RELEASE_INFO.json'));
-
-// Teste de extração real em sandbox isolado
-$testExtractDir = sys_get_temp_dir() . '/test_fail_closed_' . uniqid();
-mkdir($testExtractDir, 0755, true);
-shell_exec("tar -xzf " . escapeshellarg($latestTarball) . " -C " . escapeshellarg($testExtractDir));
-
-$autoloadWorked = false;
-$outputAutoload = (string)shell_exec("php -r \"require '{$testExtractDir}/vendor/autoload.php'; echo class_exists('ClyoNutri\\\\Core\\\\Database\\\\Connection') ? 'OK' : 'FAIL';\"");
-$autoloadWorked = (trim($outputAutoload) === 'OK');
-shell_exec("rm -rf " . escapeshellarg($testExtractDir));
-
-assertCondition("Autoload executado com sucesso no pacote extraído isoladamente", $autoloadWorked);
-
-// -----------------------------------------------------------------------------
-// RESULTADO FINAL
-// -----------------------------------------------------------------------------
-echo "\n====================================================================\n";
-echo "   RESULTADO DA SUÍTE DE TESTES NI2-178\n";
-echo "====================================================================\n";
-echo "Testes Aprovados: {$passed}\n";
-echo "Testes Falhos:    {$failed}\n";
-
-if ($failed === 0) {
-    echo "STATUS: ALL TESTS PASSED (100% SUCESSO - AUDITORIA VERIFICÁVEL APROVADA)\n";
-    exit(0);
-} else {
-    echo "STATUS: FAILURES DETECTED\n";
-    exit(1);
+echo "[1] Regra de decisão\n";
+check('Todos os P0 em PASS => APPROVED', GateReport::decide(p0All())['decision'] === 'APPROVED');
+foreach (['FAIL', 'SKIPPED', 'BLOCKED', 'NOT_TESTED'] as $status) {
+    $d = GateReport::decide(p0All(['web_journeys' => $status]));
+    check("P0 em {$status} => BLOCKED (e listado como bloqueio)", $d['decision'] === 'BLOCKED' && $d['blocking'][0]['id'] === 'web_journeys');
 }
+$missing = GateReport::decide(p0All(['mysql_schema' => null]));
+check('P0 obrigatório ausente (mysql_schema) => BLOCKED/MISSING', $missing['decision'] === 'BLOCKED' && $missing['blocking'][0]['status'] === 'MISSING');
+$native = GateReport::decide(p0All(['mobile_native_android' => 'BLOCKED']));
+check('Perfil mobile: app nativo sem evidência de dispositivo bloqueia a release', $native['decision'] === 'BLOCKED');
+$webChecks = p0All(['mobile_native_android' => null]);
+$webChecks[] = ['id' => 'mobile_native_android', 'priority' => 'INFO', 'status' => 'BLOCKED', 'detail' => 'sem evidência'];
+check('Perfil web (HostGator): Android nativo sem evidência não bloqueia', GateReport::decide($webChecks, 'web')['decision'] === 'APPROVED');
+check('Perfil mobile: rebaixar o Android para INFO não burla a exigência', GateReport::decide($webChecks, 'mobile')['decision'] === 'BLOCKED');
+check('Perfil web continua exigindo MySQL, API, web e ensaio de deploy', GateReport::decide(p0All(['deploy_rollback_rehearsal' => 'SKIPPED']), 'web')['decision'] === 'BLOCKED');
+check('Perfil desconhecido bloqueia', GateReport::decide(p0All(), 'producao')['decision'] === 'BLOCKED');
+$withP1 = array_merge(p0All(), [['id' => 'accessibility', 'priority' => 'P1', 'status' => 'FAIL', 'detail' => 'x']]);
+check('P1 em FAIL não bloqueia quando todos os P0 passam', GateReport::decide($withP1)['decision'] === 'APPROVED');
+$invalid = array_merge(p0All(), [['id' => 'x', 'priority' => 'P0', 'status' => 'OK']]);
+check('Status desconhecido ("OK") é tratado como bloqueio', GateReport::decide($invalid)['decision'] === 'BLOCKED');
+$mock = array_merge(p0All(), [['id' => 'teleconsulta_external_provider', 'priority' => 'INFO', 'status' => 'BLOCKED', 'detail' => 'sem credenciais']]);
+check('Teleconsulta externa sem credenciais aparece como NÃO homologada (INFO), nunca PASS', GateReport::decide($mock)['decision'] === 'APPROVED');
+
+echo "\n[2] Relatório a partir de evidências reais em disco\n";
+$dir = sys_get_temp_dir() . '/gate_report_test_' . getmypid();
+@mkdir($dir . '/screenshots', 0700, true);
+$checks = array_merge(p0All(['mobile_native_android' => 'BLOCKED']), [['id' => 'teleconsulta_external_provider', 'priority' => 'INFO', 'status' => 'BLOCKED', 'detail' => 'sem credenciais']]);
+file_put_contents($dir . '/checks.jsonl', implode("\n", array_map('json_encode', $checks)) . "\n");
+file_put_contents($dir . '/environment.json', json_encode(['source' => ['commit' => str_repeat('a', 40), 'dirty' => false, 'dirty_files' => 0, 'content_sha256' => str_repeat('b', 64)]]));
+file_put_contents($dir . '/screenshots/web__01.png', 'png-sintetico');
+$report = GateReport::build($dir);
+check('Relatório bloqueado com is_production_approved = false', $report['decision'] === 'BLOCKED' && $report['is_production_approved'] === false);
+check('Relatório declara fail_closed_enforced = true', $report['fail_closed_enforced'] === true);
+$shot = array_values(array_filter($report['evidence_files'], fn($f) => $f['path'] === 'screenshots/web__01.png'));
+check('Evidências listadas com SHA-256 real', $shot && $shot[0]['sha256'] === hash('sha256', 'png-sintetico'));
+check('Teleconsulta listada em features_not_homologated', (bool)array_filter($report['features_not_homologated'], fn($f) => str_starts_with($f, 'teleconsulta_external_provider')));
+check('Markdown mostra a decisão e o bloqueio', str_contains(GateReport::markdown($report), 'BLOCKED') && str_contains(GateReport::markdown($report), 'mobile_native_android'));
+array_map('unlink', glob($dir . '/screenshots/*') ?: []);
+array_map('unlink', glob($dir . '/*.*') ?: []);
+@rmdir($dir . '/screenshots');
+@rmdir($dir);
+
+echo "\n[3] build_release.sh sem resultados fixos\n";
+$script = (string)file_get_contents(__DIR__ . '/../bin/build_release.sh');
+check('Executa bin/homologation_gate.sh', str_contains($script, 'bin/homologation_gate.sh'));
+check('Exige decisão APPROVED do relatório', str_contains($script, '"APPROVED"'));
+check('Recusa relatório de outro commit ou de árvore não commitada', str_contains($script, 'git rev-parse HEAD') && str_contains($script, '["dirty"]'));
+check('Não contém camadas "PASSED" escritas à mão', !preg_match('/"(syntax_static|http_web|mobile_api|e2e_journeys)"\s*:\s*"PASSED/', $script));
+check('Exige que o perfil do relatório seja o da release pedida', str_contains($script, 'GATE_RELEASE_PROFILE') && str_contains($script, 'release_profile'));
+check('Recusa empacotar se o código mudou depois do relatório (fingerprint do conteúdo)', str_contains($script, 'source_fingerprint.sh') && str_contains($script, 'content_sha256'));
+check('Não descarta a saída das suítes (> /dev/null)', !preg_match('/php "\$test_file" > \/dev\/null/', $script));
+
+echo "\n" . ($failures === 0 ? "✓ CONTRATO FAIL CLOSED VERIFICADO" : "✗ {$failures} verificação(ões) falharam") . "\n";
+exit($failures === 0 ? 0 : 1);

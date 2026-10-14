@@ -7,6 +7,10 @@ declare(strict_types=1);
  *
  * Uso (Terminal do cPanel ou SSH):
  *   php bin/create_superadmin.php admin@seudominio.com.br "Nome do Administrador"
+ *   php bin/create_superadmin.php suporte@seudominio.com.br "Nome" --role=support_agent
+ *
+ * --role aceita os papéis de equipe da plataforma (PlatformPolicy): superadmin (padrão),
+ * admin_operacional, operator, support_agent, finance_admin, security_auditor.
  *
  * Gera uma senha forte aleatória e a exibe UMA única vez. Troque-a no primeiro acesso.
  * O superadmin é vinculado ao consultório interno "Operação da Plataforma" (criado na
@@ -27,11 +31,22 @@ use ClyoNutri\Core\Security\Env;
 Env::load(__DIR__ . '/../.env');
 date_default_timezone_set((string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo'));
 
-$email = strtolower(trim((string)($argv[1] ?? '')));
-$name = trim((string)($argv[2] ?? ''));
+$positional = array_values(array_filter(array_slice($argv, 1), static fn($a) => !str_starts_with($a, '--')));
+$roleArg = array_values(array_filter(array_slice($argv, 1), static fn($a) => str_starts_with($a, '--role=')));
+$email = strtolower(trim((string)($positional[0] ?? '')));
+$name = trim((string)($positional[1] ?? ''));
+$role = $roleArg ? substr($roleArg[0], 7) : \ClyoNutri\Core\Security\PlatformPolicy::ROLE_SUPERADMIN;
+$allowedRoles = [
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_SUPERADMIN,
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_ADMIN_OPERACIONAL,
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_OPERATOR,
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_SUPPORT_AGENT,
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_FINANCE_ADMIN,
+    \ClyoNutri\Core\Security\PlatformPolicy::ROLE_SECURITY_AUDITOR,
+];
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '') {
-    fwrite(STDERR, "Uso: php bin/create_superadmin.php <email> \"<nome>\"\n");
+if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '' || !in_array($role, $allowedRoles, true)) {
+    fwrite(STDERR, "Uso: php bin/create_superadmin.php <email> \"<nome>\" [--role=" . implode('|', $allowedRoles) . "]\n");
     exit(1);
 }
 
@@ -67,8 +82,9 @@ try {
 
         $db->prepare(
             "INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status)
-             VALUES (:uuid, :name, :email, :hash, 'superadmin', 1, 'active')"
+             VALUES (:uuid, :name, :email, :hash, :role, 1, 'active')"
         )->execute([
+            'role' => $role,
             'uuid' => $uuid(),
             'name' => $name,
             'email' => $email,
@@ -87,7 +103,7 @@ try {
         throw $e;
     }
 
-    echo "Superadmin criado com sucesso.\n";
+    echo "Usuário de equipe ({$role}) criado com sucesso.\n";
     echo "  E-mail: {$email}\n";
     echo "  Senha : {$password}\n";
     echo "Guarde esta senha agora — ela não será exibida novamente. Acesse /login e depois /admin.\n";

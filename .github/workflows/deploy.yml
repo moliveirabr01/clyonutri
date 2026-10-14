@@ -16,21 +16,56 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to HostGator (SSH Port 2222)
+    name: Deploy to HostGator (SSH Port 2222) — somente com gate APPROVED
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: gate-root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping -pgate-root" --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      GATE_DB_HOST: 127.0.0.1
+      GATE_DB_PORT: '3306'
+      GATE_DB_USER: root
+      GATE_DB_PASS: gate-root
+      # Perfil web: release do sistema na HostGator. O app nativo (lojas) usa o perfil mobile.
+      GATE_RELEASE_PROFILE: web
+      GATE_MOBILE_NATIVE_EVIDENCE: ${{ vars.GATE_MOBILE_NATIVE_EVIDENCE_PATH }}
+      # Necessário no nível do job: os passos usam `if: env.HOSTGATOR_SSH_KEY != ''`.
+      # Antes não era definido aqui e o deploy era pulado em silêncio.
+      HOSTGATOR_SSH_KEY: ${{ secrets.HOSTGATOR_SSH_KEY }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, pdo, pdo_mysql, fileinfo, intl, zip, gd
+          extensions: mbstring, pdo, pdo_mysql, pdo_sqlite, fileinfo, curl, intl, zip, gd
+          ini-values: zend.assertions=1, assert.exception=1
 
-      - name: Prepare Production Artifact
+      - name: Prepare Production Artifact (gate de homologação NI2-409, fail closed)
         run: |
-          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+          composer dump-autoload --optimize --no-interaction
+          npm ci --prefix tests/homologation --no-audit --no-fund
+          npm ci --prefix mobile --no-audit --no-fund
+          (cd tests/homologation && npx playwright install --with-deps chromium)
+          sudo apt-get install -y --no-install-recommends mysql-client rsync
           ./bin/build_release.sh "1.0.0-${GITHUB_SHA::7}"
 
       - name: Setup SSH Connection (Port 2222)
@@ -51,8 +86,14 @@ jobs:
         run: |
           ./bin/deploy_hostgator.sh "${{ inputs.target_env || 'staging' }}"
 
-      - name: Post-Deploy Smoke Test
+      - name: Post-Deploy Smoke Test (servidor real)
+        if: ${{ env.HOSTGATOR_SSH_KEY != '' }}
+        env:
+          HOSTGATOR_SSH_KEY: ${{ secrets.HOSTGATOR_SSH_KEY }}
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          echo "Simulando smoke test pós-deploy na HostGator:"
-          php bin/healthcheck.php
-          echo "✓ Verificado: endpoint de saúde responsivo e isolamento garantido."
+          if [ -z "$APP_URL" ]; then echo "::error::Defina o secret APP_URL para verificar o deploy."; exit 1; fi
+          body=$(curl -fsS --max-time 20 "$APP_URL/up")
+          echo "$body"
+          echo "$body" | grep -q '"database":"connected"' || { echo "::error::/up não confirma banco conectado após o deploy."; exit 1; }
+          echo "✓ $APP_URL/up respondeu com banco conectado."

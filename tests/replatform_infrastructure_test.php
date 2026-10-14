@@ -94,7 +94,7 @@ class ReplatformInfrastructureTest
         $this->assertTrue(is_executable($restoreScript), "Script bin/restore_database.sh é executável");
 
         // Executar backup
-        exec("bash " . escapeshellarg($backupScript) . " 2>&1", $backupOut, $backupCode);
+        exec("BACKUP_ENCRYPTION_KEY=gate-teste-chave-local-0001 bash " . escapeshellarg($backupScript) . " 2>&1", $backupOut, $backupCode);
         $this->assertEquals(0, $backupCode, "Rotina de backup executada com código 0");
 
         // Verificar arquivo .enc gerado
@@ -102,7 +102,7 @@ class ReplatformInfrastructureTest
         $this->assertTrue(!empty($encFiles), "Arquivo .enc de backup cifrado foi gerado no storage");
 
         // Executar ensaio de restauração
-        exec("bash " . escapeshellarg($restoreScript) . " 2>&1", $restoreOut, $restoreCode);
+        exec("BACKUP_ENCRYPTION_KEY=gate-teste-chave-local-0001 bash " . escapeshellarg($restoreScript) . " 2>&1", $restoreOut, $restoreCode);
         $this->assertEquals(0, $restoreCode, "Ensaio de restauração (rehearsal) executado com código 0");
     }
 

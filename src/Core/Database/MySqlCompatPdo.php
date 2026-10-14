@@ -12,11 +12,17 @@ use PDOStatement;
  *
  * As migrations foram escritas primeiro para SQLite. O MySQL 8 não aceita
  * "CREATE INDEX IF NOT EXISTS" nem "PRAGMA table_info(...)"; esta classe traduz
- * apenas esses dois padrões e repassa todo o resto sem alteração.
+ * apenas esses padrões e repassa todo o resto sem alteração.
+ *
+ * Também fixa a collation das tabelas novas em utf8mb4_unicode_ci: sem isso o MySQL 8
+ * usa utf8mb4_0900_ai_ci, divergindo do SQL de instalação e quebrando comparações de
+ * texto entre tabelas ("Illegal mix of collations").
  */
 class MySqlCompatPdo extends PDO
 {
     private const INDEX_IF_NOT_EXISTS = '/^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s+ON\s+`?(\w+)`?/i';
+    public const COLLATION = 'utf8mb4_unicode_ci';
+    private const CREATE_TABLE_CHARSET = '/^(\s*CREATE\s+TABLE\b.*\bCHARSET\s*=\s*utf8mb4\b)(?![^;]*\bCOLLATE\b)/is';
     private const PRAGMA_TABLE_INFO = '/^\s*PRAGMA\s+table_info\(\s*[`"\']?(\w+)[`"\']?\s*\)\s*;?\s*$/i';
 
     public function exec(string $statement): int|false
@@ -27,6 +33,7 @@ class MySqlCompatPdo extends PDO
             }
             $statement = (string)preg_replace('/\s+IF\s+NOT\s+EXISTS/i', '', $statement, 1);
         }
+        $statement = (string)preg_replace(self::CREATE_TABLE_CHARSET, '$1 COLLATE=' . self::COLLATION, $statement, 1);
         return parent::exec($statement);
     }
 

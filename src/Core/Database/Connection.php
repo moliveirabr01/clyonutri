@@ -92,6 +92,9 @@ class Connection
                 $offset = (new \DateTimeImmutable('now'))->format('P');
             }
             self::$instance->exec("SET time_zone = '{$offset}'");
+            if ($charset === 'utf8mb4') {
+                self::$instance->exec("SET NAMES utf8mb4 COLLATE " . MySqlCompatPdo::COLLATION);
+            }
             return;
         }
 
