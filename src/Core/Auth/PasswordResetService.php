@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace ClyoNutri\Core\Auth;
 
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Mail\Mailer;
+use ClyoNutri\Core\Mail\MailerFactory;
+use ClyoNutri\Core\Mail\PasswordResetEmail;
+use ClyoNutri\Core\Security\Env;
 use InvalidArgumentException;
 use PDO;
 use RuntimeException;
@@ -14,7 +18,6 @@ use RuntimeException;
  *
  * Implementa recuperação de acesso segura e não-enumerável:
  * - Tokens criptográficos unívocos gerados com random_bytes (64 caracteres hexadecimais).
- * - Só o hash SHA-256 do token é gravado: quem lê o banco não consegue usar o link (NI2-409).
  * - Expiração estrita de 30 minutos por token.
  * - Respostas uniformes e não-enumeráveis para prevenir enumeração de contas.
  * - Anti-abuso / Rate limiting por e-mail e endereço IP via trilha de auditoria.
@@ -22,6 +25,10 @@ use RuntimeException;
  * - Descarte atômico do token após consumo (Single-Use Token).
  * - Revogação imediata de sessões ativas anteriores (sessões web e tokens Sanctum/API).
  * - Trilha de auditoria completa em audit_logs.
+ * - Envio do link por e-mail (Mailer), com URL montada a partir de APP_URL (nunca do Host da requisição).
+ * - Somente o hash SHA-256 do token é persistido em password_resets.token.
+ * - Datas de expiração em UTC (gmdate) comparadas com "agora" em UTC fornecido pelo PHP,
+ *   independente do fuso do servidor de banco (SQLite, MySQL 5.7/8).
  */
 class PasswordResetService
 {
@@ -30,10 +37,42 @@ class PasswordResetService
     public const MAX_REQUESTS_PER_IP_15M = 10;
 
     private PDO $db;
+    private ?Mailer $mailer;
+    private ?string $appUrl;
+    /** @var (callable(\Closure): void)|null Agenda o envio para depois da resposta HTTP. */
+    private $deliveryScheduler = null;
 
-    public function __construct(?PDO $db = null)
+    /**
+     * @param Mailer|null $mailer Transporte de e-mail (padrão: MailerFactory::fromEnv(), criado sob demanda)
+     * @param string|null $appUrl URL pública da aplicação (padrão: env APP_URL)
+     */
+    public function __construct(?PDO $db = null, ?Mailer $mailer = null, ?string $appUrl = null)
     {
         $this->db = $db ?? Connection::getInstance();
+        $this->mailer = $mailer;
+        $this->appUrl = $appUrl;
+    }
+
+    /**
+     * Faz o envio do e-mail ser agendado em vez de executado na hora. O controller usa isso para
+     * mandar a resposta ao navegador antes do SMTP, para que o tempo de resposta não revele se a
+     * conta existe. O token fica só dentro da closure; nunca volta no array de requestReset().
+     */
+    public function deferEmailDelivery(?callable $scheduler): void
+    {
+        $this->deliveryScheduler = $scheduler;
+    }
+
+    /** Hash persistido do token (SHA-256 hex, 64 caracteres). */
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+
+    /** "Agora" em UTC no formato DATETIME, usado em todas as comparações de expiração. */
+    private static function nowUtc(int $offsetSeconds = 0): string
+    {
+        return gmdate('Y-m-d H:i:s', time() + $offsetSeconds);
     }
 
     /**
@@ -43,7 +82,8 @@ class PasswordResetService
      * @param string $email E-mail fornecido pelo usuário
      * @param string|null $ipAddress Endereço IP do cliente
      * @param string|null $userAgent User Agent do cliente
-     * @return array Metadados da operação (para o controller/view)
+     * @return array Metadados da operação (para o controller/view). Nunca contém o token:
+     *               ele só sai do servidor dentro do e-mail.
      */
     public function requestReset(string $email, ?string $ipAddress = null, ?string $userAgent = null): array
     {
@@ -87,7 +127,7 @@ class PasswordResetService
                 'success' => true,
                 'email' => $email,
                 'user_found' => false,
-                'token' => null,
+                'email_sent' => false,
                 'expires_at' => null,
                 'message' => $genericMessage,
             ];
@@ -98,7 +138,9 @@ class PasswordResetService
 
         // 3. Geração de token criptográfico forte e expiração
         $token = bin2hex(random_bytes(32)); // 64 caracteres
-        $expiresAt = date('Y-m-d H:i:s', time() + self::TOKEN_VALIDITY_SECONDS);
+        $tokenHash = self::hashToken($token);
+        $createdAt = self::nowUtc();
+        $expiresAt = self::nowUtc(self::TOKEN_VALIDITY_SECONDS); // UTC
 
         $this->db->beginTransaction();
         try {
@@ -109,11 +151,12 @@ class PasswordResetService
             // Insere o novo token único
             $ins = $this->db->prepare("
                 INSERT INTO password_resets (email, token, created_at, expires_at)
-                VALUES (:email, :token, CURRENT_TIMESTAMP, :expires_at)
+                VALUES (:email, :token, :created_at, :expires_at)
             ");
             $ins->execute([
                 'email' => $email,
-                'token' => self::hashToken($token),
+                'token' => $tokenHash,
+                'created_at' => $createdAt,
                 'expires_at' => $expiresAt,
             ]);
 
@@ -128,8 +171,7 @@ class PasswordResetService
                 userAgent: $userAgent,
                 details: [
                     'email' => $email,
-                    'expires_at' => $expiresAt,
-                    'token_prefix' => substr($token, 0, 8) . '...',
+                    'expires_at_utc' => $expiresAt,
                 ]
             );
 
@@ -139,13 +181,22 @@ class PasswordResetService
             throw $e;
         }
 
+        // 4. Envio do e-mail. Falha de envio NÃO altera a resposta (não-enumerável):
+        //    registra em error_log + auditoria e segue com a mensagem genérica.
+        if ($this->deliveryScheduler !== null) {
+            ($this->deliveryScheduler)(fn () => $this->sendResetEmail($user, $email, $token, $clinicId, $userId, $ipAddress, $userAgent));
+            $emailSent = null; // agendado: o resultado vai para a auditoria
+        } else {
+            $emailSent = $this->sendResetEmail($user, $email, $token, $clinicId, $userId, $ipAddress, $userAgent);
+        }
+        unset($token);
+
         return [
             'success' => true,
             'email' => $email,
             'user_found' => true,
             'user_id' => $userId,
-            'user_name' => (string)($user['name'] ?? ''),
-            'token' => $token,
+            'email_sent' => $emailSent,
             'expires_at' => $expiresAt,
             'message' => $genericMessage,
         ];
@@ -158,9 +209,10 @@ class PasswordResetService
     public function validateToken(string $token): ?array
     {
         $token = trim($token);
-        if ($token === '' || strlen($token) < 32) {
+        if (strlen($token) !== 64 || !ctype_xdigit($token)) {
             return null;
         }
+        $tokenHash = self::hashToken(strtolower($token));
 
         $stmt = $this->db->prepare("
             SELECT pr.email, pr.token, pr.created_at, pr.expires_at,
@@ -172,10 +224,10 @@ class PasswordResetService
             WHERE pr.token = :token
             LIMIT 1
         ");
-        $stmt->execute(['token' => self::hashToken($token)]);
+        $stmt->execute(['token' => $tokenHash]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$row) {
+        if (!$row || !hash_equals((string)$row['token'], $tokenHash)) {
             return null;
         }
 
@@ -184,18 +236,18 @@ class PasswordResetService
             return null;
         }
 
-        // Verifica expiração
-        $expiresTimestamp = strtotime($row['expires_at']);
+        // Verifica expiração (expires_at está em UTC)
+        $expiresTimestamp = strtotime((string)$row['expires_at'] . ' UTC');
         if ($expiresTimestamp === false || $expiresTimestamp <= time()) {
             // Token expirado: limpa da base
             $del = $this->db->prepare("DELETE FROM password_resets WHERE token = :token");
-            $del->execute(['token' => self::hashToken($token)]);
+            $del->execute(['token' => $tokenHash]);
             return null;
         }
 
         return [
             'email' => $row['email'],
-            'token' => $token,
+            'token_hash' => $row['token'],
             'user_id' => (int)$row['user_id'],
             'user_uuid' => $row['user_uuid'],
             'user_name' => $row['user_name'],
@@ -251,7 +303,7 @@ class PasswordResetService
             // 2. Remove o token utilizado (garantindo Single-Use)
             $delToken = $this->db->prepare("DELETE FROM password_resets WHERE token = :token OR LOWER(email) = :email");
             $delToken->execute([
-                'token' => self::hashToken($token),
+                'token' => (string)$validToken['token_hash'],
                 'email' => strtolower($email),
             ]);
 
@@ -296,39 +348,19 @@ class PasswordResetService
         }
     }
 
-    /** Registra na auditoria o resultado da entrega do e-mail (sem token, sem segredos). */
-    public function recordEmailDelivery(int $userId, string $email, bool $delivered, ?string $error = null, ?string $ipAddress = null): void
-    {
-        $this->logAudit(
-            clinicId: null,
-            userId: $userId,
-            action: $delivered ? 'PASSWORD_RESET_EMAIL_SENT' : 'PASSWORD_RESET_EMAIL_FAILED',
-            resource: 'password_resets',
-            resourceId: (string)$userId,
-            ipAddress: $ipAddress,
-            userAgent: null,
-            details: array_filter(['email' => $email, 'error' => $error !== null ? mb_substr($error, 0, 300) : null]),
-        );
-    }
-
-    /** Hash gravado no banco para um token de recuperação. */
-    public static function hashToken(string $token): string
-    {
-        return hash('sha256', trim($token));
-    }
-
     /**
-     * Retorna o HASH do token ativo de um e-mail (o token original só existe no link enviado).
+     * Retorna o HASH (SHA-256) do token ativo de um e-mail (testes/verificação).
+     * O token em claro não é recuperável: ele só existe no e-mail enviado.
      */
     public function getActiveTokenForEmail(string $email): ?string
     {
         $stmt = $this->db->prepare("
             SELECT token FROM password_resets
-            WHERE LOWER(email) = LOWER(:email) AND expires_at > CURRENT_TIMESTAMP
+            WHERE LOWER(email) = LOWER(:email) AND expires_at > :now
             ORDER BY created_at DESC
             LIMIT 1
         ");
-        $stmt->execute(['email' => trim($email)]);
+        $stmt->execute(['email' => trim($email), 'now' => self::nowUtc()]);
         $res = $stmt->fetchColumn();
         return $res ?: null;
     }
@@ -347,8 +379,8 @@ class PasswordResetService
      */
     public function cleanExpiredTokens(): int
     {
-        $stmt = $this->db->prepare("DELETE FROM password_resets WHERE expires_at <= CURRENT_TIMESTAMP");
-        $stmt->execute();
+        $stmt = $this->db->prepare("DELETE FROM password_resets WHERE expires_at <= :now");
+        $stmt->execute(['now' => self::nowUtc()]);
         return $stmt->rowCount();
     }
 
@@ -357,7 +389,7 @@ class PasswordResetService
      */
     private function assertRateLimitNotExceeded(string $email, ?string $ipAddress): void
     {
-        $cutoff15m = date('Y-m-d H:i:s', time() - 900);
+        $cutoff15m = self::nowUtc(-900); // audit_logs desta classe são gravados em UTC
 
         // 1. Checagem por e-mail
         $stmt = $this->db->prepare("
@@ -417,7 +449,7 @@ class PasswordResetService
     ): void {
         $stmt = $this->db->prepare("
             INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at)
-            VALUES (:clinic_id, :user_id, :action, :resource, :resource_id, :ip_address, :user_agent, :details, CURRENT_TIMESTAMP)
+            VALUES (:clinic_id, :user_id, :action, :resource, :resource_id, :ip_address, :user_agent, :details, :created_at)
         ");
         $stmt->execute([
             'clinic_id' => $clinicId,
@@ -428,6 +460,62 @@ class PasswordResetService
             'ip_address' => $ipAddress,
             'user_agent' => $userAgent,
             'details' => json_encode($details, JSON_UNESCAPED_UNICODE),
+            'created_at' => self::nowUtc(),
         ]);
+    }
+
+    /**
+     * Monta e envia o e-mail de redefinição. Retorna true se enviado.
+     * Nunca lança: falhas são registradas e a resposta ao usuário continua genérica.
+     */
+    private function sendResetEmail(
+        array $user,
+        string $email,
+        string $token,
+        ?int $clinicId,
+        int $userId,
+        ?string $ipAddress,
+        ?string $userAgent
+    ): bool {
+        try {
+            $baseUrl = rtrim(trim((string)($this->appUrl ?? Env::get('APP_URL') ?? '')), '/');
+            if (!preg_match('#^https?://[^/\s]+#i', $baseUrl)) {
+                // Nunca usa o Host da requisição como fallback (host header injection).
+                throw new \RuntimeException('APP_URL ausente ou inválida; link de redefinição não pode ser montado.');
+            }
+            $resetUrl = $baseUrl . '/recuperar-senha/' . rawurlencode($token);
+
+            $message = PasswordResetEmail::build(
+                (string)$user['email'],
+                (string)($user['name'] ?? ''),
+                $resetUrl,
+                intdiv(self::TOKEN_VALIDITY_SECONDS, 60),
+                self::supportReplyTo()
+            );
+
+            $this->mailer ??= MailerFactory::fromEnv();
+            $this->mailer->send($message);
+
+            $this->logAudit($clinicId, $userId, 'PASSWORD_RESET_EMAIL_SENT', 'password_resets', (string)$userId, $ipAddress, $userAgent, ['email' => $email]);
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][password-reset] Falha ao enviar e-mail de redefinição (user_id=' . $userId . '): ' . $e->getMessage());
+            try {
+                $this->logAudit($clinicId, $userId, 'PASSWORD_RESET_EMAIL_FAILED', 'password_resets', (string)$userId, $ipAddress, $userAgent, [
+                    'email' => $email,
+                    'error' => mb_substr($e->getMessage(), 0, 300),
+                ]);
+            } catch (\Throwable) {
+                // auditoria indisponível não pode quebrar a resposta genérica
+            }
+            return false;
+        }
+    }
+
+    /** APP_SUPPORT_EMAIL vira o responder-para do e-mail (o remetente costuma ser nao-responda@). */
+    private static function supportReplyTo(): ?string
+    {
+        $support = trim((string)(Env::get('APP_SUPPORT_EMAIL') ?? ''));
+        return filter_var($support, FILTER_VALIDATE_EMAIL) ? $support : null;
     }
 }

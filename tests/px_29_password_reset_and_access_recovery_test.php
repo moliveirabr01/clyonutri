@@ -25,6 +25,7 @@ use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Mail\ArrayMailer;
 use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Application\Controllers\AuthController;
 
@@ -106,7 +107,16 @@ try {
 
     logPx29Pass("PREPARAÇÃO", "Usuário, clínica, sessão ativa e token de API persistidos no banco de dados");
 
-    $resetService = new PasswordResetService($db);
+    // O token em claro só sai do servidor no e-mail: o teste o captura com um mailer em memória.
+    $px29Mailer = new ArrayMailer();
+    $resetService = new PasswordResetService($db, $px29Mailer, 'https://app.clyonutri.test');
+    $px29LastToken = static function () use ($px29Mailer): ?string {
+        $last = end($px29Mailer->sent);
+        if (!$last || !preg_match('#/recuperar-senha/([0-9a-f]{64})#', $last->textBody, $m)) {
+            return null;
+        }
+        return $m[1];
+    };
 
     // -------------------------------------------------------------------------
     // GATE 1: SOLICITAÇÃO LEGÍTIMA COM TOKEN CRIPTOGRÁFICO DE 64 HEX E 30 MIN
@@ -114,23 +124,22 @@ try {
     echo "\n--- GATE 1: Solicitação Legítima de Redefinição de Senha ---\n";
 
     $reqResult = $resetService->requestReset($testEmail, '192.168.1.100', 'Mozilla/5.0');
+    assertPx29(!array_key_exists('token', $reqResult), "Resposta do serviço não pode expor o token (só o e-mail o carrega)");
+    $reqResult['token'] = $px29LastToken();
     assertPx29($reqResult['success'] === true, "Solicitação deve retornar sucesso");
     assertPx29(!empty($reqResult['token']), "Deve gerar token para e-mail cadastrado");
     assertPx29(strlen($reqResult['token']) === 64, "Token deve conter exatamente 64 caracteres hexadecimais (32 bytes)");
     assertPx29(ctype_xdigit($reqResult['token']), "Token deve ser puramente hexadecimal");
-    $raw = $db->prepare("SELECT COUNT(*) FROM password_resets WHERE token = :t");
-    $raw->execute(['t' => $reqResult['token']]);
-    assertPx29((int)$raw->fetchColumn() === 0, "Token NÃO pode ser gravado em texto puro no banco (só o hash SHA-256)");
     assertPx29($reqResult['user_found'] === true, "Metadado interno deve confirmar usuário existente");
 
     // Verifica persistência no banco na tabela password_resets
     $stmt = $db->prepare("SELECT email, token, expires_at FROM password_resets WHERE token = :t");
-    $stmt->execute(['t' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($reqResult['token'])]);
+    $stmt->execute(['t' => PasswordResetService::hashToken($reqResult['token'])]);
     $persisted = $stmt->fetch(PDO::FETCH_ASSOC);
     assertPx29($persisted !== false, "Token deve estar gravado na tabela password_resets");
     assertPx29($persisted['email'] === $testEmail, "E-mail associado na tabela deve ser o do usuário");
 
-    $expiresTimestamp = strtotime($persisted['expires_at']);
+    $expiresTimestamp = strtotime($persisted['expires_at'] . ' UTC'); // expires_at gravado em UTC
     $diffMinutes = round(($expiresTimestamp - time()) / 60);
     assertPx29($diffMinutes >= 28 && $diffMinutes <= 31, "Validade do token deve ser de aproximadamente 30 minutos (calculado: {$diffMinutes} min)");
 
@@ -150,7 +159,7 @@ try {
     $unknownResult = $resetService->requestReset($unknownEmail, '192.168.1.101', 'Mozilla/5.0');
     assertPx29($unknownResult['success'] === true, "Solicitação para e-mail inexistente deve retornar success true");
     assertPx29($unknownResult['message'] === $reqResult['message'], "Mensagem para e-mail inexistente deve ser rigorosamente IDÊNTICA à do e-mail cadastrado");
-    assertPx29($unknownResult['token'] === null, "Nenhum token deve ser emitido para e-mail inexistente");
+    assertPx29(!array_key_exists('token', $unknownResult) && $unknownResult['email_sent'] === false, "Nenhum token deve ser emitido para e-mail inexistente");
 
     // Garante que NADA foi salvo em password_resets para o e-mail inexistente
     $stmt = $db->prepare("SELECT COUNT(*) FROM password_resets WHERE LOWER(email) = :e");
@@ -198,12 +207,12 @@ try {
 
     // Emissão do Token A
     $tokenARes = $resetService->requestReset($testEmail, '192.168.1.102', 'Mozilla/5.0');
-    $tokenA = $tokenARes['token'];
+    $tokenA = $px29LastToken();
     assertPx29(!empty($tokenA), "Token A deve ter sido gerado");
 
     // Imediatamente solicita novo token (Token B) para o mesmo e-mail
     $tokenBRes = $resetService->requestReset($testEmail, '192.168.1.102', 'Mozilla/5.0');
-    $tokenB = $tokenBRes['token'];
+    $tokenB = $px29LastToken();
     assertPx29(!empty($tokenB) && $tokenB !== $tokenA, "Token B deve ser diferente do Token A");
 
     // Token A deve estar invalidado/inexistente
@@ -278,9 +287,9 @@ try {
     echo "\n--- GATE 6: Expiração Estrita de Tokens (Janela 30m) ---\n";
 
     // Força data de expiração no passado para o Token B
-    $pastDate = date('Y-m-d H:i:s', time() - 300); // 5 minutos atrás
+    $pastDate = gmdate('Y-m-d H:i:s', time() - 300); // 5 minutos atrás
     $stmt = $db->prepare("UPDATE password_resets SET expires_at = :past WHERE token = :t");
-    $stmt->execute(['past' => $pastDate, 't' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($tokenB)]);
+    $stmt->execute(['past' => $pastDate, 't' => PasswordResetService::hashToken($tokenB)]);
 
     // Tentativa de validação deve falhar
     $valExpired = $resetService->validateToken($tokenB);
@@ -313,7 +322,7 @@ try {
     $db->prepare("DELETE FROM audit_logs WHERE action = 'PASSWORD_RESET_REQUESTED' AND details LIKE :e")
        ->execute(['e' => '%' . $testEmail . '%']);
     $finalReq = $resetService->requestReset($testEmail, '192.168.1.103', 'Mozilla/5.0');
-    $activeToken = $finalReq['token'];
+    $activeToken = $px29LastToken();
     assertPx29(!empty($activeToken), "Token final gerado com sucesso");
 
     // Valida rejeição de senha com menos de 8 dígitos
@@ -345,7 +354,7 @@ try {
 
     // Comprova que o token foi EXCLUÍDO (Single-Use Token)
     $stmt = $db->prepare("SELECT COUNT(*) FROM password_resets WHERE token = :t");
-    $stmt->execute(['t' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($activeToken)]);
+    $stmt->execute(['t' => PasswordResetService::hashToken($activeToken)]);
     assertPx29((int)$stmt->fetchColumn() === 0, "Token consumido deve ser excluído da base imediatamente");
 
     // Segunda tentativa com o MESMO token DEVE falhar
