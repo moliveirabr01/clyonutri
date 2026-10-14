@@ -118,11 +118,14 @@ try {
     assertPx29(!empty($reqResult['token']), "Deve gerar token para e-mail cadastrado");
     assertPx29(strlen($reqResult['token']) === 64, "Token deve conter exatamente 64 caracteres hexadecimais (32 bytes)");
     assertPx29(ctype_xdigit($reqResult['token']), "Token deve ser puramente hexadecimal");
+    $raw = $db->prepare("SELECT COUNT(*) FROM password_resets WHERE token = :t");
+    $raw->execute(['t' => $reqResult['token']]);
+    assertPx29((int)$raw->fetchColumn() === 0, "Token NÃO pode ser gravado em texto puro no banco (só o hash SHA-256)");
     assertPx29($reqResult['user_found'] === true, "Metadado interno deve confirmar usuário existente");
 
     // Verifica persistência no banco na tabela password_resets
     $stmt = $db->prepare("SELECT email, token, expires_at FROM password_resets WHERE token = :t");
-    $stmt->execute(['t' => $reqResult['token']]);
+    $stmt->execute(['t' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($reqResult['token'])]);
     $persisted = $stmt->fetch(PDO::FETCH_ASSOC);
     assertPx29($persisted !== false, "Token deve estar gravado na tabela password_resets");
     assertPx29($persisted['email'] === $testEmail, "E-mail associado na tabela deve ser o do usuário");
@@ -277,7 +280,7 @@ try {
     // Força data de expiração no passado para o Token B
     $pastDate = date('Y-m-d H:i:s', time() - 300); // 5 minutos atrás
     $stmt = $db->prepare("UPDATE password_resets SET expires_at = :past WHERE token = :t");
-    $stmt->execute(['past' => $pastDate, 't' => $tokenB]);
+    $stmt->execute(['past' => $pastDate, 't' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($tokenB)]);
 
     // Tentativa de validação deve falhar
     $valExpired = $resetService->validateToken($tokenB);
@@ -342,7 +345,7 @@ try {
 
     // Comprova que o token foi EXCLUÍDO (Single-Use Token)
     $stmt = $db->prepare("SELECT COUNT(*) FROM password_resets WHERE token = :t");
-    $stmt->execute(['t' => $activeToken]);
+    $stmt->execute(['t' => \ClyoNutri\Core\Auth\PasswordResetService::hashToken($activeToken)]);
     assertPx29((int)$stmt->fetchColumn() === 0, "Token consumido deve ser excluído da base imediatamente");
 
     // Segunda tentativa com o MESMO token DEVE falhar

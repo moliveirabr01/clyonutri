@@ -87,10 +87,27 @@ if (file_exists($heartbeatFile)) {
     ];
 }
 
-// 5. Exibir resultado
+// 5. E-mail transacional (recuperação de senha) e URL pública dos links
+$mailInfo = (new \ClyoNutri\Core\Mail\Mailer())->describe();
+$mailProblems = $mailInfo['problems'];
+if (!$mailProblems && !$mailInfo['delivers']) {
+    $mailProblems[] = "MAIL_DRIVER={$mailInfo['driver']} não entrega e-mails (só grava em log)";
+}
+$checks['mail'] = [
+    'status' => $mailProblems ? 'WARNING' : 'OK',
+    'note' => $mailProblems ? implode('; ', $mailProblems) . ' — teste com: php bin/test_mail.php voce@exemplo.com'
+        : "{$mailInfo['driver']} via " . ($mailInfo['host'] ?? 'servidor local') . ", remetente {$mailInfo['from']}",
+];
+$appUrl = trim((string)Env::get('APP_URL', ''));
+$checks['app_url'] = [
+    'status' => preg_match('#^https?://[A-Za-z0-9.\-]+(:\d+)?/?$#', $appUrl) ? 'OK' : 'WARNING',
+    'note' => $appUrl !== '' ? $appUrl : 'APP_URL não definido: links de recuperação de senha não podem ser gerados',
+];
+
+// 6. Exibir resultado
 $allOk = true;
 foreach ($checks as $name => $c) {
-    echo sprintf(" - [%s] %s\n", $c['status'], ucfirst($name));
+    echo sprintf(" - [%s] %s%s\n", $c['status'], ucfirst($name), isset($c['note']) && $c['status'] !== 'OK' ? ' — ' . $c['note'] : '');
     if ($c['status'] === 'FAIL') {
         $allOk = false;
     }

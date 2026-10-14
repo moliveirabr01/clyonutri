@@ -14,6 +14,7 @@ use RuntimeException;
  *
  * Implementa recuperação de acesso segura e não-enumerável:
  * - Tokens criptográficos unívocos gerados com random_bytes (64 caracteres hexadecimais).
+ * - Só o hash SHA-256 do token é gravado: quem lê o banco não consegue usar o link (NI2-409).
  * - Expiração estrita de 30 minutos por token.
  * - Respostas uniformes e não-enumeráveis para prevenir enumeração de contas.
  * - Anti-abuso / Rate limiting por e-mail e endereço IP via trilha de auditoria.
@@ -112,7 +113,7 @@ class PasswordResetService
             ");
             $ins->execute([
                 'email' => $email,
-                'token' => $token,
+                'token' => self::hashToken($token),
                 'expires_at' => $expiresAt,
             ]);
 
@@ -143,6 +144,7 @@ class PasswordResetService
             'email' => $email,
             'user_found' => true,
             'user_id' => $userId,
+            'user_name' => (string)($user['name'] ?? ''),
             'token' => $token,
             'expires_at' => $expiresAt,
             'message' => $genericMessage,
@@ -170,7 +172,7 @@ class PasswordResetService
             WHERE pr.token = :token
             LIMIT 1
         ");
-        $stmt->execute(['token' => $token]);
+        $stmt->execute(['token' => self::hashToken($token)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
@@ -187,13 +189,13 @@ class PasswordResetService
         if ($expiresTimestamp === false || $expiresTimestamp <= time()) {
             // Token expirado: limpa da base
             $del = $this->db->prepare("DELETE FROM password_resets WHERE token = :token");
-            $del->execute(['token' => $token]);
+            $del->execute(['token' => self::hashToken($token)]);
             return null;
         }
 
         return [
             'email' => $row['email'],
-            'token' => $row['token'],
+            'token' => $token,
             'user_id' => (int)$row['user_id'],
             'user_uuid' => $row['user_uuid'],
             'user_name' => $row['user_name'],
@@ -249,7 +251,7 @@ class PasswordResetService
             // 2. Remove o token utilizado (garantindo Single-Use)
             $delToken = $this->db->prepare("DELETE FROM password_resets WHERE token = :token OR LOWER(email) = :email");
             $delToken->execute([
-                'token' => $token,
+                'token' => self::hashToken($token),
                 'email' => strtolower($email),
             ]);
 
@@ -294,8 +296,29 @@ class PasswordResetService
         }
     }
 
+    /** Registra na auditoria o resultado da entrega do e-mail (sem token, sem segredos). */
+    public function recordEmailDelivery(int $userId, string $email, bool $delivered, ?string $error = null, ?string $ipAddress = null): void
+    {
+        $this->logAudit(
+            clinicId: null,
+            userId: $userId,
+            action: $delivered ? 'PASSWORD_RESET_EMAIL_SENT' : 'PASSWORD_RESET_EMAIL_FAILED',
+            resource: 'password_resets',
+            resourceId: (string)$userId,
+            ipAddress: $ipAddress,
+            userAgent: null,
+            details: array_filter(['email' => $email, 'error' => $error !== null ? mb_substr($error, 0, 300) : null]),
+        );
+    }
+
+    /** Hash gravado no banco para um token de recuperação. */
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', trim($token));
+    }
+
     /**
-     * Retorna o token ativo de um e-mail (utilizado por testes e verificação automatizada).
+     * Retorna o HASH do token ativo de um e-mail (o token original só existe no link enviado).
      */
     public function getActiveTokenForEmail(string $email): ?string
     {

@@ -131,7 +131,7 @@ test('gera convite do app pelo perfil do paciente', async ({ page }, testInfo) =
   const code = await page.getByLabel('Código do convite').inputValue();
   expect(code, 'código do convite exibido ao nutricionista').toMatch(/^[a-f0-9]{64}$/i);
   invitationCode = code;
-  expect(dbOne('SELECT COUNT(*) AS n FROM patient_app_invitations WHERE patient_id = ?', [patient.id]).n).not.toBe('0');
+  expect(Number(dbOne('SELECT COUNT(*) AS n FROM patient_app_invitations WHERE patient_id = ?', [patient.id]).n), 'convite persistido').toBeGreaterThan(0);
   await shot(page, testInfo, '09-convite-app');
 });
 

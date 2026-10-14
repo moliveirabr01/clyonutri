@@ -96,7 +96,7 @@
       <p>O usuário compromete-se a manter em sigilo suas credenciais de acesso, não compartilhando senhas com terceiros não autorizados. Qualquer tentativa de violar a integridade, realizar engenharia reversa ou acessar dados de outros inquilinos (tenants) resultará na rescisão imediata do acesso e na adoção das medidas legais pertinentes.</p>
 
       <h2>6. Contato e Notificações</h2>
-      <p>Para dúvidas sobre estes Termos de Uso ou suporte à plataforma, entre em contato através do canal de atendimento oficial: <code>suporte@clyonutri.com.br</code>.</p>
+      <p>Para dúvidas sobre estes Termos de Uso ou suporte à plataforma, entre em contato através do canal de atendimento oficial: <code><?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?></code>.</p>
     </article>
   </main>
 

@@ -7,12 +7,16 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Core\Mail\Mailer;
+use ClyoNutri\Core\Mail\PasswordResetMail;
 use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Core\Security\Env;
 
 class AuthController
 {
     private AuthService $authService;
     private PasswordResetService $resetService;
+    private ?Mailer $mailer = null;
 
     public function __construct(?AuthService $authService = null, ?PasswordResetService $resetService = null)
     {
@@ -249,8 +253,13 @@ class AuthController
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
             $res = $this->resetService->requestReset($email, $ip, $ua);
 
+            // Mesma resposta exista ou não a conta (não-enumerável). O e-mail é enviado depois
+            // que a resposta sai, para que o tempo de resposta também não revele a existência da conta.
             $_SESSION['flash_success'] = $res['message'];
-            header('Location: /recuperar-senha');
+            $this->redirectAndContinue('/recuperar-senha');
+            if (!empty($res['user_found']) && !empty($res['token'])) {
+                $this->deliverResetEmail($res, $ip);
+            }
             exit;
         } catch (\InvalidArgumentException $e) {
             $_SESSION['flash_error'] = $e->getMessage();
@@ -341,5 +350,71 @@ class AuthController
             header('Location: /recuperar-senha');
             exit;
         }
+    }
+
+    /** Envia o link por e-mail e registra o resultado na auditoria. Nunca expõe o token em logs. */
+    private function deliverResetEmail(array $res, ?string $ip): void
+    {
+        $userId = (int)($res['user_id'] ?? 0);
+        try {
+            $url = self::appBaseUrl() . '/recuperar-senha/' . rawurlencode((string)$res['token']);
+            $support = trim((string)Env::get('APP_SUPPORT_EMAIL', ''));
+            $message = PasswordResetMail::build(
+                (string)$res['email'],
+                (string)($res['user_name'] ?? ''),
+                $url,
+                intdiv(PasswordResetService::TOKEN_VALIDITY_SECONDS, 60),
+                filter_var($support, FILTER_VALIDATE_EMAIL) ? $support : null
+            );
+            ($this->mailer ?? new Mailer())->send($message);
+            $this->resetService->recordEmailDelivery($userId, (string)$res['email'], true, null, $ip);
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri] Falha ao enviar e-mail de redefinição de senha: ' . $e->getMessage());
+            try {
+                $this->resetService->recordEmailDelivery($userId, (string)$res['email'], false, $e->getMessage(), $ip);
+            } catch (\Throwable) {
+            }
+        }
+    }
+
+    /**
+     * URL pública do sistema para montar links de e-mail. Em produção exige APP_URL:
+     * usar o cabeçalho Host permitiria envenenar o link (host header injection).
+     */
+    public static function appBaseUrl(): string
+    {
+        $url = rtrim(trim((string)Env::get('APP_URL', '')), '/');
+        if ($url !== '' && preg_match('#^https?://[A-Za-z0-9.\-]+(:\d+)?$#', $url)) {
+            return $url;
+        }
+        if ((string)Env::get('APP_ENV', 'production') === 'production') {
+            throw new \RuntimeException('APP_URL não configurado (ex.: https://clyonutri.com).');
+        }
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . preg_replace('/[^A-Za-z0-9.\-:]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    }
+
+    /** Envia o redirecionamento ao navegador e continua o processamento em segundo plano. */
+    private function redirectAndContinue(string $location): void
+    {
+        header('Location: ' . $location, true, 302);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        ignore_user_abort(true);
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+            return;
+        }
+        if (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+            return;
+        }
+        header('Connection: close');
+        header('Content-Length: 0');
+        while (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+        flush();
     }
 }

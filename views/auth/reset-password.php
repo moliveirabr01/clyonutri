@@ -140,7 +140,7 @@
           Lembrou sua credencial? <a href="/login">Voltar ao Login</a>
         </div>
         <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-400);">
-          Dúvidas sobre sua conta? Contate <a href="mailto:suporte@clyonutri.com.br" style="color: var(--neutral-gray-500); text-decoration: underline;">suporte@clyonutri.com.br</a>
+          Dúvidas sobre sua conta? Contate <a href="mailto:<?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?>" style="color: var(--neutral-gray-500); text-decoration: underline;"><?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?></a>
         </div>
       </div>
     </div>

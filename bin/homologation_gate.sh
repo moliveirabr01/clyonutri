@@ -7,7 +7,7 @@
 #   P0 php_lint                  sintaxe de todo o PHP
 #   P0 mysql_schema              instalação zero, upgrade com dados, SQL de instalação, fingerprints
 #   P0 http_contract_security    contrato HTTP + OTP/RBAC/tenant/CSRF/sessão (Playwright request)
-#   P0 web_journeys              admin, consulta e service desk no Chromium, com screenshots
+#   P0 web_journeys              admin, consulta, service desk e recuperação de senha por e-mail (SMTP real) no Chromium
 #   P0 mobile_web_app            build web do app Expo, viewport de celular, API real
 #   P0* mobile_native_android    evidência de dispositivo/emulador para ESTE commit (*P0 só no perfil mobile)
 #   P0 deploy_rollback_rehearsal deploy, backup, rollback e falha de banco
@@ -111,9 +111,21 @@ fi
 if [ -z "${NO_DB:-}" ]; then
   # --- Aplicação sob teste: banco limpo de produção + servidor real -----------
   "$PHP_BIN" bin/homologation/mysql_schema_gate.php provision-app "$APP_DB" > "$EVID/logs/provision_app.json" 2>&1 && DB_READY=1
+
+  # SMTP de teste com TLS implícito + AUTH: o app envia pelo cliente SMTP de produção, com
+  # verificação de certificado ligada (CA de teste via openssl.cafile). Mensagens viram .eml.
+  SMTP_PORT="${GATE_SMTP_PORT:-18465}"; export GATE_MAIL_DIR="$EVID/mail"; mkdir -p "$GATE_MAIL_DIR" "$WORK/smtp"
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/smtp/key.pem" -out "$WORK/smtp/cert.pem" -days 1 \
+    -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" > /dev/null 2>&1
+  python3 tests/homologation/support/fake_smtp.py --port "$SMTP_PORT" --dir "$GATE_MAIL_DIR" --cert "$WORK/smtp/cert.pem" \
+    --key "$WORK/smtp/key.pem" --user noreply@gate.test --password gate-smtp-senha > "$EVID/logs/smtp.log" 2>&1 &
+  PIDS+=($!)
+
   ( DB_CONNECTION=mysql DB_HOST="$GATE_DB_HOST" DB_PORT="${GATE_DB_PORT:-3306}" DB_USERNAME="$GATE_DB_USER" DB_PASSWORD="${GATE_DB_PASS:-}" \
-    DB_DATABASE="$APP_DB" APP_ENV=production APP_SUPPORT_EMAIL=suporte@gate.test MOBILE_WEB_ORIGINS="$MOBILE_URL" PHP_CLI_SERVER_WORKERS=4 \
-    exec "$PHP_BIN" -S "127.0.0.1:${PORT}" -t public tests/homologation/support/router.php ) > "$EVID/logs/app_server.log" 2>&1 &
+    DB_DATABASE="$APP_DB" APP_ENV=production APP_URL="$BASE_URL" APP_SUPPORT_EMAIL=suporte@gate.test MOBILE_WEB_ORIGINS="$MOBILE_URL" \
+    MAIL_DRIVER=smtp MAIL_HOST=localhost MAIL_PORT="$SMTP_PORT" MAIL_ENCRYPTION=ssl MAIL_USERNAME=noreply@gate.test \
+    MAIL_PASSWORD=gate-smtp-senha MAIL_FROM_ADDRESS=noreply@gate.test MAIL_FROM_NAME=ClyoNutri PHP_CLI_SERVER_WORKERS=4 \
+    exec "$PHP_BIN" -d openssl.cafile="$WORK/smtp/cert.pem" -S "127.0.0.1:${PORT}" -t public tests/homologation/support/router.php ) > "$EVID/logs/app_server.log" 2>&1 &
   PIDS+=($!)
   export DB_CONNECTION=mysql DB_HOST="$GATE_DB_HOST" DB_PORT="${GATE_DB_PORT:-3306}" DB_USERNAME="$GATE_DB_USER" DB_PASSWORD="${GATE_DB_PASS:-}" DB_DATABASE="$APP_DB" APP_ENV=production
   for _ in $(seq 1 50); do curl -s -o /dev/null "$BASE_URL/up" && break; sleep 0.2; done

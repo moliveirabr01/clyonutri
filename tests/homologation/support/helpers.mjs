@@ -124,3 +124,28 @@ export async function httpCreatePatient(session, name) {
   expect([302, 303]).toContain(res.status());
   return { id: Number(dbOne('SELECT id FROM patients WHERE email = ?', [email]).id), email, name };
 }
+
+/** Decodifica cabeçalho MIME (=?UTF-8?B?...?=). */
+const decodeHeader = (v = '') => v.replace(/=\?UTF-8\?B\?([^?]+)\?=/gi, (_, b) => Buffer.from(b, 'base64').toString('utf8'));
+
+/** Lê as mensagens que o servidor SMTP de teste recebeu para um destinatário (mais recente por último). */
+export function readMails(to) {
+  const dir = process.env.GATE_MAIL_DIR;
+  if (!dir || !fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => f.endsWith(`_${to}.eml`)).sort().map((f) => {
+    const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+    const [head, ...rest] = raw.split(/\r?\n\r?\n/);
+    const headers = {};
+    for (const line of head.split(/\r?\n/)) { const i = line.indexOf(':'); if (i > 0) headers[line.slice(0, i).toLowerCase()] = line.slice(i + 1).trim(); }
+    const body = rest.join('\r\n\r\n');
+    const parts = {};
+    const boundary = headers['content-type']?.match(/boundary="([^"]+)"/)?.[1];
+    const chunks = boundary ? body.split(`--${boundary}`).slice(1, -1) : [`Content-Type: ${headers['content-type']}\r\n\r\n${body}`];
+    for (const c of chunks) {
+      const [ph, ...pb] = c.replace(/^\r?\n/, '').split(/\r?\n\r?\n/);
+      const type = ph.match(/Content-Type:\s*([^;\r\n]+)/i)?.[1]?.trim();
+      parts[type] = Buffer.from(pb.join('').replace(/\s+/g, ''), 'base64').toString('utf8');
+    }
+    return { file: f, headers, subject: decodeHeader(headers.subject), from: decodeHeader(headers.from), text: parts['text/plain'] ?? '', html: parts['text/html'] ?? '' };
+  });
+}
