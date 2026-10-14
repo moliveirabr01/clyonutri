@@ -3,7 +3,7 @@
 # Tudo é encaminhado para public/; código, vendor, storage e .env nunca ficam acessíveis.
 # Sem "Options"/"php_value"/"php_flag" (proibidos na HostGator -> 500).
 
-DirectoryIndex index.php
+DirectoryIndex index.php index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On

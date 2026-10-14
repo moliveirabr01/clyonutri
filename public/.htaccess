@@ -2,7 +2,7 @@
 # Sem "Options", "php_value" ou "php_flag": em hospedagem compartilhada essas
 # diretivas costumam ser proibidas no .htaccess e causam 500 Internal Server Error.
 
-DirectoryIndex index.php
+DirectoryIndex index.php index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
