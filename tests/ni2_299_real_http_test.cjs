@@ -61,10 +61,13 @@ const historical=html=>html.match(/<section[^>]*data-testid="historical-anamnesi
  fixture('break');const failure=await req(path+'?version=1');check('Actual schema outage returns 503 distinct from empty/missing version',failure.status===503 && failure.text.includes('Não foi possível carregar a anamnese') && !failure.text.includes('no such table') && !failure.text.includes('Nenhuma anamnese registrada'));
  fixture('restore');check('Restoring database recovers historical v1',historical((await req(path+'?version=1')).text).includes('Objetivo histórico NI299 V1'));
  fixture('inactive');check('Revoked clinic membership blocks existing session',(await req(path+'?version=1')).status===403);fixture('active');
- await req('/logout');await login(3);check('Second authorized nutritionist can read correct historical version',historical((await req(path+'?version=1')).text).includes('NI299 Autora V1'));
- await req('/logout');const roleAuth=await login(4);const receptionist=await req(path+'?version=1');check('Same-clinic receptionist denied clinical history without disclosure',receptionist.status===403 && !receptionist.text.includes('Objetivo histórico'));
+ await webLogout(req);await login(3);check('Second authorized nutritionist can read correct historical version',historical((await req(path+'?version=1')).text).includes('NI299 Autora V1'));
+ await webLogout(req);const roleAuth=await login(4);const receptionist=await req(path+'?version=1');check('Same-clinic receptionist denied clinical history without disclosure',receptionist.status===403 && !receptionist.text.includes('Objetivo histórico'));
  const deniedWrite=await req(path,{method:'POST',body:new URLSearchParams({_csrf_token:roleAuth.csrf,objectives:'DENIED'})});check('Unauthorized role cannot append clinical version',deniedWrite.status===403 && JSON.stringify(inspect().versions)===JSON.stringify(after.versions));
- await req('/logout');check('Logout denies further clinical access',(await req(path+'?version=1')).location==='/login');
+ await webLogout(req);check('Logout denies further clinical access',(await req(path+'?version=1')).location==='/login');
  writeFileSync(join(root,'docs/validation/NI2-299/evidence/persistence.json'),JSON.stringify({before:baseline,after},null,2));
  console.log(checks.length+'/'+checks.length+' checks passed');
 })().catch(e=>{checks.push({name:e.message,status:'FAIL'});console.error(e);process.exitCode=1;}).finally(()=>{if(server)server.kill();writeFileSync(join(root,'docs/validation/NI2-299/evidence/http-results.json'),JSON.stringify({timestamp:new Date().toISOString(),transport:'actual production PHP front controller, HTTP TCP, SQLite and isolated sessions; synthetic fixtures',checks},null,2));writeFileSync(join(root,'docs/validation/NI2-299/evidence/http-server.log'),log);rmSync(dir,{recursive:true,force:true});});
+
+// Logout web exige POST + CSRF: lê o token do formulário de confirmação (GET /logout → 405) e envia o POST.
+async function webLogout(req){const page=await req('/logout');const m=(page.text||'').match(/name="_csrf_token" value="([^"]+)"/);if(m)await req('/logout',{method:'POST',body:new URLSearchParams({_csrf_token:m[1]})});}

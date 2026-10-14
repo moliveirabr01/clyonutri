@@ -20,9 +20,11 @@ import {
   ProfessionalDashboardData,
   ProfessionalPatientItem,
   ProfessionalFoodDiaryItem,
+  ProfessionalChatConversation,
+  ChatMessage,
 } from '../services/api';
 
-export type ProfessionalTab = 'Agenda' | 'Pacientes' | 'Diarios' | 'Perfil';
+export type ProfessionalTab = 'Agenda' | 'Pacientes' | 'Diarios' | 'Chat' | 'Perfil';
 
 export default function ProfessionalHomeScreen({
   session,
@@ -49,26 +51,51 @@ export default function ProfessionalHomeScreen({
   const [sendingFeedback, setSendingFeedback] = useState<boolean>(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
 
+  // Estado para Chat com Pacientes
+  const [conversations, setConversations] = useState<ProfessionalChatConversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<number | null>(null);
+  const [activeConvPatientName, setActiveConvPatientName] = useState<string>('');
+  const [activeConvMessages, setActiveConvMessages] = useState<ChatMessage[]>([]);
+  const [profChatText, setProfChatText] = useState<string>('');
+  const [profChatSending, setProfChatSending] = useState<boolean>(false);
+
   const [loggingOut, setLoggingOut] = useState<boolean>(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
+  // Estados de erro independente de agenda e busca de pacientes (MOB-UX-007, MOB-UX-008)
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [patientSearch, setPatientSearch] = useState<string>('');
+  const [patientPage, setPatientPage] = useState<number>(1);
+  const [patientTotal, setPatientTotal] = useState<number>(0);
+  const [patientHasMore, setPatientHasMore] = useState<boolean>(false);
+  const [patientLoading, setPatientLoading] = useState<boolean>(false);
+
   const fetchDashboard = useCallback(async () => {
+    setDashboardError(null);
     try {
       const data = await ApiService.getProfessionalDashboard();
       setDashboard(data);
     } catch (err) {
       if (err instanceof ApiError && err.kind === 'auth') return;
-      setErrorMessage('Não foi possível carregar o dashboard profissional.');
+      const msg = err instanceof Error ? err.message : 'Não foi possível carregar a agenda profissional.';
+      setDashboardError(msg);
+      setErrorMessage(msg);
     }
   }, []);
 
-  const fetchPatients = useCallback(async () => {
+  const fetchPatients = useCallback(async (query = '', page = 1) => {
+    setPatientLoading(true);
     try {
-      const res = await ApiService.getProfessionalPatients();
-      setPatients(res.patients);
+      const res = await ApiService.getProfessionalPatients(query, page, 50);
+      setPatients(res.patients || []);
+      setPatientTotal(res.total ?? (res.patients || []).length);
+      setPatientPage(res.page ?? page);
+      setPatientHasMore(Boolean(res.has_more));
     } catch (err) {
       if (err instanceof ApiError && err.kind === 'auth') return;
       setErrorMessage('Não foi possível carregar a lista de pacientes.');
+    } finally {
+      setPatientLoading(false);
     }
   }, []);
 
@@ -94,10 +121,81 @@ export default function ProfessionalHomeScreen({
     fetchAllData();
   }, [fetchAllData]);
 
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await ApiService.getProfessionalChatConversations();
+      setConversations(res.conversations || []);
+    } catch (err) {
+      if (err instanceof ApiError && err.kind === 'auth') return;
+    }
+  }, []);
+
+  const fetchActiveMessages = useCallback(async (convId: number, afterId?: number) => {
+    try {
+      const res = await ApiService.getProfessionalChatMessages(convId, afterId);
+      if (afterId && afterId > 0) {
+        if (res.messages && res.messages.length > 0) {
+          setActiveConvMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMsgs = res.messages.filter(m => !existingIds.has(m.id));
+            return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev;
+          });
+          ApiService.markProfessionalChatAsRead(convId).catch(() => {});
+        }
+      } else {
+        setActiveConvMessages(res.messages || []);
+        if (res.messages && res.messages.length > 0) {
+          ApiService.markProfessionalChatAsRead(convId).catch(() => {});
+        }
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.kind === 'auth') return;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentTab !== 'Chat') return;
+    fetchConversations();
+    if (activeConvId) {
+      fetchActiveMessages(activeConvId);
+      const interval = setInterval(() => {
+        setActiveConvMessages(current => {
+          const lastId = current.length > 0 ? current[current.length - 1].id : 0;
+          fetchActiveMessages(activeConvId, lastId);
+          return current;
+        });
+      }, 3000);
+      return () => clearInterval(interval);
+    } else {
+      const interval = setInterval(fetchConversations, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [currentTab, activeConvId, fetchConversations, fetchActiveMessages]);
+
+  const handleSendProfMessage = async () => {
+    if (!activeConvId || !profChatText.trim() || profChatSending) return;
+    setProfChatSending(true);
+    try {
+      const res = await ApiService.sendProfessionalChatMessage(activeConvId, profChatText.trim());
+      if (res.success && res.message) {
+        setActiveConvMessages(prev => [...prev, res.message]);
+        setProfChatText('');
+      }
+    } catch (err) {
+      Alert.alert('Erro ao enviar', err instanceof Error ? err.message : 'Não foi possível enviar.');
+    } finally {
+      setProfChatSending(false);
+    }
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAllData();
-  }, [fetchAllData]);
+    if (currentTab === 'Chat') {
+      fetchConversations();
+      if (activeConvId) fetchActiveMessages(activeConvId);
+    }
+  }, [fetchAllData, currentTab, activeConvId, fetchConversations, fetchActiveMessages]);
 
   // Envio real de feedback clínico no diário alimentar do paciente
   const handleSendFeedback = async (entryId: number) => {
@@ -217,8 +315,21 @@ export default function ProfessionalHomeScreen({
               </View>
             )}
 
-            {/* Lista de Atendimentos */}
-            {dashboard && dashboard.today_appointments && dashboard.today_appointments.length > 0 ? (
+            {/* Lista de Atendimentos (MOB-UX-007: distinção entre erro e agenda vazia) */}
+            {dashboardError ? (
+              <View style={styles.emptyContainer} accessible={true} accessibilityRole="alert">
+                <Text style={[styles.emptyTitle, { color: '#B42318' }]}>⚠️ Falha ao carregar atendimentos</Text>
+                <Text style={styles.emptyDescription}>{dashboardError}</Text>
+                <TouchableOpacity
+                  style={[styles.retryBtn, { marginTop: 12, minHeight: 44, justifyContent: 'center' }]}
+                  onPress={fetchDashboard}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tentar carregar a agenda novamente"
+                >
+                  <Text style={styles.retryBtnText}>Tentar carregar novamente</Text>
+                </TouchableOpacity>
+              </View>
+            ) : dashboard && dashboard.today_appointments && dashboard.today_appointments.length > 0 ? (
               dashboard.today_appointments.map((app) => (
                 <View key={app.id} style={styles.card}>
                   <View style={styles.cardHeaderRow}>
@@ -247,42 +358,92 @@ export default function ProfessionalHomeScreen({
           </View>
         )}
 
-        {/* ABA 2: PACIENTES */}
+        {/* ABA 2: PACIENTES (MOB-UX-008: busca em tempo real e paginação completa) */}
         {currentTab === 'Pacientes' && (
           <View>
             <Text style={styles.sectionHeading} accessibilityRole="header">
-              Pacientes Cadastrados ({patients.length})
+              Pacientes Cadastrados ({patientTotal || patients.length})
             </Text>
+
+            {/* Campo de Busca de Pacientes */}
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar paciente por nome, e-mail ou telefone..."
+                placeholderTextColor="#64748B"
+                value={patientSearch}
+                onChangeText={(text) => {
+                  setPatientSearch(text);
+                  fetchPatients(text, 1);
+                }}
+                accessibilityLabel="Campo de busca na carteira de pacientes"
+              />
+            </View>
+
+            {patientLoading ? (
+              <ActivityIndicator size="small" color={t.navy} style={{ marginVertical: 12 }} />
+            ) : null}
+
             {patients.length > 0 ? (
-              patients.map((p) => (
-                <View key={p.id} style={styles.card}>
-                  <Text style={styles.patientName}>{p.name}</Text>
-                  <Text style={styles.patientContact}>📧 {p.email}</Text>
-                  {p.phone && <Text style={styles.patientContact}>📱 {p.phone}</Text>}
-                  <TouchableOpacity accessibilityRole="button" disabled={inviting !== null} style={{ minHeight: 44, justifyContent: 'center' }} onPress={async () => {
-                    if (inviting !== null) return;
-                    setInviting(p.id); setErrorMessage(null); setInvitation(null);
-                    try { const data = await ApiService.createPatientInvitation(p.id); setInvitation({ ...data, patientId: p.id }); }
-                    catch (e) { setErrorMessage(e instanceof Error ? e.message : 'Não foi possível gerar o convite.'); }
-                    finally { setInviting(null); }
-                  }}><Text style={{ color: t.copper, fontWeight: '600' }}>{inviting === p.id ? 'Gerando convite…' : 'Gerar convite para primeiro acesso'}</Text></TouchableOpacity>
-                  {invitation?.patientId === p.id && <View style={{ padding: 12, backgroundColor: t.background, gap: 8 }}>
-                    <Text>Entregue este código ao paciente por um canal privado. No app, ele deve escolher Primeiro acesso.</Text>
-                    <Text selectable accessibilityLabel="Código do convite">{invitation.invitation_code}</Text>
-                    <Text>Validade: 48 horas, uso único. Um novo convite invalida o anterior.</Text>
-                    <TouchableOpacity accessibilityRole="button" onPress={() => setInvitation(null)}><Text style={{ color: t.navy, paddingVertical: 10 }}>Ocultar convite</Text></TouchableOpacity>
-                  </View>}
-                  <View style={styles.patientFooter}>
-                    <Text style={styles.patientBadge}>Status: {p.status}</Text>
-                    <Text style={styles.patientDate}>Desde: {p.created_at.substring(0, 10)}</Text>
+              <>
+                {patients.map((p) => (
+                  <View key={p.id} style={styles.card}>
+                    <Text style={styles.patientName}>{p.name}</Text>
+                    <Text style={styles.patientContact}>📧 {p.email}</Text>
+                    {p.phone && <Text style={styles.patientContact}>📱 {p.phone}</Text>}
+                    <TouchableOpacity accessibilityRole="button" disabled={inviting !== null} style={{ minHeight: 44, justifyContent: 'center' }} onPress={async () => {
+                      if (inviting !== null) return;
+                      setInviting(p.id); setErrorMessage(null); setInvitation(null);
+                      try { const data = await ApiService.createPatientInvitation(p.id); setInvitation({ ...data, patientId: p.id }); }
+                      catch (e) { setErrorMessage(e instanceof Error ? e.message : 'Não foi possível gerar o convite.'); }
+                      finally { setInviting(null); }
+                    }}><Text style={{ color: t.copper, fontWeight: '600' }}>{inviting === p.id ? 'Gerando convite…' : 'Gerar convite para primeiro acesso'}</Text></TouchableOpacity>
+                    {invitation?.patientId === p.id && <View style={{ padding: 12, backgroundColor: t.background, gap: 8 }}>
+                      <Text>Entregue este código ao paciente por um canal privado. No app, ele deve escolher Primeiro acesso.</Text>
+                      <Text selectable accessibilityLabel="Código do convite">{invitation.invitation_code}</Text>
+                      <Text>Validade: 48 horas, uso único. Um novo convite invalida o anterior.</Text>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => setInvitation(null)}><Text style={{ color: t.navy, paddingVertical: 10 }}>Ocultar convite</Text></TouchableOpacity>
+                    </View>}
+                    <View style={styles.patientFooter}>
+                      <Text style={styles.patientBadge}>Status: {p.status}</Text>
+                      <Text style={styles.patientDate}>Desde: {p.created_at.substring(0, 10)}</Text>
+                    </View>
                   </View>
+                ))}
+
+                {/* Paginação de Pacientes */}
+                <View style={styles.paginationRow}>
+                  {patientPage > 1 && (
+                    <TouchableOpacity
+                      style={styles.pageButton}
+                      onPress={() => fetchPatients(patientSearch, patientPage - 1)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Página anterior de pacientes"
+                    >
+                      <Text style={styles.pageButtonText}>← Anterior</Text>
+                    </TouchableOpacity>
+                  )}
+                  {patientHasMore && (
+                    <TouchableOpacity
+                      style={styles.pageButton}
+                      onPress={() => fetchPatients(patientSearch, patientPage + 1)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Próxima página de pacientes"
+                    >
+                      <Text style={styles.pageButtonText}>Próxima →</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              ))
+              </>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>Nenhum paciente cadastrado</Text>
+                <Text style={styles.emptyTitle}>
+                  {patientSearch ? 'Nenhum paciente encontrado' : 'Nenhum paciente cadastrado'}
+                </Text>
                 <Text style={styles.emptyDescription}>
-                  Cadastre novos pacientes através do portal ou envie convites de onboarding.
+                  {patientSearch
+                    ? `Nenhum resultado corresponde à busca "${patientSearch}".`
+                    : 'Cadastre novos pacientes através do portal ou envie convites de onboarding.'}
                 </Text>
               </View>
             )}
@@ -390,7 +551,156 @@ export default function ProfessionalHomeScreen({
           </View>
         )}
 
-        {/* ABA 4: PERFIL & SEGURANÇA */}
+        {/* ABA 4: CHAT COM PACIENTES */}
+        {currentTab === 'Chat' && (
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.sectionHeading} accessibilityRole="header">
+                Chat & Mensagens com Pacientes
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 6 }} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#059669' }}>Online</Text>
+              </View>
+            </View>
+
+            {activeConvId ? (
+              <View>
+                {/* Botão Voltar para Lista */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+                  onPress={() => {
+                    setActiveConvId(null);
+                    setActiveConvPatientName('');
+                    setActiveConvMessages([]);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voltar para lista de conversas"
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: t.copper }}>← Voltar para Conversas</Text>
+                </TouchableOpacity>
+
+                {/* Header da conversa ativa */}
+                <View style={styles.card}>
+                  <Text style={styles.patientName}>Paciente: {activeConvPatientName}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Canal Criptografado & Auditado</Text>
+                </View>
+
+                {/* Lista de mensagens */}
+                <View style={[styles.card, { minHeight: 250 }]}>
+                  {activeConvMessages.length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#64748B', padding: 20 }}>
+                      Nenhuma mensagem enviada ainda.
+                    </Text>
+                  ) : (
+                    activeConvMessages.map((m) => {
+                      const isProf = m.sender_type === 'professional';
+                      return (
+                        <View
+                          key={m.id}
+                          style={{
+                            maxWidth: '82%',
+                            padding: 10,
+                            borderRadius: 12,
+                            marginBottom: 8,
+                            alignSelf: isProf ? 'flex-end' : 'flex-start',
+                            backgroundColor: isProf ? '#059669' : '#F1F5F9',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: isProf ? '#FFFFFF' : '#0F2747', marginBottom: 2 }}>
+                            {isProf ? 'Você (Nutricionista)' : activeConvPatientName}
+                          </Text>
+                          <Text style={{ fontSize: 14, color: isProf ? '#FFFFFF' : '#0F172A' }}>
+                            {m.message}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: isProf ? 'rgba(255,255,255,0.8)' : '#64748B', textAlign: 'right', marginTop: 4 }}>
+                            {m.created_at ? m.created_at.substring(11, 16) : ''}
+                          </Text>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+
+                {/* Input de envio do profissional (MOB-UX-017, MOB-UX-018: Acessibilidade WCAG AA) */}
+                <View style={{ flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'flex-end', marginBottom: 80 }}>
+                  <TextInput
+                    style={{ flex: 1, fontSize: 14, color: '#0F2747', paddingHorizontal: 8, paddingVertical: 6, minHeight: 38, maxHeight: 100 }}
+                    placeholder="Digite uma mensagem de orientação..."
+                    placeholderTextColor="#64748B"
+                    value={profChatText}
+                    onChangeText={setProfChatText}
+                    multiline
+                    editable={!profChatSending}
+                    accessibilityLabel="Campo de texto para mensagem de orientação ao paciente"
+                  />
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: (!profChatText.trim() || profChatSending) ? '#64748B' : '#047857',
+                      borderRadius: 8,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      minHeight: 44,
+                    }}
+                    onPress={handleSendProfMessage}
+                    disabled={!profChatText.trim() || profChatSending}
+                    accessibilityRole="button"
+                    accessibilityLabel="Enviar mensagem de orientação"
+                  >
+                    {profChatSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Enviar</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View>
+                {conversations.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyTitle}>Nenhuma conversa ativa</Text>
+                    <Text style={styles.emptyDescription}>
+                      As conversas dos seus pacientes vinculados aparecerão aqui em tempo real.
+                    </Text>
+                  </View>
+                ) : (
+                  conversations.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#059669' }]}
+                      onPress={() => {
+                        setActiveConvId(c.id);
+                        setActiveConvPatientName(c.patient_name);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Abrir conversa com paciente ${c.patient_name}`}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F2747' }}>{c.patient_name}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>{c.last_message_at ? c.last_message_at.substring(11, 16) : ''}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 13, color: '#64748B', flex: 1 }} numberOfLines={1}>
+                          {c.last_message || 'Conversa iniciada...'}
+                        </Text>
+                        {(c.unread_count ?? 0) > 0 && (
+                          <View style={{ backgroundColor: '#059669', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 }}>
+                            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{c.unread_count}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ABA 5: PERFIL & SEGURANÇA */}
         {currentTab === 'Perfil' && (
           <View>
             <Text style={styles.sectionHeading} accessibilityRole="header">
@@ -439,7 +749,7 @@ export default function ProfessionalHomeScreen({
 
       {/* Barra de Navegação Inferior (WCAG AA) */}
       <View style={styles.navBar} accessibilityRole="tablist">
-        {(['Agenda', 'Pacientes', 'Diarios', 'Perfil'] as ProfessionalTab[]).map((tab) => (
+        {(['Agenda', 'Pacientes', 'Diarios', 'Chat', 'Perfil'] as ProfessionalTab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.navItem, currentTab === tab && styles.navItemActive]}
@@ -519,6 +829,11 @@ const styles = StyleSheet.create({
   emptyContainer: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: t.border, marginTop: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 6 },
   emptyDescription: { fontSize: 13, color: t.muted, textAlign: 'center', lineHeight: 18 },
+  searchContainer: { marginBottom: 12 },
+  searchInput: { backgroundColor: t.white, borderWidth: 1, borderColor: t.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: t.navy },
+  paginationRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 14 },
+  pageButton: { backgroundColor: t.navy, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  pageButtonText: { color: t.white, fontSize: 13, fontWeight: '700' },
   logoutBtn: { backgroundColor: t.copper, padding: 14, borderRadius: t.buttonRadius, alignItems: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' },
   logoutBtnText: { color: t.white, fontSize: 15, fontWeight: '700' },
   navBar: {

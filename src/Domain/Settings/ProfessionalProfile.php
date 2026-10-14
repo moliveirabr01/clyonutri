@@ -78,7 +78,7 @@ final class ProfessionalProfile
             if($stmt->rowCount()!==1)throw new \DomainException('A senha mudou em outra sessão. Entre novamente.');
             $this->db->prepare('DELETE FROM password_resets WHERE LOWER(email)=(SELECT LOWER(email) FROM users WHERE id=?)')->execute([TenantContext::getUserId()]);
             $this->db->prepare('DELETE FROM sessions WHERE user_id=?')->execute([TenantContext::getUserId()]);
-            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type='user' AND tokenable_id=?")->execute([TenantContext::getUserId()]);
+            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type IN ('user','professional') AND tokenable_id=?")->execute([TenantContext::getUserId()]);
             $this->db->prepare("INSERT INTO audit_logs(clinic_id,user_id,action,resource,resource_id,details) VALUES(?,?,'PASSWORD_CHANGED','users',?,'{}')")->execute([TenantContext::getClinicId(),TenantContext::getUserId(),(string)TenantContext::getUserId()]);
             $this->db->commit();
         }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}

@@ -20,7 +20,7 @@
         <img src="/assets/clyonutri-logo-dark.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64">
       </div>
       <button type="button" id="clinical-menu-toggle" aria-controls="clinical-navigation" aria-expanded="false">Menu</button>
-      <nav class="clinical-mobile-priority" aria-label="Tarefas principais"><a href="/pacientes">Pacientes</a><a href="/agenda">Agenda</a><a href="/planos">Planos</a><a href="/chat">Chat</a></nav>
+      <nav class="clinical-mobile-priority" aria-label="Tarefas principais"><a href="/pacientes">Pacientes</a><a href="/agenda">Agenda</a><a href="/planos">Planos</a><a href="/chat">Conversas</a></nav>
       <nav class="app-nav" id="clinical-navigation" aria-label="Navegação do consultório">
         <a href="/dashboard" class="app-nav__item <?= ($activeNav ?? '') === 'dashboard' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
@@ -48,7 +48,7 @@
         </a>
         <a href="/chat" class="app-nav__item <?= ($activeNav ?? '') === 'chat' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>Chat</span>
+          <span>Conversas</span>
         </a>
         <a href="/financeiro" class="app-nav__item <?= ($activeNav ?? '') === 'financeiro' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
@@ -69,9 +69,9 @@
           </a>
         <?php endif; ?>
       </nav>
-      <div style="font-size: 0.8rem; color: #B7C6D4; margin-top: auto; display: flex; align-items: center; gap: 6px;">
-        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--semantic-success);"></span>
-        v1.0.0 • Multi-tenant
+      <div class="app-sidebar__version">
+        <span class="app-sidebar__status-dot" aria-hidden="true"></span>
+        v1.0.0 • Ambiente do consultório
       </div>
     </aside>
 
@@ -85,10 +85,13 @@
         <div class="app-header__user">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neutral-gray-500);"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
           <span>Olá, <strong><?= htmlspecialchars($userName ?? 'Nutricionista') ?></strong></span>
-          <a href="/logout" style="color: var(--semantic-error); text-decoration: none; font-size: 0.85rem; margin-left: 1rem; display: inline-flex; align-items: center; gap: 4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Sair
-          </a>
+          <form method="POST" action="/logout" class="logout-form" data-testid="logout-form">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit" class="app-header__logout">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Sair
+            </button>
+          </form>
         </div>
       </header>
 

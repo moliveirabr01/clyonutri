@@ -10,6 +10,7 @@ use PDO;
 
 class PatientRepository
 {
+    private const ACCENTS = ['á'=>'a','à'=>'a','â'=>'a','ã'=>'a','ä'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','í'=>'i','ì'=>'i','î'=>'i','ï'=>'i','ó'=>'o','ò'=>'o','ô'=>'o','õ'=>'o','ö'=>'o','ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c','Á'=>'A','À'=>'A','Â'=>'A','Ã'=>'A','É'=>'E','Ê'=>'E','Í'=>'I','Ó'=>'O','Ô'=>'O','Õ'=>'O','Ú'=>'U','Ç'=>'C'];
     private PDO $db;
 
     public function __construct(?PDO $db = null)
@@ -27,6 +28,8 @@ class PatientRepository
         $ownsTransaction = !$this->db->inTransaction();
         if ($ownsTransaction) $this->db->beginTransaction();
         try {
+        $this->lockClinic();
+        $this->assertUniqueContact($data);
         $stmt = $this->db->prepare("
             INSERT INTO patients (clinic_id, uuid, name, email, phone, birth_date, gender, status, notes)
             VALUES (:clinic_id, :uuid, :name, :email, :phone, :birth_date, :gender, :status, :notes)
@@ -60,6 +63,7 @@ class PatientRepository
                 ->execute([$clinicId, TenantContext::getUserId(), (string)$this->db->lastInsertId(), json_encode(['term_id'=>(int)$data['consent_term_id'], 'channel'=>'professional_attestation'])]);
         }
 
+        $this->audit('PATIENT_CREATED', $id, ['fields' => ['name','email','phone','birth_date','gender','notes']]);
         $patient = $this->findById($id);
         if ($ownsTransaction) $this->db->commit();
         return $patient;
@@ -71,48 +75,89 @@ class PatientRepository
 
     public function update(int $id, array $data): bool
     {
-        if (!$this->findById($id)) {
-            return false;
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) $this->db->beginTransaction();
+        try {
+            $this->lockClinic();
+            $patient = $this->findById($id);
+            if (!$patient) { if ($ownsTx) $this->db->rollBack(); return false; }
+            $contacts = $data;
+            if (mb_strtolower(trim((string)($data['email'] ?? ''))) === mb_strtolower(trim((string)($patient['email'] ?? '')))) $contacts['email'] = null;
+            if (preg_replace('/\D/', '', (string)($data['phone'] ?? '')) === preg_replace('/\D/', '', (string)($patient['phone'] ?? ''))) $contacts['phone'] = null;
+            $this->assertUniqueContact($contacts, $id);
+            $stmt = $this->db->prepare("UPDATE patients SET name = :name, email = :email,
+                phone = :phone, birth_date = :birth_date, gender = :gender, notes = :notes,
+                updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
+            $fields = array_intersect_key($data, array_flip(['name','email','phone','birth_date','gender','notes']));
+            $stmt->execute($fields + ['id' => $id, 'clinic_id' => TenantContext::getClinicId()]);
+            $changed = array_keys(array_filter($fields, static fn($v, $k) => $v !== $patient[$k], ARRAY_FILTER_USE_BOTH));
+            $this->audit('PATIENT_UPDATED', $id, ['fields' => $changed]);
+            if ($ownsTx) $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTx && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
         }
-        $stmt = $this->db->prepare("UPDATE patients SET name = :name, email = :email,
-            phone = :phone, birth_date = :birth_date, gender = :gender, notes = :notes
-            WHERE id = :id AND clinic_id = :clinic_id");
-        $stmt->execute([
-            'id' => $id, 'clinic_id' => TenantContext::getClinicId(),
-            'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'],
-            'birth_date' => $data['birth_date'], 'gender' => $data['gender'], 'notes' => $data['notes'],
-        ]);
-        return true;
+    }
+
+    private function lockClinic(): void
+    {
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $stmt = $this->db->prepare('SELECT id FROM clinics WHERE id = ? FOR UPDATE');
+            $stmt->execute([TenantContext::getClinicId()]);
+        }
+    }
+
+    private function assertUniqueContact(array $data, int $excludeId = 0): void
+    {
+        $email = mb_strtolower(trim((string)($data['email'] ?? '')));
+        $phone = preg_replace('/\D/', '', (string)($data['phone'] ?? ''));
+        if ($email === '' && $phone === '') return;
+        $phoneSql = "COALESCE(phone, '')";
+        foreach ([' ', '(', ')', '-', '+', '.', '/', "\t"] as $char) $phoneSql = "REPLACE($phoneSql, " . $this->db->quote($char) . ", '')";
+        $stmt = $this->db->prepare("SELECT id FROM patients WHERE clinic_id = ? AND id <> ? AND status <> 'anonymized'
+            AND ((? <> '' AND LOWER(TRIM(email)) = ?) OR (? <> '' AND $phoneSql = ?)) LIMIT 1");
+        $stmt->execute([TenantContext::getClinicId(), $excludeId, $email, $email, $phone, $phone]);
+        $id = $stmt->fetchColumn();
+        if ($id !== false) throw new DuplicatePatientException((int)$id);
+    }
+
+    private function audit(string $action, int $id, array $details = []): void
+    {
+        (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log($action, 'patients', (string)$id, $details);
+    }
+
+    public function setStatus(int $id, string $status): bool
+    {
+        if (!in_array($status, ['active','inactive'], true)) throw new \InvalidArgumentException('Selecione um status válido.');
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) $this->db->beginTransaction();
+        try {
+            $this->lockClinic();
+            $patient = $this->findById($id);
+            if (!$patient) { if ($ownsTx) $this->db->rollBack(); return false; }
+            if ($patient['status'] === 'anonymized') throw new \InvalidArgumentException('Um cadastro anonimizado não pode ser reativado.');
+            if ($patient['status'] !== $status) {
+                $this->db->prepare('UPDATE patients SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ?')
+                    ->execute([$status, $id, TenantContext::getClinicId()]);
+                if ($status === 'inactive') {
+                    $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = ?")->execute([$id]);
+                    $this->db->prepare('UPDATE patient_app_invitations SET revoked_at = CURRENT_TIMESTAMP WHERE patient_id = ? AND clinic_id = ? AND accepted_at IS NULL AND revoked_at IS NULL')
+                        ->execute([$id, TenantContext::getClinicId()]);
+                }
+                $this->audit('PATIENT_STATUS_CHANGED', $id, ['from' => $patient['status'], 'to' => $status]);
+            }
+            if ($ownsTx) $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTx && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function inactivate(int $id): bool
     {
-        $clinicId = TenantContext::getClinicId();
-        if (!$this->findById($id)) {
-            return false;
-        }
-        $ownsTx = !$this->db->inTransaction();
-        if ($ownsTx) {
-            $this->db->beginTransaction();
-        }
-        try {
-            $stmt = $this->db->prepare("UPDATE patients SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
-            $stmt->execute(['id' => $id, 'clinic_id' => $clinicId]);
-
-            // Revogar atomicamente tokens móveis e de acesso do paciente (PX-24 / NI2-317)
-            $delTok = $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = :id");
-            $delTok->execute(['id' => $id]);
-
-            if ($ownsTx) {
-                $this->db->commit();
-            }
-            return true;
-        } catch (\Throwable $e) {
-            if ($ownsTx && $this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
-        }
+        return $this->setStatus($id, 'inactive');
     }
 
     public function findById(int $id): ?array
@@ -134,6 +179,46 @@ class PatientRepository
         ");
         $stmt->execute(['clinic_id' => $clinicId]);
         return $stmt->fetchAll();
+    }
+
+    public function paginate(string $query = '', string $status = '', int $page = 1, int $perPage = 25): array
+    {
+        $perPage = max(1, min(100, $perPage));
+        $where = 'clinic_id = ?'; $args = [TenantContext::getClinicId()];
+        if (in_array($status, ['active','inactive','anonymized'], true)) { $where .= ' AND status = ?'; $args[] = $status; }
+        $query = trim($query);
+        if ($query !== '') {
+            // Treat wildcard characters literally; every placeholder is distinct for native MySQL prepares.
+            $normalized = mb_strtolower(strtr($query, self::ACCENTS));
+            $like = '%' . str_replace(['!','%','_'], ['!!','!%','!_'], $normalized) . '%';
+            $nameSql = 'name';
+            foreach (self::ACCENTS as $from=>$to) $nameSql = 'REPLACE('.$nameSql.', '.$this->db->quote($from).', '.$this->db->quote($to).')';
+            $nameSql = 'LOWER('.$nameSql.')';
+            $where .= " AND ($nameSql LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' OR phone LIKE ? ESCAPE '!')";
+            array_push($args, $like, $like, $like);
+            $digits = preg_replace('/\D/', '', $query);
+            if ($digits !== '' && preg_match('/^[\d\s()+.\-]+$/', $query)) {
+                $phoneSql = "COALESCE(phone, '')";
+                foreach ([' ', '(', ')', '-', '+', '.'] as $char) $phoneSql = "REPLACE($phoneSql, " . $this->db->quote($char) . ", '')";
+                $where = substr($where, 0, -1) . " OR $phoneSql LIKE ?)"; $args[] = '%' . $digits . '%';
+            }
+        }
+        $count = $this->db->prepare("SELECT COUNT(*) FROM patients WHERE $where"); $count->execute($args);
+        $total = (int)$count->fetchColumn(); $pages = max(1, (int)ceil($total / $perPage)); $page = max(1, min($pages, $page));
+        $offset = ($page - 1) * $perPage;
+        $stmt = $this->db->prepare("SELECT id,name,email,phone,status FROM patients WHERE $where ORDER BY name,id LIMIT $perPage OFFSET $offset");
+        $stmt->execute($args);
+        return ['patients'=>$stmt->fetchAll(), 'total'=>$total, 'pages'=>$pages, 'page'=>$page];
+    }
+
+    public function birthdays(string $today): array
+    {
+        $stmt = $this->db->prepare("SELECT id,name,birth_date FROM patients WHERE clinic_id = ? AND status <> 'anonymized' AND SUBSTR(birth_date,6,2) = ? AND birth_date <= ? ORDER BY SUBSTR(birth_date,9,2),name");
+        $stmt->execute([TenantContext::getClinicId(), substr($today,5,2), $today]);
+        return array_values(array_filter($stmt->fetchAll(), static function($p) {
+            $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $p['birth_date']);
+            return $d && $d->format('Y-m-d') === $p['birth_date'];
+        }));
     }
 
     public function search(int $clinicId, string $query): array
@@ -200,12 +285,40 @@ class PatientRepository
             return $row;
         }, $crStmt->fetchAll());
 
+        $appointments = $this->relatedRows('appointments', $id, 'scheduled_at');
+        $checkins = $this->relatedRows('checkins', $id, 'checkin_date');
+        $receivables = $this->relatedRows('receivables', $id, 'due_date');
+        foreach ($receivables as &$receivable) {
+            $paid = $this->db->prepare('SELECT COALESCE(SUM(amount_cents),0) FROM payments WHERE clinic_id = ? AND receivable_id = ?');
+            $paid->execute([$clinicId, $receivable['id']]); $receivable['paid_cents'] = (int)$paid->fetchColumn();
+        }
+        unset($receivable);
+        $timeline = [];
+        foreach ([['Consulta',$appointments,'scheduled_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
+                  ['Prontuário',$clinicalRecords,'created_at'], ['Anamnese',$anamneses,'created_at'], ['Avaliação',$assessments,'assessed_at'], ['Plano alimentar',$mealPlans,'created_at']] as [$type,$rows,$dateField]) {
+            foreach (array_slice($rows,0,20) as $row) {
+                $timeline[] = ['type'=>$type, 'date'=>$row[$dateField], 'title'=>$row['title'] ?? $row['description'] ?? $type];
+            }
+        }
+        usort($timeline, static fn($a,$b) => strcmp($b['date'],$a['date']));
+        $requests = $this->relatedRows('data_subject_requests', $id, 'created_at');
+
         return [
             'patient' => $patient,
             'anamneses' => $anamneses,
             'assessments' => $assessments,
             'meal_plans' => $mealPlans,
             'clinical_records' => $clinicalRecords,
+            'appointments'=>$appointments, 'checkins'=>$checkins, 'receivables'=>$receivables,
+            'timeline'=>array_slice($timeline,0,50), 'privacy_requests'=>$requests,
         ];
     }
+    private function relatedRows(string $table, int $id, string $order): array
+    {
+        // Table and order are internal constants, never request parameters.
+        $stmt = $this->db->prepare("SELECT * FROM $table WHERE clinic_id = ? AND patient_id = ? ORDER BY $order DESC,id DESC LIMIT 20");
+        $stmt->execute([TenantContext::getClinicId(), $id]);
+        return $stmt->fetchAll();
+    }
+
 }

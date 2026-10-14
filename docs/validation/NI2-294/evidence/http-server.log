@@ -1,100 +1,67 @@
-[Fri Oct  9 10:12:47 2026] PHP 8.5.10 Development Server (http://127.0.0.1:55932) started
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55934 Accepted
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55934 [200]: GET /up
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55934 Closing
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55935 Accepted
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55935 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55935 Closing
-[Fri Oct  9 10:12:47 2026] 127.0.0.1:55936 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55936 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55936 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55937 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55937 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55937 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55938 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55938 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55938 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55939 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55939 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55939 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55940 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55940 [400]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55940 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55941 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55941 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55941 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55942 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55942 [200]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55942 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55943 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55943 [200]: GET /api/v1/patient/home?patient_id=2&clinic_id=2
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55943 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55944 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55944 [302]: GET /dashboard
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55944 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55945 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55945 [200]: POST /api/v1/patient/hydration
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55945 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55946 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55946 [200]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55946 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55947 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55947 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55947 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55949 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55949 [200]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55949 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55950 Accepted
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55950 [200]: POST /api/v1/auth/patient-logout
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55950 Closing
-[Fri Oct  9 10:12:48 2026] 127.0.0.1:55951 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55951 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55951 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55952 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55952 [200]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55952 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55953 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55953 [200]: POST /api/v1/auth/patient-logout
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55953 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55954 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55954 [200]: POST /api/v1/auth/patient-logout
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55954 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55955 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55955 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55955 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55956 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55956 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55956 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55957 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55957 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55957 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55958 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55958 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55958 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55959 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55959 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55959 Closing
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55960 Accepted
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55960 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:49 2026] 127.0.0.1:55960 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55961 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55961 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55961 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55962 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55962 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55962 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55963 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55963 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55963 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55964 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55964 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55964 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55965 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55965 [200]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55965 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55966 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55966 [401]: GET /api/v1/patient/home
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55966 Closing
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55967 Accepted
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55967 [401]: POST /api/v1/auth/patient-login
-[Fri Oct  9 10:12:50 2026] 127.0.0.1:55967 Closing
+[Tue Oct 13 16:57:44 2026] PHP 8.5.10 Development Server (http://127.0.0.1:57062) started
+[Tue Oct 13 16:57:44 2026] 127.0.0.1:57064 Accepted
+[Tue Oct 13 16:57:44 2026] 127.0.0.1:57064 Closing
+[Tue Oct 13 16:57:44 2026] 127.0.0.1:57065 Accepted
+[Tue Oct 13 16:57:44 2026] 127.0.0.1:57065 Closing
+[Tue Oct 13 16:57:44 2026] 127.0.0.1:57066 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57066 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57067 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57067 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57068 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57068 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57069 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57069 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57070 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57070 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57071 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57071 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57072 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57072 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57073 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57073 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57074 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57074 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57075 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57075 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57076 Accepted
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57076 Closing
+[Tue Oct 13 16:57:45 2026] 127.0.0.1:57077 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57077 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57078 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57078 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57079 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57079 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57080 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57080 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57082 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57082 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57083 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57083 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57084 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57084 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57085 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57085 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57086 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57086 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57088 Accepted
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57088 Closing
+[Tue Oct 13 16:57:46 2026] 127.0.0.1:57093 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57093 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57100 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57100 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57101 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57101 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57103 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57103 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57104 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57104 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57107 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57107 Closing
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57108 Accepted
+[Tue Oct 13 16:57:47 2026] 127.0.0.1:57108 Closing
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57111 Accepted
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57111 Closing
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57112 Accepted
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57112 Closing
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57113 Accepted
+[Tue Oct 13 16:57:48 2026] 127.0.0.1:57113 Closing

@@ -690,27 +690,54 @@ class HelpdeskTicketService
             GROUP BY priority_operational
         ")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
-        // 3. Tempo Médio de Primeira Resposta (FRT) em minutos
-        $frtMinutes = (float)$this->db->query("
-            SELECT AVG((strftime('%s', first_response_at) - strftime('%s', created_at)) / 60.0) 
+        // 3. Tempo Médio de Primeira Resposta (FRT) em minutos (portável para SQLite e MySQL 8)
+        $frtRows = $this->db->query("
+            SELECT created_at, first_response_at 
             FROM helpdesk_tickets 
             WHERE first_response_at IS NOT NULL
-        ")->fetchColumn();
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $frtMinutes = 0.0;
+        if (!empty($frtRows)) {
+            $diffsFrt = [];
+            foreach ($frtRows as $row) {
+                $start = strtotime((string)$row['created_at']);
+                $end = strtotime((string)$row['first_response_at']);
+                if ($start !== false && $end !== false && $end >= $start) {
+                    $diffsFrt[] = ($end - $start) / 60.0;
+                }
+            }
+            $frtMinutes = !empty($diffsFrt) ? array_sum($diffsFrt) / count($diffsFrt) : 0.0;
+        }
 
-        // 4. Tempo Médio de Resolução (MTTR) em horas
-        $mttrHours = (float)$this->db->query("
-            SELECT AVG((strftime('%s', resolved_at) - strftime('%s', created_at)) / 3600.0) 
+        // 4. Tempo Médio de Resolução (MTTR) em horas (portável para SQLite e MySQL 8)
+        $mttrRows = $this->db->query("
+            SELECT created_at, resolved_at 
             FROM helpdesk_tickets 
             WHERE resolved_at IS NOT NULL
-        ")->fetchColumn();
+        ")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $mttrHours = 0.0;
+        if (!empty($mttrRows)) {
+            $diffsMttr = [];
+            foreach ($mttrRows as $row) {
+                $start = strtotime((string)$row['created_at']);
+                $end = strtotime((string)$row['resolved_at']);
+                if ($start !== false && $end !== false && $end >= $start) {
+                    $diffsMttr[] = ($end - $start) / 3600.0;
+                }
+            }
+            $mttrHours = !empty($diffsMttr) ? array_sum($diffsMttr) / count($diffsMttr) : 0.0;
+        }
 
-        // 5. Chamados Envelhecidos (mais de 48h abertos sem resolução)
-        $agedTickets = (int)$this->db->query("
+        // 5. Chamados Envelhecidos (mais de 48h abertos sem resolução) - ANSI SQL portável
+        $cutoff48h = date('Y-m-d H:i:s', time() - (48 * 3600));
+        $stmtAged = $this->db->prepare("
             SELECT COUNT(*) 
             FROM helpdesk_tickets 
             WHERE status NOT IN ('resolved', 'closed')
-              AND datetime(created_at) <= datetime('now', '-2 days')
-        ")->fetchColumn();
+              AND created_at <= :cutoff
+        ");
+        $stmtAged->execute(['cutoff' => $cutoff48h]);
+        $agedTickets = (int)$stmtAged->fetchColumn();
 
         // 6. Média CSAT
         $csatAvg = (float)$this->db->query("

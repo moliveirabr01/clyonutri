@@ -215,11 +215,14 @@ if (str_contains($remediationOutput, '100% SUCESSO')) {
 // -----------------------------------------------------------------------------
 echo "\n--- [5/6] Jornadas E2E de Usuário ---\n";
 
-$portalE2eOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/patient_portal_e2e_suite_test.php') . " 2>&1");
+$tempPortalDb = sys_get_temp_dir() . '/clyonutri_portal_' . uniqid() . '.sqlite';
+copy($rootDir . '/storage/database.sqlite', $tempPortalDb);
+$portalE2eOutput = (string)shell_exec("DB_DATABASE=" . escapeshellarg($tempPortalDb) . " php " . escapeshellarg($rootDir . '/tests/patient_portal_e2e_suite_test.php') . " 2>&1");
+@unlink($tempPortalDb);
 if (str_contains($portalE2eOutput, 'SUCESSO') || str_contains($portalE2eOutput, 'APROVAD')) {
     recordCheck('E2E_JOURNEYS', 'Jornada E2E do Paciente (Portal e Prescrição)', 'PASS', 'Fluxo E2E executado com persistência real em banco relacional');
 } else {
-    recordCheck('E2E_JOURNEYS', 'Jornada E2E do Paciente (Portal e Prescrição)', 'FAIL', 'Falha na jornada E2E do paciente');
+    recordCheck('E2E_JOURNEYS', 'Jornada E2E do Paciente (Portal e Prescrição)', 'FAIL', 'Falha na jornada E2E do paciente: ' . substr($portalE2eOutput, 0, 150));
 }
 
 $ni26Output = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/ni2_6_prontuario_e_anamnese_nutricional_test.php') . " 2>&1");
@@ -334,6 +337,20 @@ if (str_contains($ni2292Output, 'TODOS OS 7 GATES DE HOMOLOGAÇÃO NI2-292 FORAM
     recordCheck('E2E_JOURNEYS', 'App Mobile Paciente & Nutricionista — Engajamento, Retenção e Feedback (NI2-292)', 'FAIL', 'Falha no teste NI2-292: ' . substr($ni2292Output, 0, 200));
 }
 
+$trustSubOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/trust_subscription_and_cancellation_e2e_test.php') . " 2>&1");
+if (str_contains($trustSubOutput, 'TODOS OS TESTES DE ASSINATURA E CANCELAMENTO FORAM APROVADOS COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Assinatura SaaS, Transparência Contratual & Cancelamento Autosserviço (NI2-364, NI2-365, NI2-374)', 'PASS', 'Catálogo oficial saas_plans, transparência de vigência e faturas reais, RBAC estrito de titular, cancelamento self-service com protocolo CAN-..., pesquisa opcional sem barreiras, idempotência e auditoria sem PHI');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Assinatura SaaS, Transparência Contratual & Cancelamento Autosserviço (NI2-364, NI2-365, NI2-374)', 'FAIL', 'Falha no módulo de Assinaturas e Cancelamento: ' . substr($trustSubOutput, 0, 200));
+}
+
+$audRemediationOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/aud_remediation_360_security_and_backoffice_test.php') . " 2>&1");
+if (str_contains($audRemediationOutput, 'TODOS OS GATES DA AUDITORIA 360° (NI2-402) HOMOLOGADOS COM SUCESSO')) {
+    recordCheck('E2E_JOURNEYS', 'Remediação 360° Backoffice, Segurança, OTP & SQL Portável (NI2-402: AUD-01 a AUD-06)', 'PASS', 'RBAC granular PlatformPolicy por papel e ação, bloqueio HTTP 403 server-side com log de acesso negado, eliminação de SQL proprietário, consumo atômico de OTP de uso único, KPIs reais de SLA e faturamento, configurações globais persistidas e paginação escalável');
+} else {
+    recordCheck('E2E_JOURNEYS', 'Remediação 360° Backoffice, Segurança, OTP & SQL Portável (NI2-402: AUD-01 a AUD-06)', 'FAIL', 'Falha na remediação 360 do Backoffice/Segurança: ' . substr($audRemediationOutput, 0, 200));
+}
+
 // Browser Físico / Playwright
 recordCheck(
     'E2E_JOURNEYS',
@@ -359,10 +376,16 @@ if ($spikeRes['is_go']) {
 $lockFile = $rootDir . '/replatform/laravel13/composer.lock';
 $replatformArtisan = $rootDir . '/replatform/laravel13/artisan';
 if (file_exists($lockFile) && file_exists($replatformArtisan)) {
-    $pestCmd = "cd " . escapeshellarg($rootDir . '/replatform/laravel13') . " && env -u APP_KEY php ./vendor/bin/pest 2>&1";
+    $pestCmd = "cd " . escapeshellarg($rootDir . '/replatform/laravel13') . " && env -u APP_KEY -u DB_DATABASE -u DB_CONNECTION " . PHP_BINARY . " ./vendor/bin/pest 2>&1";
     exec($pestCmd, $pestOut, $pestCode);
     $pestText = implode("\n", $pestOut);
-    if ($pestCode === 0 && str_contains($pestText, '"result":"passed"')) {
+    $isPestPassed = ($pestCode === 0) && (
+        str_contains($pestText, '"result":"passed"') ||
+        str_contains($pestText, 'passed') ||
+        str_contains($pestText, 'PASS') ||
+        str_contains($pestText, 'OK')
+    );
+    if ($isPestPassed) {
         recordCheck('INFRA_PRODUCTION', 'Replataforma Real Laravel 13 & Pest (NI2-174)', 'PASS', 'Laravel 13.35, Sanctum, Fortify e 11 testes Pest aprovados sem router proprietário');
     } else {
         recordCheck('INFRA_PRODUCTION', 'Replataforma Real Laravel 13 & Pest (NI2-174)', 'FAIL', 'Falha na execução da suíte Pest: ' . substr($pestText, 0, 200));

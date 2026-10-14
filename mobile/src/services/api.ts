@@ -80,11 +80,60 @@ export interface ProfessionalFoodDiaryItem {
   reviewed_at?: string;
 }
 
+export interface ChatMessage {
+  id: number;
+  conversation_id: number;
+  clinic_id: number;
+  sender_type: 'patient' | 'professional';
+  sender_id: number;
+  message: string;
+  attachment_path?: string | null;
+  attachment_name?: string | null;
+  attachment_mime?: string | null;
+  attachment_size?: number | null;
+  status: 'sent' | 'delivered' | 'read';
+  created_at: string;
+  read_at?: string | null;
+  delivered_at?: string | null;
+}
+
+export interface ChatPollResponse {
+  conversation_id: number | null;
+  professional?: {
+    id: number;
+    name: string;
+    crn?: string | null;
+  } | null;
+  messages: ChatMessage[];
+  cursor: {
+    after_id: number;
+    count: number;
+    has_more: boolean;
+  };
+  polling_policy?: {
+    active_window_ms: number;
+    background_window_ms: number;
+  };
+}
+
+export interface ProfessionalChatConversation {
+  id: number;
+  patient_id: number;
+  patient_name: string;
+  patient_email?: string;
+  last_message?: string;
+  last_message_at?: string;
+  unread_count?: number;
+}
+
 export interface MealPlanItemSubstitution {
   id: number;
   item_id: number;
   food_id: number;
   food_name: string;
+  amount?: number;
+  measure_unit?: string;
+  notes?: string | null;
 }
 
 export interface MealPlanItem {
@@ -98,6 +147,7 @@ export interface MealPlanItem {
   protein_g?: number;
   carbohydrate_g?: number;
   lipid_g?: number;
+  notes?: string | null;
   substitutions?: MealPlanItemSubstitution[];
 }
 
@@ -107,6 +157,7 @@ export interface MealPlanMeal {
   name: string;
   time: string;
   ordering: number;
+  notes?: string | null;
   items: MealPlanItem[];
 }
 
@@ -117,6 +168,8 @@ export interface ActiveMealPlan {
   title: string;
   status: string;
   version_number?: number;
+  version?: number;
+  published_at?: string | null;
   notes?: string;
   meals: MealPlanMeal[];
 }
@@ -130,6 +183,16 @@ export interface Appointment {
   notes?: string;
   professional_name?: string;
   meeting_url?: string;
+}
+
+export interface PatientRecipePrescription {
+  id: number; recipe_id: number; recipe_title: string; recipe_summary?: string;
+  prescribed_servings: number; meal_name?: string; instructions_override?: string;
+  scaled_energy_kcal: number;
+}
+export interface PatientRecipeDetails {
+  title: string; instructions: string; servings: number;
+  ingredients: Array<{ id: number; food_name: string; amount: number; measure_unit: string }>;
 }
 
 export interface PatientHomeData {
@@ -189,7 +252,7 @@ export function setSessionExpiredHandler(handler: (() => void) | null) {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public kind: 'offline' | 'server' | 'invalid' | 'auth' = status === 0 ? 'offline' : status === 401 ? 'auth' : 'server', public requestId?: string) { super(message); }
+  constructor(message: string, public status: number, public kind: 'offline' | 'server' | 'invalid' | 'auth' | 'timeout' | 'unavailable' = status === 0 ? 'offline' : status === 408 ? 'timeout' : status === 401 ? 'auth' : 'server', public requestId?: string) { super(message); }
 }
 
 export function setApiBaseUrl(url: string) {
@@ -213,6 +276,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const headers: Record<string, string> = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
+    ...(typeof window !== 'undefined' ? { 'X-ClyoNutri-Web': '1' } : {}),
     ...(options.headers as Record<string, string> || {}),
   };
 
@@ -222,27 +286,36 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const url = `${currentApiBaseUrl}${endpoint}`;
   let response: Response;
-  try {
-    response = await fetch(url, { ...options, headers });
-  } catch (_) {
-    throw new ApiError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', 0);
-  }
-
-  if (response.status === 401 && currentAuthToken && !isLogin) {
-    setAuthToken(null);
-    onSessionExpired?.();
-  }
-
   let payload: any;
-  try { payload = await response.json(); }
-  catch (_) {
-    throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid', response.headers.get('X-Request-ID') || undefined);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    response = await fetch(url, { ...options, credentials: 'include', headers, signal: controller.signal });
+    if (response.status === 401 && (currentAuthToken || typeof window !== 'undefined') && !isLogin && endpoint !== '/api/v1/auth/session') {
+      setAuthToken(null);
+      onSessionExpired?.();
+    }
+    try { payload = await response.json(); }
+    catch (error: any) {
+      if (error?.name === 'AbortError') throw error;
+      throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid', response.headers.get('X-Request-ID') || undefined);
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    if (err?.name === 'AbortError') {
+      throw new ApiError('A requisição excedeu o tempo limite (15s). Verifique sua conexão e tente novamente.', 408, 'timeout');
+    }
+    throw new ApiError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', 0);
+  } finally {
+    clearTimeout(timeoutId);
   }
+
   if (!response.ok) {
     const message = response.status === 401 ? (isLogin ? 'E-mail ou senha incorretos.' : 'Sua sessão expirou. Entre novamente.')
       : response.status >= 500 ? 'Não foi possível carregar os dados. Tente novamente.'
       : typeof payload?.error === 'string' ? payload.error : 'Não foi possível concluir a solicitação.';
-    throw new ApiError(message, response.status, response.status === 401 ? 'auth' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined);
+    throw new ApiError(message, response.status, response.status === 401 ? 'auth' : payload?.code === 'prescription_content_unavailable' ? 'unavailable' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined);
   }
   if (!payload || typeof payload !== 'object' || payload.error) {
     throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid');
@@ -251,6 +324,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const ApiService = {
+  async restoreWebSession(): Promise<PatientAuthData | ProfessionalAuthData> {
+    const data = await request<PatientAuthData | ProfessionalAuthData>('/api/v1/auth/session');
+    if (!data.expires_at || !(('patient' in data && data.patient?.id) || ('professional' in data && data.professional?.id))) throw new ApiError('Resposta de sessão inválida.', 200, 'invalid');
+    return data;
+  },
+  async getAccessHelp(): Promise<{ support_email: string | null }> {
+    return request('/api/v1/auth/access-help');
+  },
   async previewPatientInvitation(invitation_code: string): Promise<PatientInvitationPreview> {
     const data = await request<PatientInvitationPreview>('/api/v1/auth/patient-onboarding/preview', { method: 'POST', body: JSON.stringify({ invitation_code }) });
     if (typeof data.patient?.name !== 'string' || typeof data.patient.email !== 'string' || typeof data.patient.phone !== 'string' || typeof data.clinic_name !== 'string' || typeof data.professional_name !== 'string') throw new ApiError('Resposta do convite inválida. Tente novamente.', 200, 'invalid');
@@ -321,11 +402,22 @@ export const ApiService = {
     return data;
   },
 
-  async logMeal(entry: { meal_name: string; description?: string; consumed_at?: string }): Promise<FoodDiaryEntry> {
+  async logMeal(entry: { meal_name: string; description?: string; consumed_at?: string; idempotency_key?: string }): Promise<FoodDiaryEntry> {
     return request<FoodDiaryEntry>('/api/v1/patient/food-diary', {
       method: 'POST',
       body: JSON.stringify(entry),
     });
+  },
+
+  async getRecipes(): Promise<PatientRecipePrescription[]> {
+    const response = await request<{ data: PatientRecipePrescription[] }>('/api/v1/patient/recipes');
+    if (!Array.isArray(response.data)) throw new ApiError('Resposta das receitas inválida. Tente novamente.', 200, 'invalid');
+    return response.data;
+  },
+
+  async getRecipe(id: number, prescriptionId?: number): Promise<PatientRecipeDetails> {
+    const response = await request<{ data: PatientRecipeDetails }>('/api/v1/patient/recipes/' + id + (prescriptionId === undefined ? '' : '?prescription_id=' + prescriptionId));
+    return response.data;
   },
 
   async getEvolution(): Promise<EvolutionData> {
@@ -374,8 +466,20 @@ export const ApiService = {
     return request<ProfessionalDashboardData>('/api/v1/professional/dashboard');
   },
 
-  async getProfessionalPatients(): Promise<{ patients: ProfessionalPatientItem[] }> {
-    return request<{ patients: ProfessionalPatientItem[] }>('/api/v1/professional/patients');
+  async getProfessionalPatients(search?: string, page: number = 1, limit: number = 50): Promise<{ patients: ProfessionalPatientItem[]; total?: number; page?: number; limit?: number; has_more?: boolean }> {
+    const params = new URLSearchParams();
+    if (search && search.trim() !== '') {
+      params.append('search', search.trim());
+    }
+    if (page > 1) {
+      params.append('page', String(page));
+    }
+    if (limit !== 50) {
+      params.append('limit', String(limit));
+    }
+    const qs = params.toString();
+    const endpoint = `/api/v1/professional/patients${qs ? `?${qs}` : ''}`;
+    return request<{ patients: ProfessionalPatientItem[]; total?: number; page?: number; limit?: number; has_more?: boolean }>(endpoint);
   },
 
   async getProfessionalFoodDiaries(): Promise<{ diaries: ProfessionalFoodDiaryItem[] }> {
@@ -386,6 +490,59 @@ export const ApiService = {
     return request<{ success: boolean; entry_id: number; feedback: string; reviewed_at: string }>(`/api/v1/professional/food-diary/${entryId}/feedback`, {
       method: 'POST',
       body: JSON.stringify({ feedback }),
+    });
+  },
+
+  // --- Métodos de Chat e Mensageria Segura (NI2-189) ---
+  async getChatMessages(afterId?: number): Promise<ChatPollResponse> {
+    const url = afterId && afterId > 0
+      ? `/api/v1/patient/chat/messages?after_id=${afterId}`
+      : '/api/v1/patient/chat/messages';
+    return request<ChatPollResponse>(url);
+  },
+
+  async sendChatMessage(message: string, conversationId?: number): Promise<{ success: boolean; message: ChatMessage }> {
+    return request<{ success: boolean; message: ChatMessage }>('/api/v1/patient/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId,
+        idempotency_key: `mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      }),
+    });
+  },
+
+  async markChatAsRead(conversationId: number): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>('/api/v1/patient/chat/read', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: conversationId }),
+    });
+  },
+
+  async getProfessionalChatConversations(): Promise<{ conversations: ProfessionalChatConversation[] }> {
+    return request<{ conversations: ProfessionalChatConversation[] }>('/api/v1/professional/chat/conversations');
+  },
+
+  async getProfessionalChatMessages(conversationId: number, afterId?: number): Promise<ChatPollResponse> {
+    const url = afterId && afterId > 0
+      ? `/api/v1/professional/chat/${conversationId}/messages?after_id=${afterId}`
+      : `/api/v1/professional/chat/${conversationId}/messages`;
+    return request<ChatPollResponse>(url);
+  },
+
+  async sendProfessionalChatMessage(conversationId: number, message: string): Promise<{ success: boolean; message: ChatMessage }> {
+    return request<{ success: boolean; message: ChatMessage }>(`/api/v1/professional/chat/${conversationId}/send`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        idempotency_key: `prof_mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      }),
+    });
+  },
+
+  async markProfessionalChatAsRead(conversationId: number): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/api/v1/professional/chat/${conversationId}/read`, {
+      method: 'POST',
     });
   },
 };

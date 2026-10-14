@@ -21,10 +21,10 @@ class AuditLogger
     {
         $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
         $user = TenantContext::getUser();
-        $userId = $user['id'] ?? null;
+        $userId = ($user['role']??'') === 'patient' ? null : ($user['id'] ?? null);
 
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI/Internal';
+        $ip = str_starts_with($action,'SECURITY_') ? null : ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+        $ua = str_starts_with($action, 'SECURITY_') ? 'security-event' : ($_SERVER['HTTP_USER_AGENT'] ?? 'CLI/Internal');
 
         $stmt = $this->db->prepare("
             INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details)

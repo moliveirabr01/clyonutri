@@ -220,7 +220,7 @@ try {
     $firstPatientData = [
         'name' => 'Mariana Oliveira da Silva',
         'email' => 'mariana.silva.' . bin2hex(random_bytes(3)) . '@paciente.com',
-        'phone' => '(11) 98765-4321',
+        'phone' => '119' . mt_rand(10000000, 99999999),
         'birth_date' => '1992-07-15',
         'gender' => 'female',
         'notes' => 'Primeira paciente real ativada via onboarding guiado.',

@@ -26,6 +26,7 @@ class PatientApiController
     public function getDailyMealPlan(int $patientId): ?array
     {
         $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId,$clinicId,$this->db);
 
         $stmt = $this->db->prepare("
             SELECT * FROM meal_plans
@@ -73,6 +74,9 @@ class PatientApiController
             $m['items'] = $items;
         }
 
+        if (!empty($plan['published_at'])) {
+            $plan['published_at'] = (new \DateTimeImmutable($plan['published_at'], new \DateTimeZone(date_default_timezone_get())))->format(DATE_ATOM);
+        }
         $plan['meals'] = $meals;
         return $plan;
     }

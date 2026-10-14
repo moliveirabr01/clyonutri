@@ -48,6 +48,11 @@ class ChatController
         $stmt->execute(['uid' => $userId]);
         $profId = (int)$stmt->fetchColumn();
 
+        // Buscar Nome da Clínica
+        $cStmt = $this->db->prepare("SELECT name FROM clinics WHERE id = :cid LIMIT 1");
+        $cStmt->execute(['cid' => $clinicId]);
+        $clinicName = (string)($cStmt->fetchColumn() ?: ($_SESSION['clinic_name'] ?? 'Clínica Principal'));
+
         TenantContext::set($clinicId, [
             'id' => $userId,
             'name' => $userName,
@@ -58,6 +63,7 @@ class ChatController
             'userId' => $userId,
             'clinicId' => $clinicId,
             'userName' => $userName,
+            'clinicName' => $clinicName,
             'profId' => $profId,
         ];
     }
@@ -161,6 +167,19 @@ class ChatController
                 'professional',
                 $auth['profId']
             );
+
+            // Resumo atualizado de todas as conversas do profissional para a lista lateral
+            $allConvs = $this->chatService->listConversationsForProfessional($auth['profId']);
+            $data['conversations_summary'] = array_map(function($c) {
+                return [
+                    'id' => (int)$c['id'],
+                    'patient_name' => $c['patient_name'],
+                    'last_message' => $c['last_message'] ?? 'Conversa iniciada...',
+                    'last_message_at' => !empty($c['last_message_at']) ? date('H:i', strtotime($c['last_message_at'])) : '',
+                    'unread_count' => (int)($c['unread_count'] ?? 0),
+                ];
+            }, $allConvs);
+
             echo json_encode($data);
         } catch (\Throwable $e) {
             $status = ($e instanceof TenantSecurityException) ? 403 : 400;
@@ -227,71 +246,36 @@ class ChatController
 
         $totalUnread = array_reduce($conversations, fn($acc, $c) => $acc + (int)($c['unread_count'] ?? 0), 0);
 
-        header('Content-Type: text/html; charset=utf-8');
+        $title = 'Chat & Mensagens Seguras';
+        $activeNav = 'chat';
+        $clinicName = $auth['clinicName'];
+        $userName = $auth['userName'];
+
+        ob_start();
         ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canal Seguro de Comunicação — ClyoNutri II</title>
     <style>
         :root {
-            --primary: #059669;
-            --primary-hover: #047857;
-            --primary-light: #ecfdf5;
-            --surface: #ffffff;
-            --background: #f8fafc;
-            --border: #e2e8f0;
-            --text: #0f172a;
-            --text-muted: #64748b;
             --patient-bubble: #f1f5f9;
-            --nutri-bubble: #10b981;
+            --nutri-bubble: #059669;
             --nutri-bubble-text: #ffffff;
-            --danger: #ef4444;
-            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: var(--font);
-            background: var(--background);
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
         }
 
-        /* Sidebar Navegação Global */
-        .sidebar-nav {
-            width: 240px;
-            background: #0f172a;
-            color: #f8fafc;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        }
-        .nav-header { padding: 20px; font-weight: 700; font-size: 1.15rem; border-bottom: 1px solid #1e293b; }
-        .nav-items { list-style: none; padding: 16px 0; }
-        .nav-items a {
-            display: flex; align-items: center; gap: 10px;
-            padding: 12px 20px; color: #94a3b8; text-decoration: none; font-size: 0.95rem;
-            transition: all 0.15s ease;
-        }
-        .nav-items a:hover, .nav-items a.active { background: #1e293b; color: #ffffff; }
-
-        /* Container Principal do Chat */
+        /* Container Principal do Chat Integrado ao Shell */
         .chat-layout {
-            flex: 1;
             display: flex;
-            height: 100vh;
+            height: calc(100vh - 120px);
+            min-height: 560px;
+            background: #ffffff;
+            border: 1px solid var(--neutral-gray-200, #e2e8f0);
+            border-radius: var(--radius-card, 12px);
             overflow: hidden;
-            background: var(--surface);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
         /* Coluna Lista de Conversas */
         .conv-list-panel {
-            width: 340px;
-            border-right: 1px solid var(--border);
+            width: 320px;
+            border-right: 1px solid var(--neutral-gray-200, #e2e8f0);
             display: flex;
             flex-direction: column;
             background: #ffffff;
@@ -299,20 +283,27 @@ class ChatController
         }
         .conv-list-header {
             padding: 18px 20px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--neutral-gray-200, #e2e8f0);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .conv-list-header h2 { font-size: 1.1rem; font-weight: 600; }
+        .conv-list-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--brand-navy-900, #0f172a);
+            margin: 0;
+        }
         .conv-list-items {
             flex: 1;
             overflow-y: auto;
             list-style: none;
+            margin: 0;
+            padding: 0;
         }
         .conv-card {
             padding: 14px 18px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--neutral-gray-200, #e2e8f0);
             cursor: pointer;
             text-decoration: none;
             color: inherit;
@@ -320,18 +311,40 @@ class ChatController
             transition: background 0.15s ease;
         }
         .conv-card:hover { background: #f8fafc; }
-        .conv-card.active { background: var(--primary-light); border-left: 4px solid var(--primary); }
-        .conv-card-title { display: flex; justify-content: space-between; margin-bottom: 4px; font-weight: 600; font-size: 0.95rem; }
-        .conv-card-time { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; }
+        .conv-card.active {
+            background: #ecfdf5;
+            border-left: 4px solid #059669;
+        }
+        .conv-card-title {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--brand-navy-900, #0f172a);
+        }
+        .conv-card-time {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: normal;
+        }
         .conv-card-preview {
-            font-size: 0.85rem; color: var(--text-muted);
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.85rem;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .badge-unread {
-            background: var(--primary); color: white;
-            font-size: 0.7rem; font-weight: 700;
-            border-radius: 999px; padding: 2px 7px;
+            background: #059669;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 2px 7px;
         }
 
         /* Coluna Mensagens e Conversa Ativa */
@@ -341,25 +354,37 @@ class ChatController
             flex-direction: column;
             height: 100%;
             background: #fafafa;
+            min-width: 0;
         }
         .chat-topbar {
             padding: 14px 24px;
             background: #ffffff;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--neutral-gray-200, #e2e8f0);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-        .chat-topbar-info h3 { font-size: 1.05rem; font-weight: 600; }
-        .chat-topbar-info p { font-size: 0.8rem; color: var(--text-muted); }
+        .chat-topbar-info h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--brand-navy-900, #0f172a);
+        }
+        .chat-topbar-info p {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 0;
+        }
         .chat-security-tag {
-            background: var(--primary-light);
-            color: var(--primary);
+            background: #ecfdf5;
+            color: #047857;
             padding: 4px 10px;
             border-radius: 6px;
             font-size: 0.75rem;
             font-weight: 600;
-            display: flex; align-items: center; gap: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .chat-messages-container {
@@ -382,7 +407,7 @@ class ChatController
         .chat-bubble.patient {
             align-self: flex-start;
             background: var(--patient-bubble);
-            color: var(--text);
+            color: #0f172a;
             border-bottom-left-radius: 4px;
         }
         .chat-bubble.professional {
@@ -419,7 +444,7 @@ class ChatController
         .chat-input-bar {
             padding: 16px 24px;
             background: #ffffff;
-            border-top: 1px solid var(--border);
+            border-top: 1px solid var(--neutral-gray-200, #e2e8f0);
         }
         .chat-input-form {
             display: flex;
@@ -429,7 +454,7 @@ class ChatController
         .chat-textarea {
             flex: 1;
             padding: 12px 16px;
-            border: 1px solid var(--border);
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
             font-family: inherit;
             font-size: 0.95rem;
@@ -438,9 +463,9 @@ class ChatController
             height: 48px;
             transition: border-color 0.15s ease;
         }
-        .chat-textarea:focus { border-color: var(--primary); }
+        .chat-textarea:focus { border-color: #059669; }
         .btn-send {
-            background: var(--primary);
+            background: #059669;
             color: white;
             border: none;
             padding: 0 20px;
@@ -450,16 +475,18 @@ class ChatController
             cursor: pointer;
             transition: background 0.15s ease;
         }
-        .btn-send:hover { background: var(--primary-hover); }
+        .btn-send:hover { background: #047857; }
         .file-label {
             cursor: pointer;
             padding: 10px;
             border-radius: 8px;
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            display: flex; align-items: center; justify-content: center;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .file-label:hover { background: #f8fafc; color: var(--text); }
+        .file-label:hover { background: #f8fafc; color: #0f172a; }
         .file-input { display: none; }
 
         /* Empty State */
@@ -469,23 +496,21 @@ class ChatController
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: var(--text-muted);
+            color: #64748b;
             padding: 40px;
             text-align: center;
         }
-        .empty-chat h3 { font-size: 1.2rem; color: var(--text); margin-bottom: 8px; }
+        .empty-chat h3 { font-size: 1.2rem; color: #0f172a; margin-bottom: 8px; }
 
-        /* Responsividade (1440, 1280, 768, 390px) */
+        /* Responsividade */
         @media (max-width: 1024px) {
             .conv-list-panel { width: 280px; }
         }
         @media (max-width: 768px) {
-            .sidebar-nav { display: none; }
-            .conv-list-panel { width: 100%; border-right: none; }
-            .chat-layout { flex-direction: column; }
+            .chat-layout { flex-direction: column; height: auto; min-height: calc(100vh - 160px); }
+            .conv-list-panel { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; }
             .conv-main-panel {
                 display: <?= ($activeConv !== null) ? 'flex' : 'none' ?>;
-                position: fixed; inset: 0; z-index: 50;
             }
         }
         @media (max-width: 390px) {
@@ -494,24 +519,9 @@ class ChatController
             .chat-bubble { max-width: 85%; font-size: 0.88rem; }
         }
     </style>
-</head>
-<body>
-    <!-- Sidebar Navegação -->
-    <nav class="sidebar-nav">
-        <div class="nav-header">🌱 ClyoNutri II</div>
-        <ul class="nav-items">
-            <li><a href="/dashboard">📊 Dashboard</a></li>
-            <li><a href="/agenda">📅 Agenda</a></li>
-            <li><a href="/pacientes">👥 Pacientes</a></li>
-            <li><a href="/planos">🥗 Planos Alimentares</a></li>
-            <li><a href="/chat" class="active">💬 Chat & Mensagens</a></li>
-            <li><a href="/ajuda">❓ Central de Ajuda</a></li>
-            <li><a href="/logout">🚪 Sair</a></li>
-        </ul>
-    </nav>
 
     <!-- Layout de Comunicação Segura -->
-    <main class="chat-layout">
+    <div class="chat-layout">
         <!-- Lista de Conversas -->
         <aside class="conv-list-panel">
             <div class="conv-list-header">
@@ -522,7 +532,7 @@ class ChatController
             </div>
             <ul class="conv-list-items">
                 <?php if (empty($conversations)): ?>
-                    <li style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+                    <li style="padding: 24px; text-align: center; color: #64748b; font-size: 0.9rem;">
                         Nenhuma conversa ativa no momento.<br>Inicie o contato a partir da ficha do paciente.
                     </li>
                 <?php else: ?>
@@ -556,8 +566,15 @@ class ChatController
                         <h3><?= htmlspecialchars($activeConv['patient_name']) ?></h3>
                         <p>Paciente vinculado • Consulta e acompanhamento</p>
                     </div>
-                    <div class="chat-security-tag">
-                        🔒 Canal Criptografado & Isolado
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #047857; font-weight: 600; background: #ecfdf5; padding: 4px 10px; border-radius: 6px; border: 1px solid #a7f3d0;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                            Online
+                        </span>
+                        <div class="chat-security-tag">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Canal Criptografado & Isolado
+                        </div>
                     </div>
                 </header>
 
@@ -573,7 +590,8 @@ class ChatController
                                 <div><?= nl2br(htmlspecialchars($m['message'])) ?></div>
                                 <?php if (!empty($m['attachment_path'])): ?>
                                     <div class="chat-attachment-box">
-                                        📎 <a href="/chat/anexo/<?= $m['id'] ?>" target="_blank">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                        <a href="/chat/anexo/<?= $m['id'] ?>" target="_blank">
                                             <?= htmlspecialchars($m['attachment_name'] ?? 'Anexo Privado') ?>
                                         </a>
                                     </div>
@@ -595,17 +613,17 @@ class ChatController
                         <input type="hidden" name="idempotency_key" id="idempotencyKeyInput" value="<?= htmlspecialchars($clientMessageId) ?>">
 
                         <label class="file-label" title="Anexar arquivo seguro (PDF, JPG, PNG até 10MB)">
-                            📎
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             <input type="file" name="attachment" class="file-input" id="attachmentInput" accept=".pdf,.png,.jpg,.jpeg">
                         </label>
-                        <span id="selectedFileName" style="font-size: 0.8rem; color: var(--text-muted); display: none;"></span>
+                        <span id="selectedFileName" style="font-size: 0.8rem; color: #64748b; display: none;"></span>
 
                         <textarea name="message" class="chat-textarea" id="chatMessageTextarea" placeholder="Digite uma mensagem segura para seu paciente..." required></textarea>
                         <button type="submit" class="btn-send" id="btnSend">Enviar</button>
                     </form>
                 </div>
 
-                <!-- Script de Polling com Cursor Delta e Prevenção de Conflito -->
+                <!-- Script de Polling com Cursor Delta e Envio Assíncrono Instantâneo -->
                 <script>
                     (function() {
                         const convId = <?= $activeConvId ?>;
@@ -615,6 +633,10 @@ class ChatController
                         const container = document.getElementById('chatMessagesContainer');
                         const fileInput = document.getElementById('attachmentInput');
                         const fileNameSpan = document.getElementById('selectedFileName');
+                        const sendForm = document.getElementById('chatSendForm');
+                        const textarea = document.getElementById('chatMessageTextarea');
+                        const btnSend = document.getElementById('btnSend');
+                        const idempotencyInput = document.getElementById('idempotencyKeyInput');
 
                         if (container) {
                             container.scrollTop = container.scrollHeight;
@@ -631,7 +653,66 @@ class ChatController
                             });
                         }
 
-                        // Polling com cursor proporcional ao estado da tela
+                        // Envio assíncrono para visualização instantânea sem recarregar a tela
+                        if (sendForm) {
+                            sendForm.addEventListener('submit', function(e) {
+                                e.preventDefault();
+                                const text = textarea.value.trim();
+                                if (!text && (!fileInput || !fileInput.files.length)) return;
+
+                                const formData = new FormData(sendForm);
+                                btnSend.disabled = true;
+                                btnSend.textContent = 'Enviando...';
+
+                                fetch(sendForm.action, {
+                                    method: 'POST',
+                                    headers: { 'Accept': 'application/json' },
+                                    body: formData
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data && data.success && data.message) {
+                                        const m = data.message;
+                                        const notice = document.getElementById('emptyStateNotice');
+                                        if (notice) notice.remove();
+
+                                        if (!document.querySelector('[data-msg-id="' + m.id + '"]')) {
+                                            const bubble = document.createElement('div');
+                                            bubble.className = 'chat-bubble professional';
+                                            bubble.setAttribute('data-msg-id', m.id);
+
+                                            let content = '<div>' + (m.message || '').replace(/\n/g, '<br>') + '</div>';
+                                            if (m.has_attachment || m.attachment_path) {
+                                                content += '<div class="chat-attachment-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> <a href="/chat/anexo/' + m.id + '" target="_blank">' + (m.attachment_name || 'Anexo Privado') + '</a></div>';
+                                            }
+                                            const timeStr = m.created_at ? m.created_at.substring(11, 16) : new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                            content += '<div class="bubble-meta"><span>' + timeStr + '</span><span>✓</span></div>';
+                                            bubble.innerHTML = content;
+                                            container.appendChild(bubble);
+                                            container.scrollTop = container.scrollHeight;
+                                            lastId = Math.max(lastId, parseInt(m.id, 10));
+                                        }
+
+                                        textarea.value = '';
+                                        if (fileInput) fileInput.value = '';
+                                        if (fileNameSpan) fileNameSpan.style.display = 'none';
+                                        if (idempotencyInput) idempotencyInput.value = 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+                                    } else if (data && data.error) {
+                                        alert(data.error);
+                                    }
+                                })
+                                .catch(() => {
+                                    // Fallback para envio padrão se fetch falhar
+                                    sendForm.submit();
+                                })
+                                .finally(() => {
+                                    btnSend.disabled = false;
+                                    btnSend.textContent = 'Enviar';
+                                });
+                            });
+                        }
+
+                        // Polling com cursor delta e atualização da lista lateral
                         function pollDelta() {
                             if (isPolling) return;
                             isPolling = true;
@@ -654,7 +735,7 @@ class ChatController
 
                                         let content = '<div>' + (m.message || '').replace(/\n/g, '<br>') + '</div>';
                                         if (m.has_attachment || m.attachment_path) {
-                                            content += '<div class="chat-attachment-box">📎 <a href="/chat/anexo/' + m.id + '" target="_blank">' + (m.attachment_name || 'Anexo Privado') + '</a></div>';
+                                            content += '<div class="chat-attachment-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> <a href="/chat/anexo/' + m.id + '" target="_blank">' + (m.attachment_name || 'Anexo Privado') + '</a></div>';
                                         }
                                         const timeStr = m.created_at ? m.created_at.substring(11, 16) : '';
                                         const checkmark = (m.sender_type === 'professional') ? ((m.status === 'read') ? '✓✓' : '✓') : '';
@@ -667,8 +748,31 @@ class ChatController
                                     container.scrollTop = container.scrollHeight;
                                 }
 
+                                // Atualizar resumo de conversas no painel esquerdo
+                                if (data && Array.isArray(data.conversations_summary)) {
+                                    data.conversations_summary.forEach(cs => {
+                                        const cardLink = document.querySelector('a[href="/chat/' + cs.id + '"]');
+                                        if (cardLink) {
+                                            const timeEl = cardLink.querySelector('.conv-card-time');
+                                            if (timeEl && cs.last_message_at) timeEl.textContent = cs.last_message_at;
+                                            const prevSpan = cardLink.querySelector('.conv-card-preview span:first-child');
+                                            if (prevSpan && cs.last_message) prevSpan.textContent = cs.last_message;
+                                            let badge = cardLink.querySelector('.badge-unread');
+                                            if (cs.unread_count > 0) {
+                                                if (!badge) {
+                                                    badge = document.createElement('span');
+                                                    badge.className = 'badge-unread';
+                                                    cardLink.querySelector('.conv-card-preview').appendChild(badge);
+                                                }
+                                                badge.textContent = cs.unread_count;
+                                            } else if (badge && cs.id === convId) {
+                                                badge.remove();
+                                            }
+                                        }
+                                    });
+                                }
+
                                 if (data && data.polling_policy) {
-                                    // Ajustar dinamicamente se a janela estiver visível ou minimizada
                                     pollIntervalMs = document.hidden ? 
                                         data.polling_policy.background_window_ms : 
                                         data.polling_policy.active_window_ms;
@@ -693,10 +797,10 @@ class ChatController
                 </div>
             <?php endif; ?>
         </section>
-    </main>
-</body>
-</html>
+    </div>
         <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     private function wantsJson(): bool

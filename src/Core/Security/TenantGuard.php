@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ClyoNutri\Core\Security;
 
 use ClyoNutri\Core\Audit\AuditLogger;
+use ClyoNutri\Core\Auth\TenantContext;
 use PDO;
 
 /**
@@ -24,7 +25,8 @@ class TenantGuard
         $stmt->execute(['id' => $patientId]);
         $patient = $stmt->fetch();
 
-        if (!$patient || (int)$patient['clinic_id'] !== $clinicId) {
+        $actor = TenantContext::getUser();
+        if (!$patient || (int)$patient['clinic_id'] !== $clinicId || (($actor['role']??'')==='patient' && (int)($actor['id']??0)!==$patientId)) {
             self::logSecurityViolation($db, $clinicId, 'patients', $patientId, 'Tentativa de acesso a paciente de outro tenant');
             throw new TenantSecurityException("Acesso negado: o paciente ID {$patientId} não pertence à clínica ativa (403 Forbidden).", 403);
         }
@@ -46,7 +48,8 @@ class TenantGuard
             FROM professionals p
             JOIN users u ON u.id = p.user_id
             JOIN clinic_members cm ON cm.user_id = p.user_id
-            WHERE p.id = :prof_id AND cm.clinic_id = :clinic_id
+            JOIN clinics c ON c.id=cm.clinic_id AND c.status='active'
+            WHERE p.id = :prof_id AND cm.clinic_id = :clinic_id AND cm.status='active' AND u.status='active' AND cm.role IN ('owner','admin','nutritionist') AND u.role IN ('nutritionist','admin','owner')
         ");
         $stmt->execute(['prof_id' => $professionalId, 'clinic_id' => $clinicId]);
         $professional = $stmt->fetch();
@@ -73,6 +76,7 @@ class TenantGuard
             throw new TenantSecurityException("Acesso negado: o agendamento ID {$appointmentId} não pertence à clínica ativa (403 Forbidden).", 403);
         }
 
+        if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$appointment['patient_id'],$clinicId,$db);
         return $appointment;
     }
 
@@ -90,6 +94,7 @@ class TenantGuard
             throw new TenantSecurityException("Acesso negado: o recebível ID {$receivableId} não pertence à clínica ativa (403 Forbidden).", 403);
         }
 
+        if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$receivable['patient_id'],$clinicId,$db);
         return $receivable;
     }
 
@@ -107,6 +112,7 @@ class TenantGuard
             throw new TenantSecurityException("Acesso negado: a conversa ID {$conversationId} não pertence à clínica ativa (403 Forbidden).", 403);
         }
 
+        if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$conversation['patient_id'],$clinicId,$db);
         return $conversation;
     }
 
@@ -124,6 +130,7 @@ class TenantGuard
             throw new TenantSecurityException("Acesso negado: o plano alimentar ID {$planId} não pertence à clínica ativa (403 Forbidden).", 403);
         }
 
+        if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$plan['patient_id'],$clinicId,$db);
         return $plan;
     }
 
@@ -159,6 +166,7 @@ class TenantGuard
                 'blocked_at' => date('c'),
             ]);
         } catch (\Throwable $e) {
+            error_log('SECURITY_CROSS_TENANT_VIOLATION_BLOCKED audit persistence unavailable');
             // Falha de log não impede bloqueio da requisição
         }
     }

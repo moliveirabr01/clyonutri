@@ -120,6 +120,13 @@ class CreateHelpdeskAndServiceDeskTables
             FOREIGN KEY (ticket_id) REFERENCES helpdesk_tickets(id) ON DELETE CASCADE,
             FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE CASCADE
         ){$engine};");
+
+        // 8. Índices de Desempenho e Agregação de SLAs e Indicadores (Ponto 8)
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hd_tickets_status ON helpdesk_tickets(status, created_at);");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hd_tickets_priority ON helpdesk_tickets(priority_operational, status);");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hd_tickets_clinic ON helpdesk_tickets(clinic_id, status);");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hd_tickets_first_resp ON helpdesk_tickets(first_response_at);");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hd_tickets_resolved ON helpdesk_tickets(resolved_at);");
     }
 
     public function down(PDO $db): void

@@ -99,11 +99,12 @@ echo "==> [Camada 2] Executando Testes de Integração & Persistência...\n";
 
 // 2.1 Persistência e Bloqueio de CPF Duplicado
 $patientRepo = new PatientRepository($db);
-$patientEmail = 'auditoria_' . time() . '@teste.com';
+$patientEmail = 'auditoria_' . time() . '_' . mt_rand(1000, 9999) . '@teste.com';
+$patientPhone = '119' . mt_rand(10000000, 99999999);
 $createdPatient = $patientRepo->create([
     'name' => 'Paciente Auditoria 360',
     'email' => $patientEmail,
-    'phone' => '11999990000',
+    'phone' => $patientPhone,
     'status' => 'active'
 ]);
 if ($createdPatient && (int)$createdPatient['id'] > 0) {
@@ -130,7 +131,7 @@ echo "==> [Camada 3] Executando Jornada Profissional via Motor de Requisições 
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_destroy();
 }
-session_start();
+@session_start();
 
 $router = new Router();
 $authCtrl = new AuthController();
@@ -187,8 +188,8 @@ $newPatientName = 'Paciente Web E2E ' . time();
 $_POST = [
     '_csrf_token' => Csrf::token(),
     'name' => $newPatientName,
-    'email' => 'e2e_' . time() . '@web.com',
-    'phone' => '11977778888',
+    'email' => 'e2e_' . time() . '_' . mt_rand(1000, 9999) . '@web.com',
+    'phone' => '119' . mt_rand(10000000, 99999999),
     'gender' => 'Feminino',
     'notes' => 'Cadastrado no teste HTTP'
 ];

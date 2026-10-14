@@ -180,7 +180,7 @@ class RecipeController
                       <?= htmlspecialchars($r['meal_type'] ?: $r['category']) ?>
                     </span>
                     <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; color: var(--neutral-gray-500);">
-                      <?= htmlspecialchars($r['difficulty'] ?? 'fácil') ?>
+                      <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::recipeDifficulty($r['difficulty'] ?? null)) ?>
                     </span>
                   </div>
                   <h3 style="font-size: 1.15rem; color: var(--brand-navy-900); margin-bottom: var(--space-1); line-height: 1.3;">
@@ -224,7 +224,7 @@ class RecipeController
                   <?php
                   $alStmt = $this->db->prepare("SELECT allergen_group FROM recipe_allergens WHERE recipe_id = :rid");
                   $alStmt->execute(['rid' => (int)$r['id']]);
-                  $alList = $alStmt->fetchAll(PDO::FETCH_COLUMN);
+                  $alList = array_unique(array_map([\ClyoNutri\Core\I18n\LabelMap::class, 'allergen'], $alStmt->fetchAll(PDO::FETCH_COLUMN)));
                   ?>
                   <?php if (!empty($alList)): ?>
                     <div style="display: flex; gap: var(--space-1); flex-wrap: wrap;">
@@ -292,12 +292,12 @@ class RecipeController
               <?php endif; ?>
 
               <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: 0.8rem; color: var(--neutral-gray-500);">
-                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Dificuldade: <strong><?= htmlspecialchars($recipe['difficulty']) ?></strong></span>
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Dificuldade: <strong><?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::recipeDifficulty($recipe['difficulty'])) ?></strong></span>
                 <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Preparo: <strong><?= (int)$recipe['prep_time_minutes'] ?> min</strong></span>
                 <?php if ((int)$recipe['cook_time_minutes'] > 0): ?>
                   <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Cozimento: <strong><?= (int)$recipe['cook_time_minutes'] ?> min</strong></span>
                 <?php endif; ?>
-                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Rendimento: <strong><?= (int)$recipe['servings'] ?> <?= htmlspecialchars($recipe['serving_size_name']) ?></strong></span>
+                <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Rendimento: <strong><?= (int)$recipe['servings'] ?> <?= htmlspecialchars($recipe['serving_size_name'] === 'porção' && (int)$recipe['servings'] !== 1 ? 'porções' : $recipe['serving_size_name']) ?></strong></span>
                 <span style="background: var(--neutral-gray-100); padding: 4px 10px; border-radius: var(--radius-input);">Versão: <strong>v<?= (int)$recipe['current_version'] ?></strong></span>
               </div>
             </div>
@@ -387,33 +387,33 @@ class RecipeController
                 <h3 style="margin: 0; color: var(--brand-navy-900);">Informação Nutricional</h3>
               </div>
               <p style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-bottom: var(--space-3);">
-                Valores calculados <strong>por porção</strong> (<?= round((float)$recipe['serving_size_g'], 1) ?> g):
+                Valores calculados <strong>por porção</strong> (<?= number_format((float)$recipe['serving_size_g'], 1, ',', '.') ?> g):
               </p>
 
               <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-4);">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); border-bottom: 2px solid var(--brand-navy-900); margin-bottom: var(--space-2);">
                   <strong style="color: var(--brand-navy-900); font-size: 1.1rem;">Valor Energético</strong>
-                  <strong style="color: var(--brand-copper-600); font-size: 1.3rem;"><?= round((float)$recipe['energy_kcal_per_serving'], 1) ?> kcal</strong>
+                  <strong style="color: var(--brand-copper-600); font-size: 1.3rem;"><?= number_format((float)$recipe['energy_kcal_per_serving'], 1, ',', '.') ?> kcal</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
                   <span>Proteínas</span>
-                  <strong><?= round((float)$recipe['protein_g_per_serving'], 1) ?> g</strong>
+                  <strong><?= number_format((float)$recipe['protein_g_per_serving'], 1, ',', '.') ?> g</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
                   <span>Carboidratos</span>
-                  <strong><?= round((float)$recipe['carbs_g_per_serving'], 1) ?> g</strong>
+                  <strong><?= number_format((float)$recipe['carbs_g_per_serving'], 1, ',', '.') ?> g</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
                   <span>Lipídios Totais</span>
-                  <strong><?= round((float)$recipe['fat_g_per_serving'], 1) ?> g</strong>
+                  <strong><?= number_format((float)$recipe['fat_g_per_serving'], 1, ',', '.') ?> g</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--neutral-gray-300); font-size: 0.9rem;">
                   <span>Fibras Alimentares</span>
-                  <strong><?= round((float)$recipe['fiber_g_per_serving'], 1) ?> g</strong>
+                  <strong><?= number_format((float)$recipe['fiber_g_per_serving'], 1, ',', '.') ?> g</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem;">
                   <span>Sódio</span>
-                  <strong><?= round((float)$recipe['sodium_mg_per_serving'], 1) ?> mg</strong>
+                  <strong><?= number_format((float)$recipe['sodium_mg_per_serving'], 1, ',', '.') ?> mg</strong>
                 </div>
               </div>
 
@@ -421,9 +421,9 @@ class RecipeController
                 <div style="background: var(--semantic-error-light); border: 1px solid #FECACA; border-radius: var(--radius-input); padding: var(--space-3); margin-bottom: var(--space-4);">
                   <strong style="color: var(--semantic-error); font-size: 0.85rem; display: block; margin-bottom: 6px;">⚠️ Alergênicos & Restrições</strong>
                   <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                    <?php foreach ($recipe['allergens'] as $alg): ?>
+                    <?php $shownAllergens = []; foreach ($recipe['allergens'] as $alg): $key = \ClyoNutri\Core\I18n\LabelMap::allergen($alg['allergen_group']).':'.$alg['risk_level']; if (isset($shownAllergens[$key])) continue; $shownAllergens[$key] = true; ?>
                       <span style="background: #FEE2E2; color: var(--semantic-error); font-size: 0.75rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 600;">
-                        <?= htmlspecialchars($alg['allergen_group']) ?> (<?= htmlspecialchars($alg['risk_level']) ?>)
+                        <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::allergen($alg['allergen_group'])) ?> (<?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::allergenRisk($alg['risk_level'])) ?>)
                       </span>
                     <?php endforeach; ?>
                   </div>
@@ -432,10 +432,10 @@ class RecipeController
 
               <?php if (!empty($recipe['tags'])): ?>
                 <div>
-                  <span style="font-size: 0.75rem; color: var(--neutral-gray-500); font-weight: 700; text-transform: uppercase;">Tags:</span>
+                  <span style="font-size: 0.75rem; color: var(--neutral-gray-500); font-weight: 700; text-transform: uppercase;">Marcadores:</span>
                   <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">
                     <?php foreach ($recipe['tags'] as $tg): ?>
-                      <span style="font-size: 0.75rem; background: var(--neutral-gray-100); color: var(--neutral-gray-500); padding: 2px 8px; border-radius: var(--radius-input);">#<?= htmlspecialchars($tg['tag_name']) ?></span>
+                      <span style="font-size: 0.75rem; background: var(--neutral-gray-100); color: var(--neutral-gray-500); padding: 2px 8px; border-radius: var(--radius-input);">#<?= htmlspecialchars($tg) ?></span>
                     <?php endforeach; ?>
                   </div>
                 </div>
@@ -592,7 +592,7 @@ class RecipeController
             <!-- Tags e Visibilidade -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tags (separadas por vírgula)</label>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Marcadores (separados por vírgula)</label>
                 <input type="text" name="tags" placeholder="Ex: rico em proteínas, rápido, low carb, sem lactose" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>

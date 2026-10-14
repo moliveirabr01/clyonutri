@@ -561,32 +561,28 @@ class AppointmentService
             $items[] = [
                 'type' => 'no_show_follow_up',
                 'severity' => 'danger',
-                'title' => "Paciente faltoso (No-Show)",
+                'title' => "Não compareceu",
                 'description' => "{$row['patient_name']} não compareceu à consulta em " . date('d/m', strtotime($row['scheduled_at'])),
                 'action_url' => "/pacientes/{$row['patient_id']}",
                 'action_label' => "Remarcar consulta",
             ];
         }
 
-        // 3. Planos em rascunho pendentes de finalização
-        $stmtDraftPlans = $this->db->prepare("
-            SELECT mp.id, mp.patient_id, p.name AS patient_name, mp.created_at
-            FROM meal_plans mp
-            JOIN patients p ON p.id = mp.patient_id
-            WHERE mp.clinic_id = :clinic_id
-              AND mp.status = 'draft'
-            ORDER BY mp.created_at ASC
-            LIMIT 5
-        ");
-        $stmtDraftPlans->execute(['clinic_id' => $clinicId]);
-        while ($row = $stmtDraftPlans->fetch()) {
+        // 3. Prescrições em rascunho, agrupadas por paciente (mesma fonte do card do Dashboard)
+        $drafts = new \ClyoNutri\Domain\MealPlan\DraftPlanSummary($this->db);
+        foreach ($drafts->byPatient($clinicId) as $group) {
+            $n = $group['draft_count'];
             $items[] = [
                 'type' => 'draft_plan',
                 'severity' => 'info',
-                'title' => "Plano alimentar em rascunho",
-                'description' => "Paciente {$row['patient_name']} aguarda publicação da prescrição",
-                'action_url' => "/pacientes/{$row['patient_id']}",
-                'action_label' => "Revisar prescrição",
+                'title' => 'Prescrição em rascunho',
+                'description' => $n === 1
+                    ? "{$group['patient_name']}: 1 plano em rascunho aguarda publicação"
+                    : "{$group['patient_name']}: {$n} planos em rascunho aguardam revisão",
+                'patient_id' => $group['patient_id'],
+                'draft_count' => $n,
+                'action_url' => \ClyoNutri\Domain\MealPlan\DraftPlanSummary::reviewUrl($group),
+                'action_label' => $n === 1 ? 'Revisar plano' : 'Revisar planos',
             ];
         }
 

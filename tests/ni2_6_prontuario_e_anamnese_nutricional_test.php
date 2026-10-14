@@ -171,11 +171,13 @@ assert($emptyRejected === true, "Anamnese finalizada vazia deve ser rejeitada co
 
 // 2.4 Validação de limite e sanitização contra DoS
 $hugeText = str_repeat('A', 8000);
-$sanitizedRes = $anamnesisService->saveAnamnesis($patientId, $profAId, [
-    'objectives' => $hugeText,
-], true);
-$checkSanitized = $anamnesisService->getAnamnesisVersion($patientId, $sanitizedRes['version']);
-assert(mb_strlen($checkSanitized['objectives'], 'UTF-8') === AnamnesisService::MAX_FIELD_LENGTH, "Texto excessivo deve ser truncado com segurança em MAX_FIELD_LENGTH");
+$beforeOversized = count($anamnesisService->getAnamnesisHistory($patientId));
+$oversizedRejected = false;
+try { $anamnesisService->saveAnamnesis($patientId, $profAId, ['objectives'=>$hugeText], true); }
+catch (\InvalidArgumentException $e) { $oversizedRejected = true; }
+assert($oversizedRejected, 'Texto excessivo deve ser rejeitado sem truncamento');
+assert(count($anamnesisService->getAnamnesisHistory($patientId)) === $beforeOversized, 'Texto excessivo não deve criar versão');
+$anamnesisService->saveAnamnesis($patientId, $profAId, ['objectives'=>str_repeat('A', AnamnesisService::MAX_FIELD_LENGTH)], true);
 
 echo "  ✓ NI2-61 Aprovado: seções clínicas completas, salvamento parcial (rascunho), validação fail-closed e sanitização comprovadas.\n\n";
 

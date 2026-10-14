@@ -1,0 +1,37 @@
+- region "Resumo atualizado com seu consultório":
+  - generic: ✓ Resumo atualizado com seu consultório
+- generic: "Última atualização do resumo: 09/10/2026, 19:04:24"
+- heading "Minhas receitas" [level=1]
+- generic: "Última atualização: 09/10/2026, 19:05:11"
+- button "Atualizar receitas":
+  - generic: Atualizar
+- generic: Receita fictícia alterada depois da prescrição
+- generic: Café da manhã
+- generic: 1,5 porção(ões) • 216,38 kcal
+- generic: Receita de exemplo para explorar a biblioteca. Quantidades em gramas de parte comestível; ingredientes cozidos são pesados após o preparo. Nutrientes estimados pelo catálogo, rendimento aproximado. Alergênicos aguardam conferência profissional e dos rótulos.
+- generic: "Orientação do nutricionista: Após o treino"
+- button "Ver ingredientes e preparo":
+  - generic: Ver ingredientes e preparo
+- generic: Ingredientes • receita completa (4 porções)
+- generic: • 80 g de Aveia em flocos
+- generic: • 300 g de Leite desnatado
+- generic: • 160 g de Banana prata crua
+- generic: Modo de preparo
+- generic: Novo preparo fictício
+- heading "Plano Alimentar Completo" [level=1]
+- generic: "Plano sintético 1 (Status: published)"
+- generic: Almoço (12:00)
+- generic: • Arroz de teste (100 g)
+- tablist:
+  - tab "Aba Hoje":
+    - generic: Hoje
+  - tab "Aba Plano" [active]:
+    - generic: Plano
+  - tab "Aba Diario":
+    - generic: Diario
+  - tab "Aba Chat":
+    - generic: Chat
+  - tab "Aba Evolucao":
+    - generic: Evolucao
+  - tab "Aba Perfil":
+    - generic: Perfil

@@ -28,11 +28,12 @@ const login = (email='patient-a@example.test') => ApiService.login({ email, pass
   await new Promise(r => listener.close(r));
   const base = `http://127.0.0.1:${port}`;
   setApiBaseUrl(base);
-  server = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', 'public'], { cwd: root, env, stdio: ['ignore','pipe','pipe'] });
+  server = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', 'public', 'public/index.php'], { cwd: root, env, stdio: ['ignore','pipe','pipe'] });
   server.stdout.on('data', d => serverLog += d);
   server.stderr.on('data', d => serverLog += d);
-  let ready=false;
-  for (let i=0;i<60;i++) { try { ready=(await fetch(base+'/up')).ok; if(ready)break; } catch{} await new Promise(r=>setTimeout(r,50)); }
+  let ready=false, lastErr=null;
+  for (let i=0;i<60;i++) { try { const r=await fetch(base+'/up'); ready=r.ok; if(ready)break; else lastErr='HTTP '+r.status; } catch(e){ lastErr=e.message; } await new Promise(r=>setTimeout(r,50)); }
+  if (!ready) { console.error('Server log:', serverLog, 'Last error:', lastErr); }
   check('Production front controller reachable over real HTTP', ready);
   const rawLogin = async body => {
     const res = await fetch(base+'/api/v1/auth/patient-login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });

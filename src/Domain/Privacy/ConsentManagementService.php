@@ -157,6 +157,10 @@ class ConsentManagementService
 
         $now = date('Y-m-d H:i:s');
         $trimmedReason = trim($reason);
+        if ($trimmedReason === '' || mb_strlen($trimmedReason) > 1000) throw new InvalidArgumentException('Informe um motivo de até 1000 caracteres.');
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) $this->db->beginTransaction();
+        try {
 
         $stmt = $this->db->prepare("
             UPDATE patient_consents
@@ -175,11 +179,12 @@ class ConsentManagementService
 
         if ($affected > 0) {
             $aStmt = $this->db->prepare("
-                INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
-                VALUES (:clinic_id, 'CONSENT_REVOKED', 'patient_consents', :res_id, :details)
+                INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details)
+                VALUES (:clinic_id, :user_id, 'CONSENT_REVOKED', 'patient_consents', :res_id, :details)
             ");
             $aStmt->execute([
                 'clinic_id' => $clinicId,
+                'user_id' => (TenantContext::getUser()['role'] ?? '') === 'patient' ? null : TenantContext::getUserId(),
                 'res_id' => (string)$patientId,
                 'details' => json_encode([
                     'patient_id' => $patientId,
@@ -190,7 +195,12 @@ class ConsentManagementService
             ]);
         }
 
+        if ($ownsTx) $this->db->commit();
         return $affected > 0;
+        } catch (\Throwable $e) {
+            if ($ownsTx && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
     }
 
     /**

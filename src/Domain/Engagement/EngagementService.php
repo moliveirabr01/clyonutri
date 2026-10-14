@@ -71,11 +71,16 @@ class EngagementService
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         // Total de água registrada hoje
+        $today = date('Y-m-d');
         $hStmt = $this->db->prepare("
             SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs
-            WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND date(logged_at) = date('now')
+            WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND date(logged_at) = :today
         ");
-        $hStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
+        $hStmt->execute([
+            'patient_id' => $patientId,
+            'clinic_id' => $clinicId,
+            'today' => $today,
+        ]);
         $waterToday = (int)$hStmt->fetchColumn();
 
         // Média de adesão dos últimos check-ins

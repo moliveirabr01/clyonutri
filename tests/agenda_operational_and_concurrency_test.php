@@ -73,16 +73,16 @@ if (!$profId) {
 $patientRepo = new PatientRepository($db);
 $p1 = $patientRepo->create([
     'name' => 'Paciente Agenda 187 A',
-    'email' => 'agenda187a_' . time() . '@teste.com',
-    'phone' => '11988880001',
+    'email' => 'agenda187a_' . time() . '_' . mt_rand(100, 999) . '@teste.com',
+    'phone' => '119' . mt_rand(10000000, 99999999),
     'birth_date' => '1990-01-01',
     'gender' => 'female',
     'lgpd_consent' => 1,
 ]);
 $p2 = $patientRepo->create([
     'name' => 'Paciente Agenda 187 B',
-    'email' => 'agenda187b_' . time() . '@teste.com',
-    'phone' => '11988880002',
+    'email' => 'agenda187b_' . time() . '_' . mt_rand(100, 999) . '@teste.com',
+    'phone' => '119' . mt_rand(10000000, 99999999),
     'birth_date' => '1992-02-02',
     'gender' => 'male',
     'lgpd_consent' => 1,

@@ -32,3 +32,15 @@
 </div>
 </form>
 </div>
+
+<?php if (($_GET['success'] ?? '') === 'status'): ?><p role="status">Status atualizado com sucesso.</p><?php endif; ?>
+<?php if (in_array($patient['status'], ['active','inactive'], true)): ?>
+<div class="card" style="max-width:720px;margin-top:20px">
+<h2>Status do paciente: <?= $patient['status'] === 'active' ? 'Ativo' : 'Inativo' ?></h2>
+<p>A inativação preserva o histórico e encerra o acesso ao app e os convites pendentes.</p>
+<form method="post" action="/pacientes/<?= (int)$patient['id'] ?>/status">
+<input type="hidden" name="_csrf_token" value="<?= $escape(\ClyoNutri\Core\Security\Csrf::token()) ?>">
+<input type="hidden" name="status" value="<?= $patient['status'] === 'active' ? 'inactive' : 'active' ?>">
+<label><input type="checkbox" name="confirm_status" value="yes" required> Confirmo a alteração de status deste paciente.</label>
+<button class="btn btn-secondary" type="submit"><?= $patient['status'] === 'active' ? 'Inativar paciente' : 'Reativar paciente' ?></button>
+</form></div><?php endif; ?>

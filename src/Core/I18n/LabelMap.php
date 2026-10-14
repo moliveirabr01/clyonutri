@@ -275,4 +275,46 @@ class LabelMap
         $cleaned = preg_replace('/append-only/i', 'imutável e preservado', (string)$cleaned);
         return trim($cleaned);
     }
+    public static function allergen(?string $value): string
+    {
+        $key = mb_strtolower(trim($value ?? ''));
+        return match ($key) {
+            'gluten','glúten' => 'Glúten', 'oats','aveia' => 'Aveia',
+            'milk','leite','dairy' => 'Leite', 'lactose' => 'Lactose',
+            'nuts','tree nuts','castanhas' => 'Castanhas', 'brazil nuts','castanha-do-pará' => 'Castanha-do-Pará',
+            'egg','eggs','ovo','ovos' => 'Ovos', 'soy','soja' => 'Soja',
+            'peanut','peanuts','amendoim' => 'Amendoim', 'fish','peixe','peixes' => 'Peixes',
+            'shellfish','crustaceans','crustáceos' => 'Crustáceos', 'sesame','gergelim' => 'Gergelim',
+            'wheat','trigo' => 'Trigo', 'sulfites','sulfitos' => 'Sulfitos',
+            '' => 'Não informado', default => $value,
+        };
+    }
+
+    public static function allergenRisk(?string $value): string
+    {
+        return match ($value) {
+            'contains' => 'Contém', 'may_contain','traces','cross_contamination' => 'Pode conter',
+            'free','free_from','does_not_contain' => 'Não contém',
+            default => 'Avaliação pendente',
+        };
+    }
+
+    public static function recipeDifficulty(?string $value): string
+    {
+        return match (mb_strtolower(trim($value ?? ''))) {
+            'easy','fácil','facil' => 'Fácil', 'medium','moderate','média','medio','médio' => 'Média',
+            'hard','difficult','difícil','dificil' => 'Difícil', default => 'Não informada',
+        };
+    }
+
+    public static function teleconsultationStatus(?string $value): string
+    {
+        return match ($value) {
+            'waiting_room' => 'Na sala de espera', 'device_checked' => 'Dispositivo verificado',
+            'scheduled' => 'Agendada', 'in_progress','active','started' => 'Em atendimento',
+            'completed','ended' => 'Encerrada', 'cancelled','canceled' => 'Cancelada',
+            'expired' => 'Expirada', default => 'Em acompanhamento',
+        };
+    }
+
 }

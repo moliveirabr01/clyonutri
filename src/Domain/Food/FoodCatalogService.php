@@ -88,8 +88,10 @@ class FoodCatalogService
     private function registerMeasure(int $foodId, string $measure, float $grams): void
     {
         try {
+            // SQLite usa "INSERT OR IGNORE"; MySQL usa "INSERT IGNORE".
+            $insertIgnore = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql' ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
             $stmt = $this->db->prepare("
-                INSERT OR IGNORE INTO food_household_measures (food_id, measure_name, grams_equivalent)
+                {$insertIgnore} INTO food_household_measures (food_id, measure_name, grams_equivalent)
                 VALUES (:food_id, :measure, :grams)
             ");
             $stmt->execute(['food_id' => $foodId, 'measure' => $measure, 'grams' => $grams]);

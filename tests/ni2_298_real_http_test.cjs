@@ -56,11 +56,11 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  check('Database failure produces 503 and retry rather than false zero',failed.status===503 && failed.text.includes('Tentar novamente') && !failed.text.includes('appointments-today-count') && !failed.text.includes('no such table'));
  check('Agenda database failure differs from empty state',failedAgenda.status===503 && !failedAgenda.text.includes('Nenhuma consulta agendada') && !failedAgenda.text.includes('no such table'));
  fixture('restore');check('Recovery restores actual persisted agenda',(await req('/agenda?date='+prepared.date)).text.includes('7 agendamento(s)'));
- await req('/logout');await login('agenda2@example.test');const other=await req('/dashboard');
+ await webLogout(req);await login('agenda2@example.test');const other=await req('/dashboard');
  check('Other authenticated clinic sees only own indicator and patient',indicator(other.text)===1 && other.text.includes('NI298 other-tenant') && !other.text.includes('NI298 completed') && !other.text.includes('NI298 scheduled'));
- await req('/logout');await login('agenda3@example.test');const empty=await req('/dashboard');const emptyAgenda=await req('/agenda?date='+prepared.date);
+ await webLogout(req);await login('agenda3@example.test');const empty=await req('/dashboard');const emptyAgenda=await req('/agenda?date='+prepared.date);
  check('Real empty clinic yields zero and explicit empty state',indicator(empty.text)===0 && empty.text.includes('Nenhuma consulta agendada para hoje') && emptyAgenda.text.includes('Nenhuma consulta agendada para este dia'));
- await req('/logout');check('Logout removes access to protected views',(await req('/dashboard')).location==='/login');
+ await webLogout(req);check('Logout removes access to protected views',(await req('/dashboard')).location==='/login');
  console.log(checks.length+'/'+checks.length+' checks passed');
  writeFileSync(join(root,'docs/validation/NI2-298/evidence/http-context.json'),JSON.stringify(prepared,null,2));
 })().catch(e=>{checks.push({name:e.message,status:'FAIL'});console.error(e);process.exitCode=1;}).finally(()=>{
@@ -69,3 +69,6 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  writeFileSync(join(root,'docs/validation/NI2-298/evidence/http-server.log'),log);
  rmSync(dir,{recursive:true,force:true});
 });
+
+// Logout web exige POST + CSRF: lê o token do formulário de confirmação (GET /logout → 405) e envia o POST.
+async function webLogout(req){const page=await req('/logout');const m=(page.text||'').match(/name="_csrf_token" value="([^"]+)"/);if(m)await req('/logout',{method:'POST',body:new URLSearchParams({_csrf_token:m[1]})});}

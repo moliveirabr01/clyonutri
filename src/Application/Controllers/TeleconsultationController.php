@@ -136,7 +136,7 @@ class TeleconsultationController
                     <div>
                         <span class="text-slate-400">Status:</span> 
                         <span id="session-status-badge" class="px-2 py-0.5 rounded text-xs font-semibold <?= $session['status'] === 'waiting_room' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white' ?>">
-                            <?= htmlspecialchars(strtoupper($session['status'])) ?>
+                            <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($session['status'])) ?>
                         </span>
                     </div>
                     <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/encerrar" onsubmit="return confirm('Deseja realmente encerrar a teleconsulta?');">
@@ -158,7 +158,7 @@ class TeleconsultationController
                             <div>
                                 <h3 class="font-bold text-sm">Controle de Admissão de Participantes</h3>
                                 <p class="text-xs mt-1" id="waiting-room-message">
-                                    <?= $session['status'] === 'waiting_room' ? 'Paciente está aguardando na sala de espera!' : 'Status atual da sessão: ' . htmlspecialchars($session['status']) ?>
+                                    <?= $session['status'] === 'waiting_room' ? 'Paciente está aguardando na sala de espera!' : 'Status atual da sessão: ' . htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($session['status'])) ?>
                                 </p>
                             </div>
                             <?php if ($session['status'] === 'waiting_room' || $session['status'] === 'device_checked' || $session['status'] === 'scheduled'): ?>

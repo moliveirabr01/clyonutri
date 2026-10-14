@@ -33,25 +33,25 @@ class HelpdeskController
 
     private function getAuthInfo(): array
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        $auth = \ClyoNutri\Core\Auth\AuthContext::resolveFromSession($this->db);
+        if (!$auth) {
+            return [
+                'userId' => 0,
+                'clinicId' => 0,
+                'userRole' => '',
+                'userName' => 'Desconhecido',
+                'clinicName' => 'Desconhecido',
+                'isSupport' => false,
+            ];
         }
 
-        $userId = (int)($_SESSION['user_id'] ?? 0);
-        $clinicId = (int)($_SESSION['clinic_id'] ?? 0);
-        $userRole = (string)($_SESSION['user_role'] ?? 'nutritionist');
-        $userName = (string)($_SESSION['user_name'] ?? 'Usuário');
-        $clinicName = (string)($_SESSION['clinic_name'] ?? 'Clínica Principal');
-
-        $isSupport = in_array($userRole, ['admin', 'operator', 'support_agent'], true);
-
         return [
-            'userId' => $userId,
-            'clinicId' => $clinicId,
-            'userRole' => $userRole,
-            'userName' => $userName,
-            'clinicName' => $clinicName,
-            'isSupport' => $isSupport,
+            'userId' => $auth->getUserId(),
+            'clinicId' => $auth->getClinicId(),
+            'userRole' => $auth->getUserRole(),
+            'userName' => $auth->getName(),
+            'clinicName' => $auth->getClinicName(),
+            'isSupport' => $auth->isSupport(),
         ];
     }
 

@@ -11,7 +11,7 @@ final class FormRecovery
         $values=[];
         foreach($input as $name=>$value) {
             if(str_starts_with((string)$name,'_')||in_array($name,['save_mode','version','view_version','revision_from','patient_id'],true))continue;
-            if(is_string($value)&&strlen($value)<=12000)$values[$name]=$value;
+            if(is_string($value)&&strlen($value)<=200000)$values[$name]=$value;
             elseif(is_array($value)&&count($value)<=100&&count(array_filter($value,'is_string'))===count($value))$values[$name]=array_map(static fn($v)=>substr($v,0,1000),$value);
         }
         $_SESSION['clinical_form_recovery'][self::key($patientId,$kind)]=['expires'=>time()+3600,'values'=>$values];

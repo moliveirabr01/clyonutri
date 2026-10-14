@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, ScrollView, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import BrandLogo from './src/components/BrandLogo';
 import PatientOnboardingScreen from './src/screens/PatientOnboardingScreen';
 import PatientHomeScreen from './src/screens/PatientHomeScreen';
@@ -18,6 +18,11 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const [restoring, setRestoring] = useState(Platform.OS === 'web');
+  const [recovery, setRecovery] = useState(false);
+  const [supportEmail, setSupportEmail] = useState<string | null>(null);
+  const [helpError, setHelpError] = useState<string | null>(null);
+
   useEffect(() => {
     if (Platform.OS !== 'web' && !process.env.EXPO_PUBLIC_API_URL) {
       const host = Constants.expoConfig?.hostUri?.split(':')[0];
@@ -29,7 +34,16 @@ export default function App() {
       setPassword('');
       setMessage('Sua sessão expirou ou o acesso foi revogado. Entre novamente.');
     });
-    return () => setSessionExpiredHandler(null);
+    let active = true;
+    if (Platform.OS === 'web') {
+      ApiService.restoreWebSession().then(auth => {
+        if (!active) return;
+        if ('patient' in auth) setSession(auth); else setProfSession(auth);
+      }).catch(error => {
+        if (active && error?.kind !== 'auth') setMessage('Não foi possível verificar sua sessão. Entre novamente ou atualize quando a conexão voltar.');
+      }).finally(() => { if (active) setRestoring(false); });
+    }
+    return () => { active = false; setSessionExpiredHandler(null); };
   }, []);
 
   async function login() {
@@ -56,6 +70,8 @@ export default function App() {
       setBusy(false);
     }
   }
+
+  if (restoring) return <SafeAreaView style={styles.page}><ActivityIndicator accessibilityLabel="Verificando sua sessão" color={t.navy} /><Text style={styles.description}>Verificando sua sessão...</Text></SafeAreaView>;
 
   if (session) {
     return (
@@ -111,6 +127,7 @@ export default function App() {
               setMessage(null);
             }}
             accessibilityRole="tab"
+            aria-selected={role === 'patient'}
             accessibilityState={{ selected: role === 'patient' }}
             accessibilityLabel="Entrar como Paciente"
           >
@@ -125,6 +142,7 @@ export default function App() {
               setMessage(null);
             }}
             accessibilityRole="tab"
+            aria-selected={role === 'professional'}
             accessibilityState={{ selected: role === 'professional' }}
             accessibilityLabel="Entrar como Nutricionista"
           >
@@ -181,6 +199,19 @@ export default function App() {
         </TouchableOpacity>
 
         {role === 'patient' && <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }} onPress={() => { setPassword(''); setMessage(null); setOnboarding(true); }}><Text style={{ color: t.navy, fontWeight: '600' }}>Primeiro acesso · Tenho um convite</Text></TouchableOpacity>}
+        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center' }} onPress={async () => {
+          setRecovery(true); setHelpError(null);
+          try { setSupportEmail((await ApiService.getAccessHelp()).support_email); }
+          catch { setHelpError('Não foi possível carregar o canal de suporte. Tente abrir a ajuda novamente.'); }
+        }}><Text style={{ color: t.navy, fontWeight: '600' }}>Esqueci minha senha · Ajuda para acessar</Text></TouchableOpacity>
+        {recovery && <View>
+          <Text style={styles.label}>Recuperação de acesso</Text>
+          <Text style={styles.description}>{role === 'patient' ? 'Peça ao seu consultório a recuperação do acesso pelo mesmo canal em que recebeu o convite. Não envie sua senha nem dados clínicos.' : 'Solicite ao suporte a recuperação do acesso. Não envie sua senha nem dados clínicos.'}</Text>
+          {helpError && <Text accessibilityRole="alert" style={styles.message}>{helpError}</Text>}
+          {supportEmail ? <TouchableOpacity accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => Linking.openURL(`mailto:${supportEmail}?subject=${encodeURIComponent('Recuperação de acesso ClyoNutri')}`)}><Text style={{ color: t.navy }}>Contatar suporte: {supportEmail}</Text></TouchableOpacity> : <Text style={styles.description}>O canal de suporte ainda não foi configurado pelo administrador. Nenhum e-mail de redefinição foi enviado.</Text>}
+          <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setRecovery(false)}><Text style={{ color: t.navy }}>Voltar ao acesso</Text></TouchableOpacity>
+        </View>}
+        <Text style={styles.footerNote}>{Platform.OS === 'web' ? 'Neste navegador, sua sessão protegida pode ser retomada até expirar. Em dispositivo compartilhado, use Encerrar sessão ao terminar.' : 'Por segurança, a sessão fica ativa enquanto o aplicativo está aberto. Após encerrá-lo, entre novamente.'}</Text>
         <Text style={styles.footerNote}>
           {role === 'patient'
             ? 'Ainda não recebeu um convite ou esqueceu a senha? Contate seu nutricionista.'

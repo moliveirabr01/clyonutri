@@ -22,7 +22,7 @@ final class PatientOnboardingService
                 AND m.role IN ('owner','admin','nutritionist')
                 AND COALESCE(p.password_hash,'')='' AND COALESCE(p.access_pin,'')=''");
             $stmt->execute([$userId, $patientId, $clinicId]);
-            if (!$stmt->fetch()) throw new DomainException('Convite indisponível. Verifique o cadastro e se o paciente já possui acesso ao app.');
+            if (!$stmt->fetch()) throw new \ClyoNutri\Core\Security\TenantSecurityException('Convite indisponível. Verifique o cadastro e se o paciente já possui acesso ao app.');
             $now = gmdate('Y-m-d H:i:s');
             $this->db->prepare('UPDATE patient_app_invitations SET revoked_at=? WHERE patient_id=? AND clinic_id=? AND accepted_at IS NULL AND revoked_at IS NULL')->execute([$now,$patientId,$clinicId]);
             $token = bin2hex(random_bytes(32));
@@ -80,7 +80,7 @@ final class PatientOnboardingService
             $update->execute([$name,$email,$phone,password_hash($password,PASSWORD_DEFAULT),$now,$row['id'],$row['clinic_id']]);
             if ($update->rowCount()!==1) throw new DomainException('Este paciente já possui acesso ao app.');
             $token=bin2hex(random_bytes(32)); $expires=gmdate('Y-m-d H:i:s',time()+30*86400);
-            $this->db->prepare("INSERT INTO personal_access_tokens(tokenable_type,tokenable_id,name,token,expires_at) VALUES('patient',?,'mobile_app',?,?)")->execute([$row['id'],hash('sha256',$token),$expires]);
+            $this->db->prepare("INSERT INTO personal_access_tokens(tokenable_type,tokenable_id,clinic_id,name,token,expires_at) VALUES('patient',?,?,'mobile_app',?,?)")->execute([$row['id'],$row['clinic_id'],hash('sha256',$token),$expires]);
             $this->db->commit();
             return ['token'=>$token,'expires_at'=>$expires,'patient'=>['id'=>(int)$row['id'],'clinic_id'=>(int)$row['clinic_id'],'name'=>$name,'email'=>$email]];
         } catch (\Throwable $e) { if ($this->db->inTransaction()) $this->db->rollBack(); throw $e; }

@@ -14,11 +14,16 @@ final class ApiErrorBoundary
         header('Cache-Control: no-store');
         $failed = false;
         $fail = static function (\Throwable $e) use ($requestId, &$failed): void {
+            if ($e instanceof \ClyoNutri\Core\Security\TenantSecurityException) {
+                http_response_code($e->getHttpStatusCode());
+                echo json_encode(['error'=>'Acesso não autorizado.']);
+                return;
+            }
             $failed = true;
             http_response_code(500);
             // Do not log credentials, request bodies or clinical data.
             error_log(json_encode(['request_id' => $requestId, 'exception' => get_class($e),
-                'file' => basename($e->getFile()), 'line' => $e->getLine()]));
+                'file' => basename($e->getFile()), 'line' => $e->getLine(), 'message' => $e->getMessage()]));
         };
         ob_start(static function (string $body) use ($requestId, &$failed): string {
             $status = http_response_code();

@@ -22,9 +22,15 @@ class AuthController
 
     public function showLogin(): void
     {
-        // Se já autenticado, redireciona para o dashboard
+        // Se já autenticado, redireciona conforme papel canônico
         if (!empty($_SESSION['user_id'])) {
-            header('Location: /dashboard');
+            $role = (string)($_SESSION['user_role'] ?? '');
+            $destination = match ($role) {
+                'operator', 'support_agent' => '/suporte/fila',
+                'receptionist' => '/agenda',
+                default => '/dashboard',
+            };
+            header('Location: ' . $destination);
             exit;
         }
 
@@ -58,21 +64,60 @@ class AuthController
             exit;
         }
 
-        // Sessão segura inicializada
+        // Sessão segura inicializada e regenerada (prevenção de session fixation)
         session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['auth_version'] = (int)$user['auth_version'];
         $_SESSION['clinic_id'] = $user['clinic_id'];
         $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_role'] = $user['role'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['clinic_name'] = $user['clinic_name'] ?? 'Minha Clínica';
 
-        header('Location: /dashboard');
+        $destination = match ($user['role']) {
+            'superadmin', 'admin_operacional', 'finance_admin', 'security_auditor' => '/admin',
+            'operator', 'support_agent' => '/suporte/fila',
+            'receptionist' => '/agenda',
+            default => '/dashboard',
+        };
+
+        header('Location: ' . $destination);
         exit;
+    }
+
+    /**
+     * GET /logout não altera estado (evita logout forçado por <img>/link de terceiros).
+     * Responde 405 com Allow: POST e oferece um formulário de confirmação com CSRF.
+     */
+    public function logoutConfirm(): void
+    {
+        if (empty($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+
+        http_response_code(405);
+        header('Allow: POST');
+        header('Content-Type: text/html; charset=utf-8');
+        $token = htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES, 'UTF-8');
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            . '<title>Sair — ClyoNutri</title><link rel="stylesheet" href="/assets/css/clinical-botanical.css"></head>'
+            . '<body><main class="logout-confirm" data-testid="logout-confirm"><h1 class="logout-confirm__title">Encerrar sessão?</h1>'
+            . '<p class="logout-confirm__text">Por segurança, a saída do sistema precisa ser confirmada.</p>'
+            . '<form method="POST" action="/logout"><input type="hidden" name="_csrf_token" value="' . $token . '">'
+            . '<button type="submit" class="btn btn-primary">Sair agora</button> '
+            . '<a href="/dashboard" class="btn btn-outline">Cancelar</a></form></main></body></html>';
     }
 
     public function logout(): void
     {
+        // A rota só é registrada como POST e o Router valida o token CSRF antes de chegar aqui.
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            $this->logoutConfirm();
+            return;
+        }
+
+        \ClyoNutri\Core\Auth\AuthContext::clear();
         TenantContext::clear();
         $_SESSION = [];
         if (ini_get("session.use_cookies")) {

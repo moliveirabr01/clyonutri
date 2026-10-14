@@ -14,7 +14,7 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  const token=html=>html.match(/name="_csrf_token" value="([^"]+)"/)[1];
  const revision=html=>html.match(/name="revision" value="([^"]+)"/)[1];
  const post=(path,data)=>req(path,{method:'POST',body:new URLSearchParams(data)});
- async function login(n){await req('/logout');const p=await req('/login');loginCsrf=token(p.text);return post('/login',{_csrf_token:token(p.text),email:`plan${n}@example.test`,password:'PlanTeste@2026'});}
+ async function login(n){await webLogout(req);const p=await req('/login');loginCsrf=token(p.text);return post('/login',{_csrf_token:token(p.text),email:`plan${n}@example.test`,password:'PlanTeste@2026'});}
  check('Unauthenticated route denied',(await post('/planos/1/itens/1/editar',{})).status===403);
  check('Real professional login',(await login(1)).status===302);
  const empty=await req('/planos/3');check('Empty draft is explicit and has no item editor',empty.status===200&&empty.text.includes('Nenhuma refeição')&&!empty.text.includes('data-testid="edit-plan-item'));
@@ -48,3 +48,6 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  await ui.setViewportSize({width:390,height:844});await ui.locator('[data-testid^=edit-plan-item] summary').click();await ui.screenshot({path:join(out,'editor-390.png'),fullPage:true});check('Mobile edit form fits viewport',await editor.evaluate(el=>el.getBoundingClientRect().right<=window.innerWidth));
  writeFileSync(join(out,'persistence.json'),JSON.stringify({before,after:inspect(),published},null,2));
 })().catch(e=>{checks.push({name:e.message,status:'FAIL'});console.error(e);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();if(server)server.kill();writeFileSync(join(out,'http-results.json'),JSON.stringify({finding:'PX-17',issue:'NI2-310',transport:'real HTTP and browser against production public/index.php, isolated persisted SQLite',checks},null,2));writeFileSync(join(out,'http-server.log'),log);rmSync(dir,{recursive:true,force:true});});
+
+// Logout web exige POST + CSRF: lê o token do formulário de confirmação (GET /logout → 405) e envia o POST.
+async function webLogout(req){const page=await req('/logout');const m=(page.text||'').match(/name="_csrf_token" value="([^"]+)"/);if(m)await req('/logout',{method:'POST',body:new URLSearchParams({_csrf_token:m[1]})});}

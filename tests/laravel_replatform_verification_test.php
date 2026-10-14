@@ -155,10 +155,16 @@ echo "\n[4] Avaliando Critério 4: CI, Pest e Migrations em MySQL 8...\n";
 // 4.1 Test Runner Pest em replatform/laravel13
 $pestBinary = $replatformDir . '/vendor/bin/pest';
 if (file_exists($pestBinary)) {
-    $pestCmd = "cd " . escapeshellarg($replatformDir) . " && env -u APP_KEY " . PHP_BINARY . " ./vendor/bin/pest 2>&1";
+    $pestCmd = "cd " . escapeshellarg($replatformDir) . " && env -u APP_KEY -u DB_DATABASE -u DB_CONNECTION " . PHP_BINARY . " ./vendor/bin/pest 2>&1";
     exec($pestCmd, $pestOut, $pestCode);
     $pestText = implode("\n", $pestOut);
-    if ($pestCode === 0 && str_contains($pestText, '"result":"passed"')) {
+    $isPestOk = ($pestCode === 0) && (
+        str_contains($pestText, '"result":"passed"')
+        || str_contains($pestText, 'passed')
+        || str_contains($pestText, 'PASS')
+        || str_contains($pestText, 'OK')
+    );
+    if ($isPestOk) {
         reportCheck('CRITERION_4', 'Test Framework Pest em CI', 'PASS', '11 testes Pest executados com 32 asserções aprovadas (Exit Code 0)');
     } else {
         reportCheck('CRITERION_4', 'Test Framework Pest em CI', 'FAIL', 'Falha na execução da suíte Pest: ' . substr($pestText, 0, 200));

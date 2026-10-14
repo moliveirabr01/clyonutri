@@ -18,12 +18,19 @@ use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Engagement\EngagementService;
 use ClyoNutri\Domain\Finance\FinanceService;
 use ClyoNutri\Domain\Food\FoodCatalogService;
+use ClyoNutri\Domain\MealPlan\DraftPlanSummary;
 use ClyoNutri\Domain\MealPlan\MealPlanService;
 use ClyoNutri\Domain\Onboarding\OnboardingService;
 use ClyoNutri\Domain\Patient\PatientRepository;
 
 class DashboardController
 {
+    /** Quantidade máxima de itens exibidos na lista "Pacientes & Prioridades" do Dashboard. */
+    private const DASHBOARD_ATTENTION_LIMIT = 5;
+
+    /** Total de passos do onboarding (OnboardingService: progress_pct = passos concluídos × 20). */
+    private const ONBOARDING_TOTAL_STEPS = 5;
+
     public function savePatient(): void
     {
         $token = $_POST['_csrf_token'] ?? '';
@@ -48,7 +55,7 @@ class DashboardController
         }
         if (!empty($_POST['gender']) && !in_array($_POST['gender'], ['Feminino','Masculino','Outro','female','male','other'], true)) throw new \InvalidArgumentException('Selecione um gênero válido.');
         $repo = new PatientRepository();
-        $repo->create([
+        $createdPatient = $repo->create([
             'name' => $name,
             'email' => !empty($_POST['email']) ? trim((string)$_POST['email']) : null,
             'phone' => !empty($_POST['phone']) ? trim((string)$_POST['phone']) : null,
@@ -59,9 +66,11 @@ class DashboardController
             'consent_term_id' => $_POST['consent_term_id'] ?? null,
         ]);
 
+        $_SESSION['patient_created_id'] = (int)$createdPatient['id'];
         $_SESSION['patient_submissions'][$submission] = 'completed';
         unset($_SESSION['patient_form']);
         } catch (\InvalidArgumentException $e) {
+            if ($e instanceof \ClyoNutri\Domain\Patient\DuplicatePatientException) $_SESSION['patient_duplicate_id'] = $e->patientId;
             $_SESSION['patient_error'] = $e->getMessage();
             header('Location: /pacientes?error=cadastro');
             return;
@@ -95,6 +104,7 @@ class DashboardController
                 $data[$field] = is_string($_POST[$field] ?? null) ? trim($_POST[$field]) : '';
                 if ($field !== 'name' && $data[$field] === '') $data[$field] = null;
             }
+            if (mb_strlen($data['name']) > 150) $errors[] = 'O nome deve ter até 150 caracteres.';
             if ($data['name'] === '') $errors[] = 'Informe o nome completo.';
             if ($data['email'] !== null && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Informe um e-mail válido.';
             if ($data['birth_date'] !== null) {
@@ -103,9 +113,15 @@ class DashboardController
             }
             if ($data['gender'] !== null && !in_array($data['gender'], ['Feminino', 'Masculino', 'Outro', 'female', 'male', 'other'], true)) $errors[] = 'Selecione um gênero válido.';
             if (!$errors) {
-                (new PatientRepository())->update((int)$patient['id'], $data);
-                header('Location: /pacientes?success=atualizado');
-                return;
+                try {
+                    (new PatientRepository())->update((int)$patient['id'], $data);
+                    header('Location: /pacientes?success=atualizado');
+                    return;
+                } catch (\InvalidArgumentException $e) {
+                    $errors[] = $e->getMessage();
+                } catch (\Throwable $e) {
+                    $errors[] = 'Não foi possível salvar. Seus dados foram mantidos. Tente novamente.';
+                }
             }
             http_response_code(422);
             $patient = array_replace($patient, $data);
@@ -120,6 +136,65 @@ class DashboardController
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
+    public function patientStatus(array $params): void
+    {
+        if (!$this->canEditPlanItems(Connection::getInstance()) || !Csrf::validate($_POST['_csrf_token'] ?? '')) { http_response_code(403); echo 'Ação não autorizada.'; return; }
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        if (!$repo->findById($id)) { http_response_code(404); echo 'Paciente não encontrado.'; return; }
+        try {
+            if (($_POST['confirm_status'] ?? '') !== 'yes') throw new \InvalidArgumentException('Confirme a alteração de status.');
+            $repo->setStatus($id, is_string($_POST['status'] ?? null) ? $_POST['status'] : '');
+            header('Location: /pacientes/'.$id.'/editar?success=status');
+        } catch (\InvalidArgumentException $e) { http_response_code(422); echo htmlspecialchars($e->getMessage()); }
+        catch (\Throwable $e) { http_response_code(500); echo 'Não foi possível alterar o status. Tente novamente.'; }
+    }
+
+    public function patientConsent(array $params): void
+    {
+        if (!$this->canEditPlanItems(Connection::getInstance()) || !Csrf::validate($_POST['_csrf_token'] ?? '')) { http_response_code(403); echo 'Ação não autorizada.'; return; }
+        $id = (int)($params['id'] ?? 0);
+        if (!(new PatientRepository())->findById($id)) { http_response_code(404); echo 'Paciente não encontrado.'; return; }
+        try {
+            $service = new \ClyoNutri\Domain\Privacy\ConsentManagementService();
+            $purpose = is_string($_POST['purpose'] ?? null) ? trim($_POST['purpose']) : '';
+            $reason = is_string($_POST['reason'] ?? null) ? trim($_POST['reason']) : '';
+            if ($purpose === '' || $reason === '' || mb_strlen($reason) > 1000 || ($_POST['confirm_revoke'] ?? '') !== 'yes') throw new \InvalidArgumentException('Informe a finalidade, o motivo e confirme a retirada.');
+            $service->revokeConsent($id, $purpose, $reason);
+            header('Location: /pacientes/'.$id.'?success=consentimento');
+        } catch (\InvalidArgumentException $e) { http_response_code(422); echo htmlspecialchars($e->getMessage()); }
+        catch (\Throwable $e) { http_response_code(500); echo 'Não foi possível retirar o consentimento. Tente novamente.'; }
+    }
+
+    public function patientPrivacyRequest(array $params): void
+    {
+        if (!$this->canEditPlanItems(Connection::getInstance()) || !Csrf::validate($_POST['_csrf_token'] ?? '')) { http_response_code(403); echo 'Ação não autorizada.'; return; }
+        $id = (int)($params['id'] ?? 0);
+        if (!(new PatientRepository())->findById($id)) { http_response_code(404); echo 'Paciente não encontrado.'; return; }
+        $type = $_POST['request_type'] ?? '';
+        if (!in_array($type, ['export','deletion'], true) || ($_POST['confirm_request'] ?? '') !== 'yes') { http_response_code(422); echo 'Selecione e confirme a solicitação.'; return; }
+        // Requests require professional review; never erase records directly from this form.
+        $service = new \ClyoNutri\Domain\Privacy\DataSubjectRequestService();
+        $db = Connection::getInstance();
+        $db->beginTransaction();
+        try {
+            $request = $service->openRequest($id, $type, 'Solicitação registrada pelo profissional na gestão de pacientes.');
+            $export = $type === 'export' ? $service->processExport($request['id'], TenantContext::getUserId()) : null;
+            $json = $export ? json_encode($export['export_package'], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : null;
+            $db->commit();
+            if ($json !== null) {
+                header('Content-Type: application/json; charset=utf-8');
+                header('Content-Disposition: attachment; filename="dados-paciente-'.$id.'.json"');
+                header('Cache-Control: no-store');
+                echo $json; return;
+            }
+            header('Location: /pacientes/'.$id.'?success=privacidade');
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            http_response_code(500); echo 'Não foi possível registrar a solicitação. Tente novamente.';
+        }
+    }
+
     public function profile360(array $params): void
     {
         $id = (int)($params['id'] ?? 0);
@@ -132,6 +207,7 @@ class DashboardController
         }
 
         $p = $profile['patient'];
+        $consents = (new \ClyoNutri\Domain\Privacy\ConsentManagementService())->getConsentAuditTrail($id);
         $title = 'Perfil 360 — ' . $p['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
@@ -218,7 +294,7 @@ class DashboardController
                 <div>
                   <h3 style="margin: 0; display: inline-block;">Prontuário Longitudinal</h3>
                   <?php if ($integrity['is_valid'] && (int)$integrity['total_records'] > 0): ?>
-                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ Integridade dos registros verificada</span>
+                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ <?= !empty($integrity['legacy_records']) ? 'Conteúdo e encadeamento verificados' : 'Integridade dos registros verificada' ?></span>
                   <?php elseif (!$integrity['is_valid']): ?>
                     <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 0.75rem; margin-left: 8px;">⚠️ Os registros precisam de verificação</span>
                   <?php endif; ?>
@@ -445,6 +521,8 @@ class DashboardController
             </div>
           </div>
         </div>
+
+        <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
@@ -1170,7 +1248,7 @@ class DashboardController
         </div>
 
         <!-- Barra de Integridade e Autenticidade Clínica -->
-        <?php if ((int)$integrity['total_records'] > 0 || !$integrity['is_valid']): ?>
+        <?php if ((int)($integrity['total_records'] ?? 0) > 0 || !$integrity['is_valid']): ?>
         <div style="background: <?= $integrity['is_valid'] ? '#F0FDF4' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#BBF7D0' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div style="display: flex; align-items: center; gap: 12px;">
             <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#22C55E' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
@@ -1181,7 +1259,8 @@ class DashboardController
                 <?= $integrity['is_valid'] ? 'Histórico Clínico Autêntico e Protegido Contra Adulteração' : 'Atenção: Integridade dos registros precisa de verificação' ?>
               </strong>
               <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
-                <?= (int)$integrity['total_records'] ?> versões registradas. As versões anteriores são preservadas.
+                Conteúdo e encadeamento dos registros verificados. <?= (int)($integrity['total_records'] ?? 0) ?> versões registradas. As versões anteriores são preservadas.
+                <?php if (!empty($integrity['legacy_records'])): ?>Título e justificativa de <?= (int)$integrity['legacy_records'] ?> registro(s) antigo(s) não fazem parte desta verificação.<?php endif; ?>
               </div>
               <?php if ($canSeeAudit && !empty($integrity['latest_hash'])): ?>
                 <details style="font-size: 0.75rem; color: #64748B; margin-top: 6px;">
@@ -2127,7 +2206,7 @@ class DashboardController
           <div style="display: flex; gap: 8px; align-items: center;">
             <span class="badge badge-warning" style="font-size: 0.875rem; padding: 6px 12px;">
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
-              <?= htmlspecialchars($app['status']) ?>
+              <?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?>
             </span>
             <a href="/teleconsulta/sessao-agenda/<?= $app['id'] ?>" class="btn btn-primary" style="background-color: #059669; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
               <span>📹 Consultório Online</span>
@@ -2640,10 +2719,22 @@ class DashboardController
             LEFT JOIN professionals pr ON pr.id = mp.professional_id
             LEFT JOIN users u ON u.id = pr.user_id
             WHERE mp.clinic_id = :clinic_id
+              AND (:status_filter = '' OR mp.status = :status_filter_eq)
+              AND (:patient_filter = 0 OR (mp.patient_id = :patient_filter_eq AND p.clinic_id = mp.clinic_id))
             ORDER BY mp.id DESC
         ");
-        $stmt->execute(['clinic_id' => $clinicId]);
+        // Filtros opcionais (lista branca + inteiro) usados pelo link "Ver todos" do Dashboard.
+        $planStatusFilter = is_string($_GET['status'] ?? null) && in_array($_GET['status'], ['draft', 'published', 'archived'], true) ? $_GET['status'] : '';
+        $planPatientFilter = max(0, (int)filter_var($_GET['paciente'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['default' => 0]]));
+        // Tipos explícitos: no SQLite, um inteiro ligado como texto ('0') não é igual ao literal 0.
+        $stmt->bindValue(':clinic_id', $clinicId, \PDO::PARAM_INT);
+        $stmt->bindValue(':status_filter', $planStatusFilter, \PDO::PARAM_STR);
+        $stmt->bindValue(':status_filter_eq', $planStatusFilter, \PDO::PARAM_STR);
+        $stmt->bindValue(':patient_filter', $planPatientFilter, \PDO::PARAM_INT);
+        $stmt->bindValue(':patient_filter_eq', $planPatientFilter, \PDO::PARAM_INT);
+        $stmt->execute();
         $plans = $stmt->fetchAll();
+        $planFilterLabels = ['draft' => 'Rascunhos', 'published' => 'Publicados', 'archived' => 'Arquivados'];
 
         $patStmt = $db->prepare("SELECT id, name FROM patients WHERE clinic_id = :clinic_id AND status = 'active' ORDER BY name ASC");
         $patStmt->execute(['clinic_id' => $clinicId]);
@@ -2683,6 +2774,15 @@ class DashboardController
           </div>
         <?php endif; ?>
 
+        <nav class="plan-filters" aria-label="Filtrar planos por status" data-testid="plan-status-filter">
+          <?php foreach (['' => 'Todos'] + $planFilterLabels as $fKey => $fLabel): ?>
+            <a href="/planos<?= $fKey !== '' ? '?status=' . $fKey : '' ?>" class="plan-filters__item<?= $planStatusFilter === $fKey && $planPatientFilter === 0 ? ' is-active' : '' ?>"<?= $planStatusFilter === $fKey && $planPatientFilter === 0 ? ' aria-current="page"' : '' ?>><?= htmlspecialchars($fLabel) ?></a>
+          <?php endforeach; ?>
+          <?php if ($planPatientFilter > 0): ?>
+            <span class="plan-filters__note">Filtrado por paciente<?= !empty($plans) ? ': ' . htmlspecialchars($plans[0]['patient_name']) : '' ?> · <a href="/planos<?= $planStatusFilter !== '' ? '?status=' . $planStatusFilter : '' ?>">limpar filtro de paciente</a></span>
+          <?php endif; ?>
+        </nav>
+
         <div class="card">
           <div class="table-responsive">
             <table class="table" style="width: 100%; border-collapse: collapse;">
@@ -2699,7 +2799,7 @@ class DashboardController
               </thead>
               <tbody>
                 <?php if (empty($plans)): ?>
-                  <tr><td colspan="7" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum plano alimentar cadastrado ainda.</td></tr>
+                  <tr><td colspan="7" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);"><?= ($planStatusFilter !== '' || $planPatientFilter > 0) ? 'Nenhum plano encontrado para este filtro.' : 'Nenhum plano alimentar cadastrado ainda.' ?></td></tr>
                 <?php else: ?>
                   <?php foreach ($plans as $pl): ?>
                     <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
@@ -2924,7 +3024,7 @@ class DashboardController
             <strong style="display: block; margin-bottom: 6px;">⚠️ Atenção Clínica: Conflitos Alergênicos Detectados com a Anamnese!</strong>
             <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
               <?php foreach ($preview['allergen_safety']['conflicts'] as $conf): ?>
-                <li>Alimento <strong><?= htmlspecialchars($conf['food_name']) ?></strong> possui grupo alergênico registrado: <em><?= htmlspecialchars($conf['allergen_group']) ?></em>.</li>
+                <li>Alimento <strong><?= htmlspecialchars($conf['food_name']) ?></strong> possui grupo alergênico registrado: <em><?= htmlspecialchars(LabelMap::allergen($conf['allergen_group'])) ?></em>.</li>
               <?php endforeach; ?>
             </ul>
           </div>
@@ -3131,20 +3231,19 @@ class DashboardController
         </div>
 
         <!-- Modal Adicionar Alimento -->
-        <div id="modal-add-item" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar Alimento</h2>
+        <div id="modal-add-item" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-item-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="food-dialog-panel">
+            <h2 id="modal-add-item-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar alimento</h2>
             <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/itens">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento (Base TACO / Catálogo) *</label>
                 <div data-food-picker>
-                <label class="form-label" for="item-food-search">Buscar por nome (com ou sem acentos)</label>
-                <input class="form-control" id="item-food-search" data-food-query type="search" maxlength="80" placeholder="Digite o nome do alimento">
-                <p role="status" aria-live="polite">Digite para pesquisar no catálogo.</p>
-                <label class="form-label" for="item-food-select">Resultados da busca</label>
+                <label class="form-label" for="item-food-search">Buscar alimento</label>
+                <input class="form-control" id="item-food-search" data-food-query type="search" maxlength="80" placeholder="Ex.: ovo, arroz integral, banana">
+                <p role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
+                <label class="form-label" data-food-results-label for="item-food-select">Resultados da busca</label>
                 <select id="item-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o alimento...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
@@ -3178,7 +3277,7 @@ class DashboardController
                 <input type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-item').style.display='none'">Cancelar</button>
+                <button type="button" class="btn btn-outline" data-food-close>Cancelar</button>
                 <button type="submit" class="btn btn-primary">Adicionar ao Plano</button>
               </div>
             </form>
@@ -3186,20 +3285,19 @@ class DashboardController
         </div>
 
         <!-- Modal Adicionar Substituição -->
-        <div id="modal-add-sub" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Configurar Substituição Vinculada</h2>
+        <div id="modal-add-sub" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-sub-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="food-dialog-panel">
+            <h2 id="modal-add-sub-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar substituição</h2>
             <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/substituicoes">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="item_id" id="add-sub-item-id" value="">
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Alimento Substituto *</label>
                 <div data-food-picker>
-                <label class="form-label" for="sub-food-search">Buscar por nome (com ou sem acentos)</label>
-                <input class="form-control" id="sub-food-search" data-food-query type="search" maxlength="80" placeholder="Digite o nome do alimento">
-                <p role="status" aria-live="polite">Digite para pesquisar no catálogo.</p>
-                <label class="form-label" for="sub-food-select">Resultados da busca</label>
+                <label class="form-label" for="sub-food-search">Buscar alimento</label>
+                <input class="form-control" id="sub-food-search" data-food-query type="search" maxlength="80" placeholder="Ex.: ovo, arroz integral, banana">
+                <p role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
+                <label class="form-label" data-food-results-label for="sub-food-select">Resultados da busca</label>
                 <select id="sub-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o alimento alternativo...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
@@ -3233,7 +3331,7 @@ class DashboardController
                 <input type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-sub').style.display='none'">Cancelar</button>
+                <button type="button" class="btn btn-outline" data-food-close>Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Opção</button>
               </div>
             </form>
@@ -3286,12 +3384,12 @@ class DashboardController
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
           document.getElementById('add-item-meal-name').innerText = 'Refeição: ' + mealName;
-          document.getElementById('modal-add-item').style.display = 'flex';
+          window.openFoodDialog('modal-add-item');
         }
         function openAddSubModal(itemId, foodName) {
           document.getElementById('add-sub-item-id').value = itemId;
           document.getElementById('add-sub-item-name').innerText = 'Substituição para o item: ' + foodName;
-          document.getElementById('modal-add-sub').style.display = 'flex';
+          window.openFoodDialog('modal-add-sub');
         }
         </script>
         <?php
@@ -4031,177 +4129,201 @@ class DashboardController
         $db = Connection::getInstance();
         $clinicId = TenantContext::getClinicId();
 
-        $stmtDraft = $db->prepare("SELECT COUNT(*) FROM meal_plans WHERE clinic_id = :cid AND status = 'draft'");
-        $stmtDraft->execute(['cid' => $clinicId]);
-        $draftPlansCount = (int)$stmtDraft->fetchColumn();
+        $draftSummary = new DraftPlanSummary($db);
+        // Definição única (card + lista): pacientes com ao menos um plano em rascunho; o total de rascunhos é complementar.
+        $draftTotals = $draftSummary->totals($clinicId);
+        $draftPatientsCount = $draftTotals['patients'];
+        $draftPlansTotal = $draftTotals['draft_plans'];
+
+        // A lista de atenção é limitada (top-N); o restante fica acessível via links "Ver todos".
+        $attentionTotal = count($attentionItems);
+        $attentionVisible = array_slice($attentionItems, 0, self::DASHBOARD_ATTENTION_LIMIT);
+        $attentionHidden = $attentionTotal - count($attentionVisible);
 
         $engagementService = new EngagementService($db);
         $adherenceMetrics = $engagementService->getClinicAdherenceMetrics($clinicId, 30);
 
         $userId = (int)($_SESSION['user_id'] ?? 0);
         $onboardingProgress = null;
+        $onboardingDone = 0;
+        $onboardingPct = 0;
         if ($userId > 0 && $clinicId > 0) {
             $onboardingService = new OnboardingService($db);
             $onboardingProgress = $onboardingService->getOrCreateProgress($userId, $clinicId);
+            // "N/5" e "% concluído" derivam da mesma fonte: passos efetivamente concluídos.
+            $onboardingDone = min(self::ONBOARDING_TOTAL_STEPS, count(array_unique((array)($onboardingProgress['completed_steps'] ?? []))));
+            $onboardingPct = (int)round($onboardingDone / self::ONBOARDING_TOTAL_STEPS * 100);
         }
 
         $title = 'Dashboard';
         $activeNav = 'dashboard';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $arrowIcon = '<svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
         ob_start();
         ?>
-        <div style="margin-bottom: var(--space-6);">
+        <div class="dashboard-intro">
           <h1>Painel Geral</h1>
-          <p style="color: var(--neutral-gray-500);">Visão operacional e prioridades clínicas em tempo real.</p>
+          <p class="dashboard-intro__subtitle">Visão operacional e prioridades clínicas do dia.</p>
         </div>
 
         <?php if (!empty($_GET['onboarding']) && $_GET['onboarding'] === 'concluido'): ?>
-          <div class="card" style="background: #F0FDF4; border: 1px solid #BBF7D0; margin-bottom: var(--space-6); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div class="card dashboard-banner dashboard-banner--success" role="status">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             <div>
-              <div style="font-weight: 700; color: #166534; font-size: 0.95rem;">Consultório ativado com sucesso!</div>
-              <div style="font-size: 0.85rem; color: #15803D;">Suas preferências profissionais e rotinas clínicas foram salvas. Você já pode cadastrar novos pacientes e iniciar consultas.</div>
+              <div class="dashboard-banner__title">Consultório ativado com sucesso!</div>
+              <div class="dashboard-banner__text">Suas preferências profissionais e rotinas clínicas foram salvas. Você já pode cadastrar novos pacientes e iniciar consultas.</div>
             </div>
           </div>
         <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed']): ?>
-          <div class="card" style="background: linear-gradient(135deg, rgba(198,90,57,0.06) 0%, rgba(26,54,68,0.05) 100%); border: 1px solid rgba(198,90,57,0.25); margin-bottom: var(--space-6); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-4) var(--space-5);">
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
-              <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--brand-copper-500); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 1rem; box-shadow: 0 2px 4px rgba(198,90,57,0.25);">
-                <?= (int)$onboardingProgress['current_step'] ?>/5
-              </div>
+          <div class="card dashboard-banner dashboard-banner--onboarding" data-testid="onboarding-banner">
+            <div class="dashboard-banner__body">
+              <div class="dashboard-banner__step tabular-nums" aria-hidden="true" data-testid="onboarding-steps"><?= $onboardingDone ?>/<?= self::ONBOARDING_TOTAL_STEPS ?></div>
               <div>
-                <div style="font-weight: 700; color: var(--brand-navy-900); font-size: 1rem;">
-                  Configuração do seu consultório em andamento (<?= (int)$onboardingProgress['progress_pct'] ?>% concluído)
+                <div class="dashboard-banner__title">
+                  Configuração do seu consultório em andamento (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>% concluído<span class="sr-only">, <?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?> passos</span>)
                 </div>
-                <div style="font-size: 0.875rem; color: var(--neutral-gray-600); margin-top: 2px;">
-                  Complete os 5 passos para personalizar totalmente suas preferências de atendimento, especialidades e seu primeiro paciente.
+                <div class="dashboard-banner__text">
+                  Complete os <?= self::ONBOARDING_TOTAL_STEPS ?> passos para personalizar totalmente suas preferências de atendimento, especialidades e seu primeiro paciente.
                 </div>
               </div>
             </div>
-            <a href="/onboarding" class="btn btn-accent" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+            <a href="/onboarding" class="btn btn-accent dashboard-banner__cta">
               Continuar Onboarding
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              <?= $arrowIcon ?>
             </a>
           </div>
         <?php endif; ?>
 
         <!-- Cards de Métricas Consolidadas -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-6); margin-bottom: var(--space-8);">
-          <div class="card" style="margin-bottom: 0;">
-            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS HOJE</div>
-            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
-              <span data-testid="appointments-today-count"><?= $todayStats['total_today'] ?></span>
+        <div class="dashboard-metrics">
+          <div class="card metric-card">
+            <div class="metric-card__label">CONSULTAS HOJE</div>
+            <div class="metric-card__value tabular-nums">
+              <span data-testid="appointments-today-count"><?= (int)$todayStats['total_today'] ?></span>
             </div>
-            <span class="badge badge-info"><?= $todayStats['confirmed'] ?> confirmada(s) • <?= $todayStats['completed'] ?> realizada(s)</span>
+            <span class="badge badge-info"><?= (int)$todayStats['confirmed'] ?> confirmada(s) • <?= (int)$todayStats['completed'] ?> realizada(s)</span>
           </div>
 
-          <div class="card" style="margin-bottom: 0;">
-            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">CONSULTAS NA SEMANA</div>
-            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
-              <span data-testid="appointments-week-count"><?= $weekStats['total'] ?></span>
+          <div class="card metric-card">
+            <div class="metric-card__label">CONSULTAS NA SEMANA</div>
+            <div class="metric-card__value tabular-nums">
+              <span data-testid="appointments-week-count"><?= (int)$weekStats['total'] ?></span>
             </div>
-            <span class="badge badge-info"><?= $weekStats['start'] ?> a <?= $weekStats['end'] ?></span>
-            <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">Canceladas não incluídas</div>
+            <span class="badge badge-info"><?= htmlspecialchars((string)$weekStats['start']) ?> a <?= htmlspecialchars((string)$weekStats['end']) ?></span>
+            <div class="metric-card__note">Canceladas não incluídas</div>
           </div>
 
-          <div class="card" style="margin-bottom: 0;">
-            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">PACIENTES ATIVOS</div>
-            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
-              <?= count($patients) ?>
+          <div class="card metric-card">
+            <div class="metric-card__label">PACIENTES ATIVOS</div>
+            <div class="metric-card__value tabular-nums">
+              <span data-testid="active-patients-count"><?= count($patients) ?></span>
             </div>
-            <span class="badge badge-success">Carteira regular</span>
+            <a href="/pacientes" class="metric-card__link">Ver pacientes</a>
           </div>
 
-          <div class="card" style="margin-bottom: 0;">
-            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">ADESÃO MÉDIA</div>
-            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: var(--space-2) 0;">
+          <div class="card metric-card">
+            <div class="metric-card__label">ADESÃO MÉDIA</div>
+            <div class="metric-card__value tabular-nums">
               <span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span>
             </div>
             <?php if ($adherenceMetrics['has_data']): ?>
-              <span class="badge badge-success"><?= $adherenceMetrics['responses_count'] ?> resposta(s) • <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
-              <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">
-                <?= $adherenceMetrics['responding_patients_count'] ?> de <?= $adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis responderam
+              <span class="badge badge-success"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) • <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
+              <div class="metric-card__note">
+                <?= (int)$adherenceMetrics['responding_patients_count'] ?> de <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis responderam
               </div>
             <?php else: ?>
-              <span class="badge" style="background: var(--neutral-gray-100); color: var(--neutral-gray-600); border: 1px solid var(--neutral-gray-300);">Sem dados (<?= $adherenceMetrics['period_days'] ?> dias)</span>
-              <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 6px;">
-                0 respostas • <?= $adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis
+              <span class="badge badge-neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span>
+              <div class="metric-card__note">
+                0 respostas • <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis
               </div>
             <?php endif; ?>
           </div>
 
-          <div class="card" style="margin-bottom: 0;">
-            <div style="font-size: 0.875rem; color: var(--neutral-gray-500); font-weight: 600;">PLANOS A REVISAR</div>
-            <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-copper-600); margin: var(--space-2) 0;">
-              <?= $draftPlansCount ?>
+          <div class="card metric-card">
+            <div class="metric-card__label">PLANOS A REVISAR</div>
+            <div class="metric-card__value metric-card__value--accent tabular-nums">
+              <span data-testid="draft-patients-count"><?= $draftPatientsCount ?></span>
             </div>
-            <span class="badge badge-<?= $draftPlansCount > 0 ? 'warning' : 'success' ?>">
-              <?= $draftPlansCount > 0 ? 'Rascunhos pendentes' : 'Todos publicados' ?>
+            <span class="badge badge-<?= $draftPatientsCount > 0 ? 'warning' : 'success' ?>">
+              <?= $draftPatientsCount > 0 ? 'Paciente(s) com rascunho' : 'Todos publicados' ?>
             </span>
+            <?php if ($draftPlansTotal > 0): ?>
+              <div class="metric-card__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> plano(s) em rascunho no total · <a href="/planos?status=draft">Ver rascunhos</a></div>
+            <?php endif; ?>
           </div>
         </div>
 
         <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
-        <div class="card" style="margin-bottom: var(--space-8); border-left: 4px solid var(--brand-copper-500);">
+        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
           <div class="card__header">
-            <h3>Pacientes & Prioridades que Exigem Atenção</h3>
-            <span style="font-size: 0.85rem; color: var(--neutral-gray-500);"><?= count($attentionItems) ?> item(ns) identificado(s)</span>
+            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
+            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
           </div>
           <?php if (empty($attentionItems)): ?>
-            <div style="padding: var(--space-4) 0; color: var(--neutral-gray-500); display: flex; align-items: center; gap: 8px;">
-              <span style="color: var(--semantic-success); font-weight: bold;">✓</span>
-              Nenhuma pendência crítica ou paciente faltoso identificado no momento. Todas as rotinas estão regulares.
+            <div class="attention-panel__empty">
+              <svg class="icon-inline icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>
+              Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
             </div>
           <?php else: ?>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
-              <?php foreach ($attentionItems as $att): ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #F8FAFC; border-radius: 6px; border: 1px solid var(--neutral-gray-200); flex-wrap: wrap; gap: 8px;">
-                  <div>
-                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?>" style="margin-right: 6px; font-size: 0.75rem;">
+            <ul class="attention-list">
+              <?php foreach ($attentionVisible as $att): ?>
+                <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
+                  <div class="attention-item__text">
+                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge">
                       <?= htmlspecialchars($att['title']) ?>
                     </span>
-                    <span style="font-size: 0.875rem; color: var(--neutral-ink-900); font-weight: 500;">
+                    <span class="attention-item__description">
                       <?= htmlspecialchars($att['description']) ?>
                     </span>
                   </div>
-                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; min-height: 32px;">
-                    <?= htmlspecialchars($att['action_label']) ?> ➔
+                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
+                    <?= htmlspecialchars($att['action_label']) ?>
+                    <?= $arrowIcon ?>
                   </a>
-                </div>
+                </li>
               <?php endforeach; ?>
-            </div>
+            </ul>
+            <?php if ($attentionHidden > 0): ?>
+              <div class="attention-panel__footer">
+                <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
+                <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
+                <?php if ($draftPatientsCount > 0): ?>
+                  <a href="/planos?status=draft" class="btn btn-outline btn-touch" data-testid="attention-see-all">Ver todos os rascunhos (<?= $draftPlansTotal ?>)</a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
           <?php endif; ?>
-        </div>
+        </section>
 
         <!-- Grid de Conteúdo Principal -->
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-6);">
-          <div class="card">
+        <div class="dashboard-main-grid">
+          <section class="card" aria-labelledby="today-title">
             <div class="card__header">
-              <h3>Consultas do Dia</h3>
-              <a href="/agenda" class="btn btn-secondary" style="min-height: 36px; padding: 0 var(--space-3); font-size: 0.85rem;">Ver agenda completa</a>
+              <h2 id="today-title" class="section-title">Consultas do Dia</h2>
+              <a href="/agenda" class="btn btn-secondary btn-touch">Ver agenda completa</a>
             </div>
             <?php if (empty($todayAppointments)): ?>
-              <p style="color: var(--neutral-gray-500); padding: var(--space-4) 0;">Nenhuma consulta agendada para hoje. Horários livres disponíveis.</p>
+              <p class="dashboard-empty">Nenhuma consulta agendada para hoje. Horários livres disponíveis.</p>
             <?php else: ?>
               <div class="table-responsive">
                 <table class="table">
                   <thead>
                     <tr>
-                      <th>Horário</th>
-                      <th>Paciente</th>
-                      <th>Tipo</th>
-                      <th>Status</th>
-                      <th style="text-align: right;">Ação</th>
+                      <th scope="col">Horário</th>
+                      <th scope="col">Paciente</th>
+                      <th scope="col">Tipo</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" class="text-right">Ação</th>
                     </tr>
                   </thead>
                   <tbody>
                     <?php foreach ($todayAppointments as $app): ?>
                       <tr>
-                        <td class="tabular-nums" style="font-weight: 600;"><?= date('H:i', strtotime($app['scheduled_at'])) ?></td>
-                        <td style="font-weight: 600; color: var(--brand-navy-900);">
-                          <a href="/pacientes/<?= $app['patient_id'] ?>" style="color: inherit; text-decoration: none;">
+                        <td class="tabular-nums dashboard-table__time"><?= date('H:i', strtotime($app['scheduled_at'])) ?></td>
+                        <td class="dashboard-table__patient">
+                          <a href="/pacientes/<?= (int)$app['patient_id'] ?>">
                             <?= htmlspecialchars($app['patient_name']) ?>
                           </a>
                         </td>
@@ -4209,11 +4331,11 @@ class DashboardController
                         <td>
                           <?= LabelMap::appointmentStatusBadge($app['status']) ?>
                         </td>
-                        <td style="text-align: right;">
+                        <td class="text-right">
                           <?php if ($app['status'] === 'completed'): ?>
-                            <a href="/pacientes/<?= $app['patient_id'] ?>" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 28px;">Prontuário</a>
+                            <a href="/pacientes/<?= (int)$app['patient_id'] ?>" class="btn btn-secondary btn-touch btn-touch--compact">Prontuário</a>
                           <?php else: ?>
-                            <a href="/consulta/<?= $app['id'] ?>" class="btn btn-primary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 28px;">Atender</a>
+                            <a href="/consulta/<?= (int)$app['id'] ?>" class="btn btn-primary btn-touch btn-touch--compact">Atender</a>
                           <?php endif; ?>
                         </td>
                       </tr>
@@ -4222,27 +4344,27 @@ class DashboardController
                 </table>
               </div>
             <?php endif; ?>
-          </div>
+          </section>
 
-          <div class="card">
+          <section class="card" aria-labelledby="quick-actions-title">
             <div class="card__header">
-              <h3>Ações Rápidas</h3>
+              <h2 id="quick-actions-title" class="section-title">Ações Rápidas</h2>
             </div>
-            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-              <a href="/pacientes" class="btn btn-primary" style="justify-content: flex-start;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="quick-actions">
+              <a href="/pacientes?novo=1" class="btn btn-primary quick-actions__item" data-testid="quick-new-patient">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>Novo Paciente</span>
               </a>
-              <a href="/planos" class="btn btn-accent" style="justify-content: flex-start;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              <a href="/planos" class="btn btn-accent quick-actions__item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                 <span>Criar Plano Alimentar</span>
               </a>
-              <a href="/alimentos" class="btn btn-secondary" style="justify-content: flex-start;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <a href="/alimentos" class="btn btn-secondary quick-actions__item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <span>Consultar Tabela TACO</span>
               </a>
             </div>
-          </div>
+          </section>
         </div>
         <?php
         $content = ob_get_clean();
@@ -4253,18 +4375,22 @@ class DashboardController
     public function patients(): void
     {
         $patientRepo = new PatientRepository();
-        $patients = $patientRepo->listAll();
-
+        $query = is_string($_GET['q'] ?? null) ? trim($_GET['q']) : '';
+        $statusFilter = is_string($_GET['status'] ?? null) ? $_GET['status'] : '';
+        if (!in_array($statusFilter, ['', 'active','inactive','anonymized'], true)) $statusFilter = '';
+        $page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT) ?: 1;
+        $listError = null;
         $today = (new \ClyoNutri\Core\Time\ClinicCalendar())->today();
         $month = substr($today, 5, 2);
         $monthNames = ['01'=>'Janeiro','02'=>'Fevereiro','03'=>'Março','04'=>'Abril','05'=>'Maio','06'=>'Junho','07'=>'Julho','08'=>'Agosto','09'=>'Setembro','10'=>'Outubro','11'=>'Novembro','12'=>'Dezembro'];
-        $birthdays = array_values(array_filter($patients, static function (array $patient) use ($today, $month): bool {
-            $birth = $patient['birth_date'] ?? null;
-            if (!is_string($birth) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $birth)) return false;
-            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $birth);
-            return $date && $date->format('Y-m-d') === $birth && $birth <= $today && substr($birth, 5, 2) === $month;
-        }));
-        usort($birthdays, static fn(array $a, array $b): int => strcmp(substr($a['birth_date'], 8, 2), substr($b['birth_date'], 8, 2)) ?: strcasecmp($a['name'], $b['name']));
+        try {
+            $listing = $patientRepo->paginate($query, $statusFilter, $page);
+            $patients = $listing['patients'];
+            $birthdays = $patientRepo->birthdays($today);
+        } catch (\Throwable $e) {
+            $listError = 'Não foi possível carregar os pacientes. Tente novamente.';
+            $listing = ['patients'=>[], 'total'=>0, 'page'=>1, 'pages'=>1]; $patients = []; $birthdays = [];
+        }
 
         $submissionId = bin2hex(random_bytes(16));
         $_SESSION['patient_submissions'] = array_slice($_SESSION['patient_submissions'] ?? [], -20, null, true);
@@ -4272,7 +4398,10 @@ class DashboardController
         $term = Connection::getInstance()->query("SELECT * FROM consent_terms WHERE purpose_code = 'clinical_care' AND is_active = 1 ORDER BY id DESC LIMIT 1")->fetch();
         $patientForm = $_SESSION['patient_form'] ?? [];
         $patientError = $_SESSION['patient_error'] ?? null;
-        unset($_SESSION['patient_error']);
+        $createdId = $_SESSION['patient_created_id'] ?? null;
+        unset($_SESSION['patient_created_id']);
+        $duplicateId = $_SESSION['patient_duplicate_id'] ?? null;
+        unset($_SESSION['patient_error'], $_SESSION['patient_duplicate_id']);
         $title = 'Pacientes';
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
@@ -4283,10 +4412,13 @@ class DashboardController
         <?php if (!empty($_GET['success'])): ?>
           <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(24, 121, 78, 0.2);">
             ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado com sucesso! Prontuário e Perfil 360 iniciados.' ?>
+            <?php if ($createdId): ?><a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a><?php endif; ?>
           </div>
         <?php endif; ?>
 
-        <?php if ($patientError): ?><div role="alert" class="card"><?= htmlspecialchars($patientError) ?></div><?php endif; ?>
+        <?php if ($patientError): ?><div role="alert" class="card"><?= htmlspecialchars($patientError) ?>
+        <?php if ($duplicateId): ?><a href="/pacientes/<?= (int)$duplicateId ?>/editar">Conferir cadastro existente</a><?php endif; ?></div><?php endif; ?>
+        <?php if ($listError): ?><div role="alert" class="card"><?= htmlspecialchars($listError) ?> <a href="/pacientes">Tentar novamente</a></div><?php endif; ?>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1>Gestão de Pacientes</h1>
@@ -4321,14 +4453,20 @@ class DashboardController
         </section>
 
         <div class="card">
-          <div style="margin-bottom: var(--space-4);">
+          <form method="get" action="/pacientes" style="margin-bottom: var(--space-4);">
             <label for="patient-search" class="form-label">Buscar paciente por nome, celular ou e-mail</label>
             <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
-              <input type="search" id="patient-search" class="form-control" placeholder="Digite o nome, celular ou e-mail" autocomplete="off" aria-controls="patient-list" style="flex: 1; min-width: 180px;">
-              <button type="button" id="patient-search-clear" class="btn btn-secondary">Limpar</button>
+              <input type="search" name="q" value="<?= htmlspecialchars($query, ENT_QUOTES) ?>" id="patient-search" class="form-control" placeholder="Digite o nome, celular ou e-mail" autocomplete="off" aria-controls="patient-list" style="flex: 1; min-width: 180px;">
+              <label for="patient-status">Status</label>
+              <select id="patient-status" name="status" class="form-control" style="width:auto">
+                <?php foreach ([''=>'Todos','active'=>'Ativos','inactive'=>'Inativos','anonymized'=>'Anonimizados'] as $value=>$label): ?>
+                <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
+              </select>
+              <button type="submit" class="btn btn-primary">Buscar</button>
+              <a href="/pacientes" class="btn btn-secondary">Limpar</a>
             </div>
-            <p id="patient-search-count" role="status" aria-live="polite" style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-top: var(--space-2);"></p>
-          </div>
+            <p id="patient-search-count" role="status" aria-live="polite" style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-top: var(--space-2);"><?= (int)$listing['total'] ?> paciente(s) encontrado(s).</p>
+          </form>
           <div class="table-responsive">
             <table class="table">
               <thead>
@@ -4342,14 +4480,14 @@ class DashboardController
               </thead>
               <tbody id="patient-list">
                 <?php if (empty($patients)): ?>
-                  <tr id="patient-list-empty"><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum paciente cadastrado nesta clínica.</td></tr>
+                  <tr id="patient-list-empty"><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);"><?= $query !== '' || $statusFilter !== '' ? 'Nenhum paciente encontrado para estes filtros.' : 'Nenhum paciente cadastrado nesta clínica.' ?></td></tr>
                 <?php else: ?>
                   <?php foreach ($patients as $p): ?>
                     <tr data-patient-row>
                       <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($p['name']) ?></td>
                       <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
-                      <td><span class="badge badge-success"><?= $p['status'] === 'active' ? 'Ativo' : 'Inativo' ?></span></td>
+                      <td><span class="badge <?= $p['status'] === 'active' ? 'badge-success' : 'badge-secondary' ?>"><?= ['active'=>'Ativo','inactive'=>'Inativo','anonymized'=>'Anonimizado'][$p['status']] ?? 'Não informado' ?></span></td>
                       <td>
                         <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver Perfil 360</a>
                         <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
@@ -4363,7 +4501,12 @@ class DashboardController
           </div>
         </div>
 
-        <script src="/assets/js/patient-search.js" defer></script>
+        <nav aria-label="Paginação de pacientes" style="display:flex;gap:12px;margin:16px 0;align-items:center">
+          <?php if ($listing['page'] > 1): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']-1])) ?>">Anterior</a><?php endif; ?>
+          <span>Página <?= $listing['page'] ?> de <?= $listing['pages'] ?></span>
+          <?php if ($listing['page'] < $listing['pages']): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']+1])) ?>">Próxima</a><?php endif; ?>
+        </nav>
+        <script>document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
 
         <!-- Modal Cadastrar Paciente (Design System Premium) -->
         <div id="patientModal" class="modal-overlay" onclick="if(event.target === this) closePatientModal()">
@@ -4436,7 +4579,7 @@ class DashboardController
           });
           const patientForm = <?= json_encode($patientForm, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
           Object.entries(patientForm).forEach(([key,value]) => { const input=document.querySelector('#patientModal [name="'+key+'"]'); if(input)input.value=value; });
-          <?php if ($patientError): ?>openPatientModal();<?php endif; ?>
+          <?php if ($patientError || ($_GET['novo'] ?? '') === '1'): ?>openPatientModal();<?php endif; ?>
         </script>
         <?php
         $content = ob_get_clean();

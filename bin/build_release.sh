@@ -43,6 +43,11 @@ echo ""
 # ------------------------------------------------------------------------------
 echo "==> [2/4] Executando Suíte Completa de Testes Automatizados..."
 
+TEMP_DB_TEST="$ROOT_DIR/storage/clyonutri_release_test_$$.sqlite"
+cp "$ROOT_DIR/storage/database.sqlite" "$TEMP_DB_TEST"
+export DB_DATABASE="$TEMP_DB_TEST"
+trap "rm -f '$TEMP_DB_TEST'" EXIT
+
 TEST_FILES=(
     "tests/foundation_test.php"
     "tests/golden_path_test.php"
@@ -87,6 +92,14 @@ TEST_FILES=(
     "tests/px_13_clinical_language_and_enum_sanitization_test.php"
     "tests/px_29_password_reset_and_access_recovery_test.php"
     "tests/ni2_292_mobile_app_patient_and_professional_e2e_test.php"
+    "tests/ni2_256_f01_auth_roles_servicedesk_test.php"
+    "tests/ni2_347_admin_console_e2e_test.php"
+    "tests/trust_subscription_and_cancellation_e2e_test.php"
+    "tests/aud_remediation_360_security_and_backoffice_test.php"
+    "tests/patient_otp_concurrency_and_security_test.php"
+    "tests/mysql8_migrations_and_ddl_validation_test.php"
+    "tests/runtime_platform_settings_and_commercial_metrics_test.php"
+    "tests/helpdesk_indicators_performance_benchmark_test.php"
     "tests/release_gate_and_fail_closed_test.php"
 )
 

@@ -73,13 +73,13 @@ VALUES (304, 'Tofu Grelhado TACO', 'Leguminosas', 'TACO', 64.00, 6.60, 2.10, 4.0
 // -----------------------------------------------------------------------------
 echo "\n--> [2/10] Cadastro Real do Paciente na Plataforma...\n";
 $patientRepo = new PatientRepository($db);
-$patientEmail = 'lucas.jornada@teste.com';
-$db->exec("DELETE FROM patients WHERE email = '{$patientEmail}'");
+$patientEmail = 'lucas.jornada_' . time() . '_' . mt_rand(100, 999) . '@teste.com';
+$patientPhone = '119' . mt_rand(10000000, 99999999);
 
 $patient = $patientRepo->create([
     'name' => 'Lucas Vinicius Silva',
     'email' => $patientEmail,
-    'phone' => '(11) 98765-4321',
+    'phone' => $patientPhone,
     'birth_date' => '1992-04-10',
     'gender' => 'male',
     'notes' => 'Objetivo: reeducação alimentar, melhora da composição corporal e disposição física.',

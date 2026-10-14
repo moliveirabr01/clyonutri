@@ -21,6 +21,10 @@ echo "   CLYONUTRI II — MOBILE REST API CONTRACT TEST SUITE (NI2-176)\n";
 echo "   Validação Fidedigna do Client TypeScript (mobile/src/services/api.ts)\n";
 echo "====================================================================\n\n";
 
+$testDb = getenv('DB_DATABASE') ?: '';
+if ($testDb === '' || realpath($testDb) === realpath(__DIR__.'/../storage/database.sqlite')) {
+    throw new RuntimeException('This destructive legacy suite requires an explicitly isolated DB_DATABASE.');
+}
 $db = Connection::getInstance();
 
 // -----------------------------------------------------------------------------

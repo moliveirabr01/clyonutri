@@ -1,0 +1,106 @@
+{
+  "issue": "NI2-268",
+  "transport": "real HTTP/API with SQLite multi-tenant",
+  "checks": [
+    {
+      "name": "Login web do nutricionista redireciona para o dashboard",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Biblioteca de receitas responde 200 e renderiza HTML",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Página de criação de receitas responde 200",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Token CSRF presente no formulário de criação",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Criação de receita persiste no banco e redireciona",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Receita criada está persistida no banco relacional",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Composição nutricional calculada via TACO",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Detalhes da receita renderizam com 200",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Página de prescrição responde 200",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Prescrição de receita ao paciente redireciona com sucesso",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Prescrição persistida com porções escalonadas (1.5x)",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "API do paciente retorna 200 para receitas prescritas",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Paciente visualiza receita prescrita no seu portal móvel",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Toggle de favorito do paciente retorna 200",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Receita marcada como favorita com sucesso",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Lista de compras do paciente gerada com 200",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Estrutura da lista de compras organizada por gôndolas",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Submissão com CSRF inválido é bloqueada com 403",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Acesso cruzado de outro tenant bloqueado (403 ou 404)",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "name": "Usuário recepcionista bloqueado do módulo clínico de receitas (403)",
+      "status": "PASS",
+      "details": ""
+    }
+  ]
+}

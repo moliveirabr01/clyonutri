@@ -1,5 +1,16 @@
 <h1>Configurações</h1>
-<p>Gerencie seu cadastro, identificação profissional, horários de atendimento e senha.</p>
+<p>Gerencie seu cadastro, identificação profissional, horários de atendimento, senha e assinatura.</p>
+
+<!-- Navegação por abas em Configurações -->
+<div style="display: flex; border-bottom: 2px solid var(--neutral-gray-200); margin-bottom: var(--space-6); gap: 1.5rem;">
+  <a href="/configuracoes" style="padding: 10px 4px; text-decoration: none; color: var(--brand-copper-600); font-weight: 600; border-bottom: 2px solid var(--brand-copper-600); margin-bottom: -2px;">
+    Perfil e Atendimento
+  </a>
+  <a href="/configuracoes/assinatura" style="padding: 10px 4px; text-decoration: none; color: var(--neutral-gray-600); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px;">
+    Assinatura &amp; Faturamento
+  </a>
+</div>
+
 <?php if($error): ?><p role="alert" class="card"><?= htmlspecialchars($error) ?></p><?php endif; ?>
 <?php if($success): ?><p role="status" class="card">Configurações atualizadas com sucesso.</p><?php endif; ?>
 <div style="max-width: 960px;">

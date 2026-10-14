@@ -11,7 +11,7 @@
     "version": "4.14.0",
     "violations": [],
     "incomplete": [],
-    "passes": 27
+    "passes": 28
   },
   {
     "path": "/pacientes/1/anamnese",

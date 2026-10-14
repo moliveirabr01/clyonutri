@@ -172,7 +172,7 @@ class AuthService
         } catch (\Throwable) {}
 
         try {
-            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'user' AND tokenable_id = :id")
+            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type IN ('user','professional') AND tokenable_id = :id")
                 ->execute(['id' => $userId]);
         } catch (\Throwable) {}
     }
@@ -186,6 +186,74 @@ class AuthService
             ->execute(['clinic_id' => $clinicId, 'user_id' => $userId]);
 
         $this->revokeUserSessions($userId);
+    }
+
+    /**
+     * Atualiza o papel canônico do usuário e invalida sessões antigas para forçar re-autenticação (NI2-256 / F01)
+     */
+    public function updateUserRole(int $userId, string $newRole, ?int $changedByUserId = null): void
+    {
+        $validRoles = ['admin', 'nutritionist', 'operator', 'support_agent', 'receptionist'];
+        if (!in_array($newRole, $validRoles, true)) {
+            throw new \InvalidArgumentException("Papel de usuário inválido: {$newRole}");
+        }
+
+        $stmtOld = $this->db->prepare("SELECT role FROM users WHERE id = :id");
+        $stmtOld->execute(['id' => $userId]);
+        $oldRole = (string)$stmtOld->fetchColumn();
+
+        $this->db->prepare("
+            UPDATE users
+            SET role = :role, auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ")->execute([
+            'role' => $newRole,
+            'id' => $userId,
+        ]);
+
+        $audit = new \ClyoNutri\Core\Audit\AuditLogger($this->db);
+        $audit->log('USER_ROLE_CHANGED', 'users', (string)$userId, [
+            'old_role' => $oldRole,
+            'new_role' => $newRole,
+            'changed_by' => $changedByUserId,
+        ]);
+    }
+
+    /**
+     * Atualiza o papel do membro na clínica e incrementa auth_version (NI2-256 / F01)
+     */
+    public function updateMembershipRole(int $clinicId, int $userId, string $newMemberRole, ?int $changedByUserId = null): void
+    {
+        $validRoles = ['owner', 'admin', 'nutritionist', 'operator', 'support_agent', 'receptionist'];
+        if (!in_array($newMemberRole, $validRoles, true)) {
+            throw new \InvalidArgumentException("Papel de membro inválido: {$newMemberRole}");
+        }
+
+        $stmtOld = $this->db->prepare("SELECT role FROM clinic_members WHERE clinic_id = :cid AND user_id = :uid");
+        $stmtOld->execute(['cid' => $clinicId, 'uid' => $userId]);
+        $oldRole = (string)$stmtOld->fetchColumn();
+
+        $this->db->prepare("
+            UPDATE clinic_members
+            SET role = :role
+            WHERE clinic_id = :cid AND user_id = :uid
+        ")->execute([
+            'role' => $newMemberRole,
+            'cid' => $clinicId,
+            'uid' => $userId,
+        ]);
+
+        $this->db->prepare("UPDATE users SET auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id")
+            ->execute(['id' => $userId]);
+
+        $audit = new \ClyoNutri\Core\Audit\AuditLogger($this->db);
+        $audit->log('MEMBERSHIP_ROLE_CHANGED', 'clinic_members', "{$clinicId}:{$userId}", [
+            'clinic_id' => $clinicId,
+            'user_id' => $userId,
+            'old_role' => $oldRole,
+            'new_role' => $newMemberRole,
+            'changed_by' => $changedByUserId,
+        ]);
     }
 }
 

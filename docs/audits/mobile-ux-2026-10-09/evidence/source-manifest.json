@@ -1,0 +1,25 @@
+{
+  "commit": "2ad8228",
+  "working_tree": "dirty; snapshot avaliado em 2026-10-09",
+  "files": {
+    "mobile/App.tsx": "c25190dafc7b611cb3e1b45e42886f2b81ba911d0ffc6a9eb429b3b22602aafb",
+    "mobile/package.json": "b4fac1bf22f2d01394d2665f6a1c78956971b02000a5ac13217acb908b149110",
+    "mobile/app.json": "0f16e7d96a43014d558695c02a6a9f97d1e415bcb6251f3bb54a288ffe7e859a",
+    "mobile/src/theme/tokens.ts": "108c1aa09471c19e8359fec3986c32bfb3e8df0474329cf837d207c3cc71697d",
+    "mobile/src/components/BrandLogo.tsx": "6880086025e536277afc33e1df63ae506d8686fef91218a9680564ca8cf59e74",
+    "mobile/src/services/api.ts": "6657e8a5b08c94ac7cd5a9344858ee03e1e255e2d601bdf58efe2c4b99d910ae",
+    "mobile/src/screens/PatientOnboardingScreen.tsx": "29d27eaa943088c56ec848fd886764945dc5bd6ec096f1cf7f39ceda5961e845",
+    "mobile/src/screens/PatientHomeScreen.tsx": "f5fd7659b0f69e0689fdfa568dc2a23cabf571262ffc15d1c6bc17b9096796bb",
+    "mobile/src/screens/ProfessionalHomeScreen.tsx": "9edf2e80b1bacd757be31787ba59f0daae0212d035f503da6d8d2d751a5504bf",
+    "public/index.php": "43a6341c78c813ee918eb0563f745e47bbc515e67b54f054b6a2513c2edc99eb",
+    "src/Application/Api/PatientApiController.php": "1ddde5d788a6c6a4cb81beefb62eeb17e1b60386dc3afaf7f923fdb1803d84b5",
+    "src/Domain/Recipe/RecipeService.php": "287ee2236dabd416b52956fddbc1c556b722634f93396566474f27cc7806e7be",
+    "src/Domain/Chat/ChatService.php": "8e681134525d85071bdebfc9d42c4c680b0b481676a1f04886eab0a11e0439b9",
+    "src/Domain/PatientPortal/PatientOnboardingService.php": "494cbab407d7f0b1281e84b301fc7493037982cfba8083d70fe83e18fbbf40fd",
+    "src/Domain/PatientPortal/PatientPortalService.php": "71d0c9b3761146b13c6f1a241f78a860f096e56a81015830d4f9e52c65fd6794",
+    "src/Domain/FoodDiary/FoodDiaryService.php": "94917ef06f4dca176b21a874ca1482a65e8f90b389e63d0ac5c9f82771e8f5db",
+    "CLYONUTRI_DESIGN_SYSTEM_PREMIUM.md": "349d3a3d5c738450f25ed2e549b5610dacc882595bf5cf4d99265aad395387f1",
+    "blueprint_extracted.txt": "c5301a8ee23f57b7ab09b2c156dc308a9802345004bd7fc177b8257f2e63be67",
+    "public/assets/css/clinical-botanical.css": "6f76ac2fe1ba7c51d0caa357a5ea37deab665f59027130ee32ca2da5dec206f5"
+  }
+}

@@ -10,9 +10,9 @@ async function post(path, body={}, token) {
 }
 (async()=>{
  const login=await post('/api/v1/auth/professional-login',{email:'plan1@example.test',password:'PlanTeste@2026'}); assert.equal(login.status,200); const prof=login.data.token;
- assert.equal((await post('/api/v1/professional/patients/2/app-invitation',{},prof)).status,422);
+ assert.equal((await post('/api/v1/professional/patients/2/app-invitation',{},prof)).status,403);
  const reception=await post('/api/v1/auth/professional-login',{email:'plan3@example.test',password:'PlanTeste@2026'});
- if(reception.status===200) assert.equal((await post('/api/v1/professional/patients/1/app-invitation',{},reception.data.token)).status,422);
+ if(reception.status===200) assert.equal((await post('/api/v1/professional/patients/1/app-invitation',{},reception.data.token)).status,403);
  assert.equal((await post('/api/v1/auth/patient-onboarding/preview',{invitation_code:'invalid'})).status,422);
  let inv=await post('/api/v1/professional/patients/1/app-invitation',{},prof); assert.equal(inv.status,200); const old=inv.data.invitation_code;
  inv=await post('/api/v1/professional/patients/1/app-invitation',{},prof); const code=inv.data.invitation_code;
@@ -26,7 +26,7 @@ async function post(path, body={}, token) {
  assert.equal((await post('/api/v1/auth/patient-onboarding/preview',{invitation_code:code})).status,200);
  const activated=await post('/api/v1/auth/patient-onboarding/complete',fields); assert.equal(activated.status,200); assert.equal(activated.data.patient.id,1);assert.equal(activated.data.patient.clinic_id,1);
  assert.equal((await post('/api/v1/auth/patient-onboarding/complete',fields)).status,422);
- assert.equal((await post('/api/v1/professional/patients/1/app-invitation',{},prof)).status,422);
+ assert.equal((await post('/api/v1/professional/patients/1/app-invitation',{},prof)).status,403);
  const auth=await post('/api/v1/auth/patient-login',{email:fields.email,password:fields.password});assert.equal(auth.status,200);
  const home=await fetch(base+'/api/v1/patient/home',{headers:{Authorization:`Bearer ${activated.data.token}`}});assert.equal(home.status,200);
  const prof2=await post('/api/v1/auth/professional-login',{email:'plan2@example.test',password:'PlanTeste@2026'});

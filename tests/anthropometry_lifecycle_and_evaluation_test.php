@@ -72,8 +72,8 @@ if (!$profIdA) {
 $patientRepo = new \ClyoNutri\Domain\Patient\PatientRepository($db);
 $patientA = $patientRepo->create([
     'name' => 'Patrícia Rocha Lima (Teste Antropo)',
-    'email' => 'patricia.rocha.' . time() . '@exemplo.com.br',
-    'phone' => '(11) 98765-4321',
+    'email' => 'patricia.rocha.' . time() . '_' . mt_rand(100, 999) . '@exemplo.com.br',
+    'phone' => '(11) 9' . mt_rand(1000, 9999) . '-' . mt_rand(1000, 9999),
     'birth_date' => '1992-05-15',
     'gender' => 'Feminino',
     'lgpd_consent' => 1,
@@ -89,8 +89,8 @@ TenantContext::setTenant($clinicBId, [
 ]);
 $patientB = $patientRepo->create([
     'name' => 'Rodrigo Cross Tenant',
-    'email' => 'rodrigo.tenantb.' . time() . '@exemplo.com.br',
-    'phone' => '(21) 99999-0000',
+    'email' => 'rodrigo.tenantb.' . time() . '_' . mt_rand(100, 999) . '@exemplo.com.br',
+    'phone' => '(21) 9' . mt_rand(1000, 9999) . '-' . mt_rand(1000, 9999),
     'birth_date' => '1988-11-20',
     'gender' => 'Masculino',
     'lgpd_consent' => 1,

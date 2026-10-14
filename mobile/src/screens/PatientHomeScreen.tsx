@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,8 +8,11 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
   Alert,
+  Linking,
 } from 'react-native';
+import { displayDateTime, tabLabels } from '../utils/presentation';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -19,6 +22,9 @@ import {
   PatientHomeData,
   FoodDiaryEntry,
   EvolutionData,
+  PatientRecipePrescription,
+  PatientRecipeDetails,
+  ChatMessage,
 } from '../services/api';
 
 type ResourceState = { loading: boolean; error: string | null; updatedAt: string | null };
@@ -36,7 +42,7 @@ function ResourceNotice({ state, retry, name }: { state: ResourceState; retry: (
   </View>;
 }
 
-export type NavigationTab = 'Hoje' | 'Plano' | 'Diario' | 'Evolucao' | 'Perfil';
+export type NavigationTab = 'Hoje' | 'Plano' | 'Diario' | 'Chat' | 'Evolucao' | 'Perfil';
 
 export default function PatientHomeScreen({ session, onLogout }: { session: PatientAuthData; onLogout: () => void }) {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('Hoje');
@@ -55,6 +61,120 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+
+  const [recipes, setRecipes] = useState<PatientRecipePrescription[]>([]);
+  const [recipesState, setRecipesState] = useState<ResourceState>(initialResource);
+  const [recipeDetails, setRecipeDetails] = useState<PatientRecipeDetails | null>(null);
+  const [selectedPrescription, setSelectedPrescription] = useState<number | null>(null);
+  const [recipeUnavailable, setRecipeUnavailable] = useState(false);
+  const [mealDraft, setMealDraft] = useState<{ name: string; planned: string } | null>(null);
+  const [mealMode, setMealMode] = useState<'planned' | 'different'>('planned');
+  const [mealDescription, setMealDescription] = useState('');
+  const [mealFeedback, setMealFeedback] = useState<string | null>(null);
+  const [mealError, setMealError] = useState<string | null>(null);
+  const [recipeDetailState, setRecipeDetailState] = useState<ResourceState>(initialResource);
+
+  // Estado e métodos do Chat Seguro com Nutricionista
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatConvId, setChatConvId] = useState<number | null>(null);
+  const [chatProfessional, setChatProfessional] = useState<{ id: number; name: string; crn?: string | null } | null>(null);
+  const [chatInputText, setChatInputText] = useState<string>('');
+  const [chatSending, setChatSending] = useState<boolean>(false);
+  const [chatState, setChatState] = useState<ResourceState>(initialResource);
+  const [chatConnected, setChatConnected] = useState<boolean>(true);
+  const chatScrollRef = useRef<ScrollView>(null);
+
+  const loadChat = useCallback(async (afterId?: number) => {
+    try {
+      const data = await ApiService.getChatMessages(afterId);
+      if (data.conversation_id) setChatConvId(data.conversation_id);
+      if (data.professional) setChatProfessional(data.professional);
+
+      setChatConnected(true);
+
+      if (afterId && afterId > 0) {
+        if (data.messages && data.messages.length > 0) {
+          setChatMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMsgs = data.messages.filter(m => !existingIds.has(m.id));
+            if (newMsgs.length === 0) return prev;
+            return [...prev, ...newMsgs];
+          });
+          if (data.conversation_id) {
+            ApiService.markChatAsRead(data.conversation_id).catch(() => {});
+          }
+        }
+      } else {
+        setChatMessages(data.messages || []);
+        setChatState({ loading: false, error: null, updatedAt: new Date().toLocaleTimeString('pt-BR') });
+        if (data.conversation_id && data.messages && data.messages.length > 0) {
+          ApiService.markChatAsRead(data.conversation_id).catch(() => {});
+        }
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.kind === 'auth') return;
+      setChatConnected(false);
+      setChatState(prev => ({ ...prev, loading: false, error: resourceError(err) }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentTab !== 'Chat') return;
+    setChatState(prev => ({ ...prev, loading: true }));
+    loadChat();
+
+    const interval = setInterval(() => {
+      setChatMessages(current => {
+        const lastId = current.length > 0 ? current[current.length - 1].id : 0;
+        loadChat(lastId);
+        return current;
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentTab, loadChat]);
+
+  const handleSendMessage = async () => {
+    const text = chatInputText.trim();
+    if (!text || chatSending) return;
+
+    setChatSending(true);
+    try {
+      const res = await ApiService.sendChatMessage(text, chatConvId ?? undefined);
+      if (res.success && res.message) {
+        setChatMessages(prev => [...prev, res.message]);
+        if (res.message.conversation_id && !chatConvId) {
+          setChatConvId(res.message.conversation_id);
+        }
+        setChatInputText('');
+        setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+    } catch (err) {
+      Alert.alert('Erro ao enviar', err instanceof Error ? err.message : 'Não foi possível enviar a mensagem.');
+    } finally {
+      setChatSending(false);
+    }
+  };
+  const refreshRecipes = useCallback(async () => {
+    setRecipesState(prev => ({ ...prev, loading: true }));
+    try {
+      setRecipes(await ApiService.getRecipes());
+      setRecipesState({ loading: false, error: null, updatedAt: new Date().toLocaleString('pt-BR') });
+    } catch (error) {
+      setRecipesState(prev => ({ ...prev, loading: false, error: resourceError(error) }));
+    }
+  }, []);
+  const openRecipe = async (prescription: PatientRecipePrescription) => {
+    setSelectedPrescription(prescription.id); setRecipeDetails(null); setRecipeUnavailable(false);
+    setRecipeDetailState({ loading: true, error: null, updatedAt: null });
+    try {
+      setRecipeDetails(await ApiService.getRecipe(prescription.recipe_id, prescription.id));
+      setRecipeDetailState({ loading: false, error: null, updatedAt: null });
+    } catch (error) {
+      setRecipeUnavailable(error instanceof ApiError && error.kind === 'unavailable');
+      setRecipeDetailState({ loading: false, error: resourceError(error), updatedAt: null });
+    }
+  };
 
   const refreshDiary = useCallback(async () => {
     setDiaryState(prev => ({ ...prev, loading: true }));
@@ -91,9 +211,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         setErrorMessage(resourceError(error));
       } finally { setLoading(false); }
     };
-    await Promise.all([home(), refreshDiary(), refreshEvolution()]);
+    await Promise.all([home(), refreshDiary(), refreshEvolution(), refreshRecipes()]);
     setRefreshing(false);
-  }, [refreshDiary, refreshEvolution]);
+  }, [refreshDiary, refreshEvolution, refreshRecipes]);
 
   useEffect(() => {
     fetchAllData();
@@ -138,17 +258,56 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     }
   };
 
-  // Registro de consumo de refeição no diário alimentar (NI2-176)
-  const handleRegisterMeal = async (mealName: string) => {
+  // Teleconsulta e Diário Alimentar (MOB-UX-003, MOB-UX-004, MOB-UX-012)
+  const [registeringMeal, setRegisteringMeal] = useState<string | null>(null);
+
+  const handleOpenTelehealth = async (url: string) => {
     try {
+      const trimmed = url.trim();
+      const supported = await Linking.canOpenURL(trimmed);
+      if (supported) {
+        await Linking.openURL(trimmed);
+      } else {
+        Alert.alert('Teleconsulta', `Não foi possível abrir o link: ${trimmed}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Erro ao abrir link', err instanceof Error ? err.message : 'Falha ao acessar teleconsulta.');
+    }
+  };
+
+  const mealWriteBusy = useRef(false);
+  const pendingMealWrites = useRef<Record<string, { key: string; consumedAt: string; description: string }>>({});
+  const handleRegisterMeal = async (mealName: string, customDescription?: string) => {
+    if (mealWriteBusy.current) return;
+    mealWriteBusy.current = true;
+    setRegisteringMeal(mealName);
+    setMealError(null);
+    try {
+      const pending = pendingMealWrites.current[mealName] ?? {
+        key: `meal_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        consumedAt: new Date().toISOString(),
+        description: customDescription || 'Consumo informado pelo paciente',
+      };
+      pendingMealWrites.current[mealName] = pending;
       const entry = await ApiService.logMeal({
         meal_name: mealName,
-        description: `Consumo registrado via aplicativo móvel às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        description: pending.description,
+        consumed_at: pending.consumedAt,
+        idempotency_key: pending.key,
       });
-      setDiaryEntries(prev => [entry, ...prev]);
-      Alert.alert('Refeição Registrada', `${mealName} foi anotado no seu Diário Alimentar.`);
+      delete pendingMealWrites.current[mealName];
+      setDiaryEntries(prev => {
+        if (prev.some(e => e.id === entry.id)) return prev;
+        return [entry, ...prev];
+      });
+      setMealFeedback(`${mealName} registrado em ${displayDateTime(entry.consumed_at)}. Você pode conferir no Diário.`);
+      setMealError(null);
+      setMealDraft(null);
     } catch (err: any) {
-      Alert.alert('Erro', 'Não foi possível salvar o consumo no diário alimentar.');
+      setMealError('Não foi possível confirmar o registro. Seus dados foram preservados. Tente salvar novamente para confirmar o mesmo consumo.');
+    } finally {
+      mealWriteBusy.current = false;
+      setRegisteringMeal(null);
     }
   };
 
@@ -229,6 +388,28 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               <Text style={styles.subGreeting}>Acompanhamento nutricional dedicado</Text>
             </View>
 
+            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')}>
+              <Text style={styles.cardTitle}>Minhas receitas</Text>
+              <Text style={styles.helperText}>Veja as receitas e orientações prescritas pelo seu nutricionista →</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.card, { borderColor: '#10B981', backgroundColor: '#F0FDF4' }]}
+              accessibilityRole="button"
+              onPress={() => setCurrentTab('Chat')}
+              accessibilityLabel="Falar com nutricionista no chat seguro"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardTitle, { color: '#065F46' }]}>💬 Chat com Nutricionista</Text>
+                  <Text style={[styles.helperText, { color: '#047857' }]}>
+                    Fale online com seu nutricionista, tire dúvidas sobre o plano e envie mensagens →
+                  </Text>
+                </View>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 8 }} />
+              </View>
+            </TouchableOpacity>
+
             {/* Card Próxima Consulta com dados reais e empty state (Critério 2) */}
             <View
               style={styles.card}
@@ -246,9 +427,16 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   <Text style={styles.appointmentDoctor}>
                     {nextApp.professional_name || 'Nutricionista'} • Status: {nextApp.status === 'confirmed' ? 'Confirmado' : 'Agendado'}
                   </Text>
-                  {nextApp.meeting_url && (
-                    <Text style={styles.telehealthLink}>Teleconsulta: Link disponível</Text>
-                  )}
+                  {nextApp.meeting_url ? (
+                    <TouchableOpacity
+                      style={styles.telehealthButton}
+                      onPress={() => handleOpenTelehealth(nextApp.meeting_url!)}
+                      accessibilityRole="link"
+                      accessibilityLabel="Entrar na sala de teleconsulta online"
+                    >
+                      <Text style={styles.telehealthButtonText}>📹 Entrar na Teleconsulta</Text>
+                    </TouchableOpacity>
+                  ) : null}
                   {nextApp.status !== 'confirmed' && (
                     <TouchableOpacity
                       style={styles.copperButton}
@@ -319,6 +507,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               </View>
             </View>
 
+            {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
             {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
             <Text style={styles.sectionTitle} accessibilityRole="header">Prescrição do Dia</Text>
 
@@ -330,6 +519,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                     <Text style={styles.mealTime}>{meal.time || '--:--'}</Text>
                   </View>
 
+                  {meal.notes ? <Text style={styles.itemNotesText}>Orientação da refeição: {meal.notes}</Text> : null}
                   {meal.items && meal.items.length > 0 ? (
                     meal.items.map((item) => (
                       <View key={item.id} style={styles.mealItemRow}>
@@ -337,24 +527,62 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                           • {item.quantity} {item.unit} de {item.food_name}
                         </Text>
                         {item.substitutions && item.substitutions.length > 0 && (
-                          <Text style={styles.substitutionText}>
-                            (Substituições: {item.substitutions.map(s => s.food_name).join(', ')})
-                          </Text>
+                          <View style={styles.substitutionContainer}>
+                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
+                            {item.substitutions.map((s) => (
+                              <Text key={s.id} style={styles.substitutionText}>
+                                ↳ {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+                              </Text>
+                            ))}
+                          </View>
                         )}
+                        {item.notes ? (
+                          <Text style={styles.itemNotesText}>
+                            ℹ️ Orientação: {item.notes}
+                          </Text>
+                        ) : null}
                       </View>
                     ))
                   ) : (
                     <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
                   )}
 
+                  {diaryEntries.filter(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>✓ Consumo registrado em {displayDateTime(entry.consumed_at)}</Text>)}
+            {mealDraft?.name === meal.name && <View style={styles.card}>
+              <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
+              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
+              <View accessibilityRole="radiogroup">
+                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
+                  <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
+                </TouchableOpacity>)}
+              </View>
+              {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
+                <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
+                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, minHeight: 88, marginTop: 8 }]} />
+              </>}
+              {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
+              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
+                <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
+            </View>}
                   <View style={styles.actionRow}>
                     <TouchableOpacity
-                      style={styles.registerMealButton}
-                      onPress={() => handleRegisterMeal(meal.name)}
+                      style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
+                      onPress={() => {
+                        const pending = pendingMealWrites.current[meal.name];
+                        setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
+                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
+                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
+                        setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
+                      }}
+                      disabled={registeringMeal !== null || mealDraft !== null}
                       accessibilityRole="button"
                       accessibilityLabel={`Registrar consumo da refeição ${meal.name}`}
                     >
-                      <Text style={styles.registerMealText}>Registrar Consumo</Text>
+                      <Text style={styles.registerMealText}>
+                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()) ? 'Registrar outro consumo' : 'Registrar Consumo'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -376,21 +604,42 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             {activePlan ? (
               <>
                 <Text style={styles.helperText}>
-                  {activePlan.title || 'Plano Vigente'} (Status: {activePlan.status})
+                  {activePlan.title || 'Plano vigente'} • Disponibilizado pelo nutricionista
+                  {activePlan.version ? ` • Versão ${activePlan.version}` : ''}
+                  {activePlan.published_at ? ` • Publicado em ${displayDateTime(activePlan.published_at)}` : ''}
                 </Text>
                 {activePlan.notes && (
                   <View style={styles.card}>
                     <Text style={styles.cardTitle}>Orientações Gerais</Text>
                     <Text style={styles.mealItem}>{activePlan.notes}</Text>
+                    <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { setChatInputText('Olá! Pode esclarecer as orientações do meu plano alimentar?'); setCurrentTab('Chat'); }}><Text style={{ color: t.navy }}>Esclarecer uma orientação com o nutricionista</Text></TouchableOpacity>
                   </View>
                 )}
                 {activePlan.meals?.map((m) => (
                   <View key={m.id} style={styles.card}>
                     <Text style={styles.cardTitle}>{m.name} ({m.time})</Text>
+                    {m.notes ? <Text style={styles.helperText}>Orientação da refeição: {m.notes}</Text> : null}
                     {m.items?.map((it) => (
-                      <Text key={it.id} style={styles.mealItem}>
-                        • {it.food_name} ({it.quantity} {it.unit})
-                      </Text>
+                      <View key={it.id} style={styles.mealItemRow}>
+                        <Text style={styles.mealItem}>
+                          • {it.food_name} ({it.quantity} {it.unit})
+                        </Text>
+                        {it.substitutions && it.substitutions.length > 0 && (
+                          <View style={styles.substitutionContainer}>
+                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
+                            {it.substitutions.map((s) => (
+                              <Text key={s.id} style={styles.substitutionText}>
+                                ↳ {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+                              </Text>
+                            ))}
+                          </View>
+                        )}
+                        {it.notes ? (
+                          <Text style={styles.itemNotesText}>
+                            ℹ️ Orientação: {it.notes}
+                          </Text>
+                        ) : null}
+                      </View>
                     ))}
                   </View>
                 ))}
@@ -403,6 +652,51 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </Text>
               </View>
             )}
+
+            <Text style={styles.sectionTitle} accessibilityRole="header">Minhas receitas</Text>
+            <ResourceNotice state={recipesState} retry={refreshRecipes} name="receitas" />
+            {!recipesState.loading && !recipesState.error && recipes.length === 0 && <Text style={styles.helperText}>Seu nutricionista ainda não prescreveu receitas para você.</Text>}
+            {recipes.map(recipe => <View key={recipe.id} style={styles.card}>
+              <Text style={styles.cardTitle}>{recipe.recipe_title}</Text>
+              {recipe.meal_name && <Text style={styles.helperText}>{recipe.meal_name}</Text>}
+              <Text style={styles.mealItem}>{Number(recipe.prescribed_servings).toLocaleString('pt-BR')} porção(ões) • {Number(recipe.scaled_energy_kcal).toLocaleString('pt-BR')} kcal</Text>
+              {recipe.recipe_summary && <Text style={styles.helperText}>{recipe.recipe_summary}</Text>}
+              {recipe.instructions_override && <Text style={styles.mealItem}>Orientação do nutricionista: {recipe.instructions_override}</Text>}
+              {!(selectedPrescription === recipe.id && recipeUnavailable) && <TouchableOpacity accessibilityRole="button" disabled={recipeDetailState.loading} style={styles.retryButton} onPress={() => openRecipe(recipe)}>
+                <Text style={styles.retryButtonText}>Ver ingredientes e preparo</Text>
+              </TouchableOpacity>}
+              {selectedPrescription === recipe.id && <>
+                {recipeDetailState.loading && <ActivityIndicator accessibilityLabel="Carregando receita" />}
+                {recipeDetailState.error && <>
+                  <Text accessibilityRole="alert" style={{ color: t.error }}>{recipeDetailState.error}{!recipeUnavailable ? ' Tente abrir novamente.' : ''}</Text>
+                  {recipeUnavailable && <TouchableOpacity accessibilityRole="button" style={styles.navyButton} onPress={() => { setChatInputText(`Olá! A receita “${recipe.recipe_title}” está indisponível no aplicativo. Pode disponibilizar uma nova prescrição?`); setCurrentTab('Chat'); }}><Text style={styles.navyButtonText}>Solicitar nova prescrição no chat</Text></TouchableOpacity>}
+                </>}
+                {recipeDetails && <>
+                  <Text style={styles.cardTitle}>
+                    Sua porção • Quantidades da sua prescrição ({recipe.prescribed_servings} porção(ões))
+                  </Text>
+                  {recipeDetails.ingredients.map(ingredient => {
+                    const ratio = Number(recipe.prescribed_servings) / (Number(recipeDetails.servings) || 1);
+                    const scaledAmount = Math.round(Number(ingredient.amount) * ratio * 100) / 100;
+                    return (
+                      <View key={ingredient.id} style={{ marginBottom: 4 }}>
+                        <Text style={styles.mealItem}>
+                          • <Text style={{ fontWeight: '700' }}>{scaledAmount} {ingredient.measure_unit}</Text> de {ingredient.food_name}
+                          {ratio !== 1 ? (
+                            <Text style={styles.helperText}> (Receita base inteira: {ingredient.amount} {ingredient.measure_unit})</Text>
+                          ) : null}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                  <Text style={styles.cardTitle}>Preparo da receita base • {Number(recipeDetails.servings).toLocaleString('pt-BR')} porções</Text>
+                  <Text style={styles.helperText}>O preparo original abaixo usa a receita inteira. Após preparar, separe sua prescrição de {Number(recipe.prescribed_servings).toLocaleString('pt-BR')} porção(ões). As quantidades acima correspondem apenas à sua porção.</Text>
+                  <Text style={styles.mealItem}>{recipeDetails.instructions}</Text>
+                </>}
+              </>}
+            </View>)}
+
+
           </View>
         )}
 
@@ -416,7 +710,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               diaryEntries.map((entry) => (
                 <View key={entry.id} style={styles.card}>
                   <Text style={styles.cardTitle}>
-                    {entry.meal_name} • {entry.consumed_at}
+                    {entry.meal_name} • {displayDateTime(entry.consumed_at)}
                   </Text>
                   {entry.description && (
                     <Text style={styles.mealItem}>{entry.description}</Text>
@@ -438,6 +732,139 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </Text>
               </View>
             ) : null}
+          </View>
+        )}
+
+        {currentTab === 'Chat' && (
+          <View style={styles.tabContent}>
+            {/* Header com profissional e status online */}
+            <View style={styles.chatHeaderCard}>
+              <View style={styles.chatHeaderInfo}>
+                <View style={styles.chatAvatar}>
+                  <Text style={styles.chatAvatarText}>
+                    {chatProfessional?.name ? chatProfessional.name.charAt(0).toUpperCase() : 'N'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.chatNutriName} accessibilityRole="header">
+                    {chatProfessional?.name || 'Seu Nutricionista'}
+                  </Text>
+                  <View style={styles.chatOnlineRow}>
+                    <View style={[styles.chatOnlineDot, !chatConnected && { backgroundColor: '#94A3B8' }]} />
+                    <Text style={styles.chatOnlineText}>
+                      {chatConnected ? 'Conectado ao consultório' : 'Desconectado'} • {chatProfessional?.crn || 'Atendimento Clínico'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={styles.chatSecurityBadge}>🔒 Canal Clínico Protegido (HTTPS/TLS) • Não substitui urgência</Text>
+            </View>
+
+            {chatState.error ? (
+              <View style={styles.chatErrorBanner} accessible={true} accessibilityRole="alert">
+                <Text style={styles.chatErrorText}>Erro de conexão: {chatState.error}</Text>
+                <TouchableOpacity
+                  style={styles.chatRetryButton}
+                  onPress={() => { setChatState(prev => ({ ...prev, loading: true, error: null })); loadChat(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tentar reconectar ao chat"
+                >
+                  <Text style={styles.chatRetryButtonText}>Reconectar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {chatState.loading && chatMessages.length === 0 ? (
+              <ActivityIndicator size="large" color="#0F2747" style={{ marginVertical: 32 }} />
+            ) : null}
+
+            {/* Mensagens do Chat */}
+            <View style={styles.chatMessagesCard}>
+              {chatMessages.length === 0 && !chatState.loading ? (
+                <View style={styles.chatEmptyState}>
+                  <Text style={styles.chatEmptyIcon}>💬</Text>
+                  <Text style={styles.chatEmptyTitle}>Converse com seu nutricionista</Text>
+                  <Text style={styles.chatEmptyDescription}>
+                    Tire dúvidas sobre o plano alimentar, relate sintomas ou compartilhe sua evolução em tempo real.
+                  </Text>
+                </View>
+              ) : (
+                chatMessages.map((m) => {
+                  const isPatient = m.sender_type === 'patient';
+                  return (
+                    <View
+                      key={m.id}
+                      style={[
+                        styles.chatBubble,
+                        isPatient ? styles.chatBubblePatient : styles.chatBubbleProfessional,
+                      ]}
+                      accessible={true}
+                      accessibilityLabel={`${isPatient ? 'Você' : 'Nutricionista'}: ${m.message}`}
+                    >
+                      {!isPatient && (
+                        <Text style={styles.chatSenderLabel}>
+                          {chatProfessional?.name || 'Nutricionista'}
+                        </Text>
+                      )}
+                      <Text
+                        style={[
+                          styles.chatBubbleText,
+                          isPatient ? styles.chatBubbleTextPatient : styles.chatBubbleTextProfessional,
+                        ]}
+                      >
+                        {m.message}
+                      </Text>
+                      <View style={styles.chatBubbleFooter}>
+                        <Text
+                          style={[
+                            styles.chatTimeText,
+                            isPatient ? styles.chatTimePatient : styles.chatTimeProfessional,
+                          ]}
+                        >
+                          {m.created_at ? m.created_at.substring(11, 16) : ''}
+                        </Text>
+                        {isPatient && (
+                          <Text style={styles.chatStatusCheck}>
+                            {m.status === 'read' ? '✓✓' : '✓'}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
+            {/* Barra de Entrada de Mensagem */}
+            <View style={styles.chatInputCard}>
+              <TextInput
+                style={styles.chatTextInput}
+                placeholder="Digite sua mensagem para o nutricionista..."
+                placeholderTextColor="#94A3B8"
+                value={chatInputText}
+                onChangeText={setChatInputText}
+                multiline
+                maxLength={1000}
+                editable={!chatSending}
+                accessibilityLabel="Campo de texto para mensagem ao nutricionista"
+              />
+              <TouchableOpacity
+                style={[
+                  styles.chatSendBtn,
+                  (!chatInputText.trim() || chatSending) && styles.chatSendBtnDisabled,
+                ]}
+                onPress={handleSendMessage}
+                disabled={!chatInputText.trim() || chatSending}
+                accessibilityRole="button"
+                accessibilityLabel="Enviar mensagem para o nutricionista"
+              >
+                {chatSending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.chatSendBtnText}>Enviar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -502,23 +929,42 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar Sessão (Logout)'}</Text>
               </TouchableOpacity>
             </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>🔒 Seus Dados e Privacidade (LGPD)</Text>
+              <Text style={styles.helperText}>
+                Seus dados cadastrais, clínicos e registros nutricionais são classificados como dados de saúde (Art. 5º, II e Art. 11º da LGPD) sob custódia e sigilo do seu consultório.
+              </Text>
+              <Text style={[styles.mealItem, { marginTop: 6 }]}>
+                • Finalidade: Prestação de assistência e acompanhamento nutricional personalizado.
+              </Text>
+              <Text style={styles.mealItem}>
+                • Prontuário Clínico: Armazenado em infraestrutura protegida com histórico auditável.
+              </Text>
+              <Text style={styles.mealItem}>
+                • Direitos do Titular: Confirmação de tratamento, acesso, correção ou portabilidade podem ser solicitados diretamente ao nutricionista responsável pela clínica.
+              </Text>
+              <TouchableOpacity accessibilityRole="button" style={styles.navyButton} onPress={() => { setChatInputText('Olá! Gostaria de solicitar atendimento sobre meus dados pessoais e direitos de privacidade.'); setCurrentTab('Chat'); }}><Text style={styles.navyButtonText}>Solicitar atendimento sobre meus dados</Text></TouchableOpacity>
+              <Text style={styles.helperText}>Você pode revisar a mensagem antes de enviá-la. O envio abre uma conversa, não executa automaticamente alterações nos seus dados.</Text>
+            </View>
           </View>
         )}
       </ScrollView>
 
       {/* Barra de Navegação Inferior WCAG AA (NI2-140) */}
       <View style={styles.navBar} accessibilityRole="tablist">
-        {(['Hoje', 'Plano', 'Diario', 'Evolucao', 'Perfil'] as NavigationTab[]).map(tab => (
+        {(['Hoje', 'Plano', 'Diario', 'Chat', 'Evolucao', 'Perfil'] as NavigationTab[]).map(tab => (
           <TouchableOpacity
             key={tab}
             style={[styles.navItem, currentTab === tab && styles.navItemActive]}
             onPress={() => setCurrentTab(tab)}
             accessibilityRole="tab"
+            aria-selected={currentTab === tab}
             accessibilityState={{ selected: currentTab === tab }}
-            accessibilityLabel={`Aba ${tab}`}
+            accessibilityLabel={`Aba ${tabLabels[tab]}`}
           >
             <Text style={[styles.navText, currentTab === tab && styles.navTextActive]}>
-              {tab}
+              {tabLabels[tab]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -644,6 +1090,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
+  telehealthButton: {
+    backgroundColor: '#027A48',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  telehealthButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   waterValue: {
     fontSize: 22,
     fontWeight: '700',
@@ -730,9 +1191,30 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     lineHeight: 20,
   },
+  substitutionContainer: {
+    marginTop: 4,
+    marginLeft: 12,
+    backgroundColor: '#FFFBEB',
+    padding: 8,
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+  },
+  substitutionHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+    marginBottom: 2,
+  },
   substitutionText: {
     fontSize: 12,
-    color: '#E67A3F',
+    color: '#78350F',
+    marginTop: 2,
+  },
+  itemNotesText: {
+    fontSize: 12,
+    color: '#0369A1',
+    marginLeft: 12,
     marginTop: 2,
     fontStyle: 'italic',
   },
@@ -758,6 +1240,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minHeight: 44,
     justifyContent: 'center',
+  },
+  registerMealButtonDisabled: {
+    backgroundColor: '#94A3B8',
   },
   registerMealText: {
     color: '#FFFFFF',
@@ -850,8 +1335,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    minWidth: 50,
+    paddingHorizontal: 6,
+    minWidth: 44,
     minHeight: 44,
   },
   navItemActive: {
@@ -859,12 +1344,226 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E67A3F',
   },
   navText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#667085',
   },
   navTextActive: {
     color: '#0F2747',
+    fontWeight: '700',
+  },
+
+  // Chat Styles
+  chatHeaderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  chatHeaderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chatAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0F2747',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  chatNutriName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F2747',
+  },
+  chatOnlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  chatOnlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  chatOnlineText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: t.success,
+  },
+  chatSecurityBadge: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  chatMessagesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: 280,
+  },
+  chatEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  chatEmptyIcon: {
+    fontSize: 36,
+    marginBottom: 12,
+  },
+  chatEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F2747',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  chatEmptyDescription: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  chatBubble: {
+    maxWidth: '82%',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  chatBubblePatient: {
+    alignSelf: 'flex-end',
+    backgroundColor: t.success,
+    borderBottomRightRadius: 4,
+  },
+  chatBubbleProfessional: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chatSenderLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F2747',
+    marginBottom: 4,
+  },
+  chatBubbleText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chatBubbleTextPatient: {
+    color: '#FFFFFF',
+  },
+  chatBubbleTextProfessional: {
+    color: '#0F172A',
+  },
+  chatBubbleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  chatTimeText: {
+    fontSize: 10,
+  },
+  chatTimePatient: {
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  chatTimeProfessional: {
+    color: '#64748B',
+  },
+  chatStatusCheck: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  chatInputCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 8,
+    alignItems: 'flex-end',
+    marginBottom: 80,
+  },
+  chatTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F2747',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    maxHeight: 100,
+    minHeight: 40,
+  },
+  chatSendBtn: {
+    backgroundColor: t.success,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 40,
+  },
+  chatSendBtnDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  chatSendBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  chatErrorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chatErrorText: {
+    fontSize: 12,
+    color: '#991B1B',
+    flex: 1,
+  },
+  chatRetryButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginLeft: 8,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  chatRetryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

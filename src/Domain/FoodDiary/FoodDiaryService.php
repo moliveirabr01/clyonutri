@@ -25,27 +25,68 @@ class FoodDiaryService
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
+        $idempotencyKey = trim((string)($data['idempotency_key'] ?? '')) ?: null;
+        if ($idempotencyKey !== null && strlen($idempotencyKey) > 64) {
+            throw new \InvalidArgumentException('Chave de idempotência inválida.');
+        }
+        if ($idempotencyKey !== null) {
+            $chkStmt = $this->db->prepare("
+                SELECT id, meal_name, patient_id, consumed_at, description, photo_path
+                FROM food_diary_entries
+                WHERE clinic_id = :clinic_id AND patient_id = :patient_id AND idempotency_key = :key
+                LIMIT 1
+            ");
+            $chkStmt->execute([
+                'clinic_id' => $clinicId,
+                'patient_id' => $patientId,
+                'key' => $idempotencyKey,
+            ]);
+            $existing = $chkStmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing) {
+                return [
+                    'id' => (int)$existing['id'],
+                    'meal_name' => $existing['meal_name'],
+                    'patient_id' => (int)$existing['patient_id'],
+                    'consumed_at' => $existing['consumed_at'],
+                    'description' => $existing['description'],
+                    'idempotent_replay' => true,
+                ];
+            }
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO food_diary_entries (
                 clinic_id, patient_id, meal_name, consumed_at, photo_path,
-                description, hunger_level, satiety_level, symptoms
+                description, hunger_level, satiety_level, symptoms, idempotency_key
             ) VALUES (
                 :clinic_id, :patient_id, :meal_name, :consumed_at, :photo_path,
-                :description, :hunger_level, :satiety_level, :symptoms
+                :description, :hunger_level, :satiety_level, :symptoms, :idempotency_key
             )
         ");
 
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'patient_id' => $patientId,
-            'meal_name' => trim($data['meal_name']),
-            'consumed_at' => $data['consumed_at'] ?? date('Y-m-d H:i:s'),
-            'photo_path' => $data['photo_path'] ?? null,
-            'description' => $data['description'] ?? null,
-            'hunger_level' => isset($data['hunger_level']) ? (int)$data['hunger_level'] : null,
-            'satiety_level' => isset($data['satiety_level']) ? (int)$data['satiety_level'] : null,
-            'symptoms' => $data['symptoms'] ?? null,
-        ]);
+        try {
+            $stmt->execute([
+                'clinic_id' => $clinicId,
+                'patient_id' => $patientId,
+                'meal_name' => trim($data['meal_name']),
+                'consumed_at' => $data['consumed_at'] ?? date('Y-m-d H:i:s'),
+                'photo_path' => $data['photo_path'] ?? null,
+                'description' => $data['description'] ?? null,
+                'hunger_level' => isset($data['hunger_level']) ? (int)$data['hunger_level'] : null,
+                'satiety_level' => isset($data['satiety_level']) ? (int)$data['satiety_level'] : null,
+                'symptoms' => $data['symptoms'] ?? null,
+                'idempotency_key' => $idempotencyKey,
+            ]);
+        } catch (\PDOException $e) {
+            // The unique index arbitrates concurrent requests; replay only our exact key.
+            if ($idempotencyKey !== null) {
+                $chkStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId, 'key' => $idempotencyKey]);
+                if ($chkStmt->fetch(PDO::FETCH_ASSOC)) {
+                    return $this->logMeal($patientId, $data);
+                }
+            }
+            throw $e;
+        }
 
         $id = (int)$this->db->lastInsertId();
 
@@ -54,6 +95,8 @@ class FoodDiaryService
             'meal_name' => $data['meal_name'],
             'patient_id' => $patientId,
             'consumed_at' => $data['consumed_at'] ?? date('Y-m-d H:i:s'),
+            'description' => $data['description'] ?? null,
+            'idempotent_replay' => false,
         ];
     }
 

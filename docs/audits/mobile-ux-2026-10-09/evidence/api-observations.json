@@ -1,0 +1,35 @@
+{
+  "recipe_before": {
+    "recipe_version_id": 1,
+    "recipe_title": "Exemplo · Aveia de véspera com banana",
+    "scaled_energy_kcal": 432.75
+  },
+  "recipe_after": {
+    "recipe_version_id": 1,
+    "recipe_title": "Receita fictícia alterada depois da prescrição",
+    "scaled_energy_kcal": 216.38
+  },
+  "recipe_detail_current_version": 2,
+  "substitution_payload": [
+    {
+      "id": 1,
+      "item_id": 1,
+      "food_id": 102,
+      "amount": 150,
+      "measure_unit": "g",
+      "notes": "Alternativa preservada",
+      "created_at": "2026-10-09 22:00:02",
+      "energy_kcal": 115.5,
+      "protein_g": 0.9,
+      "carbohydrate_g": 27.6,
+      "lipid_g": 0.15,
+      "fiber_g": 3.3,
+      "food_name": "Alternativa de teste"
+    }
+  ],
+  "item_notes": "Orientação inicial",
+  "diary_count": 2,
+  "appointment_status": "confirmed",
+  "water_ml": 250,
+  "patient_consents_count": 0
+}

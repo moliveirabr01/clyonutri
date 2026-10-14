@@ -31,6 +31,7 @@ class ClinicalRecordService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
+        if (mb_strlen(trim($title), 'UTF-8') > 255) throw new InvalidArgumentException('O título deve ter até 255 caracteres.');
         if (empty(trim($title))) {
             throw new InvalidArgumentException("O título do registro clínico é obrigatório.");
         }
@@ -40,6 +41,7 @@ class ClinicalRecordService
             $this->db->beginTransaction();
         }
         try {
+            $this->lockPatient($patientId, $clinicId);
             // 1. Obter a última versão e o último hash do paciente de forma atômica
             $lastStmt = $this->db->prepare("
                 SELECT version, record_hash 
@@ -61,18 +63,18 @@ class ClinicalRecordService
             $createdAt = date('Y-m-d H:i:s');
 
             // 2. Computar o hash SHA-256 canônico do registro
-            $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, null, $contentJson, $previousHash, $createdAt);
+            $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, null, $contentJson, $previousHash, $createdAt, trim($title), null, 2);
 
             // 3. Inserir append-only
             $stmt = $this->db->prepare("
                 INSERT INTO clinical_records (
                     clinic_id, patient_id, professional_id, version,
                     supersedes_id, revision_reason, title, content_json,
-                    record_hash, previous_hash, is_retracted, created_at
+                    record_hash, previous_hash, is_retracted, created_at, hash_version
                 ) VALUES (
                     :clinic_id, :patient_id, :professional_id, :version,
                     NULL, NULL, :title, :content_json,
-                    :record_hash, :previous_hash, 0, :created_at
+                    :record_hash, :previous_hash, 0, :created_at, 2
                 )
             ");
 
@@ -132,8 +134,14 @@ class ClinicalRecordService
             throw new InvalidArgumentException("A justificativa clínica da retificação deve conter no mínimo 10 caracteres explicativos.");
         }
 
-        $this->db->beginTransaction();
+        $this->validateRevisionContent($newContent);
+        if (mb_strlen($trimmedReason, 'UTF-8') > self::MAX_NOTE_LENGTH) throw new InvalidArgumentException('A justificativa deve ter até ' . self::MAX_NOTE_LENGTH . ' caracteres.');
+        $ownsTransaction = !$this->db->inTransaction();
+        $savepoint = 'clinical_revision_' . bin2hex(random_bytes(8));
+        if ($ownsTransaction) $this->db->beginTransaction();
+        else $this->db->exec('SAVEPOINT ' . $savepoint);
         try {
+            $this->lockPatient($patientId, $clinicId);
             // Verificar registro alvo a ser retificado
             $targetStmt = $this->db->prepare("
                 SELECT id, title, version, is_retracted 
@@ -178,20 +186,21 @@ class ClinicalRecordService
 
             $contentJson = json_encode($newContent, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             $createdAt = date('Y-m-d H:i:s');
-            $newTitle = "[Retificação v{$nextVersion}] " . $target['title'];
+            $newTitle = $target['title'];
+            if (mb_strlen($newTitle, 'UTF-8') > 255) throw new InvalidArgumentException('O título legado excede o limite permitido para a retificação.');
 
-            $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, $targetRecordId, $contentJson, $previousHash, $createdAt);
+            $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, $targetRecordId, $contentJson, $previousHash, $createdAt, $newTitle, $trimmedReason, 2);
 
             // Inserir a nova versão retificada
             $stmt = $this->db->prepare("
                 INSERT INTO clinical_records (
                     clinic_id, patient_id, professional_id, version,
                     supersedes_id, revision_reason, title, content_json,
-                    record_hash, previous_hash, is_retracted, created_at
+                    record_hash, previous_hash, is_retracted, created_at, hash_version
                 ) VALUES (
                     :clinic_id, :patient_id, :professional_id, :version,
                     :supersedes_id, :revision_reason, :title, :content_json,
-                    :record_hash, :previous_hash, 0, :created_at
+                    :record_hash, :previous_hash, 0, :created_at, 2
                 )
             ");
 
@@ -217,7 +226,8 @@ class ClinicalRecordService
                 'hash' => $recordHash,
             ]);
 
-            $this->db->commit();
+            if ($ownsTransaction) $this->db->commit();
+            else $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
 
             return [
                 'id' => $newId,
@@ -229,7 +239,11 @@ class ClinicalRecordService
                 'created_at' => $createdAt,
             ];
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
+            elseif (!$ownsTransaction && $this->db->inTransaction()) {
+                $this->db->exec('ROLLBACK TO SAVEPOINT ' . $savepoint);
+                $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
+            }
             throw $e;
         }
     }
@@ -263,12 +277,20 @@ class ClinicalRecordService
         }
 
         $expectedPreviousHash = self::GENESIS_HASH;
+        $legacyRecords = 0;
+        $extendedFormatSeen = false;
 
         foreach ($records as $index => $rec) {
             $recId = (int)$rec['id'];
             $version = (int)$rec['version'];
             $supersedesId = $rec['supersedes_id'] !== null ? (int)$rec['supersedes_id'] : null;
 
+            $hashVersion = (int)$rec['hash_version'];
+            if (!in_array($hashVersion, [1,2], true) || ($extendedFormatSeen && $hashVersion === 1)) {
+                return ['is_valid'=>false, 'tampered_record_id'=>$recId, 'version'=>$version, 'error'=>'Formato de integridade inválido.'];
+            }
+            if ($hashVersion === 1) $legacyRecords++;
+            else $extendedFormatSeen = true;
             // 1. Validar encadeamento do previous_hash
             if ($rec['previous_hash'] !== $expectedPreviousHash) {
                 return [
@@ -288,7 +310,10 @@ class ClinicalRecordService
                 $supersedesId,
                 $rec['content_json'],
                 $rec['previous_hash'],
-                $rec['created_at']
+                $rec['created_at'],
+                $rec['title'],
+                $rec['revision_reason'],
+                $hashVersion
             );
 
             if ($recalculated !== $rec['record_hash']) {
@@ -307,7 +332,9 @@ class ClinicalRecordService
             'is_valid' => true,
             'total_records' => count($records),
             'latest_hash' => $expectedPreviousHash,
-            'message' => 'Cadeia de integridade 100% íntegra e verificada.',
+            'legacy_records' => $legacyRecords,
+            'metadata_coverage_complete' => $legacyRecords === 0,
+            'message' => $legacyRecords ? 'Conteúdo e encadeamento verificados. Registros legados não incluem título e justificativa na verificação.' : 'Conteúdo, título e justificativa verificados.',
         ];
     }
 
@@ -352,9 +379,7 @@ class ClinicalRecordService
         if ($cleanTitle === '') {
             throw new InvalidArgumentException("O título da observação clínica é obrigatório.");
         }
-        if (mb_strlen($cleanTitle, 'UTF-8') > 255) {
-            $cleanTitle = mb_substr($cleanTitle, 0, 255, 'UTF-8');
-        }
+        if (mb_strlen($cleanTitle, 'UTF-8') > 255) throw new InvalidArgumentException('O título deve ter até 255 caracteres.');
 
         $cleanText = trim($observationText);
         if ($cleanText === '') {
@@ -407,6 +432,30 @@ class ClinicalRecordService
         ];
     }
 
+    private function validateRevisionContent(array $content): void
+    {
+        if (array_key_exists('text', $content) && (!is_string($content['text']) || trim($content['text']) === '')) {
+            throw new InvalidArgumentException('O texto retificado é obrigatório.');
+        }
+        $hasContent = false;
+        array_walk_recursive($content, static function ($value, $key) use (&$hasContent): void {
+            if (in_array($key, ['type','category','recorded_by','revised_by'], true)) return;
+            if (is_string($value)) {
+                if (mb_strlen(trim($value), 'UTF-8') > self::MAX_NOTE_LENGTH) throw new InvalidArgumentException('O conteúdo retificado deve ter até ' . self::MAX_NOTE_LENGTH . ' caracteres por campo.');
+                if (trim($value) !== '') $hasContent = true;
+            } elseif (is_int($value) || is_float($value)) $hasContent = true;
+        });
+        if (!$hasContent) throw new InvalidArgumentException('O conteúdo retificado é obrigatório.');
+    }
+
+    private function lockPatient(int $patientId, int $clinicId): void
+    {
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $stmt = $this->db->prepare('SELECT id FROM patients WHERE id = ? AND clinic_id = ? FOR UPDATE');
+            $stmt->execute([$patientId, $clinicId]);
+        }
+    }
+
     private function computeHash(
         int $clinicId,
         int $patientId,
@@ -415,8 +464,15 @@ class ClinicalRecordService
         ?int $supersedesId,
         string $contentJson,
         string $previousHash,
-        string $createdAt
+        string $createdAt,
+        string $title = '',
+        ?string $revisionReason = null,
+        int $hashVersion = 1
     ): string {
+        if ($hashVersion === 2) {
+            return hash('sha256', json_encode([2, $clinicId, $patientId, $professionalId, $version, $supersedesId,
+                $contentJson, $previousHash, $createdAt, $title, $revisionReason], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        }
         $dataToHash = implode('|', [
             $clinicId,
             $patientId,

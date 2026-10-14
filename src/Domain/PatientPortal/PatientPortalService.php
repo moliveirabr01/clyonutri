@@ -28,6 +28,7 @@ class PatientPortalService
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $token = bin2hex(random_bytes(32));
         $expiresAt = date('Y-m-d H:i:s', time() + ($validHours * 3600));
@@ -291,6 +292,13 @@ class PatientPortalService
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
+        if ((TenantContext::getUser()['role']??'')==='patient' && $uploadedByType!=='patient') throw new \ClyoNutri\Core\Security\TenantSecurityException('Autor do documento não autorizado.');
+        if ($uploadedByType === 'patient') {
+            if ($uploadedById !== $patientId) throw new \ClyoNutri\Core\Security\TenantSecurityException('Autor do documento não autorizado.');
+        } elseif ($uploadedByType === 'professional') {
+            TenantGuard::assertProfessionalBelongsToClinic($uploadedById,$clinicId,$this->db);
+        } else { throw new \ClyoNutri\Core\Security\TenantSecurityException('Autor do documento não autorizado.'); }
+
         $allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
         if (!in_array($fileData['mime_type'], $allowedMimes, true)) {
             throw new InvalidArgumentException("Tipo de arquivo não permitido. Apenas PDF, JPG e PNG são aceitos.");
@@ -397,6 +405,8 @@ class PatientPortalService
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        $appointment=TenantGuard::assertAppointmentBelongsToClinic($appointmentId,$clinicId,$this->db);
+        if ((int)$appointment['patient_id']!==$patientId) throw new \ClyoNutri\Core\Security\TenantSecurityException('Consulta não autorizada para este paciente.');
 
         $stmt = $this->db->prepare("
             UPDATE appointments
@@ -440,6 +450,7 @@ class PatientPortalService
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         // Buscar ou criar conversa
         $cStmt = $this->db->prepare("

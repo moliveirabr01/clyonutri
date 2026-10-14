@@ -260,7 +260,7 @@ class PasswordResetService
             // 4. Invalidação de tokens Sanctum/API pessoais ativos
             $delApiTokens = $this->db->prepare("
                 DELETE FROM personal_access_tokens
-                WHERE tokenable_type = 'user' AND tokenable_id = :user_id
+                WHERE tokenable_type IN ('user','professional') AND tokenable_id = :user_id
             ");
             $delApiTokens->execute(['user_id' => $userId]);
 
@@ -334,14 +334,19 @@ class PasswordResetService
      */
     private function assertRateLimitNotExceeded(string $email, ?string $ipAddress): void
     {
+        $cutoff15m = date('Y-m-d H:i:s', time() - 900);
+
         // 1. Checagem por e-mail
         $stmt = $this->db->prepare("
             SELECT COUNT(*) FROM audit_logs
             WHERE action = 'PASSWORD_RESET_REQUESTED'
               AND details LIKE :emailPattern
-              AND created_at >= datetime('now', '-15 minutes')
+              AND created_at >= :cutoff
         ");
-        $stmt->execute(['emailPattern' => '%' . $email . '%']);
+        $stmt->execute([
+            'emailPattern' => '%' . $email . '%',
+            'cutoff' => $cutoff15m,
+        ]);
         $countEmail = (int)$stmt->fetchColumn();
 
         if ($countEmail >= self::MAX_REQUESTS_PER_EMAIL_15M) {
@@ -357,9 +362,12 @@ class PasswordResetService
                 SELECT COUNT(*) FROM audit_logs
                 WHERE action IN ('PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_ATTEMPT_UNKNOWN')
                   AND ip_address = :ip
-                  AND created_at >= datetime('now', '-15 minutes')
+                  AND created_at >= :cutoff
             ");
-            $stmtIp->execute(['ip' => $ipAddress]);
+            $stmtIp->execute([
+                'ip' => $ipAddress,
+                'cutoff' => $cutoff15m,
+            ]);
             $countIp = (int)$stmtIp->fetchColumn();
 
             if ($countIp >= self::MAX_REQUESTS_PER_IP_15M) {

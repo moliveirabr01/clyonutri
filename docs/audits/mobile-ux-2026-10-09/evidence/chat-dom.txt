@@ -1,0 +1,32 @@
+- region "Resumo atualizado com seu consultório":
+  - generic: ✓ Resumo atualizado com seu consultório
+- generic: "Última atualização do resumo: 09/10/2026, 19:04:24"
+- generic: U
+- heading "Usuário sintético 1" [level=1]
+- generic: Online • TEST
+- generic: 🔒 Criptografia ponta-a-ponta
+- 'generic "Você: Mensagem fictícia da auditoria: dúvida sobre a porção."':
+  - generic: "Mensagem fictícia da auditoria: dúvida sobre a porção."
+  - generic: 22:01
+  - generic: ✓✓
+- 'generic "Nutricionista: Resposta fictícia: consulte a orientação na sua receita."':
+  - generic: Usuário sintético 1
+  - generic: "Resposta fictícia: consulte a orientação na sua receita."
+  - generic: 22:02
+- textbox "Campo de texto para mensagem ao nutricionista":
+  - /placeholder: Digite sua mensagem para o nutricionista...
+- button "Enviar mensagem para o nutricionista" [disabled]:
+  - generic: Enviar
+- tablist:
+  - tab "Aba Hoje":
+    - generic: Hoje
+  - tab "Aba Plano":
+    - generic: Plano
+  - tab "Aba Diario":
+    - generic: Diario
+  - tab "Aba Chat" [active]:
+    - generic: Chat
+  - tab "Aba Evolucao":
+    - generic: Evolucao
+  - tab "Aba Perfil":
+    - generic: Perfil

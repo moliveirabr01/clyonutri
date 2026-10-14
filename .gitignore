@@ -21,3 +21,19 @@ replatform/laravel13/storage/*.sqlite
 !storage/backups/.gitkeep
 storage/app/helpdesk_attachments/*
 !storage/app/helpdesk_attachments/.gitkeep
+
+# Arquivos auxiliares do SQLite (WAL/SHM) e banco isolado de testes
+storage/*.sqlite-*
+storage/testing.sqlite
+
+# Artefatos locais de release/deploy (pacotes, extrações, patches e logs de build)
+release/*.zip
+release/*.patch
+release/clyonutri_*/
+release/.claude_*
+bin/release.log
+
+# Bancos de dados locais em qualquer pasta (nunca versionar dados)
+*.sqlite
+*.sqlite-*
+*.sqlite3

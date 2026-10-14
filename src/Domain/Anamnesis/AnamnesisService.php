@@ -45,16 +45,16 @@ class AnamnesisService
 
         // 1. Sanitização e normalização de seções clínicas
         $cleanData = [
-            'objectives' => $this->sanitizeText($data['objectives'] ?? null),
-            'routine' => $this->sanitizeText($data['routine'] ?? null),
-            'food_preferences' => $this->sanitizeText($data['food_preferences'] ?? null),
-            'restrictions' => $this->sanitizeText($data['restrictions'] ?? null),
-            'allergies' => $this->sanitizeText($data['allergies'] ?? null),
-            'symptoms' => $this->sanitizeText($data['symptoms'] ?? null),
-            'habits' => $this->sanitizeText($data['habits'] ?? null),
-            'clinical_history' => $this->sanitizeText($data['clinical_history'] ?? null),
+            'objectives' => $this->sanitizeText($data['objectives'] ?? null, 'Objetivos'),
+            'routine' => $this->sanitizeText($data['routine'] ?? null, 'Rotina'),
+            'food_preferences' => $this->sanitizeText($data['food_preferences'] ?? null, 'Preferências'),
+            'restrictions' => $this->sanitizeText($data['restrictions'] ?? null, 'Restrições'),
+            'allergies' => $this->sanitizeText($data['allergies'] ?? null, 'Alergias'),
+            'symptoms' => $this->sanitizeText($data['symptoms'] ?? null, 'Sintomas'),
+            'habits' => $this->sanitizeText($data['habits'] ?? null, 'Hábitos'),
+            'clinical_history' => $this->sanitizeText($data['clinical_history'] ?? null, 'Histórico clínico'),
             'water_intake_ml' => isset($data['water_intake_ml']) && $data['water_intake_ml'] !== '' ? max(0, min(20000, (int)$data['water_intake_ml'])) : null,
-            'notes' => $this->sanitizeText($data['notes'] ?? null),
+            'notes' => $this->sanitizeText($data['notes'] ?? null, 'Observações'),
         ];
 
         $assessment = $data['allergy_assessment'] ?? (!empty($cleanData['allergies']) ? 'recorded' : 'not_assessed');
@@ -83,6 +83,15 @@ class AnamnesisService
             }
         }
 
+        $ownsTransaction = !$this->db->inTransaction();
+        $savepoint = 'anamnesis_' . bin2hex(random_bytes(8));
+        if ($ownsTransaction) $this->db->beginTransaction();
+        else $this->db->exec('SAVEPOINT ' . $savepoint);
+        try {
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $lock = $this->db->prepare('SELECT id FROM patients WHERE id = ? AND clinic_id = ? FOR UPDATE');
+            $lock->execute([$patientId, $clinicId]);
+        }
         // 3. Obter versão mais recente para incrementar
         $vStmt = $this->db->prepare("
             SELECT COALESCE(MAX(version), 0) + 1 FROM anamneses
@@ -139,6 +148,8 @@ class AnamnesisService
             'source_version' => $sourceVersion,
         ]);
 
+        if ($ownsTransaction) $this->db->commit();
+        else $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
         return [
             'id' => $id,
             'version' => $nextVersion,
@@ -146,6 +157,14 @@ class AnamnesisService
             'is_draft' => $isDraft,
             'created_at' => $createdAt,
         ];
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) $this->db->rollBack();
+            elseif (!$ownsTransaction && $this->db->inTransaction()) {
+                $this->db->exec('ROLLBACK TO SAVEPOINT ' . $savepoint);
+                $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -341,7 +360,7 @@ class AnamnesisService
         ];
     }
 
-    private function sanitizeText(?string $text): ?string
+    private function sanitizeText(?string $text, string $label): ?string
     {
         if ($text === null) {
             return null;
@@ -352,7 +371,7 @@ class AnamnesisService
         }
         // Limitar tamanho para prevenir abusos / DoS
         if (mb_strlen($trimmed, 'UTF-8') > self::MAX_FIELD_LENGTH) {
-            $trimmed = mb_substr($trimmed, 0, self::MAX_FIELD_LENGTH, 'UTF-8');
+            throw new InvalidArgumentException($label . ' excede o limite de ' . self::MAX_FIELD_LENGTH . ' caracteres. O preenchimento não foi alterado.');
         }
         return $trimmed;
     }
@@ -360,11 +379,12 @@ class AnamnesisService
     private function logAudit(int $clinicId, int $patientId, string $action, string $resourceId, array $meta): void
     {
         $stmt = $this->db->prepare("
-            INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
-            VALUES (:clinic_id, :action, 'anamneses', :res_id, :details)
+            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details)
+            VALUES (:clinic_id, :user_id, :action, 'anamneses', :res_id, :details)
         ");
         $stmt->execute([
             'clinic_id' => $clinicId,
+            'user_id' => TenantContext::getUserId(),
             'action' => $action,
             'res_id' => $resourceId,
             'details' => json_encode(array_merge([

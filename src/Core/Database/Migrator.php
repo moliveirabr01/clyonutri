@@ -67,10 +67,15 @@ class Migrator
                 $migration->up($this->db);
                 $ins = $this->db->prepare("INSERT INTO migrations (migration) VALUES (:migration)");
                 $ins->execute(['migration' => $migrationName]);
-                $this->db->commit();
+                // MySQL faz commit implícito em DDL (CREATE/ALTER/DROP); só confirma se ainda houver transação aberta.
+                if ($this->db->inTransaction()) {
+                    $this->db->commit();
+                }
                 $executed[] = $migrationName;
             } catch (\Throwable $e) {
-                $this->db->rollBack();
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
                 throw new RuntimeException("Falha ao executar migration {$migrationName}: " . $e->getMessage(), 0, $e);
             }
         }

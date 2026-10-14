@@ -196,11 +196,12 @@ class RecipeService
             if (!empty($allAllergens)) {
                 $alStmt = $this->db->prepare("
                     INSERT INTO recipe_allergens (recipe_id, allergen_group, risk_level, verified_by_professional, notes)
-                    VALUES (:recipe_id, :group, :level, 1, :notes)
+                    VALUES (:recipe_id, :group, :level, :verified, :notes)
                 ");
                 foreach ($allAllergens as $al) {
                     $alStmt->execute([
                         'recipe_id' => $recipeId,
+                        'verified' => !empty($data['allergens_verified'] ?? true) ? 1 : 0,
                         'group' => $al['group'],
                         'level' => $al['level'] ?? 'contains',
                         'notes' => $al['notes'] ?? null,
@@ -212,6 +213,10 @@ class RecipeService
             $versionSnapshot = [
                 'recipe_id' => $recipeId,
                 'version' => 1,
+                'summary' => $data['summary'] ?? null,
+                'prep_time_minutes' => (int)($data['prep_time_minutes'] ?? 15),
+                'cook_time_minutes' => (int)($data['cook_time_minutes'] ?? 0),
+                'photo_path' => $data['photo_path'] ?? null,
                 'title' => $cleanTitle,
                 'servings' => $servings,
                 'ingredients' => $ingSnapshot,
@@ -323,7 +328,7 @@ class RecipeService
         // Se novos ingredientes foram fornecidos, recalcula nutrição; senão mantém os atuais
         $ingredients = $data['ingredients'] ?? null;
         if ($ingredients === null) {
-            $iStmt = $this->db->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order ASC, id ASC");
+            $iStmt = $this->db->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY ordering ASC, id ASC");
             $iStmt->execute([$recipeId]);
             $ingredients = $iStmt->fetchAll();
         }
@@ -422,9 +427,16 @@ class RecipeService
             $this->db->prepare("UPDATE recipe_versions SET status = 'superseded' WHERE recipe_id = ?")->execute([$recipeId]);
 
             // 4. Inserir nova versão imutável
+            $currentDetails = $this->getRecipeDetails($recipeId, $clinicId);
             $versionSnapshot = [
                 'recipe_id' => $recipeId,
                 'version' => $nextVersion,
+                'summary' => $currentDetails['summary'],
+                'prep_time_minutes' => $currentDetails['prep_time_minutes'],
+                'cook_time_minutes' => $currentDetails['cook_time_minutes'],
+                'photo_path' => $currentDetails['photo_path'],
+                'ingredients' => $currentDetails['ingredients'],
+                'allergens' => $currentDetails['allergens'],
                 'title' => $cleanTitle,
                 'servings' => $servings,
                 'instructions' => $instructions,
@@ -487,7 +499,7 @@ class RecipeService
     /**
      * Consulta detalhes completos da receita assegurando governança e isolamento multi-tenant (NI2-269).
      */
-    public function getRecipeDetails(int $recipeId, ?int $clinicId = null): array
+    public function getRecipeDetails(int $recipeId, ?int $clinicId = null, ?int $versionId = null): array
     {
         $tenantClinicId = $clinicId ?? (TenantContext::hasClinic() ? TenantContext::getClinicId() : null);
 
@@ -545,12 +557,97 @@ class RecipeService
         $vStmt->execute(['id' => $recipeId]);
         $versions = $vStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+        // Se uma versão específica foi solicitada (ex: prescrição histórica - MOB-UX-002), recuperar snapshot imutável
+        if ($versionId !== null) {
+            $targetVStmt = $this->db->prepare("SELECT * FROM recipe_versions WHERE id = :vid AND recipe_id = :rid LIMIT 1");
+            $targetVStmt->execute(['vid' => $versionId, 'rid' => $recipeId]);
+            $targetVersion = $targetVStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$targetVersion) {
+                throw new PrescriptionContentUnavailable('Versão prescrita não encontrada.');
+            }
+            if ($targetVersion) {
+                if (!empty($targetVersion['title'])) {
+                    $recipe['title'] = $targetVersion['title'];
+                }
+                if (!empty($targetVersion['servings'])) {
+                    $recipe['servings'] = (float)$targetVersion['servings'];
+                }
+                if (!empty($targetVersion['serving_size_g'])) {
+                    $recipe['serving_size_g'] = (float)$targetVersion['serving_size_g'];
+                }
+                if ($targetVersion['energy_kcal_per_serving'] !== null) {
+                    $recipe['energy_kcal_per_serving'] = (float)$targetVersion['energy_kcal_per_serving'];
+                }
+                if ($targetVersion['protein_g_per_serving'] !== null) {
+                    $recipe['protein_g_per_serving'] = (float)$targetVersion['protein_g_per_serving'];
+                }
+                if ($targetVersion['carbs_g_per_serving'] !== null) {
+                    $recipe['carbs_g_per_serving'] = (float)$targetVersion['carbs_g_per_serving'];
+                }
+                if ($targetVersion['fat_g_per_serving'] !== null) {
+                    $recipe['fat_g_per_serving'] = (float)$targetVersion['fat_g_per_serving'];
+                }
+                if ($targetVersion['fiber_g_per_serving'] !== null) {
+                    $recipe['fiber_g_per_serving'] = (float)$targetVersion['fiber_g_per_serving'];
+                }
+                if ($targetVersion['sodium_mg_per_serving'] !== null) {
+                    $recipe['sodium_mg_per_serving'] = (float)$targetVersion['sodium_mg_per_serving'];
+                }
+
+                if (empty($targetVersion['payload_json'])) {
+                    throw new PrescriptionContentUnavailable('Conteúdo da versão prescrita indisponível.');
+                }
+                if (!empty($targetVersion['payload_json'])) {
+                    $payload = json_decode($targetVersion['payload_json'], true);
+                    if (!is_array($payload) || !array_key_exists('ingredients', $payload) || !is_array($payload['ingredients']) || !isset($payload['allergens']) || !is_array($payload['allergens']) || !array_key_exists('instructions', $payload)) {
+                        throw new PrescriptionContentUnavailable('Esta versão histórica não possui conteúdo completo. Solicite uma nova prescrição ao nutricionista.');
+                    }
+                    if (is_array($payload)) {
+                        foreach (['summary', 'prep_time_minutes', 'cook_time_minutes', 'photo_path'] as $field) {
+                            $recipe[$field] = $payload[$field] ?? null;
+                        }
+                        if (array_key_exists('instructions', $payload)) {
+                            $recipe['instructions'] = is_array($payload['instructions'])
+                                ? implode("\n", array_map(fn($st) => is_array($st) ? ($st['instruction'] ?? '') : (string)$st, $payload['instructions']))
+                                : (string)$payload['instructions'];
+                            $instructionLines = preg_split('/\r?\n/', $recipe['instructions']);
+                            $steps = array_map(fn($instruction, $idx) => ['instruction' => $instruction, 'ordering' => $idx + 1], $instructionLines, array_keys($instructionLines));
+                        }
+                        if (is_array($payload['ingredients'])) {
+                            $ingredients = array_map(function($ing, $idx) {
+                                return [
+                                    'id' => $ing['id'] ?? ($idx + 1),
+                                    'food_id' => $ing['food_id'] ?? 0,
+                                    'food_name' => $ing['food_name'] ?? ($ing['name'] ?? 'Ingrediente'),
+                                    'amount' => $ing['amount'] ?? 0,
+                                    'measure_unit' => $ing['measure_unit'] ?? 'g',
+                                    'weight_grams' => $ing['weight_grams'] ?? $ing['net_weight_g'] ?? ($ing['amount'] ?? 0),
+                                    'notes' => $ing['notes'] ?? null,
+                                    'energy_kcal' => $ing['energy_kcal'] ?? 0,
+                                    'protein_g' => $ing['protein_g'] ?? 0,
+                                    'carbohydrate_g' => $ing['carbohydrate_g'] ?? 0,
+                                    'lipid_g' => $ing['lipid_g'] ?? 0,
+                                ];
+                            }, $payload['ingredients'], array_keys($payload['ingredients']));
+                        }
+                        if (is_array($payload['allergens'])) {
+                            $allergens = $payload['allergens'];
+                        }
+                    }
+                }
+                $recipe['prescribed_version_id'] = (int)$targetVersion['id'];
+                $recipe['prescribed_version_number'] = (int)$targetVersion['version_number'];
+            }
+        }
+
         return array_merge($recipe, [
             'ingredients' => $ingredients,
             'steps' => $steps,
             'tags' => $tags,
             'allergens' => $allergens,
             'versions' => $versions,
+            'current_version' => $versions ? (int)$versions[0]['version_number'] : 1,
         ]);
     }
 
@@ -761,11 +858,21 @@ class RecipeService
         $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
 
         $sql = "
-            SELECT rp.*, r.title AS recipe_title, r.summary AS recipe_summary,
-                   r.energy_kcal_per_serving, r.protein_g_per_serving, r.carbs_g_per_serving, r.fat_g_per_serving,
-                   r.prep_time_minutes, r.cook_time_minutes, r.instructions, r.photo_path
+            SELECT rp.*, 
+                   COALESCE(rv.title, r.title) AS recipe_title, 
+                   r.summary AS recipe_summary,
+                   COALESCE(rv.energy_kcal_per_serving, r.energy_kcal_per_serving) AS energy_kcal_per_serving,
+                   COALESCE(rv.protein_g_per_serving, r.protein_g_per_serving) AS protein_g_per_serving,
+                   COALESCE(rv.carbs_g_per_serving, r.carbs_g_per_serving) AS carbs_g_per_serving,
+                   COALESCE(rv.fat_g_per_serving, r.fat_g_per_serving) AS fat_g_per_serving,
+                   COALESCE(rv.servings, r.servings) AS recipe_servings,
+                   r.prep_time_minutes, r.cook_time_minutes, 
+                   r.instructions, r.photo_path,
+                   rv.payload_json AS prescribed_payload,
+                   rv.version_number AS recipe_version_number
             FROM recipe_prescriptions rp
             JOIN recipes r ON r.id = rp.recipe_id
+            LEFT JOIN recipe_versions rv ON rv.id = rp.recipe_version_id
             WHERE rp.patient_id = :patient_id
         ";
         $params = ['patient_id' => $patientId];
@@ -787,6 +894,12 @@ class RecipeService
         $prescriptions = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($prescriptions as &$p) {
+            $payload = json_decode($p['prescribed_payload'] ?? '{}', true) ?: [];
+            $p['recipe_summary'] = $payload['summary'] ?? null;
+            foreach (['prep_time_minutes', 'cook_time_minutes', 'instructions', 'photo_path'] as $field) {
+                $p[$field] = $payload[$field] ?? null;
+            }
+            unset($p['prescribed_payload']);
             $servings = (float)$p['prescribed_servings'];
             $p['scaled_energy_kcal'] = round((float)$p['energy_kcal_per_serving'] * $servings, 2);
             $p['scaled_protein_g'] = round((float)$p['protein_g_per_serving'] * $servings, 2);
@@ -930,7 +1043,7 @@ class RecipeService
     /**
      * Calcula a composição nutricional dos ingredientes usando alimentos oficiais (TACO).
      */
-    private function calculateIngredientsNutrition(array $ingredients): array
+    private function calculateIngredientsNutrition(array &$ingredients): array
     {
         $totalWeightG = 0.0;
         $totalKcal = 0.0;

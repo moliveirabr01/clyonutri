@@ -1,0 +1,26 @@
+<?php
+require __DIR__.'/../vendor/autoload.php';
+use ClyoNutri\Core\Database\{Connection,Migrator};
+use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Domain\Anamnesis\AnamnesisService;
+use ClyoNutri\Domain\Clinical\{ClinicalRecordService,FormRecovery};
+$db=new PDO('sqlite::memory:');$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE,PDO::FETCH_ASSOC);$db->exec('PRAGMA foreign_keys=ON');Connection::setInstance($db);(new Migrator($db,__DIR__.'/../database/migrations'))->run();
+$db->exec("INSERT INTO clinics(id,uuid,name,status) VALUES(1,'c','Test','active'); INSERT INTO users(id,uuid,name,email,password_hash,role,status) VALUES(1,'u','Test','test@example.test','unused','nutritionist','active'); INSERT INTO clinic_members(clinic_id,user_id,role,status) VALUES(1,1,'nutritionist','active'); INSERT INTO professionals(id,user_id,crn,crn_region) VALUES(1,1,'TEST','TEST'); INSERT INTO patients(id,clinic_id,uuid,name) VALUES(1,1,'p','Test'),(2,1,'p2','Legacy test');");
+TenantContext::set(1,['id'=>1,'role'=>'nutritionist']);$a=new AnamnesisService($db);$c=new ClinicalRecordService($db);
+function check($condition,$message){if(!$condition)throw new RuntimeException($message);}
+function invalid(callable $call){try{$call();throw new RuntimeException('Validation accepted invalid input');}catch(InvalidArgumentException $e){}}
+$db->exec("CREATE TRIGGER fail_audit BEFORE INSERT ON audit_logs WHEN NEW.action IN ('ANAMNESIS_RECORD_CREATED','ANAMNESIS_DRAFT_SAVED') BEGIN SELECT RAISE(ABORT,'synthetic failure'); END");
+foreach([false,true] as $draft){try{$a->saveAnamnesis(1,1,['objectives'=>'Must roll back'],$draft);throw new RuntimeException('Audit failure ignored');}catch(PDOException $e){}}
+check((int)$db->query('SELECT COUNT(*) FROM anamneses')->fetchColumn()===0,'Anamnesis persisted without audit');
+$db->beginTransaction();try{$a->saveAnamnesis(1,1,['objectives'=>'Nested rollback']);throw new RuntimeException('Nested audit failure ignored');}catch(PDOException $e){}check($db->inTransaction(),'Caller transaction lost');$db->commit();check((int)$db->query('SELECT COUNT(*) FROM anamneses')->fetchColumn()===0,'Nested failed anamnesis persisted');$db->exec('DROP TRIGGER fail_audit');
+$long=str_repeat('🍎',5001);invalid(fn()=>$a->saveAnamnesis(1,1,['allergies'=>$long]));check((int)$db->query('SELECT COUNT(*) FROM anamneses')->fetchColumn()===0,'Oversized version persisted');
+$_SESSION=[];$_SERVER['REQUEST_URI']='/pacientes/1/anamnese';FormRecovery::remember(1,'anamnese',['allergies'=>$long]);check(FormRecovery::forCurrentPage()['values']['allergies']===$long,'Unicode form recovery truncated');
+$a->saveAnamnesis(1,1,['allergies'=>str_repeat('á',5000)]);check(mb_strlen($a->getLatestAnamnesis(1)['allergies'])===5000,'Valid boundary failed');
+$r=$c->addClinicalObservation(1,1,'Original','Initial note');$before=$db->query('SELECT COUNT(*) FROM clinical_records')->fetchColumn();
+invalid(fn()=>$c->reviseRecord($r['id'],1,1,'Valid reason for correction',['text'=>'']));invalid(fn()=>$c->reviseRecord($r['id'],1,1,'Valid reason for correction',['text'=>str_repeat('é',10001)]));check($db->query('SELECT COUNT(*) FROM clinical_records')->fetchColumn()===$before,'Invalid revision persisted');check((int)$db->query('SELECT is_retracted FROM clinical_records WHERE id='.$r['id'])->fetchColumn()===0,'Invalid revision retracted history');
+$rev=$c->reviseRecord($r['id'],1,1,'Valid reason for correction',['text'=>str_repeat('é',10000)]);check($c->verifyIntegrity(1)['is_valid'],'Valid chain broken');
+foreach(['title','revision_reason'] as $field){$row=$db->query('SELECT * FROM clinical_records WHERE id='.$rev['id'])->fetch();$db->prepare("UPDATE clinical_records SET $field=? WHERE id=?")->execute(['Changed',$rev['id']]);check(!$c->verifyIntegrity(1)['is_valid'],'Metadata modification undetected: '.$field);try{$c->exportRecordTimelineSafe(1,1);throw new RuntimeException('Tampered export allowed');}catch(RuntimeException $e){check(str_contains($e->getMessage(),'Exportação bloqueada'),'Unexpected export error');}$db->prepare("UPDATE clinical_records SET $field=? WHERE id=?")->execute([$row[$field],$rev['id']]);}
+// Preserve historical v1 hash bytes and append v2 to the same chain.
+$content='{"text":"Legacy"}';$created='2026-01-01 09:00:00';$hash=hash('sha256',implode('|',[1,2,1,1,'null',$content,ClinicalRecordService::GENESIS_HASH,$created]));
+$db->prepare('INSERT INTO clinical_records(clinic_id,patient_id,professional_id,version,title,content_json,record_hash,previous_hash,created_at) VALUES(1,2,1,1,?,?,?,?,?)')->execute(['Legacy title',$content,$hash,ClinicalRecordService::GENESIS_HASH,$created]);check($c->verifyIntegrity(2)['legacy_records']===1,'Legacy coverage missing');$c->addClinicalObservation(2,1,'New title','New note');check($c->verifyIntegrity(2)['is_valid'],'Mixed chain failed');check($db->query('SELECT record_hash FROM clinical_records WHERE patient_id=2 AND version=1')->fetchColumn()===$hash,'Historical hash rewritten');
+echo "PASS NI2-6: audit rollback standalone/nested, Unicode limit/recovery, empty/oversized revision rejection, metadata tamper/export denial, legacy hash and mixed-chain compatibility.\n";

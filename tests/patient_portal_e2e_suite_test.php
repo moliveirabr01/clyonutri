@@ -43,6 +43,10 @@ echo "   CLYONUTRI PATIENT APP & PORTAL 360 SUITE (NI2-11)\n";
 echo "   Validação das Histórias NI2-131 a NI2-141\n";
 echo "========================================================\n\n";
 
+$testDb = getenv('DB_DATABASE') ?: '';
+if ($testDb === '' || realpath($testDb) === realpath(__DIR__.'/../storage/database.sqlite')) {
+    throw new RuntimeException('This destructive legacy suite requires an explicitly isolated DB_DATABASE.');
+}
 $db = Connection::getInstance();
 
 // -----------------------------------------------------------------------------

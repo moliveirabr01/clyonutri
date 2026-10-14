@@ -14,7 +14,8 @@ final class PatientOnboardingController
         try {
             $invitation=(new PatientOnboardingService(Connection::getInstance()))->create(TenantContext::getClinicId(),(int)TenantContext::getUserId(),$patientId);
             $error=null;
-        } catch (\DomainException $e) { $error=$e->getMessage(); }
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) { http_response_code(403); $error='Convite indisponível para este paciente.'; }
+        catch (\DomainException $e) { $error=$e->getMessage(); }
         catch (\Throwable $e) { http_response_code(503); $error='Não foi possível gerar o convite. Tente novamente.'; }
         $title='Primeiro acesso ao app'; $activeNav='pacientes';
         $clinicName=$_SESSION['clinic_name']??'Minha Clínica'; $userName=$_SESSION['user_name']??'';
