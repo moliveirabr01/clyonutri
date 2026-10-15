@@ -7,13 +7,23 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # NI2-427: HTTPS obrigatório (primeira barreira; o PHP repete a checagem).
+    # Só para hosts conhecidos: o Location nunca usa um Host arbitrário enviado pelo cliente.
+    # Outros hosts seguem para o PHP, que redireciona para o APP_URL do .env.
+    # %{HTTPS} é definido pelo próprio Apache com TLS (HostGator); X-Forwarded-Proto NÃO é
+    # considerado aqui de propósito (pode ser forjado). GET/HEAD -> 301; outros métodos -> 403.
+    # (A condição do Host vem por último porque %1 usa a última condição casada.)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
+    RewriteRule ^ - [F,L]
+
     # Repassa o cabeçalho Authorization (tokens da API) no Apache/HostGator
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-    # Força HTTPS (descomente quando o SSL do subdomínio estiver ativo)
-    # RewriteCond %{HTTPS} off
-    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # Arquivos e pastas reais (assets) são servidos direto; o resto vai para index.php
     RewriteCond %{REQUEST_FILENAME} !-d

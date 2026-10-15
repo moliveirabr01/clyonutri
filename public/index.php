@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
+\ClyoNutri\Core\Security\Env::load(__DIR__ . '/../.env');
+// NI2-427: HTTPS obrigatório antes de CORS, banco, sessão ou qualquer controller.
+// GET/HEAD por HTTP -> 301 para APP_URL (https); demais métodos -> 403 sem processar.
+\ClyoNutri\Core\Http\Transport::enforce();
 \ClyoNutri\Core\Http\ApiErrorBoundary::register();
 
 use ClyoNutri\Application\Controllers\AuthController;
@@ -47,7 +51,9 @@ if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
         'path' => '/',
         'httponly' => true,
         'samesite' => 'Lax',
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        // NI2-427: Secure sempre que a requisição chegou por HTTPS (inclui proxy confiável)
+        // ou quando FORCE_HTTPS está ativo (nesse caso HTTP nunca chega até aqui).
+        'secure' => \ClyoNutri\Core\Http\Transport::isHttps() || \ClyoNutri\Core\Http\Transport::forceHttpsEnabled(),
     ]);
     session_start();
 }

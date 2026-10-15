@@ -44,8 +44,11 @@ class Router
             }
         }
 
+        // HEAD usa a mesma rota do GET (o Apache/PHP descartam o corpo). Antes, HEAD caía em 404.
+        $matchMethod = $method === 'HEAD' ? 'GET' : $method;
+
         foreach ($this->routes as $route) {
-            if ($route['method'] === $method && preg_match($route['pattern'], $path, $matches)) {
+            if ($route['method'] === $matchMethod && preg_match($route['pattern'], $path, $matches)) {
                 $params = array_filter($matches, fn($key) => !is_numeric($key), ARRAY_FILTER_USE_KEY);
                 $handler = $route['handler'];
 
