@@ -4753,7 +4753,9 @@ class DashboardController
                     $servingUnit = htmlspecialchars($f['serving_unit'] ?? 'g');
                   ?>
                     <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?></td>
+                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?><?php if (!empty($f['taco_code'])): ?>
+                        <span style="display: block; font-weight: 400; font-size: 0.75rem; color: var(--neutral-gray-500);">TACO nº <?= (int)$f['taco_code'] ?><?= !empty($f['nutrient_flags']) ? ' · ' . htmlspecialchars(str_replace(['protein_g', 'lipid_g', 'carbohydrate_g', 'fiber_g', 'energy_kcal', 'em_branco', ';', '='], ['proteína', 'lipídios', 'carboidratos', 'fibra', 'energia', 'não analisado', ', ', ': '], (string)$f['nutrient_flags'])) : '' ?></span>
+                      <?php endif; ?></td>
                       <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span></td>
                       <td>
                         <span style="font-weight: 500; color: var(--neutral-gray-800);">
@@ -4774,6 +4776,10 @@ class DashboardController
             </table>
           </div>
         </div>
+        <p class="taco-attribution" style="margin: 12px 0 0; color: var(--neutral-gray-500); font-size: 0.8rem; line-height: 1.5;">
+          Fonte dos alimentos marcados com nº TACO: NEPA-UNICAMP. <cite>Tabela Brasileira de Composição de Alimentos – TACO</cite>, 4ª ed. revisada e ampliada. Campinas: NEPA-UNICAMP, 2011. Valores por 100 g de parte comestível.
+          Tr (traço) e NA (não aplicável) aparecem como 0; "*" (análise em reavaliação na TACO) e "não analisado" também aparecem como 0 e ficam indicados abaixo do nome.
+        </p>
         <?php
         $content = ob_get_clean();
 
