@@ -4639,13 +4639,14 @@ class DashboardController
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="p_gender">Gênero / Sexo biológico</label>
-                  <select id="p_gender" name="gender" class="form-control">
+                  <label class="form-label" for="p_gender">Gênero / Sexo biológico (opcional)</label>
+                  <select id="p_gender" name="gender" class="form-control" aria-describedby="p_gender_help">
                     <option value="">Selecione...</option>
                     <option value="Feminino">Feminino</option>
                     <option value="Masculino">Masculino</option>
                     <option value="Outro">Outro / Não informado</option>
                   </select>
+                  <small id="p_gender_help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Campo único herdado. Hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro. A separação entre gênero e sexo aguarda decisão de produto (NI2-422).</small>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">

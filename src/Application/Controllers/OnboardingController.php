@@ -372,13 +372,13 @@ class OnboardingController
                   </div>
                   <div>
                     <label for="ob13-gender" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Gênero / Sexo Biológico</label>
-                    <select id="ob13-gender" name="gender" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <select id="ob13-gender" name="gender" aria-describedby="ob-gender-help" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="" <?= (!$firstPatient || empty($firstPatient['gender'])) ? 'selected' : '' ?>>Não informado (opcional)</option>
                       <option value="male" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'male') ? 'selected' : '' ?>>Masculino</option>
                       <option value="female" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'female') ? 'selected' : '' ?>>Feminino</option>
                       <option value="other" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'other') ? 'selected' : '' ?>>Outro</option>
                     </select>
-                    <span style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Relevante para equações preditivas basais.</span>
+                    <span id="ob-gender-help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Campo único herdado. Hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro. A separação entre gênero e sexo aguarda decisão de produto (NI2-422).</span>
                   </div>
                 </div>
 
