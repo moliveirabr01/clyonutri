@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ClyoNutri\Core\Database;
 
 use ClyoNutri\Domain\Food\FoodCatalogService;
+use ClyoNutri\Domain\Food\TacoCatalogImporter;
 use PDO;
 
 class CatalogSeeder
@@ -23,6 +24,9 @@ class CatalogSeeder
     public function run(): int
     {
         $catalog = new FoodCatalogService($this->db);
-        return $catalog->seedTacoReference();
+        $count = $catalog->seedTacoReference();
+        // TACO completa (597 alimentos, 4ª ed.): vincula os de referência e insere os demais; idempotente.
+        $taco = (new TacoCatalogImporter($this->db))->run();
+        return $count + $taco['inserted'];
     }
 }
