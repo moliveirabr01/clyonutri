@@ -313,7 +313,7 @@ class RecipeController
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 Prescrever ao Paciente
               </a>
-              <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" onsubmit="return confirm('Deseja criar uma variante supervisionada desta receita?');">
+              <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" data-confirm="Deseja criar uma variante supervisionada desta receita?">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <button type="submit" class="btn btn-secondary">Duplicar Variante</button>
               </form>
@@ -545,7 +545,7 @@ class RecipeController
                   <h4 style="color: var(--brand-navy-900); margin: 0;">Ingredientes Oficiais (Tabela TACO) *</h4>
                   <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Selecione os alimentos e a medida caseira correspondente.</span>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="addIngredientRow()">+ Adicionar Ingrediente</button>
+                <button type="button" class="btn btn-secondary" data-call="addIngredientRow">+ Adicionar Ingrediente</button>
               </div>
 
               <div id="ingredientsContainer" style="display: flex; flex-direction: column; gap: 8px;">
@@ -566,7 +566,7 @@ class RecipeController
                     <option value="fatia">fatia</option>
                     <option value="ml">ml</option>
                   </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
                 </div>
               </div>
             </div>
@@ -578,13 +578,13 @@ class RecipeController
                   <h4 style="color: var(--brand-navy-900); margin: 0;">Modo de Preparo (Passos Ordenados)</h4>
                   <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Descreva as etapas para orientação do paciente.</span>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="addStepRow()">+ Adicionar Passo</button>
+                <button type="button" class="btn btn-secondary" data-call="addStepRow">+ Adicionar Passo</button>
               </div>
 
               <div id="stepsContainer" style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 8px;">
                   <input type="text" name="steps[]" placeholder="Passo 1: Em uma tigela, misture os ingredientes até homogenizar..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
                 </div>
               </div>
             </div>
@@ -611,7 +611,7 @@ class RecipeController
           </form>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           let ingredientIndex = 1;
           // XSS (auditoria 14/10/2026): dados via JSON com escapes HEX e <option> criado por DOM/textContent.
           const foodOptions = <?= json_encode(array_map(static fn($f) => ['id' => (int)$f['id'], 'name' => (string)$f['name']], $foods), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
@@ -643,7 +643,7 @@ class RecipeController
                       <option value="fatia">fatia</option>
                       <option value="ml">ml</option>
                   </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
               `;
               fillFoodOptions(row.querySelector('select'));
               container.appendChild(row);
@@ -657,7 +657,7 @@ class RecipeController
               row.style.cssText = 'display: flex; gap: 8px;';
               row.innerHTML = `
                   <input type="text" name="steps[]" placeholder="Passo ${stepNum}: ..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
               `;
               container.appendChild(row);
           }
@@ -814,7 +814,7 @@ class RecipeController
 
             <div style="margin-bottom: var(--space-4);">
               <label for="rc15-patient_id" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Paciente *</label>
-              <select id="rc15-patient_id" name="patient_id" required onchange="window.location.href='/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=' + this.value" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+              <select id="rc15-patient_id" name="patient_id" required data-nav-prefix="/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                 <?php foreach ($patients as $p): ?>
                   <option value="<?= (int)$p['id'] ?>" <?= ((int)$p['id'] === $selectedPatientId) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($p['name']) ?>

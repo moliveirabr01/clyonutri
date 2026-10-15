@@ -84,7 +84,7 @@
                   <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken ?? '') ?>">
                   <?php if ($u['status'] === 'active'): ?>
                     <input type="hidden" name="status" value="suspended">
-                    <button type="submit" class="btn btn--secondary btn--sm" onclick="return confirm('Deseja suspender o acesso deste usuário?')">Suspender</button>
+                    <button type="submit" class="btn btn--secondary btn--sm" data-confirm="Deseja suspender o acesso deste usuário?">Suspender</button>
                   <?php else: ?>
                     <input type="hidden" name="status" value="active">
                     <button type="submit" class="btn btn--primary btn--sm">Ativar</button>

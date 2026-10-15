@@ -554,7 +554,7 @@
 </head>
 <body>
   <a class="skip-admin-content" href="#admin-main-content">Ir para o conteúdo principal</a>
-  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+  <div class="admin-overlay" id="admin-overlay" data-call="toggleAdminMenu"></div>
 
   <div class="admin-layout">
     <!-- Sidebar Navegação Administrativa Isolada -->
@@ -643,7 +643,7 @@
     <main class="admin-main">
       <header class="admin-header">
         <div class="admin-header__left">
-          <button type="button" class="admin-menu-toggle" aria-label="Abrir menu de navegação" onclick="toggleAdminMenu()">
+          <button type="button" class="admin-menu-toggle" aria-label="Abrir menu de navegação" data-call="toggleAdminMenu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           
@@ -693,7 +693,7 @@
         <?php if (!empty($_SESSION['flash_success'])): ?>
           <div class="admin-alert admin-alert--success" role="alert">
             <span><?= htmlspecialchars($_SESSION['flash_success']) ?></span>
-            <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-weight:700;">&times;</button>
+            <button type="button" data-remove-parent style="background:none;border:none;cursor:pointer;font-weight:700;">&times;</button>
           </div>
           <?php unset($_SESSION['flash_success']); ?>
         <?php endif; ?>
@@ -701,7 +701,7 @@
         <?php if (!empty($_SESSION['flash_error'])): ?>
           <div class="admin-alert admin-alert--error" role="alert">
             <span><?= htmlspecialchars($_SESSION['flash_error']) ?></span>
-            <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-weight:700;">&times;</button>
+            <button type="button" data-remove-parent style="background:none;border:none;cursor:pointer;font-weight:700;">&times;</button>
           </div>
           <?php unset($_SESSION['flash_error']); ?>
         <?php endif; ?>
@@ -711,7 +711,7 @@
     </main>
   </div>
 
-  <script>
+  <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
     function toggleAdminMenu() {
       const sidebar = document.getElementById('admin-sidebar');
       const overlay = document.getElementById('admin-overlay');

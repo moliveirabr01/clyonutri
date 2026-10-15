@@ -118,7 +118,7 @@ check(str_contains($prof360, 'data-testid="care-continue"') && str_contains($pro
 check(str_contains($prof360, 'href="#patient-appointments"') && !str_contains($prof360, 'Perfil Clínico 360'), 'Perfil: navegação por seções e sem jargão "Perfil Clínico 360"');
 $db->exec("UPDATE appointments SET status = 'confirmed' WHERE id = {$todayId}");
 $prof360b = $render(fn() => (new \ClyoNutri\Application\Controllers\DashboardController())->profile360(['id' => $pA]));
-check(preg_match('#<form method="POST" action="/agenda/' . $todayId . '/status"[^>]*onsubmit="return confirm\(#', $prof360b) === 1 && str_contains($prof360b, 'name="status" value="in_progress"'), 'Perfil: Iniciar atendimento é POST com confirmação (não GET)');
+check(preg_match('#<form method="POST" action="/agenda/' . $todayId . '/status"[^>]*data-confirm="Iniciar agora#', $prof360b) === 1 && str_contains($prof360b, 'name="status" value="in_progress"'), 'Perfil: Iniciar atendimento é POST com confirmação (não GET)');
 $demoUser = $db->query("SELECT u.id, cm.clinic_id FROM users u JOIN clinic_members cm ON cm.user_id = u.id WHERE u.email = 'demo.local@clyonutri.local' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $pDemo = $mkPatient((int)$demoUser['clinic_id'], 'Paciente Fictício Anamnese');
 TenantContext::set((int)$demoUser['clinic_id'], ['id' => (int)$demoUser['id'], 'role' => 'nutritionist', 'name' => 'Demo']);

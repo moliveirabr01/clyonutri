@@ -265,7 +265,7 @@ class DashboardController
             <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="btn btn-secondary">
               Antropometria ➔
             </a>
-            <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+            <button type="button" class="btn btn-primary" data-call="openAnthroModal">
               + Nova Avaliação
             </button>
           </div>
@@ -291,7 +291,7 @@ class DashboardController
             <?php if ($careStep['state'] === 'continue'): ?>
               <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>" data-testid="care-continue">Continuar atendimento</a>
             <?php elseif ($careStep['state'] === 'start_today'): ?>
-              <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" style="margin: 0;" data-no-dirty onsubmit="return confirm(<?= htmlspecialchars(json_encode('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
+              <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" style="margin: 0;" data-no-dirty data-confirm="<?= htmlspecialchars('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?', ENT_QUOTES) ?>">
                 <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="status" value="in_progress">
                 <button type="submit" class="btn btn-primary" data-testid="care-start">Iniciar atendimento</button>
@@ -443,7 +443,7 @@ class DashboardController
             <div class="card" id="secao-planos" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-plan-p360').style.display='flex'" style="font-size: 0.8rem; padding: 3px 8px;">
+                <button type="button" class="btn btn-secondary" data-show="modal-new-plan-p360" style="font-size: 0.8rem; padding: 3px 8px;">
                   + Novo Plano
                 </button>
               </div>
@@ -484,7 +484,7 @@ class DashboardController
                     <textarea id="dc2-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
                   </div>
                   <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                    <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-new-plan-p360\').style.display=\'none\'">Cancelar</button>
+                    <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan-p360">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Abrir Editor</button>
                   </div>
                 </form>
@@ -501,7 +501,7 @@ class DashboardController
               <?php if (empty($assessments)): ?>
                 <div style="text-align: center; padding: var(--space-6); color: var(--neutral-gray-500);">
                   <p>Nenhuma avaliação antropométrica registrada ainda para este paciente.</p>
-                  <button type="button" class="btn btn-secondary" onclick="openAnthroModal()" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
+                  <button type="button" class="btn btn-secondary" data-call="openAnthroModal" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
                 </div>
               <?php else: ?>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -573,11 +573,11 @@ class DashboardController
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
-        <div id="anthroModal" data-dialog="modal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
+        <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
           <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
               <h3>Nova Avaliação Antropométrica</h3>
-              <button type="button" data-dialog-close class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
             <form method="POST" action="/pacientes/<?= $p['id'] ?>/antropometria">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -661,14 +661,14 @@ class DashboardController
               </div>
 
               <div class="modal-footer">
-                <button data-dialog-close type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openAnthroModal() {
             document.getElementById('anthroModal').classList.add('active');
             document.getElementById('ant_weight').focus();
@@ -758,7 +758,7 @@ class DashboardController
             <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
             <p style="color: var(--neutral-gray-500);">Evolução dos indicadores, composição corporal e comparação entre avaliações.</p>
           </div>
-          <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+          <button type="button" class="btn btn-primary" data-call="openAnthroModal">
             + Nova Avaliação
           </button>
         </div>
@@ -832,7 +832,7 @@ class DashboardController
             <h3>Série Histórica Ponto a Ponto</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
               <label for="dc3-campo" style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
-              <select id="dc3-campo" aria-label="Medida da evolução antropométrica" onchange="location.href='/pacientes/<?= $patient['id'] ?>/antropometria?metric='+this.value" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
+              <select id="dc3-campo" aria-label="Medida da evolução antropométrica" data-nav-prefix="/pacientes/<?= (int)$patient['id'] ?>/antropometria?metric=" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
                 <option value="weight_kg" <?= $metric === 'weight_kg' ? 'selected' : '' ?>>Peso Corporal (kg)</option>
                 <option value="bmi" <?= $metric === 'bmi' ? 'selected' : '' ?>>IMC (kg/m²)</option>
                 <option value="waist_cm" <?= $metric === 'waist_cm' ? 'selected' : '' ?>>Cintura (cm)</option>
@@ -1039,11 +1039,11 @@ class DashboardController
         </div>
 
         <!-- Modal Nova Avaliação Antropométrica -->
-        <div id="anthroModal" data-dialog="modal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
+        <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
           <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
               <h3>Nova Avaliação Antropométrica</h3>
-              <button type="button" data-dialog-close class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
             <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -1127,14 +1127,14 @@ class DashboardController
               </div>
 
               <div class="modal-footer">
-                <button data-dialog-close type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openAnthroModal() {
             document.getElementById('anthroModal').classList.add('active');
             document.getElementById('ant_weight').focus();
@@ -1289,7 +1289,7 @@ class DashboardController
             <a href="/pacientes/<?= $patient['id'] ?>/anamnese" class="btn btn-secondary">
               Ver Anamnese ➔
             </a>
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+            <button type="button" class="btn btn-primary" data-show="modal-new-record">
               + Nova Evolução / Anotação
             </button>
           </div>
@@ -1365,7 +1365,7 @@ class DashboardController
           <?php if (empty($timeline)): ?>
             <div style="text-align: center; padding: 32px; color: #64748B;">
               <p>Nenhuma entrada clínica registrada ainda neste prontuário.</p>
-              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+              <button type="button" class="btn btn-primary" data-show="modal-new-record">
                 Registrar Primeira Evolução
               </button>
             </div>
@@ -1390,7 +1390,7 @@ class DashboardController
                       </div>
                     </div>
                     <?php if (!$rec['is_retracted']): ?>
-                      <button type="button" class="btn btn-sm btn-outline" onclick="openRevisionModal(<?= $rec['id'] ?>, <?= htmlspecialchars(json_encode((string)$rec['title'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="font-size: 0.75rem; padding: 3px 8px;">
+                      <button type="button" class="btn btn-sm btn-outline" data-call="openRevisionModal" data-args="[<?= $rec['id'] ?>, <?= htmlspecialchars(json_encode((string)$rec['title'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="font-size: 0.75rem; padding: 3px 8px;">
                         Retificar Formalmente (v<?= $rec['version'] + 1 ?>)
                       </button>
                     <?php endif; ?>
@@ -1463,7 +1463,7 @@ class DashboardController
                 <textarea id="dc6-content_text" name="content_text" required rows="6" maxlength="10000" placeholder="Descreva os achados, relato do paciente, metas nutricionais e conduta estabelecida..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-new-record\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-record">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Assinar & Gravar no Prontuário</button>
               </div>
             </form>
@@ -1488,14 +1488,14 @@ class DashboardController
                 <textarea id="dc8-revised_text" name="revised_text" required rows="6" maxlength="10000" placeholder="Insira o texto retificado e atualizado para este atendimento..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-revise-record\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-revise-record">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="background: #D97706; border-color: #D97706;">Publicar Retificação Versionada</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openRevisionModal(recId, title) {
             var form = document.getElementById('form-revise-record');
             form.action = '/pacientes/<?= $patient['id'] ?>/prontuario/' + recId + '/retificar';
@@ -1905,7 +1905,7 @@ class DashboardController
               <p style="flex-basis: 100%; margin: 0; text-align: right; font-size: 0.75rem; color: #64748B;">Concluir registra uma nova versão. As versões anteriores continuam no histórico.</p>
             </div>
           </form>
-          <script>
+          <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           (() => {
             const form = document.getElementById('anamnesis-form'); if (!form) return;
             const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status'), initial = status.textContent.trim();
@@ -2590,7 +2590,7 @@ class DashboardController
             <span class="sr-only" role="status" id="agenda-period"><?= htmlspecialchars($nav['period_label']) ?></span>
 
             <label class="sr-only" for="agenda-date-picker">Ir para a data</label>
-            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" onchange="if(this.value)location.href='/agenda?view=<?= $view ?>&date='+this.value" style="padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem; background: #fff;">
+            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" data-nav-prefix="/agenda?view=<?= $view ?>&date=" style="padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem; background: #fff;">
 
             <!-- Alternância de Visão Dia / Semana -->
             <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
@@ -2599,7 +2599,7 @@ class DashboardController
             </div>
 
             <!-- Botão Novo Agendamento -->
-            <button type="button" aria-controls="card-novo-agendamento" onclick="var m = document.getElementById('card-novo-agendamento'); if (m.style.display === 'none') { m.style.display = 'block'; } else if (window.ClyoDialog) { window.ClyoDialog.close(m); } else { m.style.display = 'none'; }" class="btn btn-accent" style="min-height: 38px;">
+            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-accent" style="min-height: 38px;">
               + Nova Consulta
             </button>
           </div>
@@ -2610,7 +2610,7 @@ class DashboardController
         <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: <?= $openNew ? 'block' : 'none' ?>; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
           <div class="card__header">
             <h3>Agendar Nova Consulta</h3>
-            <button type="button" data-dialog-close aria-label="Fechar agendamento" onclick="document.getElementById('card-novo-agendamento').style.display='none'" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
+            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
           </div>
           <form action="/agenda" method="POST" style="margin-top: 16px;">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -2662,7 +2662,7 @@ class DashboardController
               </label>
 
               <div style="display: flex; gap: 8px;">
-                <button type="button" data-dialog-close onclick="document.getElementById('card-novo-agendamento').style.display='none'" class="btn btn-secondary">Cancelar</button>
+                <button type="button" data-dialog-close data-hide="card-novo-agendamento" class="btn btn-secondary">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Confirmar Agendamento</button>
               </div>
             </div>
@@ -2736,12 +2736,12 @@ class DashboardController
 
                             <!-- Menu de Estados da Consulta -->
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Deseja marcar como Não Compareceu?');">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Deseja marcar como Não Compareceu?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="no_show">
                                 <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #DC2626;" title="Não compareceu">Não compareceu</button>
                               </form>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Confirmar cancelamento da consulta?');">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Confirmar cancelamento da consulta?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="cancelled">
                                 <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #64748B;" title="Cancelar consulta">Cancelar</button>
@@ -2853,7 +2853,7 @@ class DashboardController
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Prescrições e Planos Alimentares</h1>
             <p style="color: var(--neutral-gray-500); margin-top: 4px;">Monte refeições, alimentos e substituições e acompanhe os totais. Cada publicação gera uma nova versão; as anteriores ficam no histórico.</p>
           </div>
-          <button class="btn btn-primary" onclick="document.getElementById('modal-new-plan').style.display='flex'">
+          <button class="btn btn-primary" data-show="modal-new-plan">
             + Novo Plano Alimentar
           </button>
         </div>
@@ -2916,7 +2916,7 @@ class DashboardController
                         <a href="/planos/<?= $pl['id'] ?>" class="btn btn-sm btn-outline" style="text-decoration: none; padding: 4px 10px; font-size: 0.8rem; margin-right: 4px;">
                           <?= $pl['status'] === 'draft' ? 'Editar' : 'Visualizar' ?>
                         </a>
-                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" onsubmit="return confirm('Deseja duplicar este plano para um novo rascunho?');">
+                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" data-confirm="Deseja duplicar este plano para um novo rascunho?">
                           <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                           <button type="submit" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Duplicar</button>
                         </form>
@@ -2953,7 +2953,7 @@ class DashboardController
                 <textarea id="dc18-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-new-plan\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Iniciar Prescrição</button>
               </div>
             </form>
@@ -3046,13 +3046,13 @@ class DashboardController
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
             <?php if ($canEditItems): ?>
-            <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
+            <form method="POST" action="/planos/<?= $planId ?>/duplicar" data-confirm="Deseja criar um novo rascunho a partir deste plano?">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;"><?= $isDraft ? 'Duplicar como Rascunho' : 'Criar nova versão para editar' ?></button>
             </form>
             <?php endif; ?>
             <?php if ($isDraft): ?>
-              <button class="btn btn-primary" onclick="document.getElementById('modal-publish-plan').style.display='flex'">
+              <button class="btn btn-primary" data-show="modal-publish-plan">
                 Revisar & Publicar
               </button>
             <?php endif; ?>
@@ -3161,7 +3161,7 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Refeições do Dia</h2>
           <?php if ($isDraft): ?>
-            <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-add-meal').style.display='flex'">
+            <button class="btn btn-sm btn-outline" data-show="modal-add-meal">
               + Adicionar Refeição
             </button>
           <?php endif; ?>
@@ -3171,7 +3171,7 @@ class DashboardController
           <div class="card" style="padding: 32px; text-align: center; color: #64748b;">
             <p style="margin-bottom: 12px;">Nenhuma refeição adicionada a esta prescrição.</p>
             <?php if ($isDraft): ?>
-              <button class="btn btn-primary" onclick="document.getElementById('modal-add-meal').style.display='flex'">Adicionar Primeira Refeição</button>
+              <button class="btn btn-primary" data-show="modal-add-meal">Adicionar Primeira Refeição</button>
             <?php endif; ?>
           </div>
         <?php else: ?>
@@ -3190,8 +3190,8 @@ class DashboardController
                     <strong><?= number_format((float)$m['totals']['energy_kcal'], 0) ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1) ?>g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1) ?>g | G: <?= number_format((float)$m['totals']['lipid_g'], 1) ?>g
                   </span>
                   <?php if ($isDraft): ?>
-                    <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
-                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
+                    <button class="btn btn-sm btn-outline" data-call="openAddItemModal" data-args="[<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
+                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" data-confirm="Deseja excluir esta refeição e seus itens?">
                       <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                       <button type="submit" class="btn btn-sm" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
                     </form>
@@ -3230,10 +3230,10 @@ class DashboardController
                           </td>
                           <td style="padding: 12px 20px; text-align: right; width: 15%;">
                             <?php if ($isDraft): ?>
-                              <button class="btn btn-sm btn-outline" onclick="openAddSubModal(<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
+                              <button class="btn btn-sm btn-outline" data-call="openAddSubModal" data-args="[<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
                                 + Substituição
                               </button>
-                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
+                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" data-confirm="Remover este alimento?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <button type="submit" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
                               </form>
@@ -3245,7 +3245,7 @@ class DashboardController
                         <tr><td colspan="4" style="padding: var(--space-3) var(--space-4);">
                           <details data-testid="edit-plan-item-<?= (int)$it['id'] ?>">
                             <summary style="cursor: pointer; color: var(--brand-navy-900); font-weight: 600;">Editar porção e orientação</summary>
-                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').textContent='Salvando…';">
+                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" data-busy-text="Salvando…">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
                               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);">
@@ -3254,7 +3254,7 @@ class DashboardController
                               </div>
                               <div class="form-group"><label class="form-label" for="item-notes-<?= (int)$it['id'] ?>">Orientação</label><textarea class="form-control" id="item-notes-<?= (int)$it['id'] ?>" name="notes"><?= htmlspecialchars($it['notes'] ?? '', ENT_QUOTES) ?></textarea></div>
                               <button type="submit" class="btn btn-primary">Salvar alterações</button>
-                              <button type="button" class="btn btn-secondary" onclick="this.form.reset(); this.closest('details').open=false">Cancelar</button>
+                              <button type="button" class="btn btn-secondary" data-reset-close-details>Cancelar</button>
                             </form>
                           </details>
                         </td></tr>
@@ -3281,7 +3281,7 @@ class DashboardController
                               </td>
                               <td style="padding: 8px 20px; text-align: right;">
                                 <?php if ($isDraft): ?>
-                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover substituição?');">
+                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" data-confirm="Remover substituição?">
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                     <button type="submit" style="color: #57534E; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
                                   </form>
@@ -3319,7 +3319,7 @@ class DashboardController
                 <textarea id="dc21-notes" name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-add-meal\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-add-meal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Refeição</button>
               </div>
             </form>
@@ -3468,7 +3468,7 @@ class DashboardController
               <?php endif; ?>
 
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-publish-plan\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-publish-plan">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Confirmar e Publicar Versão</button>
               </div>
             </form>
@@ -3476,7 +3476,7 @@ class DashboardController
         </div>
 
         <script src="/assets/js/food-picker.js" defer></script>
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
           document.getElementById('add-item-meal-name').innerText = 'Refeição: ' + mealName;
@@ -3754,7 +3754,7 @@ class DashboardController
             <p style="color: var(--neutral-gray-600); margin: 0;">Recebíveis de consultas, controle de honorários, baixas e emissão de recibos.</p>
           </div>
           <div>
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'" style="display: inline-flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel" style="display: inline-flex; align-items: center; gap: 8px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               <span>+ Novo Lançamento Financeiro</span>
             </button>
@@ -3816,7 +3816,7 @@ class DashboardController
               Os recebíveis financeiros representam honorários de consultas clínicas e planos de acompanhamento nutricional. Eles são gerados a partir dos agendamentos na agenda ou registrados manualmente aqui para qualquer paciente da sua clínica.
             </p>
             <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 32px;">
-              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'">
+              <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel">
                 + Novo Lançamento Financeiro
               </button>
               <a href="/agenda" class="btn btn-outline" style="text-decoration: none;">
@@ -3887,10 +3887,10 @@ class DashboardController
                         <?php if (in_array($rc['status'], ['pending', 'partially_paid'], true)): ?>
                           <div style="display: inline-flex; align-items: center; gap: 8px;">
                             <button type="button" class="btn btn-sm btn-outline" style="color: var(--semantic-success); border-color: var(--semantic-success);"
-                                    onclick="openPayModal(<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, <?= htmlspecialchars(json_encode((string)$rc['description'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)">
+                                    data-call="openPayModal" data-args="[<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, <?= htmlspecialchars(json_encode((string)$rc['description'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]">
                               Dar Baixa
                             </button>
-                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" onsubmit="return confirm('Deseja realmente cancelar este recebível?');">
+                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" data-confirm="Deseja realmente cancelar este recebível?">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <button type="submit" class="btn btn-sm" style="color: var(--neutral-gray-500); background: transparent; border: none; cursor: pointer; text-decoration: underline; font-size: 0.8rem;">
                                 Cancelar
@@ -3916,7 +3916,7 @@ class DashboardController
           <div class="cn-dialog__panel card" style="width: 100%; max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Novo Lançamento Financeiro</h3>
-              <button type="button" data-dialog-close onclick="document.getElementById(\'modal-novo-recebivel\').style.display=\'none\'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+              <button type="button" data-dialog-close data-hide="modal-novo-recebivel" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
             </div>
             
             <form method="POST" action="/financeiro/recebiveis/novo">
@@ -3967,7 +3967,7 @@ class DashboardController
               <?php endif; ?>
 
               <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-novo-recebivel\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-novo-recebivel">Cancelar</button>
                 <button type="submit" class="btn btn-primary" <?= empty($patients) ? 'disabled' : '' ?>>Salvar Lançamento</button>
               </div>
             </form>
@@ -3979,7 +3979,7 @@ class DashboardController
           <div class="cn-dialog__panel card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Dar Baixa no Recebível</h3>
-              <button type="button" data-dialog-close onclick="document.getElementById(\'modal-dar-baixa\').style.display=\'none\'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+              <button type="button" data-dialog-close data-hide="modal-dar-baixa" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
             </div>
             
             <form id="form-dar-baixa" method="POST" action="">
@@ -4007,14 +4007,14 @@ class DashboardController
               </div>
 
               <div style="display: flex; justify-content: flex-end; gap: 12px;">
-                <button type="button" data-dialog-close class="btn btn-outline" onclick="document.getElementById(\'modal-dar-baixa\').style.display=\'none\'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-dar-baixa">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #10b981); border-color: var(--semantic-success, #10b981);">Confirmar Recebimento</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openPayModal(id, amountCents, description) {
           var form = document.getElementById('form-dar-baixa');
           form.action = '/financeiro/recebiveis/' + id + '/pagar';
@@ -4522,7 +4522,7 @@ class DashboardController
             <h1>Gestão de Pacientes</h1>
             <p style="color: var(--neutral-gray-500);">Cadastro, histórico de acompanhamento e prontuários.</p>
           </div>
-          <button type="button" class="btn btn-primary" aria-haspopup="dialog" aria-controls="patientModal" onclick="openPatientModal()">
+          <button type="button" class="btn btn-primary" aria-haspopup="dialog" aria-controls="patientModal" data-call="openPatientModal">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>Cadastrar Paciente</span>
           </button>
@@ -4604,14 +4604,14 @@ class DashboardController
           <span>Página <?= $listing['page'] ?> de <?= $listing['pages'] ?></span>
           <?php if ($listing['page'] < $listing['pages']): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']+1])) ?>">Próxima</a><?php endif; ?>
         </nav>
-        <script>document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
 
         <!-- Modal Cadastrar Paciente (Design System Premium) -->
-        <div id="patientModal" data-dialog="modal" class="modal-overlay" onclick="if(event.target === this) closePatientModal()">
+        <div id="patientModal" data-dialog="modal" class="modal-overlay" data-call-self="closePatientModal">
           <div class="cn-dialog__panel modal-dialog">
             <div class="modal-header">
               <h3>Novo Paciente</h3>
-              <button type="button" data-dialog-close class="modal-close" onclick="closePatientModal()" aria-label="Fechar modal">
+              <button type="button" data-dialog-close class="modal-close" data-call="closePatientModal" aria-label="Fechar modal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -4658,14 +4658,14 @@ class DashboardController
                 <?php require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               </div>
               <div class="modal-footer">
-                <button data-dialog-close type="button" class="btn btn-secondary" onclick="closePatientModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closePatientModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Paciente</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openPatientModal() {
             document.getElementById('patientModal').classList.add('active');
             document.getElementById('p_name').focus();

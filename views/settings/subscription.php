@@ -240,7 +240,7 @@
         </ul>
       </div>
 
-      <form method="POST" action="/configuracoes/assinatura/cancelar" onsubmit="return confirm('Tem certeza de que deseja cancelar a assinatura do consultório? O acesso permanecerá até o fim do ciclo pago.');">
+      <form method="POST" action="/configuracoes/assinatura/cancelar" data-confirm="Tem certeza de que deseja cancelar a assinatura do consultório? O acesso permanecerá até o fim do ciclo pago.">
         <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
 
         <fieldset style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 1.25rem; margin-bottom: var(--space-4);">

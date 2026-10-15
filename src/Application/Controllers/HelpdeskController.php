@@ -141,7 +141,7 @@ class HelpdeskController
               <?php else: ?>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                   <?php foreach ($searchResults as $art): ?>
-                    <a href="/ajuda/artigo/<?= $art['slug'] ?>" style="text-decoration: none; color: inherit; display: block; padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #F8FAFC; transition: all 0.2s;" onmouseover="this.style.borderColor='#94A3B8'" onmouseout="this.style.borderColor='#E2E8F0'">
+                    <a href="/ajuda/artigo/<?= $art['slug'] ?>" style="text-decoration: none; color: inherit; display: block; padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #F8FAFC; transition: all 0.2s;" data-hover="borderColor:#94A3B8" data-unhover="borderColor:#E2E8F0">
                       <strong style="color: #0F172A; font-size: 1rem; display: block; margin-bottom: 4px;"><?= htmlspecialchars($art['title']) ?></strong>
                       <p style="color: #475569; font-size: 0.85rem; margin: 0;"><?= htmlspecialchars($art['summary']) ?></p>
                       <span style="font-size: 0.75rem; color: #94A3B8; margin-top: 6px; display: inline-block;">👁️ <?= $art['view_count'] ?> visualizações</span>
@@ -156,7 +156,7 @@ class HelpdeskController
           <h2 style="font-size: 1.25rem; font-weight: 700; color: #0F172A; margin: 0 0 16px 0;">Categorias de Ajuda</h2>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 32px;">
             <?php foreach ($categories as $cat): ?>
-              <a href="/ajuda/categoria/<?= $cat['slug'] ?>" style="text-decoration: none; color: inherit;" class="card" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+              <a href="/ajuda/categoria/<?= $cat['slug'] ?>" style="text-decoration: none; color: inherit;" class="card" data-hover="transform:translateY(-2px)" data-unhover="transform:none">
                 <div style="display: flex; align-items: flex-start; gap: 12px;">
                   <div style="background: #EFF6FF; color: #2563EB; width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
                     📘
@@ -178,7 +178,7 @@ class HelpdeskController
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
               <?php foreach ($featuredFaqs as $faq): ?>
-                <a href="/ajuda/artigo/<?= $faq['slug'] ?>" style="text-decoration: none; color: inherit; padding: 12px; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; display: block;" onmouseover="this.style.borderColor='#2563EB'" onmouseout="this.style.borderColor='#E2E8F0'">
+                <a href="/ajuda/artigo/<?= $faq['slug'] ?>" style="text-decoration: none; color: inherit; padding: 12px; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; display: block;" data-hover="borderColor:#2563EB" data-unhover="borderColor:#E2E8F0">
                   <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">
                     <?= htmlspecialchars(KnowledgeBaseService::CATEGORIES[$faq['category']]['name'] ?? $faq['category']) ?>
                   </div>
@@ -238,7 +238,7 @@ class HelpdeskController
               </div>
             <?php else: ?>
               <?php foreach ($articles as $art): ?>
-                <a href="/ajuda/artigo/<?= $art['slug'] ?>" class="card" style="text-decoration: none; color: inherit; transition: border-color 0.2s;" onmouseover="this.style.borderColor='#2563EB'" onmouseout="this.style.borderColor='#E2E8F0'">
+                <a href="/ajuda/artigo/<?= $art['slug'] ?>" class="card" style="text-decoration: none; color: inherit; transition: border-color 0.2s;" data-hover="borderColor:#2563EB" data-unhover="borderColor:#E2E8F0">
                   <div style="display: flex; justify-content: space-between; align-items: baseline;">
                     <h3 style="margin: 0 0 6px 0; color: #0F172A; font-size: 1.05rem;"><?= htmlspecialchars($art['title']) ?></h3>
                     <span style="font-size: 0.75rem; color: #94A3B8;">👁️ <?= $art['view_count'] ?></span>
@@ -443,7 +443,7 @@ class HelpdeskController
             </form>
           </div>
         </div>
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           // Prevenção de duplo clique
           document.getElementById('form-ticket').addEventListener('submit', function() {
             var btn = document.getElementById('btn-submit-ticket');
@@ -655,7 +655,7 @@ class HelpdeskController
 
               <!-- Ações de Resolução -->
               <?php if (in_array($ticket['status'], [HelpdeskTicketService::STATUS_OPEN, HelpdeskTicketService::STATUS_IN_PROGRESS, HelpdeskTicketService::STATUS_WAITING_CLIENT])): ?>
-                <form action="/ajuda/chamado/<?= $ticket['protocol'] ?>/resolver" method="POST" onsubmit="return confirm('Confirma que o problema foi solucionado e deseja fechar o chamado?');">
+                <form action="/ajuda/chamado/<?= $ticket['protocol'] ?>/resolver" method="POST" data-confirm="Confirma que o problema foi solucionado e deseja fechar o chamado?">
                   <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                   <button type="submit" class="btn btn-sm btn-secondary" style="color: #059669; border-color: #10B981;">
                     ✓ Marcar como Resolvido

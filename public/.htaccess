@@ -41,3 +41,14 @@ DirectoryIndex index.php index.html
         Deny from all
     </IfModule>
 </FilesMatch>
+
+# NI2-429: cabeçalhos para o que o Apache serve direto (CSS, JS, imagens, SVG).
+# "setifempty" só preenche quando o PHP não enviou o cabeçalho: o PHP é a fonte única das
+# páginas e da API (CSP com nonce, HSTS configurável), sem valores duplicados ou divergentes.
+# HSTS não é enviado aqui de propósito: o valor do rollout fica só no .env (HSTS_MAX_AGE).
+<IfModule mod_headers.c>
+    Header setifempty X-Content-Type-Options "nosniff"
+    Header setifempty X-Frame-Options "DENY"
+    Header setifempty Referrer-Policy "strict-origin-when-cross-origin"
+    Header setifempty Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+</IfModule>

@@ -9,6 +9,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 \ClyoNutri\Core\Http\Transport::enforce();
 // NI2-428: HSTS gradual (só por HTTPS; valor em HSTS_MAX_AGE).
 \ClyoNutri\Core\Http\SecurityHeaders::sendHsts();
+// NI2-429: CSP (nonce por resposta), anti-enquadramento, nosniff, Referrer/Permissions-Policy.
+\ClyoNutri\Core\Http\SecurityHeaders::sendBrowserPolicies((string)($_SERVER['REQUEST_URI'] ?? '/'));
 \ClyoNutri\Core\Http\ApiErrorBoundary::register();
 
 use ClyoNutri\Application\Controllers\AuthController;

@@ -578,7 +578,7 @@ class ChatController
                 <?php if ($totalUnread > 0): ?>
                     <span class="badge-unread"><?= $totalUnread ?> não lidas</span>
                 <?php endif; ?>
-                <button type="button" class="btn btn-primary" data-testid="new-conversation" onclick="window.ClyoDialog ? window.ClyoDialog.open('modal-nova-conversa') : (document.getElementById('modal-nova-conversa').style.display='flex')" style="min-height: 36px; font-size: 0.85rem;">Nova conversa</button>
+                <button type="button" class="btn btn-primary" data-testid="new-conversation" data-dialog-open="modal-nova-conversa" style="min-height: 36px; font-size: 0.85rem;">Nova conversa</button>
             </div>
             <ul class="conv-list-items">
                 <?php if (empty($conversations)): ?>
@@ -674,7 +674,7 @@ class ChatController
                 </div>
 
                 <!-- Script de Polling com Cursor Delta e Envio Assíncrono Instantâneo -->
-                <script>
+                <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
                     (function() {
                         const convId = <?= $activeConvId ?>;
                         let lastId = <?= !empty($messages) ? (int)end($messages)['id'] : 0 ?>;
@@ -844,7 +844,7 @@ class ChatController
                 <div class="empty-chat">
                     <h3>Nenhuma conversa selecionada</h3>
                     <p>Selecione uma conversa na lista ou comece uma nova.</p>
-                    <button type="button" class="btn btn-primary" onclick="window.ClyoDialog && window.ClyoDialog.open('modal-nova-conversa')">Nova conversa</button>
+                    <button type="button" class="btn btn-primary" data-dialog-open="modal-nova-conversa">Nova conversa</button>
                 </div>
             <?php endif; ?>
         </section>
@@ -870,7 +870,7 @@ class ChatController
         </form>
       </div>
     </div>
-    <script>
+    <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
     (() => {
       const q = document.getElementById('new-conv-search'), box = document.getElementById('new-conv-results'), st = document.getElementById('new-conv-status');
       const more = document.getElementById('new-conv-more'), hid = document.getElementById('new-conv-patient'), chosen = document.getElementById('new-conv-chosen'), submit = document.getElementById('new-conv-submit');
@@ -928,7 +928,7 @@ class ChatController
         }
 
         echo "<h1>Erro</h1><p>" . htmlspecialchars($message) . "</p>";
-        echo "<a href='javascript:history.back()'>← Voltar</a>";
+        echo "<a href='#' data-history-back>← Voltar</a>";
         exit;
     }
 }

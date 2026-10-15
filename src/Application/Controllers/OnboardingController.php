@@ -499,7 +499,7 @@ class OnboardingController
                 http_response_code(400);
             }
             echo "Erro ao processar etapa #{$step}: " . htmlspecialchars($e->getMessage());
-            echo "<br><br><a href='javascript:history.back()'>← Voltar e Corrigir</a>";
+            echo "<br><br><a href='#' data-history-back>← Voltar e Corrigir</a>";
         }
     }
 

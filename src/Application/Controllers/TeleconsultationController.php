@@ -119,7 +119,7 @@ class TeleconsultationController
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Consultório Virtual ClyoNutri — Dr(a). <?= htmlspecialchars($session['professional_name']) ?></title>
-            <script src="https://cdn.tailwindcss.com"></script>
+            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
         </head>
         <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
             <!-- Header do Consultório -->
@@ -139,7 +139,7 @@ class TeleconsultationController
                             <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($session['status'])) ?>
                         </span>
                     </div>
-                    <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/encerrar" onsubmit="return confirm('Deseja realmente encerrar a teleconsulta?');">
+                    <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/encerrar" data-confirm="Deseja realmente encerrar a teleconsulta?">
                         <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
                         <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium text-xs">
                             Encerrar Atendimento
@@ -385,7 +385,7 @@ class TeleconsultationController
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Sala de Espera Virtual — ClyoNutri II</title>
-            <script src="https://cdn.tailwindcss.com"></script>
+            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
         </head>
         <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
             <div class="max-w-xl w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-6 space-y-6">
@@ -417,7 +417,7 @@ class TeleconsultationController
                     </div>
 
                     <div class="flex items-center justify-between pt-2">
-                        <button type="button" id="btn-test-media" onclick="testMedia()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 px-4 rounded">
+                        <button type="button" id="btn-test-media" data-call="testMedia" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 px-4 rounded">
                             Iniciar Teste de Dispositivos
                         </button>
                         <span id="media-status" class="text-xs text-slate-400">Aguardando teste</span>
@@ -441,7 +441,7 @@ class TeleconsultationController
 
                 <!-- Etapa 3: Acesso à Sala de Espera -->
                 <div id="step-waiting" class="space-y-3">
-                    <button type="button" id="btn-enter-waiting" onclick="enterWaitingRoom()" disabled
+                    <button type="button" id="btn-enter-waiting" data-call="enterWaitingRoom" disabled
                             class="w-full bg-emerald-600 disabled:opacity-50 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-lg text-sm transition">
                         Entrar na Sala de Espera
                     </button>
@@ -452,7 +452,7 @@ class TeleconsultationController
                 </div>
             </div>
 
-            <script>
+            <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
                 const token = <?= json_encode($token) ?>;
                 let deviceCheckPassed = false;
 
@@ -636,7 +636,7 @@ class TeleconsultationController
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Consulta Online com Dr(a). <?= htmlspecialchars($session['professional_name']) ?> — ClyoNutri</title>
-            <script src="https://cdn.tailwindcss.com"></script>
+            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
         </head>
         <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
             <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">

@@ -44,7 +44,7 @@
                 <form action="/admin/acessos/revogar-sessao" method="POST" style="display: inline-block;">
                   <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken ?? '') ?>">
                   <input type="hidden" name="session_id" value="<?= htmlspecialchars($s['id']) ?>">
-                  <button type="submit" class="btn btn--danger btn--sm" onclick="return confirm('Deseja revogar esta sessão imediatamente?')">Revogar</button>
+                  <button type="submit" class="btn btn--danger btn--sm" data-confirm="Deseja revogar esta sessão imediatamente?">Revogar</button>
                 </form>
               </td>
             </tr>
