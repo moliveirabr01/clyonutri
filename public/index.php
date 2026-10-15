@@ -552,7 +552,8 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
     // (realm 'patient', conta normalizada + IP e só IP). Reservado antes de buscar o paciente e do password_verify,
     // então conta existente e inexistente consomem o limite igualmente. Limites de OTP abaixo continuam valendo.
     $patientLimiter = null;
-    $patientAccountKey = $email !== '' ? $email : $phone;
+    // V2-02: e-mail, telefone e aliases do mesmo paciente resolvem para a mesma identidade (patient#ID).
+    $patientAccountKey = \ClyoNutri\Core\Security\LoginRateLimiter::resolvePatientIdentity($db, $email, $phone);
     $patientIpKey = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     if ($password !== '') {
         $patientLimiter = new \ClyoNutri\Core\Security\LoginRateLimiter($db);
@@ -839,8 +840,8 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
 
     // Retornar novo total acumulado hoje (ANSI SQL portável)
     $todayDate = date('Y-m-d');
-    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND date(logged_at) = :today");
-    $hStmt->execute(['pid' => $patientId, 'today' => $todayDate]);
+    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = :today");
+    $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
     $res['total_water_today'] = (int)$hStmt->fetchColumn();
 
     echo json_encode($res);
@@ -1168,7 +1169,13 @@ $router->post('/api/v1/patient/recipes/{id}/favorite', function($params = []) us
     $recipeId = (int)($params['id'] ?? 0);
 
     $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
-    $isFav = $recipeService->togglePatientFavorite($patientId, $recipeId);
+    try {
+        $isFav = $recipeService->togglePatientFavorite($patientId, $recipeId);
+    } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Receita não encontrada.'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
     echo json_encode(['is_favorite' => $isFav]);
 });
 
