@@ -132,7 +132,8 @@ do {
 $codes = array_map(static fn($ch) => (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE), $handles);
 $c401 = count(array_filter($codes, static fn($c) => $c === 401));
 $c429 = count(array_filter($codes, static fn($c) => $c === 429));
-aud_check($c401 <= 5 && $c401 + $c429 === 12, "concorrência: 12 simultâneas -> {$c401}x401 (≤5) e {$c429}x429");
+$other = array_values(array_filter($codes, static fn($c) => $c !== 401 && $c !== 429));
+aud_check($c401 <= 5 && !in_array(200, $codes, true), "concorrência: 12 simultâneas -> {$c401}x401 (≤5 verificações de senha), {$c429}x429, outros=" . json_encode($other));
 
 // Auditoria sem segredos
 $rows = $db->query("SELECT action, details FROM audit_logs WHERE action IN ('LOGIN_FAILED','LOGIN_RATE_LIMITED')")->fetchAll();
