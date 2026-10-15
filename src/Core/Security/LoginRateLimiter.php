@@ -88,7 +88,7 @@ final class LoginRateLimiter
         [$acct, $ipb] = $this->buckets($realm, $account, $ip);
         $this->db->prepare("DELETE FROM login_attempts WHERE bucket_key = :k")->execute(['k' => $acct[0]]);
         $this->db->prepare("UPDATE login_attempts
-            SET locked_until = CASE WHEN failures - 1 < :lim THEN NULL ELSE locked_until END,
+            SET locked_until = CASE WHEN failures - 1 < CAST(:lim AS SIGNED) THEN NULL ELSE locked_until END,
                 failures = failures - 1
             WHERE bucket_key = :k AND failures > 0")->execute(['k' => $ipb[0], 'lim' => $ipb[2]]);
     }
@@ -136,7 +136,7 @@ final class LoginRateLimiter
         // Atômico: locked_until é atribuído ANTES de failures (MySQL avalia SET da esquerda p/ direita;
         // SQLite usa valores antigos) — nos dois casos a expressão enxerga o valor antigo de failures.
         $upd = $this->db->prepare("UPDATE login_attempts
-            SET locked_until = CASE WHEN failures + 1 >= :lim THEN :lu ELSE locked_until END,
+            SET locked_until = CASE WHEN failures + 1 >= CAST(:lim AS SIGNED) THEN :lu ELSE locked_until END,
                 failures = failures + 1,
                 last_attempt_at = :n
             WHERE bucket_key = :k AND (locked_until IS NULL OR locked_until <= :n2)");
