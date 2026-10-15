@@ -868,7 +868,7 @@ class RecipeService
         $versionId = $version ? (int)$version['id'] : null;
 
         // Verificar conflitos com alergias do paciente
-        $conflicts = $this->checkPatientAllergenConflicts($patientId, $recipe['allergens']);
+        $conflicts = $this->checkPatientAllergenConflicts($patientId, $recipe['allergens'], $clinicId);
 
         $stmt = $this->db->prepare("
             INSERT INTO recipe_prescriptions (
@@ -1072,6 +1072,17 @@ class RecipeService
      */
     public function togglePatientFavorite(int $patientId, int $recipeId): bool
     {
+        // Reauditoria (varredura): o paciente só pode favoritar receita visível à própria clínica
+        // (da clínica ou pública). Receita privada de outra clínica ou inexistente: mesma exceção.
+        $pc = $this->db->prepare("SELECT clinic_id FROM patients WHERE id = :pid");
+        $pc->execute(['pid' => $patientId]);
+        $patientClinic = $pc->fetchColumn();
+        $vis = $this->db->prepare("SELECT id FROM recipes WHERE id = :rid AND (clinic_id = :cid OR visibility = 'public')");
+        $vis->execute(['rid' => $recipeId, 'cid' => (int)$patientClinic]);
+        if ($patientClinic === false || !$vis->fetchColumn()) {
+            throw new TenantSecurityException('Receita não encontrada.', 404);
+        }
+
         $stmt = $this->db->prepare("SELECT id FROM recipe_patient_favorites WHERE patient_id = :pid AND recipe_id = :rid");
         $stmt->execute(['pid' => $patientId, 'rid' => $recipeId]);
         $existing = $stmt->fetchColumn();
@@ -1095,7 +1106,8 @@ class RecipeService
         $stmt = $this->db->prepare("
             SELECT r.* FROM recipes r
             JOIN recipe_patient_favorites f ON f.recipe_id = r.id
-            WHERE f.patient_id = :pid
+            JOIN patients p ON p.id = f.patient_id
+            WHERE f.patient_id = :pid AND (r.clinic_id = p.clinic_id OR r.visibility = 'public')
             ORDER BY f.created_at DESC
         ");
         $stmt->execute(['pid' => $patientId]);
@@ -1260,12 +1272,44 @@ class RecipeService
     }
 
     /**
+     * Contexto clínico do paciente para o formulário de prescrição (reauditoria V2-01).
+     * Exige tenant: valida o paciente contra a clínica informada (TenantGuard) antes de ler
+     * planos e anamnese, e as consultas filtram clinic_id como segunda barreira.
+     *
+     * @return array{plans: list<array{id:int,title:string}>, allergies: list<string>}
+     * @throws TenantSecurityException paciente inexistente ou de outra clínica
+     */
+    public function getPrescriptionPatientContext(int $patientId, int $clinicId): array
+    {
+        if ($patientId <= 0 || $clinicId <= 0) {
+            throw new TenantSecurityException('Paciente não encontrado.', 404);
+        }
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $pl = $this->db->prepare("SELECT id, title FROM meal_plans WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC");
+        $pl->execute(['pid' => $patientId, 'cid' => $clinicId]);
+        $plans = $pl->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $an = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
+        $an->execute(['pid' => $patientId, 'cid' => $clinicId]);
+        $row = $an->fetch(PDO::FETCH_ASSOC);
+        $allergies = [];
+        if ($row) {
+            $raw = trim((string)($row['allergies'] ?? '') . ' ' . (string)($row['restrictions'] ?? ''));
+            if ($raw !== '') {
+                $allergies = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $raw))));
+            }
+        }
+        return ['plans' => $plans, 'allergies' => $allergies];
+    }
+
+    /**
      * Verifica possíveis incompatibilidades entre alergênicos da receita e anamnese do paciente.
      */
-    private function checkPatientAllergenConflicts(int $patientId, array $recipeAllergens): array
+    private function checkPatientAllergenConflicts(int $patientId, array $recipeAllergens, int $clinicId): array
     {
-        $stmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-        $stmt->execute(['pid' => $patientId]);
+        $stmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
+        $stmt->execute(['pid' => $patientId, 'cid' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {

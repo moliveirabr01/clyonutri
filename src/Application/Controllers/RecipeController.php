@@ -764,24 +764,20 @@ class RecipeController
 
         $selectedPatientId = (int)($_GET['patient_id'] ?? ($patients[0]['id'] ?? 0));
 
-        // Buscar planos do paciente selecionado
+        // V2-01 (reauditoria): o paciente é validado contra a clínica da sessão ANTES de qualquer
+        // leitura clínica. Paciente de outra clínica e ID inexistente recebem a MESMA resposta 404.
         $plans = [];
         $patientAllergies = [];
         if ($selectedPatientId > 0) {
-            $plStmt = $this->db->prepare("SELECT id, title FROM meal_plans WHERE patient_id = :pid ORDER BY id DESC");
-            $plStmt->execute(['pid' => $selectedPatientId]);
-            $plans = $plStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Verificar histórico de anamnese / alergias
-            $anStmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-            $anStmt->execute(['pid' => $selectedPatientId]);
-            $anamnese = $anStmt->fetch(PDO::FETCH_ASSOC);
-            if ($anamnese) {
-                $rawAllergies = trim((string)($anamnese['allergies'] ?? '') . ' ' . (string)($anamnese['restrictions'] ?? ''));
-                if ($rawAllergies !== '') {
-                    $patientAllergies = array_filter(array_map('trim', preg_split('/[,;\n]+/', $rawAllergies)));
-                }
+            try {
+                $context = $this->recipeService->getPrescriptionPatientContext($selectedPatientId, (int)$auth['clinicId']);
+            } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+                http_response_code(404);
+                echo "Paciente não encontrado.";
+                return;
             }
+            $plans = $context['plans'];
+            $patientAllergies = $context['allergies'];
         }
 
         $title = 'Prescrever Receita — ' . $recipe['title'];
