@@ -58,7 +58,7 @@ class AuthController
         // F03: limitador persistente por conta+IP e por IP, antes da verificação do hash.
         $result = $this->authService->attemptWithRateLimit($email, $password, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'));
         if ($result['status'] === 'locked') {
-            $_SESSION['flash_error'] = 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.';
+            $_SESSION['flash_error'] = 'Muitas tentativas de acesso. Por segurança, o acesso com este e-mail foi pausado temporariamente; aguarde alguns minutos e tente novamente.';
             $_SESSION['old_email'] = $email;
             header('Retry-After: ' . max(1, (int)$result['retry_after']));
             header('Location: /login');
@@ -180,8 +180,8 @@ class AuthController
             exit;
         }
 
-        if (strlen($password) < 8) {
-            $_SESSION['flash_error'] = 'A senha deve possuir pelo menos 8 dígitos.';
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            $_SESSION['flash_error'] = 'A senha deve ter pelo menos 8 caracteres.';
             $_SESSION['old_input'] = $_POST;
             header('Location: /cadastro');
             exit;
@@ -348,8 +348,8 @@ class AuthController
             exit;
         }
 
-        if (strlen($password) < 8) {
-            $_SESSION['flash_error'] = 'A senha deve possuir pelo menos 8 dígitos.';
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            $_SESSION['flash_error'] = 'A senha deve ter pelo menos 8 caracteres.';
             header("Location: /recuperar-senha/{$tokenParam}");
             exit;
         }

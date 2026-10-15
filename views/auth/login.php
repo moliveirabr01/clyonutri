@@ -78,6 +78,12 @@
     .auth-footer a:hover {
       text-decoration: underline;
     }
+  
+    .password-field { position: relative; }
+    .password-field input { padding-right: 88px; }
+    .password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; min-width: 72px; border: 1px solid var(--neutral-gray-300, #CBD5E1); background: #fff; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--brand-navy-900, #0F2747); }
+    .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #A3532A); outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
 </head>
 <body>
@@ -90,9 +96,7 @@
       <p class="auth-subtitle">Acesse o sistema operacional do seu consultório</p>
 
       <?php if (!empty($error)): ?>
-        <div class="alert-error">
-          ⚠️ <?= htmlspecialchars($error) ?>
-        </div>
+        <div class="alert-error"><p role="alert" style="margin: 0;">⚠️ <?= htmlspecialchars($error) ?><?php if (str_starts_with((string)$error, 'Muitas tentativas')): ?> Se não lembrar a senha, use <a href="/recuperar-senha">Esqueci minha senha</a>.<?php endif; ?></p></div>
       <?php endif; ?>
 
       <?php if (!empty($success)): ?>
@@ -106,7 +110,7 @@
 
         <div class="form-group">
           <label class="form-label" for="email">E-mail profissional</label>
-          <input type="email" id="email" name="email" class="form-control" placeholder="seu.email@exemplo.com.br" required autofocus value="<?= htmlspecialchars($oldEmail ?? '') ?>">
+          <input type="email" id="email" name="email" class="form-control" placeholder="seu.email@exemplo.com.br" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required autofocus value="<?= htmlspecialchars($oldEmail ?? '') ?>">
         </div>
 
         <div class="form-group">
@@ -114,7 +118,7 @@
             <label class="form-label" for="password" style="margin-bottom: 0;">Senha de acesso</label>
             <a href="/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600); text-decoration: none; font-weight: 500;">Esqueci minha senha</a>
           </div>
-          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required>
+          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" autocomplete="current-password" data-password-toggle required>
         </div>
 
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);">
@@ -131,5 +135,6 @@
       </div>
     </div>
   </div>
+  <script src="/assets/js/password-toggle.js" defer></script>
 </body>
 </html>
