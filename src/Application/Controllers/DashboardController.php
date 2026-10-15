@@ -1342,7 +1342,7 @@ class DashboardController
                       </div>
                     </div>
                     <?php if (!$rec['is_retracted']): ?>
-                      <button type="button" class="btn btn-sm btn-outline" onclick="openRevisionModal(<?= $rec['id'] ?>, '<?= htmlspecialchars(addslashes($rec['title'])) ?>')" style="font-size: 0.75rem; padding: 3px 8px;">
+                      <button type="button" class="btn btn-sm btn-outline" onclick="openRevisionModal(<?= $rec['id'] ?>, <?= htmlspecialchars(json_encode((string)$rec['title'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="font-size: 0.75rem; padding: 3px 8px;">
                         Retificar Formalmente (v<?= $rec['version'] + 1 ?>)
                       </button>
                     <?php endif; ?>
@@ -3094,7 +3094,7 @@ class DashboardController
                     <strong><?= number_format((float)$m['totals']['energy_kcal'], 0) ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1) ?>g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1) ?>g | G: <?= number_format((float)$m['totals']['lipid_g'], 1) ?>g
                   </span>
                   <?php if ($isDraft): ?>
-                    <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>')" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
+                    <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
                     <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
                       <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                       <button type="submit" class="btn btn-sm" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
@@ -3134,7 +3134,7 @@ class DashboardController
                           </td>
                           <td style="padding: 12px 20px; text-align: right; width: 15%;">
                             <?php if ($isDraft): ?>
-                              <button class="btn btn-sm btn-outline" onclick="openAddSubModal(<?= $it['id'] ?>, '<?= htmlspecialchars(addslashes($it['food_name'])) ?>')" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
+                              <button class="btn btn-sm btn-outline" onclick="openAddSubModal(<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
                                 + Substituição
                               </button>
                               <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
@@ -3791,7 +3791,7 @@ class DashboardController
                         <?php if (in_array($rc['status'], ['pending', 'partially_paid'], true)): ?>
                           <div style="display: inline-flex; align-items: center; gap: 8px;">
                             <button type="button" class="btn btn-sm btn-outline" style="color: var(--semantic-success); border-color: var(--semantic-success);"
-                                    onclick="openPayModal(<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, '<?= htmlspecialchars(addslashes($rc['description'])) ?>')">
+                                    onclick="openPayModal(<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, <?= htmlspecialchars(json_encode((string)$rc['description'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>)">
                               Dar Baixa
                             </button>
                             <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" onsubmit="return confirm('Deseja realmente cancelar este recebível?');">
