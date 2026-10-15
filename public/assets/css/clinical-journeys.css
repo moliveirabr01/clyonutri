@@ -65,8 +65,10 @@ html.cn-dialog-open { overflow: hidden; }
 .cn-sticky-actions { position: sticky; bottom: 0; z-index: 5; background: var(--neutral-white, #fff); display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; border-top: 1px solid var(--neutral-gray-200, #E2E8F0); padding: 12px 0; }
 .cn-sticky-actions__status { margin-right: auto; font-size: 0.8rem; color: #475569; }
 
-/* NI2-421 (UX-09): métricas em colunas deliberadas por breakpoint (5 cartões sem linha órfã) */
+/* NI2-421 (UX-09): prioridades antes das métricas; 5 métricas em colunas deliberadas (sem linha órfã) */
+.attention-panel { margin-bottom: var(--space-6); }
 .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); }
-@media (max-width: 1280px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 1; } }
-@media (max-width: 1280px) and (min-width: 769px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > * { grid-column: span 2; } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 3; } }
-@media (max-width: 768px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > :last-child { grid-column: 1 / -1; } }
+.dashboard-metrics.cn-metrics-5 .metric-card { padding: var(--space-4); }
+@media (max-width: 1280px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > * { grid-column: span 2; } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 3; } }
+@media (max-width: 768px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > *, .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 1; } .dashboard-metrics.cn-metrics-5 > :last-child { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: minmax(0, 1fr); } .dashboard-metrics.cn-metrics-5 > * { grid-column: auto !important; } }

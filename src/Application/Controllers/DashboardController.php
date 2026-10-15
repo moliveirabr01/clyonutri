@@ -4292,8 +4292,50 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Cards de Métricas Consolidadas -->
-        <div class="dashboard-metrics">
+        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
+        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
+          <div class="card__header">
+            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
+            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
+          </div>
+          <?php if (empty($attentionItems)): ?>
+            <div class="attention-panel__empty">
+              <svg class="icon-inline icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>
+              Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
+            </div>
+          <?php else: ?>
+            <ul class="attention-list">
+              <?php foreach ($attentionVisible as $att): ?>
+                <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
+                  <div class="attention-item__text">
+                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge">
+                      <?= htmlspecialchars($att['title']) ?>
+                    </span>
+                    <span class="attention-item__description">
+                      <?= htmlspecialchars($att['description']) ?>
+                    </span>
+                  </div>
+                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
+                    <?= htmlspecialchars($att['action_label']) ?>
+                    <?= $arrowIcon ?>
+                  </a>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php if ($attentionHidden > 0): ?>
+              <div class="attention-panel__footer">
+                <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
+                <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
+                <?php if ($draftPatientsCount > 0): ?>
+                  <a href="/planos?status=draft" class="btn btn-outline btn-touch" data-testid="attention-see-all">Ver todos os rascunhos (<?= $draftPlansTotal ?>)</a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          <?php endif; ?>
+        </section>
+
+        <!-- Cards de Métricas Consolidadas (NI2-421: depois das prioridades) -->
+        <div class="dashboard-metrics cn-metrics-5" role="region" aria-label="Indicadores da clínica">
           <div class="card metric-card">
             <div class="metric-card__label">CONSULTAS HOJE</div>
             <div class="metric-card__value tabular-nums">
@@ -4350,48 +4392,6 @@ class DashboardController
             <?php endif; ?>
           </div>
         </div>
-
-        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
-        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
-          <div class="card__header">
-            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
-            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
-          </div>
-          <?php if (empty($attentionItems)): ?>
-            <div class="attention-panel__empty">
-              <svg class="icon-inline icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>
-              Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
-            </div>
-          <?php else: ?>
-            <ul class="attention-list">
-              <?php foreach ($attentionVisible as $att): ?>
-                <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
-                  <div class="attention-item__text">
-                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge">
-                      <?= htmlspecialchars($att['title']) ?>
-                    </span>
-                    <span class="attention-item__description">
-                      <?= htmlspecialchars($att['description']) ?>
-                    </span>
-                  </div>
-                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
-                    <?= htmlspecialchars($att['action_label']) ?>
-                    <?= $arrowIcon ?>
-                  </a>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-            <?php if ($attentionHidden > 0): ?>
-              <div class="attention-panel__footer">
-                <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
-                <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
-                <?php if ($draftPatientsCount > 0): ?>
-                  <a href="/planos?status=draft" class="btn btn-outline btn-touch" data-testid="attention-see-all">Ver todos os rascunhos (<?= $draftPlansTotal ?>)</a>
-                <?php endif; ?>
-              </div>
-            <?php endif; ?>
-          <?php endif; ?>
-        </section>
 
         <!-- Grid de Conteúdo Principal -->
         <div class="dashboard-main-grid">
