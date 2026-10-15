@@ -55,7 +55,16 @@ class AuthController
             exit;
         }
 
-        $user = $this->authService->attempt($email, $password);
+        // F03: limitador persistente por conta+IP e por IP, antes da verificação do hash.
+        $result = $this->authService->attemptWithRateLimit($email, $password, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'));
+        if ($result['status'] === 'locked') {
+            $_SESSION['flash_error'] = 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.';
+            $_SESSION['old_email'] = $email;
+            header('Retry-After: ' . max(1, (int)$result['retry_after']));
+            header('Location: /login');
+            exit;
+        }
+        $user = $result['user'];
 
         if (!$user) {
             $_SESSION['flash_error'] = 'E-mail ou senha incorretos.';

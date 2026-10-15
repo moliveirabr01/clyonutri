@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ClyoNutri II — Esquema Completo DDL para MySQL 8.0 (HostGator / AlmaLinux)
--- Total de Migrações: 31 | Charset: utf8mb4 | Engine: InnoDB
+-- Total de Migrações: 32 | Charset: utf8mb4 | Engine: InnoDB
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -1238,5 +1238,22 @@ CREATE TABLE IF NOT EXISTS platform_settings (
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 INSERT INTO platform_settings (setting_key, setting_value, description) VALUES (?, ?, ?);
 INSERT INTO `migrations` (`migration`) VALUES ('2026_10_10_000031_create_platform_settings_table') ON DUPLICATE KEY UPDATE `migration` = `migration`;
+
+-- ----------------------------------------------------------------------------
+-- Migration: 2026_10_14_000032_create_login_attempts_table
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `login_attempts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `bucket_key` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `scope` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `failures` int NOT NULL DEFAULT '0',
+  `window_started_at` datetime NOT NULL,
+  `locked_until` datetime DEFAULT NULL,
+  `last_attempt_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `bucket_key` (`bucket_key`),
+  KEY `idx_login_attempts_last` (`last_attempt_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO `migrations` (`migration`) VALUES ('2026_10_14_000032_create_login_attempts_table') ON DUPLICATE KEY UPDATE `migration` = `migration`;
 
 SET FOREIGN_KEY_CHECKS = 1;

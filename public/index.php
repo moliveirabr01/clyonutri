@@ -534,6 +534,23 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
         }
     }
 
+    // F03: senha e PIN chegam pelo mesmo campo e compartilham o MESMO contador persistente
+    // (realm 'patient', conta normalizada + IP e só IP). Reservado antes de buscar o paciente e do password_verify,
+    // então conta existente e inexistente consomem o limite igualmente. Limites de OTP abaixo continuam valendo.
+    $patientLimiter = null;
+    $patientAccountKey = $email !== '' ? $email : $phone;
+    $patientIpKey = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    if ($password !== '') {
+        $patientLimiter = new \ClyoNutri\Core\Security\LoginRateLimiter($db);
+        $gate = $patientLimiter->attempt('patient', $patientAccountKey, $patientIpKey);
+        if (!$gate['allowed']) {
+            http_response_code(429);
+            header('Retry-After: ' . max(1, (int)$gate['retry_after']));
+            echo json_encode(['error' => 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.', 'retry_after' => (int)$gate['retry_after']]);
+            return;
+        }
+    }
+
     // Helper para concorrência e retry em SQLite/MySQL sob corrida de processos
     $executeWithRetry = function(\PDOStatement &$stmt, array $params = []) use ($db): bool {
         for ($attempt = 0; $attempt < 60; $attempt++) {
@@ -576,6 +593,7 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
     $patients = $stmt->fetchAll();
     $stmt->closeCursor();
     if (count($patients) !== 1) {
+        $patientLimiter?->failure('patient', $patientAccountKey, $patientIpKey);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial inválida ou acesso indisponível.']);
         return;
@@ -591,6 +609,11 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
             $authenticated = true;
         } elseif (!empty($patient['access_pin']) && password_verify($password, $patient['access_pin'])) {
             $authenticated = true;
+        }
+        if ($patientLimiter !== null) {
+            $authenticated
+                ? $patientLimiter->success('patient', $patientAccountKey, $patientIpKey)
+                : $patientLimiter->failure('patient', $patientAccountKey, $patientIpKey);
         }
     }
 
@@ -1226,6 +1249,17 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
         return;
     }
 
+    // F03: limitador compartilhado com o login web (mesmo realm 'staff'), antes de qualquer password_verify.
+    $loginLimiter = new \ClyoNutri\Core\Security\LoginRateLimiter($db);
+    $clientIpPro = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    $gate = $loginLimiter->attempt('staff', $email, $clientIpPro);
+    if (!$gate['allowed']) {
+        http_response_code(429);
+        header('Retry-After: ' . max(1, (int)$gate['retry_after']));
+        echo json_encode(['error' => 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.', 'retry_after' => (int)$gate['retry_after']]);
+        return;
+    }
+
     $stmt = $db->prepare("
         SELECT u.*, cm.role AS member_role, cm.clinic_id, c.name AS clinic_name
         FROM users u
@@ -1238,10 +1272,13 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        $loginLimiter->failure('staff', $email, $clientIpPro);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial profissional inválida ou acesso indisponível.']);
         return;
     }
+
+    $loginLimiter->success('staff', $email, $clientIpPro);
 
     // Validação de papel clínico (RBAC)
     if (!\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical(['user_role'=>$user['role'],'member_role'=>$user['member_role']])) {

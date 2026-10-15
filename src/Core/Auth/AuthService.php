@@ -101,6 +101,27 @@ class AuthService
     }
 
     /**
+     * Login web com limitador persistente (F03): a tentativa é reservada ANTES do password_verify.
+     * Retorna ['status' => 'ok'|'invalid'|'locked', 'user' => ?array, 'retry_after' => int].
+     * Conta inexistente e senha errada produzem o mesmo 'invalid' e consomem o mesmo limite.
+     */
+    public function attemptWithRateLimit(string $email, string $password, string $ip, ?\ClyoNutri\Core\Security\LoginRateLimiter $limiter = null): array
+    {
+        $limiter ??= new \ClyoNutri\Core\Security\LoginRateLimiter($this->db);
+        $gate = $limiter->attempt('staff', $email, $ip);
+        if (!$gate['allowed']) {
+            return ['status' => 'locked', 'user' => null, 'retry_after' => (int)$gate['retry_after']];
+        }
+        $user = $this->attempt($email, $password);
+        if ($user === null) {
+            $limiter->failure('staff', $email, $ip);
+            return ['status' => 'invalid', 'user' => null, 'retry_after' => 0];
+        }
+        $limiter->success('staff', $email, $ip);
+        return ['status' => 'ok', 'user' => $user, 'retry_after' => 0];
+    }
+
+    /**
      * Autenticação segura com verificação de tenant
      */
     public function attempt(string $email, string $password): ?array
