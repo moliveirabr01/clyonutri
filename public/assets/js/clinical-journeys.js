@@ -8,7 +8,7 @@
   const snapshot = form => {
     const out = [];
     for (const el of form.elements) {
-      if (!el.name || el.disabled || isTransient(el) || ['submit', 'button', 'reset', 'file'].includes(el.type)) continue;
+      if (!el.name || el.disabled || isTransient(el) || ['submit', 'button', 'reset', 'file', 'hidden'].includes(el.type)) continue; // hidden = contexto definido pelo código (ex.: meal_id), não digitação
       if (el.type === 'checkbox' || el.type === 'radio') out.push(el.name + '=' + (el.checked ? el.value : '\u0000'));
       else if (el.tagName === 'SELECT' && el.multiple) out.push(el.name + '=' + [...el.selectedOptions].map(o => o.value).join(','));
       else out.push(el.name + '=' + el.value);
@@ -36,7 +36,7 @@
    * inerte, Escape/Cancelar/clique fora com regra de descarte explícita e
    * retorno do foco ao gatilho.
    * ------------------------------------------------------------------ */
-  const SEL = '[data-dialog],[id^="modal-"],.modal-overlay';
+  const SEL = '[data-dialog],div[id^="modal-"],.modal-overlay';
   const isInline = d => d.dataset.dialog === 'inline';
   const isOpen = d => getComputedStyle(d).display !== 'none';
   const focusables = d => [...d.querySelectorAll('button,input,select,textarea,a[href],[tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled && el.type !== 'hidden' && el.getClientRects().length && !el.closest('[inert]'));
@@ -44,7 +44,7 @@
   document.addEventListener('pointerdown', e => { lastPointer = e.target.closest('button,a,[tabindex]'); }, true);
   const state = new WeakMap();
   const show = d => { if (d.classList.contains('modal-overlay')) d.classList.add('active'); else d.style.display = isInline(d) ? 'block' : 'flex'; };
-  const hide = d => { d.classList.remove('active'); d.style.display = 'none'; };
+  const hide = d => { if (d.classList.contains('modal-overlay')) { d.classList.remove('active'); d.style.removeProperty('display'); } else d.style.display = 'none'; };
   const DISCARD_MSG = 'Descartar o que foi preenchido nesta janela? Rascunhos já salvos e outros formulários não são afetados.';
   const requestClose = d => {
     const dirty = [...d.querySelectorAll('form')].filter(isDirty);
@@ -88,7 +88,7 @@
     }
     st.open = open;
   };
-  const dialogs = [...document.querySelectorAll(SEL)];
+  const dialogs = [...document.querySelectorAll(SEL)].filter(d => !d.parentElement?.closest(SEL)); // títulos/elementos internos (ex.: modal-x-title) não são diálogos
   dialogs.forEach(d => {
     if (!d.hasAttribute('data-dialog')) d.setAttribute('data-dialog', 'modal');
     state.set(d, { open: false });
@@ -107,7 +107,7 @@
   // Cancelar / ✕ / clique no fundo: interceptados antes dos onclick inline legados
   document.addEventListener('click', e => {
     const closer = e.target.closest('[data-dialog-close]');
-    const d = closer ? (closer.dataset.dialogClose ? document.getElementById(closer.dataset.dialogClose) : closer.closest(SEL)) : (e.target.matches?.(SEL) && !isInline(e.target) ? e.target : null);
+    const d = closer ? (closer.dataset.dialogClose ? document.getElementById(closer.dataset.dialogClose) : [...dialogs].find(x => x.contains(closer))) : (dialogs.includes(e.target) && !isInline(e.target) ? e.target : null);
     if (!d || !state.has(d)) return;
     e.preventDefault(); e.stopImmediatePropagation(); requestClose(d);
   }, true);
@@ -129,7 +129,7 @@
         else if (typeof value === 'string') field.value = value;
       }
       const notice = document.createElement('p'); notice.setAttribute('role', 'status'); notice.textContent = 'Preenchimento recuperado após a falha. Confira os dados antes de salvar. Disponível nesta sessão por até uma hora.'; form.prepend(notice);
-      const modal = form.closest(SEL); if (modal) show(modal);
+      const modal = dialogs.find(x => x.contains(form)); if (modal) show(modal);
     }
   }
 
