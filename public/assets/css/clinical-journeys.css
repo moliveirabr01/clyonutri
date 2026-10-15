@@ -24,3 +24,49 @@
 @media (max-width: 600px) {
   .app-content div[style*="grid-template-columns"] { grid-template-columns: minmax(0,1fr) !important; }
 }
+
+/* ==========================================================================
+   NI2-412 — UX/UI v3
+   ========================================================================== */
+/* NI2-423 (UX-11) / NI2-417 (UX-05): diálogo único com margem segura, altura máxima e rolagem interna */
+[data-dialog="modal"] { box-sizing: border-box; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); overflow: hidden; }
+.cn-dialog__panel { box-sizing: border-box; max-width: min(100%, var(--cn-dialog-max, 640px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+.cn-dialog__panel .modal-footer { position: sticky; bottom: 0; z-index: 1; }
+.cn-dialog__panel form > div:last-child:has(> button[type="submit"]) { position: sticky; bottom: calc(-1 * var(--space-6, 24px)); background: var(--neutral-white, #fff); padding-block: 12px; }
+html.cn-dialog-open { overflow: hidden; }
+.field-error { color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0; }
+.field-error:empty { display: none; }
+[aria-invalid="true"] { border-color: #DC2626 !important; }
+/* Grades de formulário por classe (substitui gradualmente o remendo por correspondência de texto no atributo style) */
+.cn-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+.cn-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-6); }
+@media (max-width: 900px) { .cn-split { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .cn-form-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* NI2-415 (UX-03): resultados de alimentos distinguíveis */
+.food-result { display: grid; gap: 2px; text-align: left; }
+.food-result__badge { justify-self: start; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #EEF2F7; color: #1E3A5F; }
+.food-result__badge--custom { background: #FFF4ED; color: #9A3412; }
+.food-result__meta { font-size: 0.75rem; color: #475569; }
+.food-result__dup { font-size: 0.72rem; color: #92400E; }
+
+/* NI2-418 (UX-06): próximo passo e navegação por seções do perfil */
+.cn-next-step { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-left: 4px solid var(--brand-copper-500, #C2703D); margin-bottom: var(--space-4); }
+.cn-section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-6); padding: 0; list-style: none; }
+.cn-section-nav a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--neutral-gray-300, #CBD5E1); border-radius: 999px; text-decoration: none; color: var(--brand-navy-900, #0F2747); font-size: 0.85rem; background: #fff; }
+[id^="secao-"] { scroll-margin-top: 16px; }
+
+/* NI2-420 (UX-08): índice e barra de ações persistente da anamnese */
+.cn-anamnesis-index { position: sticky; top: 0; z-index: 5; background: var(--neutral-white, #fff); padding: 8px 0; margin-bottom: 12px; border-bottom: 1px solid var(--neutral-gray-200, #E2E8F0); }
+.cn-anamnesis-index ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.cn-anamnesis-index a { display: inline-flex; gap: 4px; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--neutral-gray-300, #CBD5E1); font-size: 0.8rem; text-decoration: none; color: var(--brand-navy-900, #0F2747); }
+.cn-anamnesis-index a[data-filled="true"]::before { content: "●"; color: #18794E; }
+.cn-anamnesis-index a[data-filled="false"]::before { content: "○"; color: #94A3B8; }
+.cn-sticky-actions { position: sticky; bottom: 0; z-index: 5; background: var(--neutral-white, #fff); display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; border-top: 1px solid var(--neutral-gray-200, #E2E8F0); padding: 12px 0; }
+.cn-sticky-actions__status { margin-right: auto; font-size: 0.8rem; color: #475569; }
+
+/* NI2-421 (UX-09): métricas em colunas deliberadas por breakpoint (5 cartões sem linha órfã) */
+.dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); }
+@media (max-width: 1280px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 1; } }
+@media (max-width: 1280px) and (min-width: 769px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > * { grid-column: span 2; } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 3; } }
+@media (max-width: 768px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > :last-child { grid-column: 1 / -1; } }

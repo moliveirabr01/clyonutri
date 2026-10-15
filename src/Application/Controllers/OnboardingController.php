@@ -169,8 +169,8 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-5);">
-                  <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Áreas de Especialidade / Atuação (Selecione uma ou mais):</label>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                  <p id="ob-grupo-1" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Áreas de Especialidade / Atuação (Selecione uma ou mais):</p>
+                  <div role="group" aria-labelledby="ob-grupo-1" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     <?php
                     $focusOptions = [
                         'Nutrição Clínica Geral' => 'Emagrecimento, saúde e bem-estar',
@@ -196,8 +196,8 @@ class OnboardingController
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Meta de Pacientes Ativos / Mês</label>
-                    <select name="monthly_patients_goal" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob1-monthly_patients_goal" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Meta de Pacientes Ativos / Mês</label>
+                    <select id="ob1-monthly_patients_goal" name="monthly_patients_goal" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="15" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 15) ? 'selected' : '' ?>>Até 15 pacientes/mês</option>
                       <option value="30" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 30) ? 'selected' : '' ?>>15 a 30 pacientes/mês</option>
                       <option value="60" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 60) ? 'selected' : '' ?>>30 a 60 pacientes/mês</option>
@@ -205,8 +205,8 @@ class OnboardingController
                     </select>
                   </div>
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Atuação Clínica</label>
-                    <select name="clinical_experience_years" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob2-clinical_experience_years" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Atuação Clínica</label>
+                    <select id="ob2-clinical_experience_years" name="clinical_experience_years" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="0">Recém-formado / Iniciando consultório</option>
                       <option value="2">1 a 3 anos de experiência</option>
                       <option value="5">3 a 7 anos de experiência</option>
@@ -234,12 +234,12 @@ class OnboardingController
 
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Número de Registro CRN *</label>
-                    <input type="text" name="crn" required value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" placeholder="Ex: 12345" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob3-crn" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Número de Registro CRN *</label>
+                    <input id="ob3-crn" type="text" name="crn" required value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" placeholder="Ex: 12345" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Região do CRN *</label>
-                    <select name="crn_region" required style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob4-crn_region" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Região do CRN *</label>
+                    <select id="ob4-crn_region" name="crn_region" required style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <?php for ($r = 1; $r <= 11; $r++): ?>
                         <option value="CRN-<?= $r ?>" <?= (($profCurrent['crn_region'] ?? 'CRN-3') === "CRN-{$r}") ? 'selected' : '' ?>>CRN-<?= $r ?></option>
                       <?php endfor; ?>
@@ -248,13 +248,13 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-4);">
-                  <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Especialidade / Título Principal</label>
-                  <input type="text" name="specialty" value="<?= htmlspecialchars($profCurrent['specialty'] ?? 'Nutricionista Clínico') ?>" placeholder="Ex: Nutricionista Clínico e Esportivo - Pós-Graduado" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                  <label for="ob5-specialty" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Especialidade / Título Principal</label>
+                  <input id="ob5-specialty" type="text" name="specialty" value="<?= htmlspecialchars($profCurrent['specialty'] ?? 'Nutricionista Clínico') ?>" placeholder="Ex: Nutricionista Clínico e Esportivo - Pós-Graduado" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                 </div>
 
                 <div style="margin-bottom: var(--space-6);">
-                  <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Apresentação / Minibiografia</label>
-                  <textarea name="bio" rows="3" placeholder="Breve resumo da sua metodologia de acompanhamento e formação..." style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);"><?= htmlspecialchars($profCurrent['bio'] ?? '') ?></textarea>
+                  <label for="ob6-bio" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Apresentação / Minibiografia</label>
+                  <textarea id="ob6-bio" name="bio" rows="3" placeholder="Breve resumo da sua metodologia de acompanhamento e formação..." style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);"><?= htmlspecialchars($profCurrent['bio'] ?? '') ?></textarea>
                 </div>
 
               <?php elseif ($step === 3): ?>
@@ -274,8 +274,8 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-5);">
-                  <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Modalidades Aceitas:</label>
-                  <div style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+                  <p id="ob-grupo-2" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Modalidades Aceitas:</p>
+                  <div role="group" aria-labelledby="ob-grupo-2" style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
                       <input type="checkbox" name="modalities[]" value="presencial" <?= in_array('presencial', $currentModalities, true) ? 'checked' : '' ?>>
                       🏢 Consultório Presencial
@@ -289,8 +289,8 @@ class OnboardingController
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Duração Padrão da Consulta</label>
-                    <select name="default_duration_minutes" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob7-default_duration_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Duração Padrão da Consulta</label>
+                    <select id="ob7-default_duration_minutes" name="default_duration_minutes" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="30" <?= (($savedPref['default_duration_minutes'] ?? 60) === 30) ? 'selected' : '' ?>>30 minutos (Retorno rápido)</option>
                       <option value="45" <?= (($savedPref['default_duration_minutes'] ?? 60) === 45) ? 'selected' : '' ?>>45 minutos</option>
                       <option value="60" <?= (($savedPref['default_duration_minutes'] ?? 60) === 60) ? 'selected' : '' ?>>60 minutos (Recomendado para 1ª consulta)</option>
@@ -298,14 +298,14 @@ class OnboardingController
                     </select>
                   </div>
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Valor Médio da Consulta (R$)</label>
-                    <input type="number" step="10" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob8-default_price" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Valor Médio da Consulta (R$)</label>
+                    <input id="ob8-default_price" type="number" step="10" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="margin-bottom: var(--space-6);">
-                  <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Dias de Atendimento na Semana:</label>
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <p id="ob-grupo-3" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Dias de Atendimento na Semana:</p>
+                  <div role="group" aria-labelledby="ob-grupo-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <?php
                     $weekDays = ['seg' => 'Segunda', 'ter' => 'Terça', 'qua' => 'Quarta', 'qui' => 'Quinta', 'sex' => 'Sexta', 'sab' => 'Sábado'];
                     ?>
@@ -348,31 +348,31 @@ class OnboardingController
 
                 <div style="display: grid; grid-template-columns: 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Nome Completo do Paciente *</label>
-                    <input type="text" name="name" required value="<?= $firstPatient ? htmlspecialchars($firstPatient['name']) : '' ?>" placeholder="Ex: Roberto da Silva" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob9-name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Nome Completo do Paciente *</label>
+                    <input id="ob9-name" type="text" name="name" required value="<?= $firstPatient ? htmlspecialchars($firstPatient['name']) : '' ?>" placeholder="Ex: Roberto da Silva" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">E-mail do Paciente</label>
-                    <input type="email" name="email" value="<?= $firstPatient ? htmlspecialchars($firstPatient['email'] ?? '') : '' ?>" placeholder="paciente@exemplo.com.br" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob10-email" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">E-mail do Paciente</label>
+                    <input id="ob10-email" type="email" name="email" value="<?= $firstPatient ? htmlspecialchars($firstPatient['email'] ?? '') : '' ?>" placeholder="paciente@exemplo.com.br" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">WhatsApp / Telefone</label>
-                    <input type="tel" name="phone" value="<?= $firstPatient ? htmlspecialchars($firstPatient['phone'] ?? '') : '' ?>" placeholder="(11) 98888-7777" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob11-phone" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">WhatsApp / Telefone</label>
+                    <input id="ob11-phone" type="tel" name="phone" value="<?= $firstPatient ? htmlspecialchars($firstPatient['phone'] ?? '') : '' ?>" placeholder="(11) 98888-7777" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Data de Nascimento</label>
-                    <input type="date" name="birth_date" max="<?= date('Y-m-d') ?>" value="<?= $firstPatient ? htmlspecialchars($firstPatient['birth_date'] ?? '') : '' ?>" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob12-birth_date" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Data de Nascimento</label>
+                    <input id="ob12-birth_date" type="date" name="birth_date" max="<?= date('Y-m-d') ?>" value="<?= $firstPatient ? htmlspecialchars($firstPatient['birth_date'] ?? '') : '' ?>" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                     <span style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Usado para cálculo de idade e protocolos metabólicos.</span>
                   </div>
                   <div>
-                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Gênero / Sexo Biológico</label>
-                    <select name="gender" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob13-gender" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Gênero / Sexo Biológico</label>
+                    <select id="ob13-gender" name="gender" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="" <?= (!$firstPatient || empty($firstPatient['gender'])) ? 'selected' : '' ?>>Não informado (opcional)</option>
                       <option value="male" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'male') ? 'selected' : '' ?>>Masculino</option>
                       <option value="female" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'female') ? 'selected' : '' ?>>Feminino</option>

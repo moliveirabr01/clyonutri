@@ -215,22 +215,22 @@ class TeleconsultationController
                         <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Título da Evolução / Queixa Principal</label>
-                            <input type="text" name="title" required
+                            <label for="tc1-title" class="block text-xs font-semibold text-slate-300 mb-1">Título da Evolução / Queixa Principal</label>
+                            <input id="tc1-title" type="text" name="title" required
                                    value="Evolução Teleconsulta - <?= date('d/m/Y H:i') ?>"
                                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                         </div>
 
                         <div class="flex-1 flex flex-col">
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Conduta Nutricional & Anotações de Teleconsulta</label>
-                            <textarea name="clinical_notes" required rows="8"
+                            <label for="tc2-clinical_notes" class="block text-xs font-semibold text-slate-300 mb-1">Conduta Nutricional & Anotações de Teleconsulta</label>
+                            <textarea id="tc2-clinical_notes" name="clinical_notes" required rows="8"
                                       placeholder="Registre as queixas, recordatório alimentar, metas discutidas, orientações e alterações de plano..."
                                       class="w-full flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-emerald-500"></textarea>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Metas para a Próxima Sessão</label>
-                            <input type="text" name="goals" placeholder="Ex: Aumentar ingestão hídrica para 2.5L/dia; meta proteica atingida"
+                            <label for="tc3-goals" class="block text-xs font-semibold text-slate-300 mb-1">Metas para a Próxima Sessão</label>
+                            <input id="tc3-goals" type="text" name="goals" placeholder="Ex: Aumentar ingestão hídrica para 2.5L/dia; meta proteica atingida"
                                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                         </div>
 
