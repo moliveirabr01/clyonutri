@@ -145,6 +145,8 @@ touch "$TEMP_STAGE/storage/uploads/.gitkeep"
 touch "$TEMP_STAGE/storage/backups/.gitkeep"
 
 # Gerar arquivo comprimido
+# F04 (auditoria 14/10/2026): nenhum script de diagnóstico/phpinfo/teste pode ir em public/
+php bin/release_check.php "$TEMP_STAGE" || { echo "Release abortado: public/ contém artefato proibido."; exit 1; }
 tar -czf "$RELEASE_DIR/$PACKAGE_NAME" -C "$TEMP_STAGE" .
 
 # Limpar staging temporário
