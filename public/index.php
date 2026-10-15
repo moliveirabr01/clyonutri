@@ -7,6 +7,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 // NI2-427: HTTPS obrigatório antes de CORS, banco, sessão ou qualquer controller.
 // GET/HEAD por HTTP -> 301 para APP_URL (https); demais métodos -> 403 sem processar.
 \ClyoNutri\Core\Http\Transport::enforce();
+// NI2-428: HSTS gradual (só por HTTPS; valor em HSTS_MAX_AGE).
+\ClyoNutri\Core\Http\SecurityHeaders::sendHsts();
 \ClyoNutri\Core\Http\ApiErrorBoundary::register();
 
 use ClyoNutri\Application\Controllers\AuthController;
