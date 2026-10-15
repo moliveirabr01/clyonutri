@@ -72,3 +72,13 @@ html.cn-dialog-open { overflow: hidden; }
 @media (max-width: 1280px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > * { grid-column: span 2; } .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 3; } }
 @media (max-width: 768px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-metrics.cn-metrics-5 > *, .dashboard-metrics.cn-metrics-5 > :nth-child(n+4) { grid-column: span 1; } .dashboard-metrics.cn-metrics-5 > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 420px) { .dashboard-metrics.cn-metrics-5 { grid-template-columns: minmax(0, 1fr); } .dashboard-metrics.cn-metrics-5 > * { grid-column: auto !important; } }
+
+/* Base de Alimentos — paginação e filtros (v9) */
+.foods-filters { align-items: flex-end; }
+.foods-pagination { gap: 8px; }
+.foods-pagination .btn { white-space: nowrap; }
+@media (max-width: 420px) {
+  .foods-pagination { justify-content: center; }
+  .foods-pagination > div { justify-content: center; width: 100%; }
+  .foods-page-header h1 { font-size: 1.25rem; }
+}

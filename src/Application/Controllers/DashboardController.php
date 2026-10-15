@@ -4687,8 +4687,46 @@ class DashboardController
     {
         $foodService = new FoodCatalogService();
         $foodService->seedTacoReference();
+
         $query = trim((string)($_GET['q'] ?? ''));
-        $foods = $foodService->search($query);
+        $category = trim((string)($_GET['category'] ?? ''));
+        $source = trim((string)($_GET['source'] ?? ''));
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPageRaw = (int)($_GET['per_page'] ?? 50);
+        $perPage = in_array($perPageRaw, FoodCatalogService::PER_PAGE_ALLOWED, true) ? $perPageRaw : 50;
+
+        $listing = $foodService->paginate([
+            'q' => $query,
+            'category' => $category,
+            'source' => $source,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+        $foods = $listing['foods'];
+        $categories = $foodService->listCategories();
+
+        $qs = static function (array $overrides = []) use ($listing): string {
+            $base = [
+                'q' => $listing['q'],
+                'category' => $listing['category'],
+                'source' => $listing['source'],
+                'per_page' => $listing['per_page'],
+                'page' => $listing['page'],
+            ];
+            $merged = array_merge($base, $overrides);
+            foreach (['q', 'category', 'source'] as $k) {
+                if ($merged[$k] === '' || $merged[$k] === null) {
+                    unset($merged[$k]);
+                }
+            }
+            if ((int)$merged['per_page'] === 50) {
+                unset($merged['per_page']);
+            }
+            if ((int)$merged['page'] === 1) {
+                unset($merged['page']);
+            }
+            return http_build_query($merged);
+        };
 
         $title = 'Base de Alimentos';
         $activeNav = 'alimentos';
@@ -4697,31 +4735,69 @@ class DashboardController
 
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <div class="foods-page-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Tabela de Alimentos (TACO)</h1>
             <p style="color: var(--neutral-gray-600); margin: 0; font-size: 0.95rem;">Referência analítica por 100g da Tabela Brasileira de Composição de Alimentos com cálculo proporcional por medida caseira.</p>
           </div>
-          <form method="GET" action="/alimentos" style="display: flex; gap: 8px; align-items: center;">
-            <label for="food-search-input" class="sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);">Buscar alimento</label>
-            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="Buscar alimento ou categoria..." class="form-control" style="width: 260px; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-            <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Buscar</button>
-            <?php if ($query !== ''): ?>
-              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none;">Limpar</a>
-            <?php endif; ?>
-          </form>
         </div>
+
+        <form method="GET" action="/alimentos" class="foods-filters" data-busy-text="Buscando…" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: var(--space-4);">
+          <div style="flex: 1 1 200px; min-width: 160px;">
+            <label for="food-search-input" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Buscar</label>
+            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($listing['q']) ?>" placeholder="Alimento ou categoria…" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+          </div>
+          <div style="flex: 0 1 220px; min-width: 140px;">
+            <label for="food-category-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Grupo TACO</label>
+            <select id="food-category-filter" name="category" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <option value="">Todos os grupos</option>
+              <?php foreach ($categories as $cat): ?>
+                <option value="<?= htmlspecialchars($cat) ?>" <?= $listing['category'] === $cat ? 'selected' : '' ?>><?= htmlspecialchars($cat) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="flex: 0 1 160px; min-width: 120px;">
+            <label for="food-source-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Fonte</label>
+            <select id="food-source-filter" name="source" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <option value="" <?= $listing['source'] === '' ? 'selected' : '' ?>>Todas</option>
+              <option value="TACO" <?= $listing['source'] === 'TACO' ? 'selected' : '' ?>>TACO</option>
+              <option value="clinic" <?= $listing['source'] === 'clinic' ? 'selected' : '' ?>>Minha clínica</option>
+            </select>
+          </div>
+          <div style="flex: 0 1 120px; min-width: 100px;">
+            <label for="food-per-page" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Por página</label>
+            <select id="food-per-page" name="per_page" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <?php foreach (FoodCatalogService::PER_PAGE_ALLOWED as $n): ?>
+                <option value="<?= $n ?>" <?= (int)$listing['per_page'] === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="submit" class="btn btn-primary" style="padding: 8px 16px; min-height: 44px;">Buscar</button>
+            <?php if ($listing['q'] !== '' || $listing['category'] !== '' || $listing['source'] !== '' || (int)$listing['per_page'] !== 50): ?>
+              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Limpar</a>
+            <?php endif; ?>
+          </div>
+        </form>
 
         <!-- Banner Explicativo de Integridade Clínica (PX-16) -->
         <div class="card" style="padding: 16px 20px; background: rgba(15, 39, 71, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem; margin-bottom: 4px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             Diferença entre Referência Padrão (100g) e Medida Caseira
           </div>
           <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.5;">
             Os dados laboratoriais oficiais (TACO) são mensurados na <strong>base fixa de 100g</strong>. Na coluna <em>Medida Caseira</em>, a quantidade em gramas/ml e a energia resultante são calculadas proporcionalmente para orientar prescrições clínicas seguras sem confusão métrica.
           </p>
         </div>
+
+        <p class="foods-result-summary" style="margin: 0 0 12px; color: var(--neutral-gray-600); font-size: 0.9rem;" aria-live="polite">
+          <?php if ($listing['total'] === 0): ?>
+            Nenhum alimento encontrado.
+          <?php else: ?>
+            Mostrando <?= (int)$listing['from'] ?>–<?= (int)$listing['to'] ?> de <?= (int)$listing['total'] ?>
+          <?php endif; ?>
+        </p>
 
         <div class="card" style="padding: 0; overflow: hidden;">
           <div class="table-responsive">
@@ -4746,7 +4822,7 @@ class DashboardController
                     </td>
                   </tr>
                 <?php else: ?>
-                  <?php foreach ($foods as $f): 
+                  <?php foreach ($foods as $f):
                     $servingG = (float)($f['serving_size_g'] > 0 ? $f['serving_size_g'] : 100);
                     $energy100 = (float)$f['energy_kcal'];
                     $portionKcal = round(($energy100 * $servingG) / 100, 1);
@@ -4776,6 +4852,36 @@ class DashboardController
             </table>
           </div>
         </div>
+
+        <?php if ($listing['pages'] > 1 || $listing['total'] > 0): ?>
+        <nav class="foods-pagination" aria-label="Paginação da base de alimentos" style="display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; align-items:center; justify-content:space-between;">
+          <span style="color: var(--neutral-gray-600); font-size: 0.9rem;">Página <?= (int)$listing['page'] ?> de <?= (int)$listing['pages'] ?></span>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+            <?php if ($listing['page'] > 1): ?>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => 1])) ?>">Primeira</a>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] - 1])) ?>" rel="prev">Anterior</a>
+            <?php endif; ?>
+            <?php
+              $window = 2;
+              $startP = max(1, $listing['page'] - $window);
+              $endP = min($listing['pages'], $listing['page'] + $window);
+              for ($p = $startP; $p <= $endP; $p++):
+                $isCurrent = $p === (int)$listing['page'];
+            ?>
+              <?php if ($isCurrent): ?>
+                <span class="btn btn-primary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none;" aria-current="page"><?= $p ?></span>
+              <?php else: ?>
+                <a class="btn btn-secondary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $p])) ?>"><?= $p ?></a>
+              <?php endif; ?>
+            <?php endfor; ?>
+            <?php if ($listing['page'] < $listing['pages']): ?>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] + 1])) ?>" rel="next">Próxima</a>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['pages']])) ?>">Última</a>
+            <?php endif; ?>
+          </div>
+        </nav>
+        <?php endif; ?>
+
         <p class="taco-attribution" style="margin: 12px 0 0; color: var(--neutral-gray-500); font-size: 0.8rem; line-height: 1.5;">
           Fonte dos alimentos marcados com nº TACO: NEPA-UNICAMP. <cite>Tabela Brasileira de Composição de Alimentos – TACO</cite>, 4ª ed. revisada e ampliada. Campinas: NEPA-UNICAMP, 2011. Valores por 100 g de parte comestível.
           Tr (traço) e NA (não aplicável) aparecem como 0; "*" (análise em reavaliação na TACO) e "não analisado" também aparecem como 0 e ficam indicados abaixo do nome.
@@ -4785,4 +4891,5 @@ class DashboardController
 
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
+
 }
