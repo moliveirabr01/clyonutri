@@ -1769,8 +1769,22 @@ class DashboardController
             <?php endif; ?>
           </div>
 
-          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese">
+          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese" id="anamnesis-form" aria-describedby="anamnesis-progress">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+            <!-- NI2-420 (UX-08): índice acessível das seções; não impõe ordem clínica -->
+            <nav class="cn-anamnesis-index" aria-label="Seções da anamnese">
+              <p id="anamnesis-progress" role="status" aria-live="polite" style="margin: 0 0 6px; font-size: 0.8rem; color: #475569;"></p>
+              <ol>
+                <li><a href="#sec-objetivos" data-sec="objectives">Objetivos</a></li>
+                <li><a href="#sec-alergias" data-sec="allergy_assessment,allergies">Alergias</a></li>
+                <li><a href="#sec-restricoes" data-sec="restrictions">Restrições</a></li>
+                <li><a href="#sec-preferencias" data-sec="food_preferences">Preferências</a></li>
+                <li><a href="#sec-sintomas" data-sec="symptoms">Sintomas</a></li>
+                <li><a href="#sec-rotina" data-sec="routine,habits">Rotina e hábitos</a></li>
+                <li><a href="#sec-historico" data-sec="clinical_history,water_intake_ml">Histórico e hidratação</a></li>
+                <li><a href="#sec-notas" data-sec="notes">Notas e conduta</a></li>
+              </ol>
+            </nav>
             <?php if ($revisionFrom): ?>
               <input type="hidden" name="revision_from" value="<?= (int)$revisionFrom['version'] ?>">
               <p role="status">Esta gravação criará uma nova versão. A versão de origem será preservada.</p>
@@ -1779,7 +1793,7 @@ class DashboardController
             <?php endif; ?>
 
             <!-- 1. Objetivos & Metas -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-objetivos" style="margin-bottom: 16px;">
               <label for="anamnesis_objectives" id="label_anamnesis_objectives" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 1. Objetivos & Metas do Paciente
               </label>
@@ -1789,8 +1803,8 @@ class DashboardController
             <!-- 2. Alergias & Restrições (Crítico para Prescrição) -->
             <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
+              <div class="cn-form-grid">
+                <div id="sec-alergias" style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
                   <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #B91C1C;">
                     ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
                   </label>
@@ -1803,7 +1817,7 @@ class DashboardController
                   <textarea id="anamnesis_allergies" name="allergies" aria-labelledby="label_anamnesis_allergies" aria-describedby="anamnesis_allergies_help" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
                   <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
                 </div>
-                <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
+                <div id="sec-restricoes" style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
                   <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #92400E;">
                     ⚠️ 3. Restrições Alimentares & Intolerâncias
                   </label>
@@ -1814,7 +1828,7 @@ class DashboardController
             </fieldset>
 
             <!-- 3. Preferências & Aversões -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-preferencias" style="margin-bottom: 16px;">
               <label for="anamnesis_food_preferences" id="label_anamnesis_food_preferences" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 4. Preferências Alimentares & Aversões
               </label>
@@ -1822,7 +1836,7 @@ class DashboardController
             </div>
 
             <!-- 4. Sinais & Sintomas Clínicos -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-sintomas" style="margin-bottom: 16px;">
               <label for="anamnesis_symptoms" id="label_anamnesis_symptoms" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 5. Sinais & Sintomas Gastrointestinais / Gerais
               </label>
@@ -1830,9 +1844,9 @@ class DashboardController
             </div>
 
             <!-- 5. Rotina & Hábitos -->
-            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <fieldset id="sec-rotina" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Rotina Diária & Hábitos de Vida</legend>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="cn-form-grid">
                 <div class="form-group">
                   <label for="anamnesis_routine" id="label_anamnesis_routine" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                     6. Rotina Diária & Horários
@@ -1849,7 +1863,7 @@ class DashboardController
             </fieldset>
 
             <!-- 6. Histórico Clínico & Hidratação -->
-            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <fieldset id="sec-historico" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Histórico Clínico & Meta Hídrica Prescrita</legend>
               <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
                 <div class="form-group">
@@ -1869,23 +1883,51 @@ class DashboardController
             </fieldset>
 
             <!-- 7. Anotações Adicionais -->
-            <div class="form-group" style="margin-bottom: 24px;">
+            <div class="form-group" id="sec-notas" style="margin-bottom: 24px;">
               <label for="anamnesis_notes" id="label_anamnesis_notes" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 10. Notas & Conduta Inicial do Nutricionista
               </label>
               <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
             </div>
 
-            <!-- Botões de Ação com Suporte a Rascunho Parcial -->
-            <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--neutral-gray-200); padding-top: 16px;">
-              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;">
-                Salvar como Rascunho Parcial
+            <!-- NI2-420 (UX-08) / NI2-419 (UX-07): barra de ações sempre alcançável, com estado de salvamento -->
+            <div class="cn-sticky-actions" role="group" aria-label="Salvar anamnese">
+              <p class="cn-sticky-actions__status" id="anamnesis-save-status" aria-live="polite">
+                <?php if ($latest): ?>Última gravação: v<?= (int)$latest['version'] ?> <?= !empty($latest['is_draft']) ? '(rascunho)' : '(concluída)' ?> em <?= date('d/m/Y H:i', strtotime($latest['created_at'])) ?>.<?php else: ?>Nada salvo ainda para este paciente.<?php endif; ?>
+              </p>
+              <span id="anamnesis-actions-help" class="sr-only">Salvar rascunho guarda a coleta parcial para continuar depois. Concluir anamnese registra uma nova versão; as versões anteriores continuam no histórico.</span>
+              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;" aria-describedby="anamnesis-actions-help">
+                Salvar rascunho
               </button>
-              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
-                Finalizar & Gerar Nova Versão Imutável
+              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;" aria-describedby="anamnesis-actions-help">
+                Concluir anamnese
               </button>
+              <p style="flex-basis: 100%; margin: 0; text-align: right; font-size: 0.75rem; color: #64748B;">Concluir registra uma nova versão. As versões anteriores continuam no histórico.</p>
             </div>
           </form>
+          <script>
+          (() => {
+            const form = document.getElementById('anamnesis-form'); if (!form) return;
+            const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status'), initial = status.textContent.trim();
+            const assessLabel = {not_assessed: 'não avaliado', denied: 'nega alergias', recorded: 'alergia registrada'};
+            const update = () => {
+              let filled = 0; const links = [...form.querySelectorAll('.cn-anamnesis-index a[data-sec]')];
+              links.forEach(a => {
+                const names = a.dataset.sec.split(','), isAllergy = names.includes('allergy_assessment');
+                const has = names.some(n => { const el = form.elements[n]; return el && el.value.trim() !== '' && !(n === 'allergy_assessment' && el.value === 'not_assessed'); });
+                a.dataset.filled = String(has); if (has) filled++;
+                const base = a.textContent.replace(/ \(.*\)$/, '');
+                a.textContent = isAllergy ? base + ' (' + (assessLabel[form.elements.allergy_assessment?.value] || 'não avaliado') + ')' : base;
+                a.setAttribute('aria-label', a.textContent + (isAllergy ? '' : (has ? ', com conteúdo' : ', sem conteúdo')));
+              });
+              progress.textContent = filled + ' de ' + links.length + ' seções com conteúdo. Seção vazia significa "não registrado", não negação.';
+              const dirty = window.ClyoForms ? window.ClyoForms.isDirty(form) : false;
+              status.textContent = dirty ? 'Alterações não salvas. ' + initial : initial;
+            };
+            form.addEventListener('input', update); form.addEventListener('change', update); update();
+            window.addEventListener('load', update);
+          })();
+          </script>
         </div>
 
         <?php endif; ?>
