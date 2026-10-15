@@ -7,17 +7,27 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # NI2-427: HTTPS obrigatório (primeira barreira; o PHP repete a checagem).
-    # Só para hosts conhecidos: o Location nunca usa um Host arbitrário enviado pelo cliente.
-    # Outros hosts seguem para o PHP, que redireciona para o APP_URL do .env.
-    # %{HTTPS} é definido pelo próprio Apache com TLS (HostGator); X-Forwarded-Proto NÃO é
-    # considerado aqui de propósito (pode ser forjado). GET/HEAD -> 301; outros métodos -> 403.
-    # (A condição do Host vem por último porque %1 usa a última condição casada.)
+    # NI2-427 / v10: HTTPS obrigatório (primeira barreira; o PHP repete a checagem).
+    # Está nos DOIS .htaccess (raiz e public/): vale qualquer que seja a pasta raiz do domínio.
+    # "Já é HTTPS" = %{HTTPS}=on OU %{ENV:HTTPS}=on OU X-Forwarded-Proto=https (sem loop atrás de
+    # proxy). Um X-Forwarded-Proto forjado só faz a requisição chegar ao PHP, que (com
+    # TRUSTED_PROXIES vazio) redireciona/recusa do mesmo jeito.
+    # O Location nunca usa um Host arbitrário: só hosts conhecidos; outros seguem para o PHP,
+    # que redireciona para o APP_URL do .env. (A condição do Host vem por último: %1.)
+    # 1) www -> https://clyonutri.com (um único salto, de http ou https)
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^www\.(clyonutri\.com(\.br)?)(:(80|443))?$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+    # 2) http -> https no mesmo host conhecido (GET/HEAD 301; outros métodos 403)
     RewriteCond %{HTTPS} !=on
+    RewriteCond %{ENV:HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https [NC]
     RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
     RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
     RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
     RewriteCond %{HTTPS} !=on
+    RewriteCond %{ENV:HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https [NC]
     RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
     RewriteRule ^ - [F,L]
 
@@ -32,6 +42,17 @@ DirectoryIndex index.php index.html
 </IfModule>
 
 # Bloqueia dotfiles (.env, .htaccess, .git etc.)
+# v10 (2.2): dumps, backups, bancos, logs e configs nunca são servidos, mesmo se forem parar em public/.
+<FilesMatch "(?i)(\.(sql|sqlite3?|db|zip|tar|gz|tgz|rar|7z|bak|old|orig|save|swp|tmp|log|ini|conf|env|sh|lock|dist|phar|md)$|^error_log$|^composer\.(json|lock)$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
 <FilesMatch "^\.">
     <IfModule mod_authz_core.c>
         Require all denied

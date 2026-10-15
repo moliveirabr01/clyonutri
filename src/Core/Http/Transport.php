@@ -20,7 +20,7 @@ use ClyoNutri\Core\Security\Env;
  *   "fingir" HTTPS nem provocar loop.
  *
  * Configuração (.env):
- *   FORCE_HTTPS=true|false   padrão: true quando APP_ENV=production, senão false.
+ *   FORCE_HTTPS=true|false   padrão: true quando APP_ENV=production (só "false" explícito desliga, com aviso no log), senão false.
  *   TRUSTED_PROXIES=         padrão vazio (HostGator termina TLS no próprio Apache).
  */
 final class Transport
@@ -89,13 +89,41 @@ final class Transport
         return (($ipBin[$bytes] & $mask) === ($netBin[$bytes] & $mask));
     }
 
+    /**
+     * v10: em produção o HTTPS é obrigatório por padrão. FORCE_HTTPS ausente, vazio ou com valor
+     * desconhecido NÃO desliga; só um "false/0/off/no" explícito desliga, e isso gera um aviso no log.
+     */
     public static function forceHttpsEnabled(): bool
     {
         $raw = Env::get('FORCE_HTTPS');
-        if ($raw === null || $raw === '') {
-            return strtolower((string)(Env::get('APP_ENV', '') ?? '')) === 'production';
+        $val = strtolower(trim((string)($raw ?? '')));
+        $isProd = self::isProduction();
+        if (in_array($val, ['1', 'true', 'on', 'yes'], true)) {
+            return true;
         }
-        return in_array(strtolower(trim((string)$raw)), ['1', 'true', 'on', 'yes'], true);
+        if (in_array($val, ['0', 'false', 'off', 'no'], true)) {
+            if ($isProd) {
+                self::warnOnce('[ClyoNutri][seguranca] FORCE_HTTPS=false com APP_ENV=production: HTTPS obrigatório DESLIGADO pelo .env. Remova a linha ou use FORCE_HTTPS=true.');
+            }
+            return false;
+        }
+        return $isProd;
+    }
+
+    public static function isProduction(): bool
+    {
+        return strtolower(trim((string)(Env::get('APP_ENV', '') ?? ''))) === 'production';
+    }
+
+    private static bool $warned = false;
+
+    private static function warnOnce(string $msg): void
+    {
+        if (self::$warned || PHP_SAPI === 'cli') {
+            return;
+        }
+        self::$warned = true;
+        error_log($msg);
     }
 
     /** Origem canônica https://host[:porta] a partir de APP_URL; null se APP_URL não for https válida. */

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Reteste externo NI2-426 (NI2-427/428/429). Rode no Mac, fora do servidor:
+# Reteste externo NI2-426 (NI2-427/428/429) + v10 (www, /health mínimo, diagnóstico). Rode no Mac, fora do servidor:
 #   bash reteste-ni2-426.sh [https://clyonutri.com] [versao-implantada] > evidencia-ni2-426.txt
 # Só GET/HEAD/OPTIONS e um POST com dados FICTÍCIOS por HTTP. Nenhuma credencial real.
 # Cookies, tokens CSRF e nonces são mascarados na saída.
-BASE="${1:-https://clyonutri.com}"; VER="${2:-v7}"
+BASE="${1:-https://clyonutri.com}"; VER="${2:-v10}"
 HOST="${BASE#https://}"; HOST="${HOST%%/*}"; HTTP="${HTTP_BASE:-http://$HOST}"; EXPECT="${EXPECT_HTTPS:-https://$HOST}"
 UA="reteste-ni2-426"
 san(){ sed -E -e 's/(set-cookie: *[^=]+=)[^;]*/\1<mascarado>/I' -e "s/'nonce-[A-Za-z0-9_+\/=-]+'/'nonce-<mascarado>'/g" -e 's/(_csrf_token" value=")[^"]*/\1<mascarado>/' -e 's/\r$//'; }
@@ -53,6 +53,27 @@ for p in / /login /dashboard /admin /api/v1/patient/home /rota-inexistente-ni2-4
 done; done
 echo "### Diretivas da CSP de /login"
 curl -sS ${CURL_INSECURE:+-k} -I -m 20 "$BASE/login" | grep -i '^content-security-policy:' | san | tr ';' '\n' | sed 's/^/   /'
+echo
+echo "## v10 — www, /health mínimo e diagnóstico"
+APEX="${HOST#www.}"; WWW="www.$APEX"
+for u in "http://$WWW/" "http://$WWW/login" "https://$WWW/" "https://$WWW/login" "http://$APEX/health"; do
+  p="/${u#*://*/}"; [ "$p" = "/$u" ] && p=/
+  echo "### GET $u"; H=$(req GET "$u"); echo "$H" | hdr
+  st=$(echo "$H" | awk 'toupper($1) ~ /^HTTP/ {print $2; exit}'); loc=$(echo "$H" | grep -i '^location:' | head -1 | awk '{print $2}' | tr -d '\r')
+  [ "$st" = 301 ] && [ "$loc" = "https://$APEX$p" ] && r=1 || r=0; res $r "301 para https://$APEX$p"
+done
+echo "### GET $BASE/health"; H=$(req GET "$BASE/health"); echo "$H" | hdr; b=$(cat /tmp/ni2426_body); echo "  corpo: $b"
+st=$(echo "$H" | awk 'toupper($1) ~ /^HTTP/ {print $2; exit}')
+[ "$st" = 200 ] && [ "$b" = '{"status":"ok"}' ] && r=1 || r=0; res $r "/health responde só {\"status\":\"ok\"} (sem serviço, versão ou horário)"
+echo "$H" | grep -qi '^cache-control: *no-store' && r=1 || r=0; res $r "/health com Cache-Control: no-store"
+echo "### GET $BASE/up"; H=$(req GET "$BASE/up"); b=$(cat /tmp/ni2426_body); echo "  corpo: $b"
+echo "$b" | grep -Eq '^\{"status":"(ok|unavailable)"\}$' && r=1 || r=0; res $r "/up mínimo (sem banco, versão ou horário)"
+for f in _diag_99ba259d91b45cec0606e89f.php test_mail.php phpinfo.php info.php .env bin/diagnostico.php vendor/autoload.php; do
+  st=$(curl -sS ${CURL_INSECURE:+-k} -o /tmp/ni2426_body -w '%{http_code}' -m 20 "$BASE/$f")
+  [ "$st" = 404 ] || [ "$st" = 403 ] && r=1 || r=0; res $r "/$f -> $st (esperado 404/403)"
+done
+st=$(curl -sS ${CURL_INSECURE:+-k} -o /tmp/ni2426_body -w '%{http_code}' -m 20 "$BASE/rota-inexistente-v10")
+grep -Eqi 'stack trace|\.php|sqlstate|/home[0-9]*/' /tmp/ni2426_body && r=0 || r=1; res $r "página de erro sem stack trace/caminho ($st)"
 echo
 echo "## Totais: $ok OK, $nok FALHA"
 echo "## Pendentes manuais: (1) abrir scripts/teste-iframe-ni2-426.html no navegador e ver que o login NÃO aparece no quadro;"

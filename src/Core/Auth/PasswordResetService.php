@@ -483,6 +483,10 @@ class PasswordResetService
                 // Nunca usa o Host da requisição como fallback (host header injection).
                 throw new \RuntimeException('APP_URL ausente ou inválida; link de redefinição não pode ser montado.');
             }
+            // v10: link de e-mail sempre em https:// em produção (mesmo que APP_URL esteja com http://).
+            if (\ClyoNutri\Core\Http\Transport::isProduction() || \ClyoNutri\Core\Http\Transport::forceHttpsEnabled()) {
+                $baseUrl = (string)preg_replace('#^http://#i', 'https://', $baseUrl);
+            }
             $resetUrl = $baseUrl . '/recuperar-senha/' . rawurlencode($token);
 
             $message = PasswordResetEmail::build(

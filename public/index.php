@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 \ClyoNutri\Core\Security\Env::load(__DIR__ . '/../.env');
+// v10: em produção nunca exibe erro/stack trace ao público, mesmo com APP_DEBUG=true.
+\ClyoNutri\Core\Http\ErrorExposure::configure();
 // NI2-427: HTTPS obrigatório antes de CORS, banco, sessão ou qualquer controller.
 // GET/HEAD por HTTP -> 301 para APP_URL (https); demais métodos -> 403 sem processar.
 \ClyoNutri\Core\Http\Transport::enforce();
@@ -120,49 +122,26 @@ $router->post('/recuperar-senha/{token}', [$authCtrl, 'resetPassword']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
 $router->get('/up', function () {
+    // v10: resposta mínima (sem versão, horário, nome do serviço ou estado do banco/agendador).
+    // Detalhes só pela linha de comando: php bin/diagnostico.php / php bin/healthcheck.php.
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     $dbOk = false;
     try {
-        $db = Connection::getInstance();
-        $db->query("SELECT 1");
+        Connection::getInstance()->query('SELECT 1');
         $dbOk = true;
     } catch (\Throwable $e) {
         $dbOk = false;
     }
-
-    $heartbeatFile = __DIR__ . '/../storage/scheduler_heartbeat.json';
-    $heartbeatOk = false;
-    if (file_exists($heartbeatFile)) {
-        $data = json_decode((string)file_get_contents($heartbeatFile), true);
-        if (!empty($data['timestamp']) && (time() - $data['timestamp'] < 1200)) {
-            $heartbeatOk = true;
-        }
-    }
-
-    $allOk = $dbOk;
-    if (!$allOk) {
-        http_response_code(503);
-    } else {
-        http_response_code(200);
-    }
-
-    echo json_encode([
-        'status' => $allOk ? 'up' : 'degraded',
-        'database' => $dbOk ? 'connected' : 'disconnected',
-        'scheduler_heartbeat' => $heartbeatOk ? 'healthy' : 'pending_or_delayed',
-        'version' => '1.0.0',
-        'timestamp' => date('c'),
-    ]);
+    http_response_code($dbOk ? 200 : 503);
+    echo json_encode(['status' => $dbOk ? 'ok' : 'unavailable']);
 });
 
 $router->get('/health', function () {
+    // v10 (achado "Endpoint público de diagnóstico"): só {"status":"ok"}; nada de serviço, versão ou horário.
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'status' => 'healthy',
-        'service' => 'ClyoNutri API & Web Engine',
-        'version' => '1.0.0',
-        'timestamp' => date('c'),
-    ]);
+    header('Cache-Control: no-store');
+    echo json_encode(['status' => 'ok']);
 });
 
 // Verificação de Modo de Manutenção em Tempo de Execução (NI2-407 / NI2-411)
@@ -247,6 +226,8 @@ $requireAuth = function (callable $action) use ($db) {
             \ClyoNutri\Core\Http\Response::redirect('/login?error=session_revoked');
         }
 
+        // v10 (2.2): páginas autenticadas nunca ficam em cache (navegador/proxy).
+        if (!headers_sent()) { header('Cache-Control: no-store, private'); header('Pragma: no-cache'); }
         $actor = $authUser->toArray();
         try {
             \ClyoNutri\Core\Security\ClinicalAuthorization::assertWebAccess($actor, parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', $_SERVER['REQUEST_METHOD'], $db);

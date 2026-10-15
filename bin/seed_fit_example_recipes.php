@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // v10: script só de linha de comando
 require __DIR__.'/../vendor/autoload.php';
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Auth\TenantContext;

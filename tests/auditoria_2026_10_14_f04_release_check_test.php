@@ -20,6 +20,8 @@ aud_check($check($root) === 0, 'release_check aprova o public/ atual');
 $tmp = sys_get_temp_dir() . '/aud_rel_' . bin2hex(random_bytes(4));
 mkdir("{$tmp}/public/assets", 0777, true);
 copy("{$root}/public/index.php", "{$tmp}/public/index.php");
+copy("{$root}/public/.htaccess", "{$tmp}/public/.htaccess"); // v10: release_check exige HTTPS nos dois .htaccess
+copy("{$root}/.htaccess", "{$tmp}/.htaccess");
 aud_check($check($tmp) === 0, 'cópia limpa aprovada');
 $cases = [
     'public/_diag_99ba259d91b45cec0606e89f.php' => "<?php echo PHP_VERSION;",
