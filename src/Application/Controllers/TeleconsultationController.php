@@ -206,7 +206,7 @@ class TeleconsultationController
                     <div class="border-b border-slate-700 pb-3">
                         <h2 class="font-bold text-white text-base">Evolução Clínica & Prontuário em Tempo Real</h2>
                         <p class="text-xs text-slate-400 mt-1">
-                            Notas persistidas com encadeamento imutável SHA-256. Paciente não tem visibilidade das notas privadas.
+                            As notas ficam salvas no prontuário com histórico preservado. O paciente não vê as notas privadas.
                         </p>
                     </div>
 

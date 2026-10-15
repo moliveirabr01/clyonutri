@@ -340,7 +340,7 @@ class OnboardingController
                         </div>
                       </div>
                       <a href="/pacientes/<?= (int)$firstPatient['id'] ?>" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;" target="_blank">
-                        Ver Perfil 360 ↗
+                        Ver perfil do paciente ↗
                       </a>
                     </div>
                   </div>
@@ -421,7 +421,7 @@ class OnboardingController
                     <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4);">
                       <div style="font-size: 1.5rem; margin-bottom: 8px;">🥗</div>
                       <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Prescrever Plano Alimentar</strong>
-                      <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Monte dietas com cálculos oficiais TACO, medidas caseiras e snapshots imutáveis.</p>
+                      <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Monte dietas com cálculos oficiais TACO, medidas caseiras e histórico de versões publicadas.</p>
                       <a href="/planos" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Criar Plano →</a>
                     </div>
 

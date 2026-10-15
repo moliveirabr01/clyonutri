@@ -753,10 +753,10 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Análise longitudinal de indicadores, composição corporal e comparativo clínico.</p>
+            <p style="color: var(--neutral-gray-500);">Evolução dos indicadores, composição corporal e comparação entre avaliações.</p>
           </div>
           <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
             + Nova Avaliação
@@ -1276,7 +1276,7 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Prontuário Eletrônico & Evolução Clínica</h1>
             <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico de registros clínicos</p>
@@ -1683,7 +1683,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div role="status" aria-live="polite" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ Anamnese gravada com sucesso! Nova versão versionada e preservada no histórico longitudinal.
+            ✓ Anamnese salva. As versões anteriores continuam disponíveis no histórico.
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -1695,10 +1695,10 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Anamnese Nutricional Estruturada</h1>
-            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Coleta clínica versionada e imutável</p>
+            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Cada conclusão gera uma nova versão; as anteriores ficam no histórico</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
@@ -2260,7 +2260,7 @@ class DashboardController
               <span>📹 Consultório Online</span>
             </a>
             <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
-              Ver Perfil 360 ↗
+              Ver perfil do paciente ↗
             </a>
           </div>
         </div>
@@ -2520,7 +2520,7 @@ class DashboardController
         <?php endif; ?>
         <?php if (!empty($_GET['status_updated'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ Status da consulta atualizado com sucesso no histórico de auditoria!
+            ✓ Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -2809,7 +2809,7 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Prescrições e Planos Alimentares</h1>
-            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Editor por refeições, alimentos, substituições, totais nutricionais e versionamento imutável.</p>
+            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Monte refeições, alimentos e substituições e acompanhe os totais. Cada publicação gera uma nova versão; as anteriores ficam no histórico.</p>
           </div>
           <button class="btn btn-primary" onclick="document.getElementById('modal-new-plan').style.display='flex'">
             + Novo Plano Alimentar
@@ -2890,7 +2890,7 @@ class DashboardController
         <!-- Modal Novo Plano -->
         <div id="modal-new-plan" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
           <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Criar Novo Plano Alimentar</h2>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Novo plano alimentar</h2>
             <form method="POST" action="/planos/novo">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 16px;">
@@ -2996,7 +2996,7 @@ class DashboardController
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
               <a href="/planos" style="text-decoration: none; color: #475569; font-size: 0.9rem;">← Voltar para lista</a>
               <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#def7ec' ?>; color: <?= $isDraft ? '#854d0e' : '#03543f' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
-                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (Imutável v' . (int)$plan['version'] . ')' ?>
+                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (versão ' . (int)$plan['version'] . ', somente leitura)' ?>
               </span>
             </div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;"><?= htmlspecialchars($plan['title']) ?></h1>
@@ -3397,7 +3397,7 @@ class DashboardController
           <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">Revisar e Publicar Versão</h2>
             <p style="color: #475569; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
-              A publicação torna este plano a <strong>prescrição ativa e vigente</strong> para o paciente no aplicativo móvel. Um snapshot imutável será gravado com número de versão e registro de auditoria clínica.
+              Ao publicar, este plano passa a ser a <strong>prescrição ativa</strong> que o paciente vê no aplicativo. Ele vira uma nova versão numerada e não poderá mais ser editado; para mudar depois, crie uma cópia. As versões anteriores continuam no histórico.
             </p>
 
             <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
@@ -3620,7 +3620,7 @@ class DashboardController
 
         try {
             $res = $service->publishPlan($planId, $allowAllergenOverride, true);
-            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! Snapshot imutável gerado.";
+            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro na publicação: " . $e->getMessage();
         }
@@ -4209,7 +4209,7 @@ class DashboardController
             $onboardingPct = (int)round($onboardingDone / self::ONBOARDING_TOTAL_STEPS * 100);
         }
 
-        $title = 'Dashboard';
+        $title = 'Visão geral';
         $activeNav = 'dashboard';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -4465,7 +4465,7 @@ class DashboardController
         ?>
         <?php if (!empty($_GET['success'])): ?>
           <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(24, 121, 78, 0.2);">
-            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado com sucesso! Prontuário e Perfil 360 iniciados.' ?>
+            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado. Próximo passo: abra o perfil para agendar ou iniciar o atendimento.' ?>
             <?php if ($createdId): ?><a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a><?php endif; ?>
           </div>
         <?php endif; ?>
@@ -4476,7 +4476,7 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1>Gestão de Pacientes</h1>
-            <p style="color: var(--neutral-gray-500);">Acompanhamento longitudinal, Perfil 360 e prontuários.</p>
+            <p style="color: var(--neutral-gray-500);">Cadastro, histórico de acompanhamento e prontuários.</p>
           </div>
           <button class="btn btn-primary" onclick="openPatientModal()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4543,7 +4543,7 @@ class DashboardController
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
                       <td><span class="badge <?= $p['status'] === 'active' ? 'badge-success' : 'badge-secondary' ?>"><?= ['active'=>'Ativo','inactive'=>'Inativo','anonymized'=>'Anonimizado'][$p['status']] ?? 'Não informado' ?></span></td>
                       <td>
-                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver Perfil 360</a>
+                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver perfil</a>
                         <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
                       </td>
                     </tr>
