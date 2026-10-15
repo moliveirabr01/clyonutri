@@ -76,7 +76,11 @@ class ChatController
         $auth = $this->getAuthInfo();
         $patientId = isset($_GET['patient_id']) ? (int)$_GET['patient_id'] : 0;
         if ($patientId > 0 && $auth['profId'] > 0) {
-            $activeConvId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
+            try {
+                $activeConvId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
+            } catch (TenantSecurityException $e) {
+                http_response_code(404); echo 'Paciente não encontrado.'; return;
+            }
             $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
         } else {
             $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
@@ -84,6 +88,51 @@ class ChatController
         }
 
         $this->renderChatView($auth, $conversations, $activeConvId);
+    }
+
+    /**
+     * NI2-424 (UX-12): busca paginada de pacientes ativos da clínica para "Nova conversa" (JSON, somente leitura).
+     */
+    public function patientSearch(array $params = []): void
+    {
+        $auth = $this->getAuthInfo();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $term = $_GET['q'] ?? '';
+        $page = $_GET['page'] ?? '1';
+        if (!is_string($term) || mb_strlen($term) > 80 || !is_string($page) || !ctype_digit($page) || (int)$page < 1 || (int)$page > 200) {
+            http_response_code(422); echo json_encode(['error' => 'Busca inválida.']); return;
+        }
+        $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower(trim($term))) . '%';
+        $offset = ((int)$page - 1) * 20;
+        $stmt = $this->db->prepare("SELECT p.id, p.name, (SELECT c.id FROM chat_conversations c WHERE c.clinic_id = p.clinic_id AND c.patient_id = p.id AND c.professional_id = :prof LIMIT 1) AS conversation_id
+            FROM patients p WHERE p.clinic_id = :cid AND p.status = 'active' AND LOWER(p.name) LIKE :q ESCAPE '!' ORDER BY p.name, p.id LIMIT 21 OFFSET {$offset}");
+        $stmt->execute(['cid' => $auth['clinicId'], 'prof' => $auth['profId'], 'q' => $like]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $more = count($rows) > 20;
+        echo json_encode(['data' => array_map(static fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'has_conversation' => $r['conversation_id'] !== null], array_slice($rows, 0, 20)), 'has_more' => $more, 'page' => (int)$page], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * NI2-424 (UX-12): abre (ou reaproveita) a conversa com o paciente escolhido explicitamente. Não envia mensagem.
+     */
+    public function startConversation(array $params = []): void
+    {
+        $auth = $this->getAuthInfo();
+        if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
+            http_response_code(419); echo 'Sessão expirada. Recarregue a página.'; return;
+        }
+        $patientId = ctype_digit((string)($_POST['patient_id'] ?? '')) ? (int)$_POST['patient_id'] : 0;
+        if ($patientId <= 0 || $auth['profId'] <= 0) {
+            header('Location: /chat?erro=paciente'); exit;
+        }
+        try {
+            $convId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
+        } catch (TenantSecurityException $e) {
+            http_response_code(404); echo 'Paciente não encontrado.'; return;
+        }
+        header('Location: /chat/' . $convId);
+        exit;
     }
 
     /**
@@ -529,11 +578,12 @@ class ChatController
                 <?php if ($totalUnread > 0): ?>
                     <span class="badge-unread"><?= $totalUnread ?> não lidas</span>
                 <?php endif; ?>
+                <button type="button" class="btn btn-primary" data-testid="new-conversation" onclick="window.ClyoDialog ? window.ClyoDialog.open('modal-nova-conversa') : (document.getElementById('modal-nova-conversa').style.display='flex')" style="min-height: 36px; font-size: 0.85rem;">Nova conversa</button>
             </div>
             <ul class="conv-list-items">
                 <?php if (empty($conversations)): ?>
                     <li style="padding: 24px; text-align: center; color: #64748b; font-size: 0.9rem;">
-                        Nenhuma conversa ativa no momento.<br>Inicie o contato a partir da ficha do paciente.
+                        Nenhuma conversa ativa no momento.<br>Use <strong>Nova conversa</strong> para escolher o paciente (o atalho no perfil do paciente continua disponível).
                     </li>
                 <?php else: ?>
                     <?php foreach ($conversations as $c): ?>
@@ -618,7 +668,7 @@ class ChatController
                         </label>
                         <span id="selectedFileName" style="font-size: 0.8rem; color: #64748b; display: none;"></span>
 
-                        <textarea name="message" class="chat-textarea" id="chatMessageTextarea" placeholder="Digite uma mensagem segura para seu paciente..." required></textarea>
+                        <textarea name="message" class="chat-textarea" id="chatMessageTextarea" aria-label="Mensagem para <?= htmlspecialchars($activeConv['patient_name']) ?>" placeholder="Digite uma mensagem segura para seu paciente..." required></textarea>
                         <button type="submit" class="btn-send" id="btnSend">Enviar</button>
                     </form>
                 </div>
@@ -793,11 +843,69 @@ class ChatController
             <?php else: ?>
                 <div class="empty-chat">
                     <h3>Nenhuma conversa selecionada</h3>
-                    <p>Selecione um paciente na lista à esquerda para visualizar e enviar mensagens seguras.</p>
+                    <p>Selecione uma conversa na lista ou comece uma nova.</p>
+                    <button type="button" class="btn btn-primary" onclick="window.ClyoDialog && window.ClyoDialog.open('modal-nova-conversa')">Nova conversa</button>
                 </div>
             <?php endif; ?>
         </section>
     </div>
+
+    <!-- NI2-424 (UX-12): Nova conversa — busca paginada, destinatário explícito, nenhuma mensagem enviada aqui -->
+    <div id="modal-nova-conversa" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+      <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px;">
+        <h2 style="font-size: 1.15rem; margin: 0 0 12px;">Nova conversa</h2>
+        <form method="POST" action="/chat/nova" id="new-conv-form">
+          <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+          <input type="hidden" name="patient_id" id="new-conv-patient" value="">
+          <label class="form-label" for="new-conv-search">Buscar paciente da clínica</label>
+          <input class="form-control" type="search" id="new-conv-search" maxlength="80" autocomplete="off" placeholder="Digite parte do nome" aria-describedby="new-conv-status">
+          <p id="new-conv-status" role="status" aria-live="polite" style="font-size: 0.8rem; color: #475569; margin: 6px 0;"></p>
+          <div id="new-conv-results" role="group" aria-label="Pacientes encontrados" style="display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto;"></div>
+          <button type="button" class="btn btn-secondary" id="new-conv-more" hidden style="margin-top: 6px;">Mais pacientes</button>
+          <p id="new-conv-chosen" style="margin: 12px 0 0; font-weight: 600;" aria-live="polite">Nenhum paciente selecionado.</p>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="new-conv-submit" disabled>Abrir conversa</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script>
+    (() => {
+      const q = document.getElementById('new-conv-search'), box = document.getElementById('new-conv-results'), st = document.getElementById('new-conv-status');
+      const more = document.getElementById('new-conv-more'), hid = document.getElementById('new-conv-patient'), chosen = document.getElementById('new-conv-chosen'), submit = document.getElementById('new-conv-submit');
+      const form = document.getElementById('new-conv-form');
+      let page = 1, timer, seq = 0;
+      const clear = () => { hid.value = ''; submit.disabled = true; submit.textContent = 'Abrir conversa'; chosen.textContent = 'Nenhum paciente selecionado.'; };
+      async function load(append) {
+        const my = ++seq; st.textContent = 'Buscando pacientes…';
+        try {
+          const r = await fetch('/chat/pacientes?q=' + encodeURIComponent(q.value) + '&page=' + page, {headers: {Accept: 'application/json'}});
+          if (!r.ok) throw Error(); const data = await r.json(); if (my !== seq) return;
+          if (!append) box.replaceChildren();
+          data.data.forEach(p => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-secondary'; b.style.justifyContent = 'space-between';
+            b.textContent = p.name + (p.has_conversation ? ' — já tem conversa' : '');
+            b.setAttribute('aria-pressed', 'false');
+            b.addEventListener('click', () => {
+              box.querySelectorAll('[aria-pressed]').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true');
+              hid.value = String(p.id); submit.disabled = false;
+              submit.textContent = (p.has_conversation ? 'Abrir conversa existente com ' : 'Abrir conversa com ') + p.name;
+              chosen.textContent = 'Destinatário: ' + p.name + (p.has_conversation ? ' (a conversa existente será aberta, sem duplicar)' : '') + '. Nenhuma mensagem é enviada nesta etapa.';
+            });
+            box.append(b);
+          });
+          more.hidden = !data.has_more;
+          st.textContent = box.children.length ? box.children.length + ' paciente(s) exibido(s).' : 'Nenhum paciente ativo encontrado.';
+        } catch (e) { if (my === seq) st.textContent = 'Não foi possível buscar pacientes. Tente novamente.'; }
+      }
+      q.addEventListener('input', () => { clearTimeout(timer); page = 1; clear(); timer = setTimeout(() => load(false), 250); });
+      q.addEventListener('focus', () => { if (!box.children.length) load(false); });
+      more.addEventListener('click', () => { page++; load(true); });
+      form.addEventListener('clyo:discard', () => { box.replaceChildren(); st.textContent = ''; more.hidden = true; clear(); });
+      form.addEventListener('submit', e => { if (!hid.value) { e.preventDefault(); st.textContent = 'Selecione um paciente na lista.'; q.focus(); } });
+    })();
+    </script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';

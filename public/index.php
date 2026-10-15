@@ -402,6 +402,8 @@ $router->post('/suporte/chamado/{id}/status', $requireAuth([$helpCtrl, 'backoffi
 
 // 3.3 Canal Seguro de Comunicação & Chat (NI2-189 / NI2-411)
 $router->get('/chat', $requireAuth($requireChat([$chatCtrl, 'index'])));
+$router->get('/chat/pacientes', $requireAuth($requireChat([$chatCtrl, 'patientSearch'])));
+$router->post('/chat/nova', $requireAuth($requireChat([$chatCtrl, 'startConversation'])));
 $router->get('/chat/{id}', $requireAuth($requireChat([$chatCtrl, 'conversationView'])));
 $router->post('/chat/{id}/enviar', $requireAuth($requireChat([$chatCtrl, 'sendMessage'])));
 $router->get('/chat/{id}/poll', $requireAuth($requireChat([$chatCtrl, 'pollMessages'])));
