@@ -219,6 +219,21 @@ class AuthService
             throw new \InvalidArgumentException("Papel de usuário inválido: {$newRole}");
         }
 
+        // Papéis de plataforma (users.role 'admin' = administrador da PLATAFORMA, operator, support_agent)
+        // só podem ser concedidos por equipe da plataforma; CLI (bin/) conta como plataforma.
+        if (in_array($newRole, \ClyoNutri\Core\Security\RoleModel::PLATFORM_ROLES, true)) {
+            $grantorRole = null;
+            if ($changedByUserId !== null) {
+                $g = $this->db->prepare("SELECT role FROM users WHERE id = :id AND status = 'active'");
+                $g->execute(['id' => $changedByUserId]);
+                $grantorRole = (string)$g->fetchColumn();
+            }
+            $isCli = PHP_SAPI === 'cli' && $changedByUserId === null;
+            if (!$isCli && !\ClyoNutri\Core\Security\RoleModel::canGrantUserRole($grantorRole, $newRole)) {
+                throw new \ClyoNutri\Core\Security\AuthorizationException("Somente a equipe da plataforma pode conceder o papel {$newRole}.");
+            }
+        }
+
         $stmtOld = $this->db->prepare("SELECT role FROM users WHERE id = :id");
         $stmtOld->execute(['id' => $userId]);
         $oldRole = (string)$stmtOld->fetchColumn();

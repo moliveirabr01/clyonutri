@@ -728,7 +728,7 @@ class HelpdeskController
             <?php foreach ($ticket['messages'] as $idx => $msg): ?>
               <?php 
                 $isMe = ((int)$msg['user_id'] === $auth['userId']);
-                $isOperator = in_array($msg['author_role'], ['admin', 'operator', 'support_agent'], true);
+                $isOperator = \ClyoNutri\Core\Security\RoleModel::isPlatformSupport($msg['author_role'] ?? ''); // u.role (plataforma)
               ?>
               <div style="border-radius: 8px; padding: 16px; border: 1px solid <?= $isOperator ? '#BFDBFE' : '#E2E8F0' ?>; background: <?= $isOperator ? '#EFF6FF' : '#FFFFFF' ?>;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
