@@ -15,6 +15,7 @@ declare(strict_types=1);
  *  1. Drenagem de fila database em lote (--stop-when-empty, max 120s, timeout 50s)
  *  2. Atualização de heartbeat de observabilidade (scheduler:heartbeat)
  *  3. Limpeza de tokens expirados e sessões antigas
+ *     + contadores antigos de tentativas de login (login_attempts, v6)
  *  4. Envio de notificações agendadas em lote
  * ==============================================================================
  */
@@ -45,6 +46,7 @@ class HostGatorCronScheduler
         $this->recordHeartbeat();
         $this->drainDatabaseQueue();
         $this->pruneExpiredTokens();
+        $this->pruneLoginAttempts();
         $this->pruneOldLogs();
 
         $elapsed = round(microtime(true) - $startTime, 3);
@@ -114,6 +116,16 @@ class HostGatorCronScheduler
         $this->executionLog['pruning'] = 'TOKENS_PRUNED';
     }
 
+    /** v6: contadores de login sem atividade há mais de 1 dia e IPs conhecidos vencidos (LoginRateLimiter::purgeStale). */
+    private function pruneLoginAttempts(): void
+    {
+        try {
+            $this->executionLog['login_attempts_pruned'] = \ClyoNutri\Core\Security\LoginRateLimiter::purgeStale(Connection::getInstance());
+        } catch (\Throwable $e) {
+            $this->executionLog['login_attempts_pruned'] = 'WARNING: ' . $e->getMessage();
+        }
+    }
+
     private function pruneOldLogs(): void
     {
         $logDir = $this->storageDir . '/logs';
@@ -141,6 +153,7 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     $report = $scheduler->run();
     echo " Heartbeat : " . $report['heartbeat'] . "\n";
     echo " Fila      : " . ($report['queue']['status'] ?? 'OK') . "\n";
+    echo " Login     : " . ($report['login_attempts_pruned'] ?? '-') . " registro(s) antigo(s) de tentativa removido(s)\n";
     echo " Duração   : " . $report['duration_seconds'] . "s\n";
     echo " Status    : ✓ Concluído dentro da janela de compliance da HostGator.\n";
     echo "========================================================================\n";

@@ -4497,7 +4497,9 @@ class DashboardController
         $createdId = $_SESSION['patient_created_id'] ?? null;
         unset($_SESSION['patient_created_id']);
         $duplicateId = $_SESSION['patient_duplicate_id'] ?? null;
-        unset($_SESSION['patient_error'], $_SESSION['patient_duplicate_id']);
+        // NI2-414 (V4-UX-01): o preenchimento devolvido após erro é exibido uma única vez, junto com o erro.
+        // Se o usuário descartar, recarregar ou voltar depois, os dados não reaparecem como se fossem estado limpo.
+        unset($_SESSION['patient_error'], $_SESSION['patient_duplicate_id'], $_SESSION['patient_form']);
         $title = 'Pacientes';
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';

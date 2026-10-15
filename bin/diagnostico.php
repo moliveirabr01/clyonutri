@@ -55,4 +55,8 @@ foreach (['MAIL_DRIVER', 'MAIL_HOST', 'MAIL_PORT', 'MAIL_ENCRYPTION', 'MAIL_USER
 echo $ok(class_exists('PHPMailer\\PHPMailer\\PHPMailer') || is_dir("$root/vendor/phpmailer/phpmailer")) . " PHPMailer instalado\n";
 $lt = isset($pdo) ? (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_attempts'")->fetchColumn() : 0;
 echo $ok($lt === 1) . " tabela login_attempts (migração 2026-10-14)\n";
+if ($lt === 1) {
+    $pk = (string)($pdo->query("SELECT GROUP_CONCAT(COLUMN_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_attempts' AND INDEX_NAME = 'PRIMARY'")->fetchColumn() ?: '');
+    echo $ok($pk === 'bucket_key') . " login_attempts com chave primária em bucket_key" . ($pk === 'bucket_key' ? '' : " (atual: " . ($pk ?: 'nenhuma') . "; rode migracao-2026-10-15-login-attempts-chave-primaria.sql)") . "\n";
+}
 passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/release_check.php'), $rc);

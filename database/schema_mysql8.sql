@@ -1243,17 +1243,21 @@ INSERT INTO `migrations` (`migration`) VALUES ('2026_10_10_000031_create_platfor
 -- Migration: 2026_10_14_000032_create_login_attempts_table
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `login_attempts` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `bucket_key` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `scope` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `bucket_key` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `scope` varchar(20) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `failures` int NOT NULL DEFAULT '0',
   `window_started_at` datetime NOT NULL,
   `locked_until` datetime DEFAULT NULL,
   `last_attempt_at` datetime NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `bucket_key` (`bucket_key`),
+  PRIMARY KEY (`bucket_key`),
   KEY `idx_login_attempts_last` (`last_attempt_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT INTO `migrations` (`migration`) VALUES ('2026_10_14_000032_create_login_attempts_table') ON DUPLICATE KEY UPDATE `migration` = `migration`;
+
+-- ----------------------------------------------------------------------------
+-- Migration: 2026_10_15_000033_convert_login_attempts_to_bucket_key_primary
+-- (instalação nova já nasce no modelo final; só registra)
+-- ----------------------------------------------------------------------------
+INSERT INTO `migrations` (`migration`) VALUES ('2026_10_15_000033_convert_login_attempts_to_bucket_key_primary') ON DUPLICATE KEY UPDATE `migration` = `migration`;
 
 SET FOREIGN_KEY_CHECKS = 1;

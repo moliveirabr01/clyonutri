@@ -234,6 +234,24 @@ final class LoginRateLimiter
         return ['allowed' => true, 'retry_after' => 0];
     }
 
+    /**
+     * Limpeza periódica (v6): remove contadores sem atividade há mais de 1 dia e sem bloqueio vigente,
+     * e registros de IP conhecido vencidos. Nunca toca em janela (15 min) ou bloqueio (máx. 15 min) em curso.
+     * O filtro principal por last_attempt_at usa idx_login_attempts_last. Datas em UTC, como no resto da classe.
+     * Retorna o número de linhas removidas.
+     */
+    public static function purgeStale(PDO $db, ?int $now = null): int
+    {
+        $now ??= time();
+        $st = $db->prepare("DELETE FROM login_attempts
+            WHERE last_attempt_at < :cutoff
+              AND ((scope <> 'trusted_ip' AND (locked_until IS NULL OR locked_until < :n1))
+                OR (scope = 'trusted_ip' AND locked_until < :n2))");
+        $nowStr = gmdate('Y-m-d H:i:s', $now);
+        $st->execute(['cutoff' => gmdate('Y-m-d H:i:s', $now - 86400), 'n1' => $nowStr, 'n2' => $nowStr]);
+        return $st->rowCount();
+    }
+
     private function audit(string $action, string $realm, string $scope, string $ip): void
     {
         try {

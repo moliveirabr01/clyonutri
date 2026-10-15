@@ -25,7 +25,19 @@
     });
   });
   const isDirty = form => baseline.has(form) && !submitting.has(form) && snapshot(form) !== baseline.get(form);
-  const discard = form => { form.reset(); form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid')); form.querySelectorAll('.field-error').forEach(m => { m.textContent = ''; }); form.dispatchEvent(new CustomEvent('clyo:discard')); };
+  // NI2-414 (V4-UX-01): descarte explícito. reset() volta aos valores padrão do HTML — último estado salvo
+  // (edição) ou formulário vazio (cadastro); preenchimento recuperado após erro é aplicado por JS e não é
+  // restaurado. O novo baseline é tirado DEPOIS do reset e dos handlers de clyo:discard (ex.: food-picker
+  // recria opções) e substitui a sentinela de recuperação. Só este formulário é afetado.
+  const discard = form => {
+    form.reset();
+    form.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
+    form.querySelectorAll('.field-error').forEach(m => { m.textContent = ''; });
+    form.querySelectorAll('[data-recovery-notice]').forEach(n => n.remove());
+    form.dispatchEvent(new CustomEvent('clyo:discard'));
+    form.removeAttribute('data-start-dirty');
+    if (baseline.has(form)) baseline.set(form, snapshot(form));
+  };
   window.ClyoForms = { isDirty, discard, dirtyForms: () => [...baseline.keys()].filter(isDirty) };
   window.addEventListener('beforeunload', e => { if (window.ClyoForms.dirtyForms().length) { e.preventDefault(); e.returnValue = ''; } });
 
@@ -128,7 +140,7 @@
         if (field.type === 'checkbox' || field.type === 'radio') field.checked = Array.isArray(value) ? value.includes(field.value) : value === field.value;
         else if (typeof value === 'string') field.value = value;
       }
-      const notice = document.createElement('p'); notice.setAttribute('role', 'status'); notice.textContent = 'Preenchimento recuperado após a falha. Confira os dados antes de salvar. Disponível nesta sessão por até uma hora.'; form.prepend(notice);
+      const notice = document.createElement('p'); notice.setAttribute('role', 'status'); notice.setAttribute('data-recovery-notice', ''); notice.textContent = 'Preenchimento recuperado após a falha. Confira os dados antes de salvar. Disponível nesta sessão por até uma hora.'; form.prepend(notice);
       const modal = dialogs.find(x => x.contains(form)); if (modal) show(modal);
     }
   }
