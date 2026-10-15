@@ -275,7 +275,7 @@ class DashboardController
           $stepApp = $careStep['appointment'];
           $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
         ?>
-        <!-- NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. -->
+        <?php /* NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. */ ?>
         <section class="card cn-next-step" aria-labelledby="proximo-passo-titulo" data-testid="care-next-step" data-state="<?= htmlspecialchars($careStep['state']) ?>">
           <div>
             <h2 id="proximo-passo-titulo" style="font-size: 1.05rem; margin: 0 0 4px;">Próximo passo com <?= htmlspecialchars($p['name']) ?></h2>
@@ -1771,7 +1771,7 @@ class DashboardController
 
           <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese" id="anamnesis-form" aria-describedby="anamnesis-progress">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-            <!-- NI2-420 (UX-08): índice acessível das seções; não impõe ordem clínica -->
+            <?php /* NI2-420 (UX-08): índice acessível das seções; não impõe ordem clínica */ ?>
             <nav class="cn-anamnesis-index" aria-label="Seções da anamnese">
               <p id="anamnesis-progress" role="status" aria-live="polite" style="margin: 0 0 6px; font-size: 0.8rem; color: #475569;"></p>
               <ol>
@@ -1890,7 +1890,7 @@ class DashboardController
               <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
             </div>
 
-            <!-- NI2-420 (UX-08) / NI2-419 (UX-07): barra de ações sempre alcançável, com estado de salvamento -->
+            <?php /* NI2-420 (UX-08) / NI2-419 (UX-07): barra de ações sempre alcançável, com estado de salvamento */ ?>
             <div class="cn-sticky-actions" role="group" aria-label="Salvar anamnese">
               <p class="cn-sticky-actions__status" id="anamnesis-save-status" aria-live="polite">
                 <?php if ($latest): ?>Última gravação: v<?= (int)$latest['version'] ?> <?= !empty($latest['is_draft']) ? '(rascunho)' : '(concluída)' ?> em <?= date('d/m/Y H:i', strtotime($latest['created_at'])) ?>.<?php else: ?>Nada salvo ainda para este paciente.<?php endif; ?>
@@ -4334,7 +4334,7 @@ class DashboardController
           <?php endif; ?>
         </section>
 
-        <!-- Cards de Métricas Consolidadas (NI2-421: depois das prioridades) -->
+        <?php /* Cards de Métricas Consolidadas (NI2-421: depois das prioridades) */ ?>
         <div class="dashboard-metrics cn-metrics-5" role="region" aria-label="Indicadores da clínica">
           <div class="card metric-card">
             <div class="metric-card__label">CONSULTAS HOJE</div>
@@ -4646,7 +4646,7 @@ class DashboardController
                     <option value="Masculino">Masculino</option>
                     <option value="Outro">Outro / Não informado</option>
                   </select>
-                  <small id="p_gender_help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Campo único herdado. Hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro. A separação entre gênero e sexo aguarda decisão de produto (NI2-422).</small>
+                  <small id="p_gender_help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</small>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">

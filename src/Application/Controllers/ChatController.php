@@ -850,7 +850,7 @@ class ChatController
         </section>
     </div>
 
-    <!-- NI2-424 (UX-12): Nova conversa — busca paginada, destinatário explícito, nenhuma mensagem enviada aqui -->
+    <?php /* NI2-424 (UX-12): Nova conversa — busca paginada, destinatário explícito, nenhuma mensagem enviada aqui */ ?>
     <div id="modal-nova-conversa" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
       <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px;">
         <h2 style="font-size: 1.15rem; margin: 0 0 12px;">Nova conversa</h2>

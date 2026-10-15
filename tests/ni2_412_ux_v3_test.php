@@ -135,6 +135,7 @@ $_SESSION['user_id'] = 0;
 $dash = $render(fn() => (new \ClyoNutri\Application\Controllers\DashboardController())->index());
 check(strpos($dash, 'data-testid="attention-panel"') < strpos($dash, 'dashboard-metrics cn-metrics-5'), 'Painel: prioridades antes das métricas');
 check(substr_count($dash, 'class="card metric-card"') === 5, 'Painel: as 5 métricas continuam presentes');
+foreach (['painel' => $dash, 'perfil' => $prof360, 'anamnese' => $anam, 'pacientes' => $pat, 'agenda' => $agenda, 'planos' => $plans] as $nome => $h) { check(!preg_match('/NI2-\d+|decisão de produto/u', $h), "HTML de $nome não expõe código de ticket nem jargão interno ao usuário"); }
 $css = file_get_contents($root . '/public/assets/css/clinical-journeys.css');
 check(str_contains($css, '.dashboard-metrics.cn-metrics-5 { grid-template-columns: repeat(5, minmax(0, 1fr))'), 'CSS: 5 colunas deliberadas (sem auto-fit que gera linha órfã)');
 check(str_contains($css, '.cn-dialog__panel { box-sizing: border-box; max-width: min(100%') && str_contains($css, 'max-height: calc(100dvh - 24px)'), 'CSS: painel de diálogo com altura máxima e rolagem interna');

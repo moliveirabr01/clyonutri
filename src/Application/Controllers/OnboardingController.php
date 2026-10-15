@@ -378,7 +378,7 @@ class OnboardingController
                       <option value="female" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'female') ? 'selected' : '' ?>>Feminino</option>
                       <option value="other" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'other') ? 'selected' : '' ?>>Outro</option>
                     </select>
-                    <span id="ob-gender-help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Campo único herdado. Hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro. A separação entre gênero e sexo aguarda decisão de produto (NI2-422).</span>
+                    <span id="ob-gender-help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Relevante para equações preditivas basais. No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</span>
                   </div>
                 </div>
 
