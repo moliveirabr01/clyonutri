@@ -246,6 +246,20 @@ $requireAuth = function (callable $action) use ($db) {
             echo json_encode(['error' => 'Acesso não autorizado para este perfil.']);
             return;
         }
+        // CSRF + Origin/Referer para mutações /api/ autenticadas por cookie de sessão (auditoria 14/10/2026).
+        $csrfError = \ClyoNutri\Core\Security\SessionApiCsrfGuard::check(
+            (string)($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+            parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/',
+            $_SERVER,
+            $_POST,
+            (string)file_get_contents('php://input')
+        );
+        if ($csrfError !== null) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => $csrfError]);
+            return;
+        }
         $action($params);
     };
 };
