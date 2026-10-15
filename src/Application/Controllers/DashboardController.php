@@ -208,7 +208,7 @@ class DashboardController
 
         $p = $profile['patient'];
         $consents = (new \ClyoNutri\Domain\Privacy\ConsentManagementService())->getConsentAuditTrail($id);
-        $title = 'Perfil 360 — ' . $p['name'];
+        $title = 'Perfil do paciente — ' . $p['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -225,6 +225,7 @@ class DashboardController
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
         $latestAnamnesis = $anamnesisService->getLatestAnamnesis($id);
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
+        $careStep = (new AppointmentService())->careStepForPatient($id);
 
         ob_start();
         ?>
@@ -246,7 +247,7 @@ class DashboardController
               <a href="/pacientes" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar para Pacientes</a>
             </div>
             <h1><?= htmlspecialchars($p['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
+            <p style="color: var(--neutral-gray-500);">Perfil do paciente • Histórico de acompanhamento</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <a href="/chat?patient_id=<?= $p['id'] ?>" class="btn btn-secondary">Conversar via Chat</a>
@@ -270,9 +271,56 @@ class DashboardController
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-6);">
+        <?php
+          $stepApp = $careStep['appointment'];
+          $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
+        ?>
+        <!-- NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. -->
+        <section class="card cn-next-step" aria-labelledby="proximo-passo-titulo" data-testid="care-next-step" data-state="<?= htmlspecialchars($careStep['state']) ?>">
+          <div>
+            <h2 id="proximo-passo-titulo" style="font-size: 1.05rem; margin: 0 0 4px;">Próximo passo com <?= htmlspecialchars($p['name']) ?></h2>
+            <p style="margin: 0; color: var(--neutral-gray-600, #475569); font-size: 0.9rem;">
+              <?php if ($careStep['state'] === 'continue'): ?>Atendimento em andamento desde <?= htmlspecialchars($stepWhen) ?>. Continue de onde parou: anamnese, avaliação e plano ficam vinculados a este paciente.
+              <?php elseif ($careStep['state'] === 'start_today'): ?>Consulta agendada para hoje (<?= htmlspecialchars(date('H:i', strtotime($stepApp['scheduled_at']))) ?>). Ao iniciar, a consulta passa para "em andamento".
+              <?php elseif ($careStep['state'] === 'upcoming'): ?>Próxima consulta em <?= htmlspecialchars($stepWhen) ?>. Você pode revisar a anamnese e os planos antes do atendimento.
+              <?php else: ?>Nenhuma consulta agendada. Agende o atendimento para iniciar a sequência anamnese → avaliação → plano.
+              <?php endif; ?>
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <?php if ($careStep['state'] === 'continue'): ?>
+              <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>" data-testid="care-continue">Continuar atendimento</a>
+            <?php elseif ($careStep['state'] === 'start_today'): ?>
+              <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" style="margin: 0;" data-no-dirty onsubmit="return confirm(<?= htmlspecialchars(json_encode('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>);">
+                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="status" value="in_progress">
+                <button type="submit" class="btn btn-primary" data-testid="care-start">Iniciar atendimento</button>
+              </form>
+            <?php elseif ($careStep['state'] === 'upcoming'): ?>
+              <a class="btn btn-secondary" href="/agenda?view=day&amp;date=<?= htmlspecialchars(substr($stepApp['scheduled_at'], 0, 10)) ?>">Ver na agenda</a>
+              <a class="btn btn-primary" href="/pacientes/<?= (int)$p['id'] ?>/anamnese">Revisar anamnese</a>
+            <?php else: ?>
+              <a class="btn btn-primary" href="/agenda?novo=1&amp;paciente=<?= (int)$p['id'] ?>" data-testid="care-schedule">Agendar atendimento</a>
+            <?php endif; ?>
+          </div>
+        </section>
+        <nav aria-label="Seções do perfil">
+          <ul class="cn-section-nav">
+            <li><a href="#secao-dados">Dados</a></li>
+            <li><a href="#secao-prontuario">Prontuário</a></li>
+            <li><a href="#secao-anamnese">Anamnese</a></li>
+            <li><a href="#secao-planos">Planos</a></li>
+            <li><a href="#secao-avaliacoes">Avaliações</a></li>
+            <li><a href="#patient-appointments">Consultas</a></li>
+            <li><a href="#patient-checkins">Check-ins</a></li>
+            <li><a href="#patient-finance">Financeiro</a></li>
+            <li><a href="#patient-consents">Privacidade</a></li>
+          </ul>
+        </nav>
+
+        <div class="cn-split">
           <!-- Coluna 1: Dados Cadastrais -->
-          <div class="card">
+          <div class="card" id="secao-dados">
             <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Dados Essenciais</h3>
             <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
             <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
@@ -289,10 +337,10 @@ class DashboardController
           <!-- Coluna 2: Prontuário, Anamnese, Avaliações e Planos -->
           <div>
             <!-- Card 1: Prontuário Eletrônico & Evoluções -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-prontuario" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
-                  <h3 style="margin: 0; display: inline-block;">Prontuário Longitudinal</h3>
+                  <h3 style="margin: 0; display: inline-block;">Prontuário</h3>
                   <?php if ($integrity['is_valid'] && (int)$integrity['total_records'] > 0): ?>
                     <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ <?= !empty($integrity['legacy_records']) ? 'Conteúdo e encadeamento verificados' : 'Integridade dos registros verificada' ?></span>
                   <?php elseif (!$integrity['is_valid']): ?>
@@ -332,7 +380,7 @@ class DashboardController
             </div>
 
             <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-anamnese" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
                   <h3 style="margin: 0; display: inline-block;">Anamnese Nutricional</h3>
@@ -392,7 +440,7 @@ class DashboardController
             </div>
 
             <!-- Card 3: Planos Alimentares -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-planos" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-plan-p360').style.display='flex'" style="font-size: 0.8rem; padding: 3px 8px;">
@@ -444,7 +492,7 @@ class DashboardController
             </div>
 
             <!-- Card de Avaliações Antropométricas com Indicadores OMS -->
-            <div class="card">
+            <div class="card" id="secao-avaliacoes">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Avaliações Antropométricas (<?= count($assessments) ?>)</h3>
                 <a href="/pacientes/<?= $p['id'] ?>/antropometria" style="font-size: 0.85rem; color: var(--brand-copper-600); font-weight: 600; text-decoration: none;">Análise Completa ➔</a>
@@ -2516,7 +2564,8 @@ class DashboardController
         </div>
 
         <!-- Formulário Retrátil de Novo Agendamento -->
-        <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: none; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
+        <?php $prefillPatient = (isset($_GET['paciente']) && ctype_digit((string)$_GET['paciente'])) ? (int)$_GET['paciente'] : 0; $openNew = ($_GET['novo'] ?? '') === '1'; ?>
+        <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: <?= $openNew ? 'block' : 'none' ?>; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
           <div class="card__header">
             <h3>Agendar Nova Consulta</h3>
             <button type="button" data-dialog-close aria-label="Fechar agendamento" onclick="document.getElementById('card-novo-agendamento').style.display='none'" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
@@ -2530,7 +2579,7 @@ class DashboardController
                 <select id="dc11-patient_id" name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o paciente...</option>
                   <?php foreach ($patients as $pt): ?>
-                    <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['name']) ?></option>
+                    <option value="<?= $pt['id'] ?>" <?= ((int)$pt['id'] === $prefillPatient) ? 'selected' : '' ?>><?= htmlspecialchars($pt['name']) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>

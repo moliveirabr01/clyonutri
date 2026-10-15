@@ -418,6 +418,35 @@ class AppointmentService
     /**
      * Lista consultas de um dia específico com filtros e ordenação horária (NI2-83).
      */
+    /**
+     * NI2-418 (UX-06): próximo passo de atendimento do paciente, somente leitura e escopo de clínica.
+     * Ordem: consulta em andamento (continuar) > consulta de hoje agendada/confirmada (iniciar, com POST) >
+     * próxima consulta futura > nenhuma (agendar). Não altera estado.
+     * @return array{state:string,appointment:?array}
+     */
+    public function careStepForPatient(int $patientId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        $base = "SELECT id, patient_id, scheduled_at, status, type, duration_minutes FROM appointments WHERE clinic_id = :c AND patient_id = :p";
+        $q = $this->db->prepare($base . " AND status = 'in_progress' ORDER BY scheduled_at DESC, id DESC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'continue', 'appointment' => $row];
+        }
+        $day = $this->calendar->day($this->todayDate());
+        $q = $this->db->prepare($base . " AND status IN ('scheduled','confirmed') AND scheduled_at >= :s AND scheduled_at < :e ORDER BY scheduled_at ASC, id ASC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId, 's' => $day['start'], 'e' => $day['end']]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'start_today', 'appointment' => $row];
+        }
+        $q = $this->db->prepare($base . " AND status IN ('scheduled','confirmed') AND scheduled_at >= :e ORDER BY scheduled_at ASC, id ASC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId, 'e' => $day['end']]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'upcoming', 'appointment' => $row];
+        }
+        return ['state' => 'none', 'appointment' => null];
+    }
+
     public function listByDay(string $date, ?int $professionalId = null): array
     {
         $clinicId = TenantContext::getClinicId();
