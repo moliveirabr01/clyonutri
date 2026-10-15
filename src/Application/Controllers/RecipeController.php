@@ -456,8 +456,8 @@ class RecipeController
         $auth = $this->getAuthInfo();
 
         // Buscar alimentos do catálogo TACO oficial para autocomplete/select
-        $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
-        $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // F02: somente catálogo global + alimentos particulares da própria clínica.
+        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
 
         $title = 'Nova Receita Culinária';
         $activeNav = 'receitas';
@@ -613,11 +613,16 @@ class RecipeController
 
         <script>
           let ingredientIndex = 1;
-          const foodOptionsHtml = `<?php
-              foreach ($foods as $f) {
-                  echo '<option value="' . (int)$f['id'] . '">' . htmlspecialchars(addslashes($f['name'])) . '</option>';
-              }
-          ?>`;
+          // XSS (auditoria 14/10/2026): dados via JSON com escapes HEX e <option> criado por DOM/textContent.
+          const foodOptions = <?= json_encode(array_map(static fn($f) => ['id' => (int)$f['id'], 'name' => (string)$f['name']], $foods), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+          function fillFoodOptions(select) {
+              foodOptions.forEach(function (f) {
+                  const opt = document.createElement('option');
+                  opt.value = String(f.id);
+                  opt.textContent = f.name;
+                  select.appendChild(opt);
+              });
+          }
 
           function addIngredientRow() {
               const container = document.getElementById('ingredientsContainer');
@@ -627,7 +632,6 @@ class RecipeController
               row.innerHTML = `
                   <select name="ingredients[${ingredientIndex}][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
                       <option value="">Selecione o alimento TACO...</option>
-                      ${foodOptionsHtml}
                   </select>
                   <input type="number" step="0.1" name="ingredients[${ingredientIndex}][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
                   <select name="ingredients[${ingredientIndex}][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
@@ -641,6 +645,7 @@ class RecipeController
                   </select>
                   <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
               `;
+              fillFoodOptions(row.querySelector('select'));
               container.appendChild(row);
               ingredientIndex++;
           }
@@ -891,44 +896,44 @@ class RecipeController
         $servings = (float)($_POST['servings'] ?? 1.0);
         $instructions = trim((string)($_POST['instructions'] ?? ''));
 
-        // Se meal_plan_id for 0, buscar ou criar plano ativo
-        if ($mealPlanId <= 0) {
-            $stmt = $this->db->prepare("SELECT id FROM meal_plans WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-            $stmt->execute(['pid' => $patientId]);
-            $mealPlanId = (int)$stmt->fetchColumn();
-
-            if ($mealPlanId <= 0) {
-                $cStmt = $this->db->prepare("
-                    INSERT INTO meal_plans (clinic_id, patient_id, professional_id, title, status, created_at, updated_at)
-                    VALUES (:cid, :pid, :prid, 'Plano Alimentar Individualizado', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ");
-                $cStmt->execute([
-                    'cid' => $auth['clinicId'],
-                    'pid' => $patientId,
-                    'prid' => $auth['profId'],
-                ]);
-                $mealPlanId = (int)$this->db->lastInsertId();
-            }
-        }
-
+        // F01: autorização de paciente/profissional/plano + transação ficam no serviço.
+        $status = 303;
         try {
-            $this->recipeService->prescribeRecipe(
-                $auth['clinicId'],
-                $mealPlanId,
-                null,
+            $this->recipeService->prescribeRecipeWithPlan(
+                (int)$auth['clinicId'],
+                (int)$auth['profId'],
                 $patientId,
+                $mealPlanId,
                 $recipeId,
                 $servings,
                 $instructions,
                 $mealName
             );
-
-            header('Location: /receitas?prescrito=1');
-            exit;
         } catch (\Throwable $e) {
-            http_response_code(400);
-            echo "Erro ao prescrever receita: " . htmlspecialchars($e->getMessage());
+            $status = self::httpStatusForException($e);
+            http_response_code($status);
+            echo $status === 403
+                ? "Acesso negado: paciente ou plano não pertence à sua clínica."
+                : "Erro ao prescrever receita: " . htmlspecialchars($e->getMessage());
+            return;
         }
+
+        header('Location: /receitas?prescrito=1');
+        exit;
+    }
+
+    /**
+     * Mapeia exceções de domínio para status HTTP (F01). Público para teste.
+     */
+    public static function httpStatusForException(\Throwable $e): int
+    {
+        if ($e instanceof \ClyoNutri\Core\Security\TenantSecurityException) {
+            return 403;
+        }
+        if ($e instanceof \InvalidArgumentException && stripos($e->getMessage(), 'não encontrad') !== false) {
+            return 404;
+        }
+        return 400;
     }
 
     /**
@@ -981,8 +986,8 @@ class RecipeController
             return;
         }
 
-        $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
-        $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // F02: somente catálogo global + alimentos particulares da própria clínica.
+        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
 
         $title = 'Editar Receita — ' . $recipe['title'];
         $activeNav = 'receitas';
