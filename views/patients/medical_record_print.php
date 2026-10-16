@@ -67,8 +67,8 @@ $period = $doc['period']['from'] || $doc['period']['to']
     <?php else: ?>
       <dl class="pi-grid">
         <div><dt>Alergias alimentares</dt><dd><?= $e($doc['summary']['allergy_label']) ?><?= $doc['summary']['allergies'] ? ': ' . $e($doc['summary']['allergies']) : '' ?></dd></div>
-        <div><dt>Restrições e intolerâncias</dt><dd><?= $e($doc['summary']['restrictions'] ?: 'Não relatado') ?></dd></div>
-        <?php if (!empty($doc['summary']['objectives'])): ?><div class="pi-wide"><dt>Objetivos</dt><dd><?= $e($doc['summary']['objectives']) ?></dd></div><?php endif; ?>
+        <div><dt>Restrições e intolerâncias</dt><dd><?= $e(\ClyoNutri\Core\I18n\LabelMap::recorded($doc['summary']['restrictions'] ?? null)) ?></dd></div>
+        <div class="pi-wide"><dt>Objetivos</dt><dd><?= $e(\ClyoNutri\Core\I18n\LabelMap::recorded($doc['summary']['objectives'] ?? null)) ?></dd></div>
       </dl>
       <?php if (!empty($doc['summary']['source'])): ?>
         <p class="pi-muted">Fonte: anamnese versão <?= (int)$doc['summary']['source']['version'] ?>, por <?= $e($doc['summary']['source']['author']) ?>, em <?= $e($fmtDate($doc['summary']['source']['recorded_at'])) ?>.</p>

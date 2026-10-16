@@ -17,8 +17,9 @@
 <label class="form-label" for="edit_gender">Gênero / Sexo biológico (opcional)</label>
 <select class="form-control" id="edit_gender" name="gender" aria-describedby="edit_gender_help">
 <option value="">Selecione...</option>
-<?php foreach (['Feminino' => 'Feminino', 'Masculino' => 'Masculino', 'Outro' => 'Outro / Não informado', 'female' => 'Feminino', 'male' => 'Masculino', 'other' => 'Outro / Não informado'] as $value => $label): ?>
-<option value="<?= $value ?>" <?= ($patient['gender'] ?? '') === $value ? 'selected' : '' ?>><?= $label ?></option>
+<?php $selectedGender = \ClyoNutri\Core\I18n\LabelMap::canonicalGender($patient['gender'] ?? null); /* UX-10 (v14): legado female/male/other cai na opção equivalente */ ?>
+<?php foreach (\ClyoNutri\Core\I18n\LabelMap::GENDER_OPTIONS as $value => $label): ?>
+<option value="<?= $value ?>" <?= $selectedGender === $value ? 'selected' : '' ?>><?= $label ?></option>
 <?php endforeach; ?>
 </select>
 <small id="edit_gender_help" style="display:block;font-size:0.75rem;color:var(--neutral-gray-500);margin-top:4px">No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</small>

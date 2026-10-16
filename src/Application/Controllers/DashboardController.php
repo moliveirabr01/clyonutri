@@ -112,6 +112,8 @@ class DashboardController
                 if (!$date || $date->format('Y-m-d') !== $data['birth_date'] || $date > new \DateTimeImmutable('today')) $errors[] = 'Informe uma data de nascimento válida.';
             }
             if ($data['gender'] !== null && !in_array($data['gender'], ['Feminino', 'Masculino', 'Outro', 'female', 'male', 'other'], true)) $errors[] = 'Selecione um gênero válido.';
+            // UX-10 (v14): se a opção equivale ao valor legado gravado (ex.: 'female' = 'Feminino'), mantém o gravado (sem alteração silenciosa).
+            if ($data['gender'] !== null && LabelMap::canonicalGender($data['gender']) === LabelMap::canonicalGender($patient['gender'] ?? null)) $data['gender'] = $patient['gender'];
             if (!$errors) {
                 try {
                     (new PatientRepository())->update((int)$patient['id'], $data);
@@ -430,7 +432,7 @@ class DashboardController
                       <?= !empty($latestAnamnesis['restrictions']) ? '⚠️ RESTRIÇÕES ALIMENTARES' : 'RESTRIÇÕES' ?>
                     </span>
                     <span style="font-size: 0.85rem; color: #1E293B;">
-                      <?= htmlspecialchars($latestAnamnesis['restrictions'] ?? 'Nenhuma relatada') ?>
+                      <?= htmlspecialchars(LabelMap::recorded($latestAnamnesis['restrictions'] ?? null)) ?>
                     </span>
                   </div>
 
@@ -544,11 +546,11 @@ class DashboardController
                       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; font-size: 0.875rem;">
                         <div>
                           <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">PESO & ALTURA</span>
-                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['weight_kg'] ?> kg</strong> / <span class="tabular-nums"><?= $as['height_cm'] ?> cm</span>
+                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($as['weight_kg'] ?? null, 1)) ?> kg</strong> / <span class="tabular-nums"><?= htmlspecialchars(LabelMap::num($as['height_cm'] ?? null, 1)) ?> cm</span>
                         </div>
                         <div>
                           <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">IMC (OMS)</span>
-                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['bmi'] ?></strong>
+                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($as['bmi'] ?? null, 2)) ?></strong>
                           <span class="badge badge-info" style="font-size: 0.7rem; padding: 1px 5px;"><?= $as['bmi_classification'] ?></span>
                         </div>
                         <?php if ($as['whr'] !== null): ?>
@@ -561,7 +563,7 @@ class DashboardController
                         <?php if ($as['body_fat_pct'] !== null): ?>
                           <div>
                             <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">GORDURA CORPORAL</span>
-                            <strong class="tabular-nums" style="color: var(--brand-copper-600);"><?= $as['body_fat_pct'] ?>%</strong>
+                            <strong class="tabular-nums" style="color: var(--brand-copper-600);"><?= htmlspecialchars(LabelMap::num($as['body_fat_pct'] ?? null, 1)) ?>%</strong>
                             <?php if ($as['fat_mass_kg'] !== null): ?>
                               <span style="font-size: 0.75rem; color: var(--neutral-gray-500);">(<?= $as['fat_mass_kg'] ?> kg)</span>
                             <?php endif; ?>
@@ -781,7 +783,7 @@ class DashboardController
             <div class="card" style="margin-bottom: 0;">
               <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">ÚLTIMO PESO REGISTRADO</div>
               <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
-                <?= $latestEval['weight_kg'] ?> kg
+                <?= htmlspecialchars(LabelMap::num($latestEval['weight_kg'] ?? null, 1)) ?> kg
               </div>
               <?php if ($firstEval && $firstEval['id'] !== $latestEval['id']): ?>
                 <?php $deltaTot = round($latestEval['weight_kg'] - $firstEval['weight_kg'], 1); ?>
@@ -796,7 +798,7 @@ class DashboardController
             <div class="card" style="margin-bottom: 0;">
               <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">IMC ATUAL (OMS)</div>
               <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
-                <?= $latestEval['bmi'] ?>
+                <?= htmlspecialchars(LabelMap::num($latestEval['bmi'] ?? null, 2)) ?>
               </div>
               <span class="badge badge-info"><?= $latestEval['bmi_classification'] ?></span>
             </div>
@@ -817,7 +819,7 @@ class DashboardController
               <div class="card" style="margin-bottom: 0;">
                 <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">% GORDURA CORPORAL</div>
                 <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-copper-600); margin: 6px 0;">
-                  <?= $latestEval['body_fat_pct'] ?>%
+                  <?= htmlspecialchars(LabelMap::num($latestEval['body_fat_pct'] ?? null, 1)) ?>%
                 </div>
                 <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">
                   <?= $latestEval['fat_mass_kg'] !== null ? "{$latestEval['fat_mass_kg']} kg massa gorda" : 'Informado' ?>
@@ -943,7 +945,7 @@ class DashboardController
                 <select id="eval_a_select" name="eval_a" aria-labelledby="label_eval_a" aria-label="Avaliação baseline para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalAId === (int)$opt['id'] ? 'selected' : '' ?>>
-                      Baseline: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
+                      Baseline: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= htmlspecialchars(LabelMap::num($opt['weight_kg'] ?? null, 1)) ?> kg)
                     </option>
                   <?php endforeach; ?>
                 </select>
@@ -954,7 +956,7 @@ class DashboardController
                 <select id="eval_b_select" name="eval_b" aria-labelledby="label_eval_b" aria-label="Avaliação comparada para evolução" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalBId === (int)$opt['id'] ? 'selected' : '' ?>>
-                      Comparar: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= $opt['weight_kg'] ?> kg)
+                      Comparar: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= htmlspecialchars(LabelMap::num($opt['weight_kg'] ?? null, 1)) ?> kg)
                     </option>
                   <?php endforeach; ?>
                 </select>
@@ -1362,11 +1364,11 @@ class DashboardController
               </div>
               <div style="padding: 10px; background: <?= !empty($clinicalSummary['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>; border-radius: 6px;">
                 <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">RESTRIÇÕES & INTOLERÂNCIAS</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['restrictions'] ?? '[Não relatado]') ?></span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['restrictions'] ?? null)) ?></span>
               </div>
               <div style="padding: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
                 <span style="font-size: 0.75rem; font-weight: 700; color: #0284C7; display: block;">OBJETIVOS PRINCIPAIS</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['objectives'] ?? '[Não relatado]') ?></span>
+                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['objectives'] ?? null)) ?></span>
               </div>
             </div>
           <?php endif; ?>
@@ -1431,9 +1433,9 @@ class DashboardController
 
                     <?php if (!empty($rec['content']['weight_kg'])): ?>
                       <div style="margin-top: 8px; font-size: 0.8rem; color: #0284C7;">
-                        <strong>Peso aferido:</strong> <?= $rec['content']['weight_kg'] ?> kg
+                        <strong>Peso aferido:</strong> <?= htmlspecialchars(LabelMap::num($rec['content']['weight_kg'] ?? null, 1)) ?> kg
                         <?php if (!empty($rec['content']['waist_cm'])): ?>
-                          | <strong>Cintura:</strong> <?= $rec['content']['waist_cm'] ?> cm
+                          | <strong>Cintura:</strong> <?= htmlspecialchars(LabelMap::num($rec['content']['waist_cm'] ?? null, 1)) ?> cm
                         <?php endif; ?>
                       </div>
                     <?php endif; ?>
@@ -2577,15 +2579,15 @@ class DashboardController
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 8px;">
                   <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
                     <span style="font-size: 0.75rem; color: #64748B;">Peso</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= $latest['weight_kg'] ?> kg</strong>
+                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['weight_kg'] ?? null, 1, 'kg')) ?></strong>
                   </div>
                   <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
                     <span style="font-size: 0.75rem; color: #64748B;">Altura</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= $latest['height_cm'] ?> cm</strong>
+                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['height_cm'] ?? null, 1, 'cm')) ?></strong>
                   </div>
                   <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
                     <span style="font-size: 0.75rem; color: #64748B;">IMC</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= $latest['bmi'] ?></strong>
+                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['bmi'] ?? null, 2)) ?></strong>
                   </div>
                 </div>
                 <small style="color: var(--neutral-gray-500);">Registrado em: <?= date('d/m/Y', strtotime($latest['assessed_at'])) ?></small>
@@ -3421,11 +3423,11 @@ class DashboardController
             </div>
             <div>
               <span style="color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">RESTRIÇÕES:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['restrictions'] ?? '[Nenhuma relatada]') ?></span>
+              <span style="color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['restrictions'] ?? null)) ?></span>
             </div>
             <div>
               <span style="color: #0369A1; font-weight: 600; display: block; font-size: 0.75rem;">OBJETIVOS:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['objectives'] ?? '[Não informado]') ?></span>
+              <span style="color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['objectives'] ?? null)) ?></span>
             </div>
           </div>
         </div>
@@ -3510,7 +3512,7 @@ class DashboardController
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <span style="font-size: 0.85rem; color: #64748b;">
-                    <strong><?= number_format((float)$m['totals']['energy_kcal'], 0) ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1) ?>g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1) ?>g | G: <?= number_format((float)$m['totals']['lipid_g'], 1) ?>g
+                    <strong><?= number_format((float)$m['totals']['energy_kcal'], 0, ',', '.') ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1, ',', '.') ?> g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1, ',', '.') ?> g | G: <?= number_format((float)$m['totals']['lipid_g'], 1, ',', '.') ?> g
                   </span>
                   <?php if ($isDraft): ?>
                     <button class="btn btn-sm btn-outline" data-call="openAddItemModal" data-args="[<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
@@ -3546,10 +3548,10 @@ class DashboardController
                             <?php endif; ?>
                           </td>
                           <td style="padding: 12px 20px; font-weight: 600; color: #334155; width: 20%;">
-                            <?= number_format((float)$it['amount'], 0) ?> <?= htmlspecialchars($it['measure_unit']) ?>
+                            <?= number_format((float)$it['amount'], 0, ',', '.') ?> <?= htmlspecialchars($it['measure_unit']) ?>
                           </td>
                           <td style="padding: 12px 20px; color: #64748b; width: 25%; font-size: 0.85rem;">
-                            <?= number_format((float)$it['energy_kcal'], 0) ?> kcal <span style="font-size: 0.75rem;">(P:<?= number_format((float)$it['protein_g'], 1) ?> C:<?= number_format((float)$it['carbohydrate_g'], 1) ?> G:<?= number_format((float)$it['lipid_g'], 1) ?>)</span>
+                            <?= number_format((float)$it['energy_kcal'], 0, ',', '.') ?> kcal <span style="font-size: 0.75rem;">(P:<?= number_format((float)$it['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$it['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$it['lipid_g'], 1, ',', '.') ?>)</span>
                           </td>
                           <td style="padding: 12px 20px; text-align: right; width: 15%;">
                             <?php if ($isDraft): ?>
@@ -3597,10 +3599,10 @@ class DashboardController
                                 <?php endif; ?>
                               </td>
                               <td style="padding: 8px 20px; font-size: 0.85rem; color: #44403c;">
-                                <?= number_format((float)$sub['amount'], 0) ?> <?= htmlspecialchars($sub['measure_unit']) ?>
+                                <?= number_format((float)$sub['amount'], 0, ',', '.') ?> <?= htmlspecialchars($sub['measure_unit']) ?>
                               </td>
                               <td style="padding: 8px 20px; font-size: 0.8rem; color: #78716c;">
-                                <?= number_format((float)$sub['energy_kcal'], 0) ?> kcal (P:<?= number_format((float)$sub['protein_g'], 1) ?> C:<?= number_format((float)$sub['carbohydrate_g'], 1) ?> G:<?= number_format((float)$sub['lipid_g'], 1) ?>)
+                                <?= number_format((float)$sub['energy_kcal'], 0, ',', '.') ?> kcal (P:<?= number_format((float)$sub['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$sub['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$sub['lipid_g'], 1, ',', '.') ?>)
                               </td>
                               <td style="padding: 8px 20px; text-align: right;">
                                 <?php if ($isDraft): ?>
@@ -3666,7 +3668,7 @@ class DashboardController
                 <select id="item-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o alimento...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
-                    <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?> (<?= number_format((float)$fc['energy_kcal'], 0) ?> kcal/100g)</option>
+                    <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?> (<?= number_format((float)$fc['energy_kcal'], 0, ',', '.') ?> kcal/100g)</option>
                   <?php endforeach; ?>
                 </select>
                 <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>

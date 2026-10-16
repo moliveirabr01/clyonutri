@@ -168,7 +168,7 @@ class EngagementService
         return [
             'has_data' => $hasData,
             'average_pct' => $hasData ? round($rawAvg, 1) : null,
-            'formatted_value' => $hasData ? number_format(round($rawAvg, 1), 1) . '%' : 'Sem dados',
+            'formatted_value' => $hasData ? number_format(round($rawAvg, 1), 1, ',', '.') . '%' : 'Sem dados',
             'responses_count' => $responsesCount,
             'responding_patients_count' => $respondingPatients,
             'total_eligible_patients' => $totalEligiblePatients,

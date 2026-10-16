@@ -37,6 +37,15 @@ class LabelMap
         'routine' => 'Consulta de Rotina',
         'emergency' => 'Urgência / Encaixe',
         'encaixe' => 'Urgência / Encaixe',
+        // UX-09 (v14): variantes de consulta online que apareciam cruas.
+        'online' => 'Teleconsulta',
+        'teleconsultation' => 'Teleconsulta',
+        'video' => 'Teleconsulta',
+        'in_person' => 'Presencial',
+        'presencial' => 'Presencial',
+        'return' => 'Retorno / Acompanhamento',
+        'retorno' => 'Retorno / Acompanhamento',
+        'first_consultation' => 'Primeira Consulta',
     ];
 
     /**
@@ -113,13 +122,54 @@ class LabelMap
     /**
      * Traduz tipo de atendimento.
      */
+    /**
+     * UX-06 (v14): campo clínico vazio aparece sempre como "Não registrado" (nunca em branco nem como
+     * negação inventada). Negação explícita registrada (ex.: "Nega alergias") é exibida como foi escrita.
+     */
+    public const NOT_RECORDED = 'Não registrado';
+
+    public static function recorded(mixed $value): string
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return self::NOT_RECORDED;
+        }
+        return trim((string)$value);
+    }
+
+    /**
+     * UX-09 (v14): número em pt-BR (vírgula decimal, ponto de milhar), com unidade opcional.
+     * Vazio/não numérico -> '—'.
+     */
+    public static function num(mixed $value, int $decimals = 1, string $unit = ''): string
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            return '—';
+        }
+        $out = number_format((float)$value, $decimals, ',', '.');
+        return $unit === '' ? $out : $out . ' ' . $unit;
+    }
+
+    /** UX-10 (v14): opções únicas do formulário de paciente (valor gravado => rótulo). */
+    public const GENDER_OPTIONS = ['Feminino' => 'Feminino', 'Masculino' => 'Masculino', 'Outro' => 'Outro / Não informado'];
+
+    /** UX-10 (v14): valor legado (female/male/other/f/m) -> opção canônica; desconhecido/vazio -> null. */
+    public static function canonicalGender(?string $gender): ?string
+    {
+        return match (strtolower(trim((string)$gender))) {
+            'feminino', 'female', 'f' => 'Feminino',
+            'masculino', 'male', 'm' => 'Masculino',
+            'outro', 'other' => 'Outro',
+            default => null,
+        };
+    }
+
     public static function appointmentType(?string $type): string
     {
         if ($type === null || trim($type) === '') {
             return 'Consulta';
         }
         $key = strtolower(trim($type));
-        return self::APPOINTMENT_TYPES[$key] ?? ucfirst(str_replace('_', ' ', $type));
+        return self::APPOINTMENT_TYPES[$key] ?? 'Consulta'; // UX-09: nunca expõe o código interno
     }
 
     /**
