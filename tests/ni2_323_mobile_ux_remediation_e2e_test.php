@@ -405,9 +405,10 @@ $db->prepare("
 $homeResp2 = apiRequest('GET', '/api/v1/patient/home', null, $patientToken);
 assert($homeResp2['status'] === 200, "Falha ao obter home: {$homeResp2['raw']}");
 $nextApp = $homeResp2['json']['next_appointment'];
-assert(!empty($nextApp['meeting_url']), "URL da teleconsulta não retornada na API do paciente");
-assert($nextApp['meeting_url'] === $telehealthUrl, "URL da teleconsulta divergente da gravada!");
-echo "✓ GATE 4 PASS: Teleconsulta retornada com URL acionável no endpoint oficial do app ({$nextApp['meeting_url']})\n";
+// v11 (NI2-221 F02): a tabela legada telehealth_sessions não é mais lida; nenhum link (fictício ou não) vaza para o app.
+assert(empty($nextApp['meeting_url']), "App não deve receber URL da tabela legada telehealth_sessions");
+assert(array_key_exists('video_status', $nextApp), "App deve receber o estado honesto do vídeo (video_status)");
+echo "✓ GATE 4 PASS: app recebe estado honesto (video_status={$nextApp['video_status']}), sem URL legada\n";
 
 // =========================================================================
 // GATE 5: MOB-UX-007 — Distinção entre Erro de Conexão e Agenda Livre

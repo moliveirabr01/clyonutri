@@ -5,331 +5,249 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 
 /**
- * Suíte de Testes E2E: Consultório Online ClyoNutri II — Teleconsulta Real e Jornada Clínica
- * Atende aos critérios de aceite de:
- * NI2-221, NI2-234, NI2-235, NI2-236, NI2-237, NI2-238, NI2-239, NI2-242, NI2-243, NI2-244, NI2-245, NI2-247, NI2-248, NI2-249, NI2-250.
+ * Teleconsulta (NI2-221) — v11. Exercita o CAMINHO DO CONTROLLER (TeleconsultationController) com sessão PHP,
+ * CSRF e IDs divergentes users.id × professionals.id, além do serviço. Sem provedor de vídeo real:
+ * o único provedor "configurado" aqui é um FALSO em memória para checar F11 (nome da sala) — não prova integração.
+ * A antiga afirmação "PASS NI2-245 … integração com Daily comprovada" (classe mock) foi removida.
  */
 
+use ClyoNutri\Application\Controllers\TeleconsultationController;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
-use ClyoNutri\Core\Security\TenantSecurityException;
+use ClyoNutri\Core\Http\SecurityHeaders;
+use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Core\Security\TelehealthRateLimiter;
+use ClyoNutri\Core\Settings\PlatformSettings;
 use ClyoNutri\Domain\Appointment\AppointmentService;
-use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Telehealth\Contracts\VideoConferenceProviderInterface;
-use ClyoNutri\Domain\Telehealth\Exceptions\ExternalMediaProviderBlockedException;
 use ClyoNutri\Domain\Telehealth\Providers\DailyVideoProvider;
+use ClyoNutri\Domain\Telehealth\TeleconsultationException;
 use ClyoNutri\Domain\Telehealth\TeleconsultationService;
+use ClyoNutri\Domain\Telehealth\TelehealthService;
 
+ob_start();
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 $db = Connection::getInstance();
-
-function logPass(string $testName, string $detail = ''): void {
-    echo "[PASS] {$testName}" . ($detail ? " — {$detail}" : "") . "\n";
+$passed = 0;
+function ok(bool $cond, string $msg): void {
+    global $passed;
+    if (!$cond) { ob_end_flush(); fwrite(STDERR, "FALHA: {$msg}\n"); exit(1); }
+    $passed++; fwrite(STDOUT, "[PASS] {$msg}\n");
 }
+function run(callable $fn): array { ob_start(); http_response_code(200); $fn(); $out = (string)ob_get_clean(); return [http_response_code(), $out]; }
+function asUser(int $userId, int $clinicId): void { $_SESSION['user_id'] = $userId; $_SESSION['clinic_id'] = $clinicId; TenantContext::setClinicId($clinicId); }
+function csrf(): string { return Csrf::generate(); }
+function col(PDO $db, string $q) { return $db->query($q)->fetchColumn(); }
+function throwsStatus(callable $fn): ?int { try { $fn(); } catch (TeleconsultationException $e) { return $e->httpStatus; } return null; }
 
-function logBlocked(string $testName, string $reason): void {
-    echo "[BLOCKED] {$testName} — {$reason}\n";
-}
-
-function assertCondition(bool $cond, string $msg): void {
-    if (!$cond) {
-        throw new RuntimeException("FALHA NA ASSERTIVA: {$msg}");
-    }
-}
-
-echo "\n========================================================================\n";
-echo ">>> SUÍTE E2E: CONSULTÓRIO ONLINE CLYONUTRI II (TELECONSULTA REAL) <<<\n";
-echo "========================================================================\n\n";
-
-// Setup de dados reais em banco de produção (Tenant 1 e Tenant 2)
 $db->beginTransaction();
-
 try {
-    // 1. Criar Clínicas para teste de multi-tenancy estrito
-    $uuid1 = 'clyo-matriz-' . bin2hex(random_bytes(6));
-    $uuid2 = 'clyo-concorrente-' . bin2hex(random_bytes(6));
-    $db->exec("INSERT INTO clinics (uuid, name, email) VALUES ('{$uuid1}', 'Clínica NutriVida Matriz', 'contato@nutrivida.com.br')");
-    $clinicId1 = (int)$db->lastInsertId();
-
-    $db->exec("INSERT INTO clinics (uuid, name, email) VALUES ('{$uuid2}', 'Clínica BioEquilíbrio Concorrente', 'contato@bioequilibrio.com.br')");
-    $clinicId2 = (int)$db->lastInsertId();
-
-    // 2. Criar Usuários, Vínculos de Clínica e Profissionais habilitados (CRN)
-    $userUuid1 = 'user-vanessa-' . bin2hex(random_bytes(4));
-    $db->exec("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status)
-               VALUES ('{$userUuid1}', 'Dra. Vanessa Lima', 'vanessa@nutrivida.com.br', 'hash_pw_1', 'nutritionist', 1, 'active')");
-    $userId1 = (int)$db->lastInsertId();
-
-    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role, status)
-               VALUES ({$clinicId1}, {$userId1}, 'nutritionist', 'active')");
-
-    $db->exec("INSERT INTO professionals (user_id, crn, crn_region, specialty)
-               VALUES ({$userId1}, 'CRN-3 44102', 'CRN-3', 'Nutrição Clínica')");
-    $profId1 = (int)$db->lastInsertId();
-
-    $userUuid2 = 'user-roberto-' . bin2hex(random_bytes(4));
-    $db->exec("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status)
-               VALUES ('{$userUuid2}', 'Dr. Roberto Alves', 'roberto@bioequilibrio.com.br', 'hash_pw_2', 'nutritionist', 1, 'active')");
-    $userId2 = (int)$db->lastInsertId();
-
-    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role, status)
-               VALUES ({$clinicId2}, {$userId2}, 'nutritionist', 'active')");
-
-    $db->exec("INSERT INTO professionals (user_id, crn, crn_region, specialty)
-               VALUES ({$userId2}, 'CRN-3 88991', 'CRN-3', 'Nutrição Esportiva')");
-    $profId2 = (int)$db->lastInsertId();
-
-    // 3. Criar Pacientes
-    $patientUuid1 = 'pat-juliana-' . bin2hex(random_bytes(4));
-    $db->exec("INSERT INTO patients (clinic_id, uuid, name, email, phone) 
-               VALUES ({$clinicId1}, '{$patientUuid1}', 'Juliana Paes Nutri', 'juliana.paes@email.com', '11988887777')");
-    $patientId1 = (int)$db->lastInsertId();
-
-    $patientUuid2 = 'pat-lucas-' . bin2hex(random_bytes(4));
-    $db->exec("INSERT INTO patients (clinic_id, uuid, name, email, phone) 
-               VALUES ({$clinicId2}, '{$patientUuid2}', 'Lucas Mendes Concorrente', 'lucas.mendes@email.com', '11977776666')");
-    $patientId2 = (int)$db->lastInsertId();
-
-    // 4. Criar Agendamentos de Teleconsulta
-    $db->exec("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, type, status) 
-               VALUES ({$clinicId1}, {$patientId1}, {$profId1}, '2026-10-10 14:00:00', 50, 'online', 'scheduled')");
-    $appointmentId1 = (int)$db->lastInsertId();
-
-    $db->exec("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, type, status) 
-               VALUES ({$clinicId2}, {$patientId2}, {$profId2}, '2026-10-10 15:00:00', 50, 'online', 'scheduled')");
-    $appointmentId2 = (int)$db->lastInsertId();
-
-    // =========================================================================
-    // TESTE 1: [NI2-234 / NI2-242] Decisão Arquitetural e Provedor WebRTC Real
-    // Sem chaves no .env, deve classificar estritamente como BLOCKED (Fail-Closed)
-    // =========================================================================
-    $dailyProvider = new DailyVideoProvider(null, null);
-    assertCondition(!$dailyProvider->isConfigured(), "DailyVideoProvider não deve estar configurado sem DAILY_API_KEY no .env");
-
-    $blockedTriggered = false;
-    try {
-        $dailyProvider->createRoom("sala-teste-falha");
-    } catch (ExternalMediaProviderBlockedException $e) {
-        $blockedTriggered = true;
-    }
-    assertCondition($blockedTriggered, "DailyVideoProvider deve disparar ExternalMediaProviderBlockedException na ausência de credenciais.");
-    logBlocked("NI2-234 / NI2-242: Provedor WebRTC de Mídia Externa", "DAILY_API_KEY não injetada em ambiente local; fail-closed ativo, proibido gerar link mock.");
-
-    // =========================================================================
-    // TESTE 2: [NI2-235 / NI2-243] Agendamento de Teleconsulta e Vínculo Obrigatório
-    // =========================================================================
-    TenantContext::setClinicId($clinicId1);
-    $teleService = new TeleconsultationService($db, $dailyProvider);
-
-    $sessionData = $teleService->scheduleSession($appointmentId1, $clinicId1);
-    assertCondition(!empty($sessionData['session_id']), "Sessão de teleconsulta deve ser persistida com ID válido.");
-    assertCondition($sessionData['status'] === 'scheduled', "Status inicial da sessão deve ser 'scheduled'.");
-    assertCondition(!empty($sessionData['raw_patient_token']), "Token seguro de acesso do paciente deve ser gerado.");
-    assertCondition(str_starts_with($sessionData['media_provider_status'], 'BLOCKED:'), "Status do provedor externo deve indicar BLOCKED de forma transparente.");
-    
-    // Verificar que no banco salvou apenas o HASH SHA-256 e NUNCA o token bruto
-    $stmtCheckDb = $db->prepare("SELECT patient_token_hash FROM teleconsultation_sessions WHERE id = :id");
-    $stmtCheckDb->execute(['id' => $sessionData['session_id']]);
-    $savedHash = $stmtCheckDb->fetchColumn();
-    assertCondition($savedHash === hash('sha256', $sessionData['raw_patient_token']), "O banco deve armazenar estritamente o hash SHA-256 do token do paciente.");
-
-    logPass("NI2-235 / NI2-243: Modelo de Teleconsulta e Vínculo Obrigatório", "Sessão criada e vinculada a appointment, patient, professional e clinic.");
-
-    // =========================================================================
-    // TESTE 3: [NI2-235 / NI2-243] Prevenção de Sessões Duplicadas / Órfãs
-    // =========================================================================
-    $duplicateBlocked = false;
-    try {
-        $teleService->scheduleSession($appointmentId1, $clinicId1);
-    } catch (RuntimeException $e) {
-        $duplicateBlocked = true;
-    }
-    assertCondition($duplicateBlocked, "Tentativa de criar sessão duplicada para o mesmo agendamento deve ser bloqueada.");
-    logPass("NI2-235: Prevenção de Sessões Duplicadas", "Regra de unicidade de agendamento por sessão respeitada.");
-
-    // =========================================================================
-    // TESTE 4: [NI2-236 / NI2-244] Segurança, RBAC e Ataque Cross-Tenant (IDOR)
-    // =========================================================================
-    // Tenant 2 tenta acessar a sessão do Tenant 1
-    TenantContext::setClinicId($clinicId2);
-    $crossTenantBlocked = false;
-    try {
-        $teleService->getSessionById($sessionData['session_id'], $clinicId2);
-    } catch (TenantSecurityException $e) {
-        $crossTenantBlocked = true;
-    }
-    assertCondition($crossTenantBlocked, "Tenant 2 não pode visualizar sessão pertencente ao Tenant 1.");
-
-    // Profissional do Tenant 2 tenta admitir paciente da sessão do Tenant 1
-    $crossAdmitBlocked = false;
-    try {
-        $teleService->admitPatient($sessionData['session_id'], $profId2);
-    } catch (TenantSecurityException $e) {
-        $crossAdmitBlocked = true;
-    }
-    assertCondition($crossAdmitBlocked, "Profissional de outro tenant não pode admitir paciente em sessão alheia.");
-    logPass("NI2-236 / NI2-244: Segurança Cross-Tenant e Proteção Anti-IDOR", "Tenant B e profissionais não autorizados bloqueados com 403 / TenantSecurityException.");
-
-    // =========================================================================
-    // TESTE 5: [NI2-238 / NI2-248] Pré-Consulta, Teste de Dispositivos e Consentimento
-    // =========================================================================
-    $rawToken = $sessionData['raw_patient_token'];
-    
-    // Teste negativo de dispositivo (câmera falhou)
-    $failedCheck = false;
-    try {
-        $teleService->submitDeviceCheck($rawToken, ['camera_ok' => false, 'microphone_ok' => true]);
-    } catch (InvalidArgumentException $e) {
-        $failedCheck = true;
-    }
-    assertCondition($failedCheck, "Teste de dispositivo sem confirmação de câmera deve ser rejeitado.");
-
-    // Teste positivo de dispositivo
-    $resDevice = $teleService->submitDeviceCheck($rawToken, [
-        'camera_ok' => true,
-        'microphone_ok' => true,
-        'browser' => 'Mozilla/5.0 Chrome 131',
-    ]);
-    assertCondition($resDevice['device_check_passed'] === 1, "Teste de dispositivo válido deve ser registrado.");
-
-    // Tentar entrar na sala de espera sem consentimento informado -> deve falhar
-    $failedWaitingWithoutConsent = false;
-    try {
-        $teleService->enterWaitingRoom($rawToken);
-    } catch (RuntimeException $e) {
-        $failedWaitingWithoutConsent = true;
-    }
-    assertCondition($failedWaitingWithoutConsent, "Ingresso na sala de espera sem consentimento prévio deve ser bloqueado.");
-
-    // Registrar Consentimento Informado (LGPD / CFN)
-    $resConsent = $teleService->acceptConsent($rawToken, '2026.1', '127.0.0.1', 'Desktop Chrome');
-    assertCondition($resConsent['success'] === true, "Consentimento informado deve ser gravado com sucesso.");
-
-    logPass("NI2-238 / NI2-248: Preparação Pré-Consulta", "Validação de hardware WebRTC e consentimento versionado auditados.");
-
-    // =========================================================================
-    // TESTE 6: [NI2-237 / NI2-247] Sala de Espera Virtual (Lobby) e Gerenciamento
-    // =========================================================================
-    $waitingRes = $teleService->enterWaitingRoom($rawToken);
-    assertCondition($waitingRes['status'] === 'waiting_room', "Status deve transicionar para 'waiting_room'.");
-
-    // Checar status da sala de espera pelo paciente
-    $statusCheck = $teleService->checkWaitingRoomStatus($rawToken);
-    assertCondition($statusCheck['status'] === 'waiting_room', "Paciente deve receber status 'waiting_room'.");
-    assertCondition($statusCheck['is_admitted'] === false, "Paciente ainda não deve constar como admitido.");
-
-    logPass("NI2-237 / NI2-247: Sala de Espera e Presença", "Paciente ingressou no lobby e aguarda autorização do nutricionista.");
-
-    // =========================================================================
-    // TESTE 7: [NI2-237 / NI2-247] Nutricionista Admite o Paciente
-    // =========================================================================
-    TenantContext::setClinicId($clinicId1);
-    $admitRes = $teleService->admitPatient($sessionData['session_id'], $profId1);
-    assertCondition($admitRes['status'] === 'admitted', "Sessão deve transicionar para 'admitted'.");
-
-    // Verificar que o paciente agora vê is_admitted = true no polling
-    $statusCheckAfterAdmit = $teleService->checkWaitingRoomStatus($rawToken);
-    assertCondition($statusCheckAfterAdmit['is_admitted'] === true, "Paciente deve ser notificado da admissão com sucesso.");
-
-    logPass("NI2-237 / NI2-247: Admissão pelo Nutricionista", "Nutricionista admitiu paciente com autorização verificada.");
-
-    // =========================================================================
-    // TESTE 8: [NI2-249] Evolução Clínica Durante a Teleconsulta (SHA-256 Append-Only)
-    // =========================================================================
-    $clinicalRecord = $teleService->recordClinicalEvolution(
-        $sessionData['session_id'],
-        $profId1,
-        "Teleconsulta de Retorno — Ajuste de Plano Nutricional",
-        [
-            'queixa' => 'Paciente relata boa adesão à dieta e redução de episódios de compulsão.',
-            'conduta' => 'Aumentada ingestão proteica para 1.8g/kg/dia. Prescrita hidratação de 2.5L/dia.',
-            'metas' => ['Meta 1: Bater água diariamente', 'Meta 2: Consumir salada no almoço e jantar'],
-        ]
-    );
-
-    assertCondition(!empty($clinicalRecord['id']), "Registro de evolução clínica deve ser salvo no prontuário.");
-    assertCondition(!empty($clinicalRecord['record_hash']), "Registro deve conter hash SHA-256 encadeado.");
-    assertCondition($clinicalRecord['version'] >= 1, "Versão do prontuário deve ser >= 1.");
-
-    // Validar integridade da cadeia de prontuário com ClinicalRecordService
-    $clinicalService = new ClinicalRecordService($db);
-    $verification = $clinicalService->verifyIntegrity($patientId1);
-    assertCondition($verification['is_valid'] === true, "Cadeia do prontuário eletrônico após teleconsulta deve estar 100% íntegra.");
-
-    // Verificar que as notas clínicas NÃO são expostas na resposta do paciente
-    $patientViewSession = $teleService->getSessionByPatientToken($rawToken);
-    assertCondition(!isset($patientViewSession['appointment_notes']), "Notas privadas da consulta não devem ser vazadas ao paciente.");
-
-    logPass("NI2-249: Evolução Clínica Durante Teleconsulta", "Prontuário salvo de forma imutável com encadeamento SHA-256 e isolamento de notas privadas.");
-
-    // =========================================================================
-    // TESTE 9: Encerramento da Consulta e Invalidação da Sessão
-    // =========================================================================
-    $concludeRes = $teleService->endTeleconsultation($sessionData['session_id'], $profId1);
-    assertCondition($concludeRes['status'] === 'completed', "Status deve ser 'completed'.");
-
-    // Verificar que agendamento na tabela appointments foi atualizado para completed
-    $stmtAppAfter = $db->prepare("SELECT status FROM appointments WHERE id = :id");
-    $stmtAppAfter->execute(['id' => $appointmentId1]);
-    assertCondition($stmtAppAfter->fetchColumn() === 'completed', "Agendamento correspondente deve estar com status 'completed'.");
-
-    // Tentativa do paciente de reutilizar o token após encerramento deve ser bloqueada
-    $reentryBlocked = false;
-    try {
-        $teleService->getSessionByPatientToken($rawToken);
-    } catch (TenantSecurityException $e) {
-        $reentryBlocked = true;
-    }
-    assertCondition($reentryBlocked, "Acesso com token de sessão encerrada deve ser terminantemente proibido.");
-    logPass("NI2-237: Encerramento e Invalidação de Sessão", "Sessão finalizada, agenda sincronizada e tokens invalidados.");
-
-    // =========================================================================
-    // TESTE 10: Auditoria Completa de Eventos da Teleconsulta (LGPD / CFN)
-    // =========================================================================
-    $events = $teleService->getSessionEvents($sessionData['session_id'], $clinicId1);
-    $eventTypes = array_column($events, 'event_type');
-
-    $expectedEvents = ['session_created', 'device_checked', 'consent_signed', 'waiting_room_entered', 'patient_admitted', 'clinical_note_appended', 'call_ended'];
-    foreach ($expectedEvents as $exp) {
-        assertCondition(in_array($exp, $eventTypes, true), "Evento auditável obrigatório '{$exp}' deve constar na trilha da sessão.");
-    }
-
-    logPass("Governança e Auditoria (CFN / LGPD)", "Todos os 7 eventos da jornada da teleconsulta registrados na trilha de auditoria.");
-
-    // =========================================================================
-    // TESTE 11: Simulação com Provedor Real Ativo (Spike Mock Provider Conforme Protocolo)
-    // =========================================================================
-    $activeProviderMock = new class implements VideoConferenceProviderInterface {
-        public function getProviderName(): string { return 'daily_co'; }
-        public function createRoom(string $roomName, int $expiresIn = 7200): array {
-            return [
-                'room_id' => 'daily-' . $roomName,
-                'room_url' => "https://clyonutri-test.daily.co/{$roomName}",
-                'expires_at' => date('Y-m-d H:i:s', time() + $expiresIn),
-            ];
-        }
-        public function issueMeetingToken(string $roomName, string $role, string $userName, int $expiresIn = 7200): array {
-            return ['token' => 'jwt_daily_token_escopado', 'expires_at' => date('Y-m-d H:i:s', time() + $expiresIn)];
-        }
-        public function deleteRoom(string $roomName): bool { return true; }
+    $sfx = bin2hex(random_bytes(4));
+    $mk = function (string $sql) use ($db): int { $db->exec($sql); return (int)$db->lastInsertId(); };
+    $cA = $mk("INSERT INTO clinics (uuid, name, email, status) VALUES ('tA-{$sfx}', 'Clinica Ficticia A', 'a{$sfx}@fict.test', 'active')");
+    $cB = $mk("INSERT INTO clinics (uuid, name, email, status) VALUES ('tB-{$sfx}', 'Clinica Ficticia B', 'b{$sfx}@fict.test', 'active')");
+    $user = function (string $n, string $role) use ($mk, $sfx): int {
+        return $mk("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status) VALUES ('u-{$n}-{$sfx}', '{$n}', '{$n}{$sfx}@fict.test', 'x', '{$role}', 1, 'active')");
     };
+    $member = fn(int $c, int $u, string $r) => $mk("INSERT INTO clinic_members (clinic_id, user_id, role, status) VALUES ({$c}, {$u}, '{$r}', 'active')");
+    $prof = fn(int $u) => $mk("INSERT INTO professionals (user_id, crn, crn_region) VALUES ({$u}, 'F{$u}', '3')");
 
-    // Criar nova consulta para testar integração quando o provedor estiver ativo
-    $db->exec("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, type, status) 
-               VALUES ({$clinicId1}, {$patientId1}, {$profId1}, '2026-10-11 10:00:00', 50, 'online', 'scheduled')");
-    $appActiveId = (int)$db->lastInsertId();
+    // N1: responsável; os IDs divergem. Colisão: users.id do "NC" = professionals.id do N1.
+    $uN2 = $user('n2', 'nutritionist'); $member($cA, $uN2, 'nutritionist'); $pN2 = $prof($uN2);
+    $uN1 = $user('n1', 'nutritionist'); $member($cA, $uN1, 'nutritionist');
+    $pN1 = (int)max(col($db, 'SELECT COALESCE(MAX(id),0) FROM professionals'), col($db, 'SELECT COALESCE(MAX(id),0) FROM users')) + 1000;
+    $db->exec("INSERT INTO professionals (id, user_id, crn, crn_region) VALUES ({$pN1}, {$uN1}, 'F{$uN1}', '3')");
+    $uSec = $user('sec', 'receptionist'); $member($cA, $uSec, 'receptionist');
+    $uNB = $user('nb', 'nutritionist'); $member($cB, $uNB, 'nutritionist'); $pNB = $prof($uNB);
+    // força a colisão: cria um usuário com id = professionals.id do N1 (se livre)
+    $uNC = null;
+    if (!col($db, "SELECT COUNT(*) FROM users WHERE id = {$pN1}")) {
+        $db->exec("INSERT INTO users (id, uuid, name, email, password_hash, role, is_verified, status) VALUES ({$pN1}, 'u-nc-{$sfx}', 'nc', 'nc{$sfx}@fict.test', 'x', 'nutritionist', 1, 'active')");
+        $uNC = $pN1; $member($cA, $uNC, 'nutritionist'); $prof($uNC);
+    }
+    ok($uN1 !== $pN1, 'Cenário com users.id ≠ professionals.id para o responsável');
 
-    $teleServiceActive = new TeleconsultationService($db, $activeProviderMock);
-    $activeSession = $teleServiceActive->scheduleSession($appActiveId, $clinicId1);
+    $pat = $mk("INSERT INTO patients (clinic_id, uuid, name, email) VALUES ({$cA}, 'p-{$sfx}', 'Paciente Ficticio', 'p{$sfx}@fict.test')");
+    $soon = date('Y-m-d H:i:s', time() + 300);
+    $app = fn(string $when, string $type, int $p = 0) => $mk("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, type, status) VALUES ({$cA}, {$pat}, " . ($p ?: $pN1) . ", '{$when}', 50, '{$type}', 'scheduled')");
+    $a1 = $app($soon, 'teleconsultation');
+    $aPres = $app($soon, 'first_visit');
+    $aCancel = $app(date('Y-m-d H:i:s', time() + 86400), 'teleconsultation');
+    $aReag = $app(date('Y-m-d H:i:s', time() + 2 * 86400), 'online');
 
-    assertCondition($activeSession['media_provider_status'] === 'active', "Com provedor configurado, status deve ser 'active'.");
-    assertCondition(!empty($activeSession['external_room_url']), "URL da sala externa do provedor deve estar presente.");
-    logPass("NI2-245: Provedor WebRTC Ativo e Provisionamento", "Integração funcional com Daily Video API comprovada.");
+    $svc = new TeleconsultationService($db, new DailyVideoProvider(null, null));
+    $ctl = new TeleconsultationController($db, $svc);
 
+    // ---------------- F01: identidade resolvida no servidor
+    ok($svc->resolveProfessionalId($uN1, $cA) === $pN1, 'F01: users.id do N1 resolve para o professionals.id dele');
+    ok($svc->resolveProfessionalId($uSec, $cA) === null, 'F01: secretária não tem professionals.id clínico');
+    ok($svc->resolveProfessionalId($uNB, $cA) === null, 'F01: profissional de outra clínica não resolve na clínica A');
+
+    // ---------------- F07: GET não cria; só o responsável; POST com CSRF
+    asUser($uN2, $cA);
+    [$st] = run(fn() => $ctl->openFromAppointment(['appointmentId' => $a1]));
+    ok($st === 403 && !col($db, "SELECT COUNT(*) FROM teleconsultation_sessions WHERE appointment_id = {$a1}"), 'F07: não responsável GET → 403 e nenhuma sessão');
+    asUser($uN1, $cA);
+    [$st, $html] = run(fn() => $ctl->openFromAppointment(['appointmentId' => $a1]));
+    ok($st === 200 && str_contains($html, 'method="POST"') && !col($db, "SELECT COUNT(*) FROM teleconsultation_sessions WHERE appointment_id = {$a1}"), 'F07: responsável GET → 200 com botão POST, sem criar sessão');
+    $_POST = [];
+    [$st] = run(fn() => $ctl->createFromAppointment(['appointmentId' => $a1]));
+    ok($st === 403, 'F07: POST de criação sem CSRF → 403');
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctl->createFromAppointment(['appointmentId' => $a1]));
+    [$st2] = run(fn() => $ctl->createFromAppointment(['appointmentId' => $a1]));
+    $sid = (int)col($db, "SELECT id FROM teleconsultation_sessions WHERE appointment_id = {$a1}");
+    ok($st === 303 && $st2 === 303 && $sid > 0 && (int)col($db, "SELECT COUNT(*) FROM teleconsultation_sessions WHERE appointment_id = {$a1}") === 1, 'F07: POST com CSRF cria; repetir é idempotente (1 sessão)');
+    ok((int)col($db, "SELECT professional_id FROM teleconsultation_sessions WHERE id = {$sid}") === $pN1, 'F01: sessão gravada com o professionals.id do responsável');
+
+    // ---------------- F19: presencial
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctl->createFromAppointment(['appointmentId' => $aPres]));
+    ok($st === 409 && !col($db, "SELECT COUNT(*) FROM teleconsultation_sessions WHERE appointment_id = {$aPres}"), 'F19: consulta presencial → 409, nenhuma sessão');
+
+    // ---------------- F07/F20: leitura da sala
+    asUser($uN2, $cA);
+    [$st, $html] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+    ok($st === 403 && !str_contains($html, 'Paciente Ficticio'), 'F07: não responsável não abre a sala (403, sem dados do paciente)');
+    if ($uNC) {
+        asUser($uNC, $cA);
+        [$st] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+        ok($st === 403, 'F01b: usuário cujo users.id = professionals.id do responsável → 403');
+        $_POST = ['_csrf' => csrf()];
+        [$st] = run(fn() => $ctl->admit(['id' => $sid]));
+        ok($st === 403, 'F01b: colisão não admite (403)');
+    }
+    asUser($uNB, $cB);
+    [$st] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+    $_POST = ['_csrf' => csrf()];
+    [$st2, $out2] = run(fn() => $ctl->admit(['id' => $sid]));
+    ok($st === 404 && $st2 === 404 && !str_contains($out2, 'tenant') && !str_contains($out2, 'ID '), 'F20: outra clínica → 404 (não 500), sem ID na resposta');
+    asUser($uN1, $cA);
+    [$st, $html] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+    ok($st === 200 && str_contains($html, 'Vídeo não configurado') && !str_contains($html, 'Vídeo Real Conectado') && !str_contains($html, 'LGPD Seguro') && !str_contains($html, 'tailwindcss'), 'F02/F13: sala honesta, sem selos nem Tailwind CDN');
+
+    // ---------------- link do paciente (mostrado uma vez; só hash)
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctl->issueLink(['id' => $sid]));
+    [, $html] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+    preg_match('#/teleconsulta/sala-espera/([0-9a-f]{64})#', $html, $m);
+    $tok = $m[1] ?? '';
+    [, $html2] = run(fn() => $ctl->professionalRoom(['id' => $sid]));
+    ok($st === 303 && $tok !== '' && !preg_match('#/sala-espera/[0-9a-f]{64}#', $html2), 'F03 (parcial): link gerado e exibido UMA vez');
+    ok(col($db, "SELECT patient_token_hash FROM teleconsultation_sessions WHERE id = {$sid}") === hash('sha256', $tok), 'F04: banco guarda só o SHA-256 do token');
+
+    // ---------------- paciente via controller: troca por cookie, CSRF, consentimento, espera
+    $db->exec("DELETE FROM login_attempts WHERE scope LIKE 'tele_%'");
+    unset($_SESSION['user_id'], $_SESSION['clinic_id']);
+    [$st] = run(fn() => $ctl->patientLinkExchange(['token' => $tok]));
+    ok($st === 303 && isset($_SESSION['_tele_patient']), 'F14: link trocado por cookie e redirecionado (303) para a URL limpa');
+    $_POST = []; $_SERVER['HTTP_X_CSRF_TOKEN'] = '';
+    [$st] = run(fn() => $ctl->patientEnterWaiting());
+    ok($st === 403, 'Paciente: POST sem CSRF → 403');
+    $_SERVER['HTTP_X_CSRF_TOKEN'] = csrf();
+    $sess = $svc->getSessionForPatientCookie($sid, (int)$_SESSION['_tele_patient']['gen'], (string)$_SESSION['_tele_patient']['h']);
+    $svc->submitDeviceCheck($sess, ['camera_ok' => true, 'microphone_ok' => true]);
+    $term = $svc->getActiveConsentTerm();
+    ok($term !== null, 'F18: termo de teleconsulta ativo existe (migração 35)');
+    $sess = $svc->getSessionForPatientCookie($sid, (int)$_SESSION['_tele_patient']['gen'], (string)$_SESSION['_tele_patient']['h']);
+    ok(throwsStatus(fn() => $svc->recordConsent($sess, 999999, true, '10.1.2.3', 'X')) === 409, 'F18: termo errado → 409');
+    $svc->recordConsent($sess, (int)$term['id'], false, '10.1.2.3', 'Mozilla/5.0 (Windows NT 10.0) Chrome/120');
+    $svc->recordConsent($sess, (int)$term['id'], true, '10.1.2.3', 'Mozilla/5.0 (Windows NT 10.0) Chrome/120');
+    $rows = $db->query("SELECT clinic_id, granted, term_id, ip_address, user_agent FROM patient_consents WHERE patient_id = {$pat} ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    ok(count($rows) === 2 && (int)$rows[0]['granted'] === 0 && (int)$rows[1]['granted'] === 1 && (int)$rows[1]['clinic_id'] === $cA
+        && (int)$rows[1]['term_id'] === (int)$term['id'] && $rows[1]['ip_address'] === '10.1.2.0' && $rows[1]['user_agent'] === 'Chrome/Windows',
+        'F18: recusa e aceite gravados em patient_consents (clinic_id, granted, term_id, IP /24, UA resumido)');
+    [$st, $out] = run(fn() => $ctl->patientEnterWaiting());
+    ok($st === 200 && col($db, "SELECT status FROM teleconsultation_sessions WHERE id = {$sid}") === 'waiting_room', 'Paciente entra na espera pelo controller');
+    $db->exec("UPDATE teleconsultation_sessions SET external_room_url = 'https://dummy-video.invalid/x', external_room_name = 'clyo-x' WHERE id = {$sid}");
+    [$st, $out] = run(fn() => $ctl->patientStatus());
+    $j = json_decode($out, true);
+    ok($st === 200 && array_keys($j) === ['status', 'is_admitted'] && !str_contains($out, 'dummy-video'), 'F05: status do paciente só com o estado');
+
+    // ---------------- F01/F08/F10 pelo controller
+    asUser($uN1, $cA);
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctl->admit(['id' => $sid]));
+    ok($st === 303 && (int)col($db, "SELECT actor_id FROM teleconsultation_events WHERE session_id = {$sid} AND event_type = 'patient_admitted'") === $pN1, 'F01: responsável com IDs divergentes admite (303, antes 500); autoria = professionals.id');
+    [$st] = run(fn() => $ctl->admit(['id' => $sid]));
+    ok($st === 303 && (int)col($db, "SELECT COUNT(*) FROM teleconsultation_events WHERE session_id = {$sid} AND event_type = 'patient_admitted'") === 1, 'F08: admitir de novo é idempotente');
+    $_POST = ['_csrf' => csrf(), 'title' => 'Evolucao v11', 'clinical_notes' => 'texto ficticio', 'goals' => ''];
+    [$st] = run(fn() => $ctl->recordEvolution(['id' => $sid]));
+    ok($st === 303 && (int)col($db, "SELECT professional_id FROM clinical_records WHERE patient_id = {$pat} ORDER BY id DESC LIMIT 1") === $pN1
+        && col($db, "SELECT status FROM teleconsultation_sessions WHERE id = {$sid}") === 'in_progress', 'F01: evolução com autoria do responsável; admitted → in_progress');
+    $fake = new class implements VideoConferenceProviderInterface {
+        public array $deleted = [];
+        public function isConfigured(): bool { return true; }
+        public function getProviderName(): string { return 'fake_test'; }
+        public function createRoom(string $roomName, int $expiresInSeconds = 7200): array { return ['room_id' => 'id-' . $roomName, 'room_name' => $roomName, 'room_url' => 'https://dummy-video.invalid/' . $roomName]; }
+        public function issueMeetingToken(string $roomName, string $participantRole, string $userName, int $expiresInSeconds = 7200): array { throw new RuntimeException('não usado'); }
+        public function deleteRoom(string $roomName): bool { $this->deleted[] = $roomName; return true; }
+    };
+    $ctlF = new TeleconsultationController($db, new TeleconsultationService($db, $fake));
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctlF->end(['id' => $sid]));
+    [$st2] = run(fn() => $ctlF->end(['id' => $sid]));
+    ok($st === 303 && $st2 === 303 && (int)col($db, "SELECT COUNT(*) FROM teleconsultation_events WHERE session_id = {$sid} AND event_type = 'call_ended'") === 1, 'F08: encerrar é idempotente (1 call_ended)');
+    ok(col($db, "SELECT status FROM appointments WHERE id = {$a1}") === 'scheduled', 'F10: encerrar a chamada NÃO conclui o agendamento');
+    ok($fake->deleted === ['clyo-x'], 'F11: deleteRoom recebe o NOME da sala (provedor falso em memória)');
+    $_POST = ['_csrf' => csrf(), 'title' => 'Adendo', 'clinical_notes' => 'adendo', 'goals' => ''];
+    [$st] = run(fn() => $ctl->recordEvolution(['id' => $sid]));
+    ok($st === 303 && col($db, "SELECT status FROM teleconsultation_sessions WHERE id = {$sid}") === 'completed', 'F08: evolução após encerrar é adendo e não reabre');
+    $_POST = ['_csrf' => csrf()];
+    [$st] = run(fn() => $ctl->admit(['id' => $sid]));
+    ok($st === 409, 'F08: admitir após encerrar → 409');
+    ok(throwsStatus(fn() => $svc->getSessionByPatientToken($tok)) === 404, 'F04: encerrar revoga o link do paciente');
+    ok(!TeleconsultationService::canTransition('rejected', 'admitted') && !TeleconsultationService::canTransition('completed', 'in_progress'), 'F08: rejected/completed são terminais');
+
+    // ---------------- F04: cancelar / reagendar / janela / regerar
+    $sidC = $svc->createSessionForAppointment($aCancel, $uN1, $cA)['session_id'];
+    $tC = $svc->issuePatientLink($sidC, $uN1, $cA)['token'];
+    ok(!empty($svc->getSessionByPatientToken($tC)['too_early']), 'F04: antes da janela o link é válido mas marcado "ainda não abriu"');
+    ok(throwsStatus(fn() => $svc->submitDeviceCheck($svc->getSessionByPatientToken($tC), ['camera_ok' => 1, 'microphone_ok' => 1])) === 409, 'F04: fora da janela não avança (409)');
+    (new AppointmentService($db))->updateStatus($aCancel, 'cancelled', 'teste', $uN1);
+    ok(throwsStatus(fn() => $svc->getSessionByPatientToken($tC)) === 404 && col($db, "SELECT status FROM teleconsultation_sessions WHERE id = {$sidC}") === 'cancelled', 'F04: cancelar o agendamento revoga o link e cancela a sessão');
+    $sidR = $svc->createSessionForAppointment($aReag, $uN1, $cA)['session_id'];
+    $tR = $svc->issuePatientLink($sidR, $uN1, $cA)['token'];
+    (new AppointmentService($db))->edit($aReag, ['scheduled_at' => date('Y-m-d H:i', time() + 3 * 86400)], true, $uN1);
+    ok(throwsStatus(fn() => $svc->getSessionByPatientToken($tR)) === 404, 'F04: reagendar revoga o link');
+    ok(col($db, "SELECT type FROM appointments WHERE id = {$aReag}") === 'online', 'Reagendar sem enviar "type" preserva a modalidade (antes virava first_visit)');
+    $tR2 = $svc->issuePatientLink($sidR, $uN1, $cA)['token'];
+    $tR3 = $svc->issuePatientLink($sidR, $uN1, $cA)['token'];
+    ok(throwsStatus(fn() => $svc->getSessionByPatientToken($tR2)) === 404 && $svc->getSessionByPatientToken($tR3)['id'] == $sidR, 'F04: um token ativo por consulta (regerar invalida o anterior)');
+    $late = new TeleconsultationService($db, null, null, fn() => time() + 10 * 86400);
+    ok(throwsStatus(fn() => $late->getSessionByPatientToken($tR3)) === 404, 'F04: depois do fim + 30 min o link expira');
+    ok(throwsStatus(fn() => $svc->getSessionByPatientToken(str_repeat('0', 64))) === 404 && throwsStatus(fn() => $svc->getSessionByPatientToken('x')) === 404, 'F04: token inválido → 404 genérico');
+
+    // ---------------- F14 rate limit
+    $rl = new TelehealthRateLimiter($db);
+    $okHits = 0;
+    for ($i = 0; $i < 15; $i++) { if ($rl->hit('tele_consent', "t-{$sfx}")) { $okHits++; } }
+    ok($okHits === 10 && $rl->isLocked('tele_consent', "t-{$sfx}"), 'F14: 10 consentimentos por janela, depois bloqueia');
+    $later = new TelehealthRateLimiter($db, fn() => time() + 1000);
+    ok($later->hit('tele_consent', "t-{$sfx}"), 'F14: bloqueio expira com a janela (sem bloqueio permanente)');
 } finally {
-    // Reverter transação para isolamento de dados de teste
-    $db->rollBack();
+    if ($db->inTransaction()) { $db->rollBack(); }
 }
 
-echo "\n========================================================================\n";
-echo ">>> TODOS OS GATES DA TELECONSULTA FORAM EXECUTADOS COM SUCESSO! <<<\n";
-echo "========================================================================\n\n";
+// ---------------- F12 flag, F06 CSP, legado (sem banco)
+$ref = new ReflectionProperty(PlatformSettings::class, 'cachedSettings');
+$ref->setValue(null, ['maintenance_mode' => '0']);
+ok(PlatformSettings::isTelehealthEnabled() === false, 'F12: sem a chave feature_flag_telehealth o módulo fica DESLIGADO');
+$ref->setValue(null, ['feature_flag_telehealth' => '1']);
+ok(PlatformSettings::isTelehealthEnabled() === true, 'F12: liga só com a chave = 1');
+PlatformSettings::clearCache();
+putenv('TELEHEALTH_PROVIDER_ORIGIN=');
+ok(SecurityHeaders::allowTelehealthProviderOrigin() === null && str_contains(SecurityHeaders::pagePolicy(), "frame-src 'self';"), 'F06: sem TELEHEALTH_PROVIDER_ORIGIN nada muda na CSP');
+putenv('TELEHEALTH_PROVIDER_ORIGIN=javascript:alert(1)');
+ok(SecurityHeaders::allowTelehealthProviderOrigin() === null, 'F06: origem inválida é ignorada');
+putenv('TELEHEALTH_PROVIDER_ORIGIN=https://clinica.daily.co');
+ok(SecurityHeaders::allowTelehealthProviderOrigin() === 'https://clinica.daily.co' && str_contains(SecurityHeaders::pagePolicy(), "frame-src 'self' https://clinica.daily.co") && str_contains(SecurityHeaders::pagePolicy(), "connect-src 'self' https://clinica.daily.co"), 'F06: origem configurada entra em frame-src/connect-src da página que pedir');
+putenv('TELEHEALTH_PROVIDER_ORIGIN');
+$threw = false;
+try { TenantContext::setClinicId(1); (new TelehealthService($db))->generateSession(-1); } catch (\Throwable $e) { $threw = true; }
+ok($threw, 'F02: TelehealthService legado não gera mais URL fictícia');
+ok(TeleconsultationService::isOnlineType('teleconsultation') && !TeleconsultationService::isOnlineType('first_visit'), 'F19: classificação online × presencial');
+ok(TelehealthRateLimiter::anonymizeIp('2001:db8:1:2::5') === '2001:db8:1::', 'Minimização de IPv6 (/48)');
+
+ob_end_flush();
+echo "\nTeleconsulta v11: {$passed} verificações OK\n";

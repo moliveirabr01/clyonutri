@@ -41,10 +41,11 @@ $appointmentService = new AppointmentService($db);
 $agendamento = $appointmentService->schedule($patient['id'], $nutri['user_id'], '2026-10-15 15:00:00', 'online_consultation');
 
 $telehealth = new TelehealthService($db);
-$teleSession = $telehealth->generateSession($agendamento['id']);
-assert($teleSession['id'] > 0, "Sessão de teleconsulta deve ser gerada");
-assert(str_starts_with($teleSession['meeting_url'], 'https://meet.clyonutri.com.br/room/'), "Link de teleconsulta gerado");
-echo "  ✓ Teleconsulta gerada com link seguro: {$teleSession['meeting_url']}.\n\n";
+// v11 (NI2-221 F02): o serviço legado não gera mais a URL fictícia meet.clyonutri.com.br.
+$legadoRecusado = false;
+try { $telehealth->generateSession($agendamento['id']); } catch (\RuntimeException $e) { $legadoRecusado = true; }
+assert($legadoRecusado, "TelehealthService legado não deve gerar link fictício");
+echo "  ✓ Teleconsulta legada desativada (sem link fictício); a sala oficial é a da agenda.\n\n";
 
 // 2. NI2-121: Perfil Profissional Público
 echo "[2/6] Testando NI2-121: Perfil Público e Agendamento Online...\n";
