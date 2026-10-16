@@ -3,6 +3,16 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
+\ClyoNutri\Core\Security\Env::load(__DIR__ . '/../.env');
+// v10: em produção nunca exibe erro/stack trace ao público, mesmo com APP_DEBUG=true.
+\ClyoNutri\Core\Http\ErrorExposure::configure();
+// NI2-427: HTTPS obrigatório antes de CORS, banco, sessão ou qualquer controller.
+// GET/HEAD por HTTP -> 301 para APP_URL (https); demais métodos -> 403 sem processar.
+\ClyoNutri\Core\Http\Transport::enforce();
+// NI2-428: HSTS gradual (só por HTTPS; valor em HSTS_MAX_AGE).
+\ClyoNutri\Core\Http\SecurityHeaders::sendHsts();
+// NI2-429: CSP (nonce por resposta), anti-enquadramento, nosniff, Referrer/Permissions-Policy.
+\ClyoNutri\Core\Http\SecurityHeaders::sendBrowserPolicies((string)($_SERVER['REQUEST_URI'] ?? '/'));
 \ClyoNutri\Core\Http\ApiErrorBoundary::register();
 
 use ClyoNutri\Application\Controllers\AuthController;
@@ -47,7 +57,9 @@ if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
         'path' => '/',
         'httponly' => true,
         'samesite' => 'Lax',
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        // NI2-427: Secure sempre que a requisição chegou por HTTPS (inclui proxy confiável)
+        // ou quando FORCE_HTTPS está ativo (nesse caso HTTP nunca chega até aqui).
+        'secure' => \ClyoNutri\Core\Http\Transport::isHttps() || \ClyoNutri\Core\Http\Transport::forceHttpsEnabled(),
     ]);
     session_start();
 }
@@ -110,49 +122,26 @@ $router->post('/recuperar-senha/{token}', [$authCtrl, 'resetPassword']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
 $router->get('/up', function () {
+    // v10: resposta mínima (sem versão, horário, nome do serviço ou estado do banco/agendador).
+    // Detalhes só pela linha de comando: php bin/diagnostico.php / php bin/healthcheck.php.
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     $dbOk = false;
     try {
-        $db = Connection::getInstance();
-        $db->query("SELECT 1");
+        Connection::getInstance()->query('SELECT 1');
         $dbOk = true;
     } catch (\Throwable $e) {
         $dbOk = false;
     }
-
-    $heartbeatFile = __DIR__ . '/../storage/scheduler_heartbeat.json';
-    $heartbeatOk = false;
-    if (file_exists($heartbeatFile)) {
-        $data = json_decode((string)file_get_contents($heartbeatFile), true);
-        if (!empty($data['timestamp']) && (time() - $data['timestamp'] < 1200)) {
-            $heartbeatOk = true;
-        }
-    }
-
-    $allOk = $dbOk;
-    if (!$allOk) {
-        http_response_code(503);
-    } else {
-        http_response_code(200);
-    }
-
-    echo json_encode([
-        'status' => $allOk ? 'up' : 'degraded',
-        'database' => $dbOk ? 'connected' : 'disconnected',
-        'scheduler_heartbeat' => $heartbeatOk ? 'healthy' : 'pending_or_delayed',
-        'version' => '1.0.0',
-        'timestamp' => date('c'),
-    ]);
+    http_response_code($dbOk ? 200 : 503);
+    echo json_encode(['status' => $dbOk ? 'ok' : 'unavailable']);
 });
 
 $router->get('/health', function () {
+    // v10 (achado "Endpoint público de diagnóstico"): só {"status":"ok"}; nada de serviço, versão ou horário.
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'status' => 'healthy',
-        'service' => 'ClyoNutri API & Web Engine',
-        'version' => '1.0.0',
-        'timestamp' => date('c'),
-    ]);
+    header('Cache-Control: no-store');
+    echo json_encode(['status' => 'ok']);
 });
 
 // Verificação de Modo de Manutenção em Tempo de Execução (NI2-407 / NI2-411)
@@ -237,6 +226,8 @@ $requireAuth = function (callable $action) use ($db) {
             \ClyoNutri\Core\Http\Response::redirect('/login?error=session_revoked');
         }
 
+        // v10 (2.2): páginas autenticadas nunca ficam em cache (navegador/proxy).
+        if (!headers_sent()) { header('Cache-Control: no-store, private'); header('Pragma: no-cache'); }
         $actor = $authUser->toArray();
         try {
             \ClyoNutri\Core\Security\ClinicalAuthorization::assertWebAccess($actor, parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', $_SERVER['REQUEST_METHOD'], $db);
@@ -244,6 +235,20 @@ $requireAuth = function (callable $action) use ($db) {
             http_response_code(403);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Acesso não autorizado para este perfil.']);
+            return;
+        }
+        // CSRF + Origin/Referer para mutações /api/ autenticadas por cookie de sessão (auditoria 14/10/2026).
+        $csrfError = \ClyoNutri\Core\Security\SessionApiCsrfGuard::check(
+            (string)($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+            parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/',
+            $_SERVER,
+            $_POST,
+            (string)file_get_contents('php://input')
+        );
+        if ($csrfError !== null) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => $csrfError]);
             return;
         }
         $action($params);
@@ -333,6 +338,7 @@ $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
 
 // 3.1 Consultório Online & Teleconsulta (NI2-221 / NI2-411)
+// v11 (NI2-221): criação só por POST; o link do paciente vira cookie e redireciona para URL limpa.
 $router->get('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'openFromAppointment'])));
 $router->post('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'createFromAppointment'])));
 $router->get('/teleconsulta/{id}/atendimento', $requireAuth($requireTelehealth([$teleCtrl, 'professionalRoom'])));
@@ -401,6 +407,8 @@ $router->post('/suporte/chamado/{id}/status', $requireAuth([$helpCtrl, 'backoffi
 
 // 3.3 Canal Seguro de Comunicação & Chat (NI2-189 / NI2-411)
 $router->get('/chat', $requireAuth($requireChat([$chatCtrl, 'index'])));
+$router->get('/chat/pacientes', $requireAuth($requireChat([$chatCtrl, 'patientSearch'])));
+$router->post('/chat/nova', $requireAuth($requireChat([$chatCtrl, 'startConversation'])));
 $router->get('/chat/{id}', $requireAuth($requireChat([$chatCtrl, 'conversationView'])));
 $router->post('/chat/{id}/enviar', $requireAuth($requireChat([$chatCtrl, 'sendMessage'])));
 $router->get('/chat/{id}/poll', $requireAuth($requireChat([$chatCtrl, 'pollMessages'])));
@@ -548,6 +556,24 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
         }
     }
 
+    // F03: senha e PIN chegam pelo mesmo campo e compartilham o MESMO contador persistente
+    // (realm 'patient', conta normalizada + IP e só IP). Reservado antes de buscar o paciente e do password_verify,
+    // então conta existente e inexistente consomem o limite igualmente. Limites de OTP abaixo continuam valendo.
+    $patientLimiter = null;
+    // V2-02: e-mail, telefone e aliases do mesmo paciente resolvem para a mesma identidade (patient#ID).
+    $patientAccountKey = \ClyoNutri\Core\Security\LoginRateLimiter::resolvePatientIdentity($db, $email, $phone);
+    $patientIpKey = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    if ($password !== '') {
+        $patientLimiter = new \ClyoNutri\Core\Security\LoginRateLimiter($db);
+        $gate = $patientLimiter->attempt('patient', $patientAccountKey, $patientIpKey);
+        if (!$gate['allowed']) {
+            http_response_code(429);
+            header('Retry-After: ' . max(1, (int)$gate['retry_after']));
+            echo json_encode(['error' => 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.', 'retry_after' => (int)$gate['retry_after']]);
+            return;
+        }
+    }
+
     // Helper para concorrência e retry em SQLite/MySQL sob corrida de processos
     $executeWithRetry = function(\PDOStatement &$stmt, array $params = []) use ($db): bool {
         for ($attempt = 0; $attempt < 60; $attempt++) {
@@ -590,6 +616,7 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
     $patients = $stmt->fetchAll();
     $stmt->closeCursor();
     if (count($patients) !== 1) {
+        $patientLimiter?->failure('patient', $patientAccountKey, $patientIpKey);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial inválida ou acesso indisponível.']);
         return;
@@ -605,6 +632,11 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
             $authenticated = true;
         } elseif (!empty($patient['access_pin']) && password_verify($password, $patient['access_pin'])) {
             $authenticated = true;
+        }
+        if ($patientLimiter !== null) {
+            $authenticated
+                ? $patientLimiter->success('patient', $patientAccountKey, $patientIpKey)
+                : $patientLimiter->failure('patient', $patientAccountKey, $patientIpKey);
         }
     }
 
@@ -816,8 +848,8 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
 
     // Retornar novo total acumulado hoje (ANSI SQL portável)
     $todayDate = date('Y-m-d');
-    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND date(logged_at) = :today");
-    $hStmt->execute(['pid' => $patientId, 'today' => $todayDate]);
+    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = :today");
+    $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
     $res['total_water_today'] = (int)$hStmt->fetchColumn();
 
     echo json_encode($res);
@@ -1145,7 +1177,13 @@ $router->post('/api/v1/patient/recipes/{id}/favorite', function($params = []) us
     $recipeId = (int)($params['id'] ?? 0);
 
     $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
-    $isFav = $recipeService->togglePatientFavorite($patientId, $recipeId);
+    try {
+        $isFav = $recipeService->togglePatientFavorite($patientId, $recipeId);
+    } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Receita não encontrada.'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
     echo json_encode(['is_favorite' => $isFav]);
 });
 
@@ -1240,6 +1278,17 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
         return;
     }
 
+    // F03: limitador compartilhado com o login web (mesmo realm 'staff'), antes de qualquer password_verify.
+    $loginLimiter = new \ClyoNutri\Core\Security\LoginRateLimiter($db);
+    $clientIpPro = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    $gate = $loginLimiter->attempt('staff', $email, $clientIpPro);
+    if (!$gate['allowed']) {
+        http_response_code(429);
+        header('Retry-After: ' . max(1, (int)$gate['retry_after']));
+        echo json_encode(['error' => 'Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.', 'retry_after' => (int)$gate['retry_after']]);
+        return;
+    }
+
     $stmt = $db->prepare("
         SELECT u.*, cm.role AS member_role, cm.clinic_id, c.name AS clinic_name
         FROM users u
@@ -1252,10 +1301,13 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        $loginLimiter->failure('staff', $email, $clientIpPro);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial profissional inválida ou acesso indisponível.']);
         return;
     }
+
+    $loginLimiter->success('staff', $email, $clientIpPro);
 
     // Validação de papel clínico (RBAC)
     if (!\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical(['user_role'=>$user['role'],'member_role'=>$user['member_role']])) {

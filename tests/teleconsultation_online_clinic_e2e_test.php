@@ -303,7 +303,7 @@ step('F03: app recebe bilhete curto da sala de espera; link legado não é expos
 step('NI2-239/250: convite e lembrete por e-mail sem dados clínicos', function () use ($db, $svc, $p2p, $mkAppt, $clinicA, $patientA, $nutriA, $appKey) {
     putenv('APP_KEY=' . $appKey); putenv('APP_URL=https://app.clyonutri.test');
     $log = sys_get_temp_dir() . '/tele-mail-' . bin2hex(random_bytes(3)) . '.log';
-    $mailer = new \ClyoNutri\Core\Mail\Mailer(['driver' => 'log', 'from_address' => 'nao-responda@clyonutri.test', 'log_path' => $log]);
+    $mailer = new \ClyoNutri\Core\Mail\LogMailer($log); // merge v11: Mailer virou interface (pacote v6)
     $appt = $mkAppt($clinicA, $patientA, $nutriA['pro'], '2026-10-20 14:00:00');
     $c = $svc->scheduleSession($appt, $nutriA['pro'], $clinicA);
     $at = new DateTimeImmutable('2026-10-20 16:00:00', new DateTimeZone('UTC')); // 45 min antes da abertura (16:45)
@@ -343,7 +343,7 @@ step('NI2-239: paciente sem e-mail e e-mail não configurado são informados, n�
     $noEmail = $q("INSERT INTO patients (clinic_id, uuid, name) VALUES (?, ?, 'Sem Email')", [$clinicA, 'ne-' . bin2hex(random_bytes(3))]);
     $appt = $mkAppt($clinicA, $noEmail, $nutriA['pro'], '2026-10-20 14:00:00');
     $c = $svc->scheduleSession($appt, $nutriA['pro'], $clinicA);
-    $broken = new \ClyoNutri\Core\Mail\Mailer(['driver' => 'smtp', 'host' => null, 'from_address' => 'x@clyonutri.test']);
+    $broken = new class implements \ClyoNutri\Core\Mail\Mailer { public function send(\ClyoNutri\Core\Mail\MailMessage $m): void { throw new \ClyoNutri\Core\Mail\MailException('E-mail não configurado: SMTP_HOST ausente.'); } };
     $n = new \ClyoNutri\Domain\Telehealth\TeleconsultationNotifier($db, $svc, $broken);
     check($n->sendInvite((int)$c['session_id'], $nutriA['pro'], $clinicA)['status'] === 'skipped', 'sem e-mail: não enviado');
     $db->prepare('UPDATE patients SET email = ? WHERE id = ?')->execute(['tem@email.test', $noEmail]);

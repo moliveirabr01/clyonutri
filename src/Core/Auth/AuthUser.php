@@ -63,15 +63,13 @@ final class AuthUser
         return $this->clinicName;
     }
 
+    /**
+     * Suporte global = papel de PLATAFORMA em users.role ('admin' = administrador da plataforma).
+     * clinic_members.role (memberRole) nunca entra aqui. Ver RoleModel / docs/delivery/MODELO_PAPEIS.md.
+     */
     public function isSupport(): bool
     {
-        return in_array($this->userRole, [
-            'superadmin',
-            'admin_operacional',
-            'admin',
-            'operator',
-            'support_agent'
-        ], true);
+        return \ClyoNutri\Core\Security\RoleModel::isPlatformSupport($this->userRole);
     }
 
     public function isClinical(): bool
@@ -87,15 +85,7 @@ final class AuthUser
 
     public function isPlatformAdmin(): bool
     {
-        return in_array($this->userRole, [
-            'superadmin',
-            'admin_operacional',
-            'admin',
-            'operator',
-            'support_agent',
-            'finance_admin',
-            'security_auditor'
-        ], true);
+        return \ClyoNutri\Core\Security\RoleModel::isPlatformConsole($this->userRole);
     }
 
     public function toArray(): array

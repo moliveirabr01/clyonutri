@@ -125,8 +125,11 @@ export async function httpCreatePatient(session, name) {
   return { id: Number(dbOne('SELECT id FROM patients WHERE email = ?', [email]).id), email, name };
 }
 
-/** Decodifica cabeçalho MIME (=?UTF-8?B?...?=). */
-const decodeHeader = (v = '') => v.replace(/=\?UTF-8\?B\?([^?]+)\?=/gi, (_, b) => Buffer.from(b, 'base64').toString('utf8'));
+/** Decodifica cabeçalho MIME (=?UTF-8?B?...?= e =?UTF-8?Q?...?=, como o PHPMailer gera). */
+const decodeHeader = (v = '') => v
+  .replace(/\?=\s+=\?/g, '?==?')
+  .replace(/=\?UTF-8\?B\?([^?]+)\?=/gi, (_, b) => Buffer.from(b, 'base64').toString('utf8'))
+  .replace(/=\?UTF-8\?Q\?([^?]+)\?=/gi, (_, q) => Buffer.from(q.replace(/_/g, ' ').replace(/=([0-9A-F]{2})/gi, (_m, h) => String.fromCharCode(parseInt(h, 16))), 'latin1').toString('utf8'));
 
 /** Lê as mensagens que o servidor SMTP de teste recebeu para um destinatário (mais recente por último). */
 export function readMails(to) {
@@ -136,7 +139,7 @@ export function readMails(to) {
     const raw = fs.readFileSync(path.join(dir, f), 'utf8');
     const [head, ...rest] = raw.split(/\r?\n\r?\n/);
     const headers = {};
-    for (const line of head.split(/\r?\n/)) { const i = line.indexOf(':'); if (i > 0) headers[line.slice(0, i).toLowerCase()] = line.slice(i + 1).trim(); }
+    for (const line of head.replace(/\r?\n[ \t]+/g, ' ').split(/\r?\n/)) { const i = line.indexOf(':'); if (i > 0) headers[line.slice(0, i).toLowerCase()] = line.slice(i + 1).trim(); }
     const body = rest.join('\r\n\r\n');
     const parts = {};
     const boundary = headers['content-type']?.match(/boundary="([^"]+)"/)?.[1];

@@ -413,6 +413,9 @@ class PatientPortalService
         } catch (\Throwable $e) {
             $row['meeting_url'] = null; // sem teleconsulta disponível; nunca um link inventado
         }
+        // v11 (NI2-221 F19): estado honesto da modalidade para o app.
+        $row['is_online'] = \ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($row['type'] ?? null);
+        $row['video_status'] = !$row['is_online'] ? 'presencial' : ($row['meeting_url'] !== null ? 'sala_disponivel' : 'aguardando_sala');
         return $row;
     }
 

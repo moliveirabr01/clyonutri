@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Migration 32: Endurecimento do Consultório Online (NI2-221 / NI2-235 / NI2-236 / NI2-244).
+ * Migration 36 (era a 32 do WIP do Maicon; renumerada no merge v11): Endurecimento do Consultório Online (NI2-221 / NI2-235 / NI2-236 / NI2-244).
  *
  * Aditiva e idempotente: não remove colunas nem altera dados existentes.
  * - Janela de entrada e expiração do convite (instantes em UTC, sufixo _utc).
@@ -13,7 +13,7 @@ declare(strict_types=1);
  * - Registro de tentativas para limitação de taxa dos endpoints do paciente.
  * - Canal de sinalização do WebRTC P2P (offer/answer/ICE); apagado ao liberar a sala.
  */
-class HardenTeleconsultationSessions
+class AddTeleconsultationWebrtcAndJoinWindow
 {
     public function up(PDO $db): void
     {

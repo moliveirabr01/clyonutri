@@ -1,26 +1,79 @@
-<IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
+# ClyoNutri - public/.htaccess (compatível com HostGator / Apache 2.4)
+# Sem "Options", "php_value" ou "php_flag": em hospedagem compartilhada essas
+# diretivas costumam ser proibidas no .htaccess e causam 500 Internal Server Error.
 
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Redireciona cabeçalho Authorization para que o Sanctum e JWT funcionem no Apache/HostGator
+    # NI2-427 / v10: HTTPS obrigatório (primeira barreira; o PHP repete a checagem).
+    # Está nos DOIS .htaccess (raiz e public/): vale qualquer que seja a pasta raiz do domínio.
+    # "Já é HTTPS" = %{HTTPS}=on OU %{ENV:HTTPS}=on OU X-Forwarded-Proto=https (sem loop atrás de
+    # proxy). Um X-Forwarded-Proto forjado só faz a requisição chegar ao PHP, que (com
+    # TRUSTED_PROXIES vazio) redireciona/recusa do mesmo jeito.
+    # O Location nunca usa um Host arbitrário: só hosts conhecidos; outros seguem para o PHP,
+    # que redireciona para o APP_URL do .env. (A condição do Host vem por último: %1.)
+    # 1) www -> https://clyonutri.com (um único salto, de http ou https)
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^www\.(clyonutri\.com(\.br)?)(:(80|443))?$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+    # 2) http -> https no mesmo host conhecido (GET/HEAD 301; outros métodos 403)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{ENV:HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https [NC]
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{ENV:HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https [NC]
+    RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
+    RewriteRule ^ - [F,L]
+
+    # Repassa o cabeçalho Authorization (tokens da API) no Apache/HostGator
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Redireciona para HTTPS se habilitado pelo SSL
-    # RewriteCond %{HTTPS} off
-    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-    # Não reescreve arquivos ou diretórios físicos existentes
+    # Arquivos e pastas reais (assets) são servidos direto; o resto vai para index.php
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# Bloqueio estrito de acesso a arquivos de configuração sensíveis e dotfiles
-<FilesMatch "^\.">
-    Order allow,deny
-    Deny from all
+# Bloqueia dotfiles (.env, .htaccess, .git etc.)
+# v10 (2.2): dumps, backups, bancos, logs e configs nunca são servidos, mesmo se forem parar em public/.
+<FilesMatch "(?i)(\.(sql|sqlite3?|db|zip|tar|gz|tgz|rar|7z|bak|old|orig|save|swp|tmp|log|ini|conf|env|sh|lock|dist|phar|md)$|^error_log$|^composer\.(json|lock)$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
+
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# NI2-429: cabeçalhos para o que o Apache serve direto (CSS, JS, imagens, SVG).
+# O PHP é a fonte única das páginas e da API (CSP com nonce, X-Frame-Options, HSTS configurável).
+# Correção v8: com PHP via FPM/CGI (HostGator), "Header setifempty" NÃO enxerga os cabeçalhos do PHP
+# e acrescentava uma 2ª CSP (form-action 'none') nas páginas, bloqueando o envio do login. Por isso
+# X-Frame-Options e a CSP estática ficam restritas aos arquivos estáticos (FilesMatch abaixo).
+# HSTS não é enviado aqui de propósito: o valor do rollout fica só no .env (HSTS_MAX_AGE).
+<IfModule mod_headers.c>
+    Header setifempty X-Content-Type-Options "nosniff"
+    Header setifempty Referrer-Policy "strict-origin-when-cross-origin"
+    <FilesMatch "\.(css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf|txt|webmanifest)$">
+        Header set X-Frame-Options "DENY"
+        Header set Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    </FilesMatch>
+</IfModule>

@@ -15,28 +15,28 @@
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Nome da Plataforma SaaS</label>
-          <input type="text" name="app_name" value="<?= htmlspecialchars($settings['app_name'] ?? 'ClyoNutri II') ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem; background-color: var(--admin-gray-50);" readonly>
+          <label for="cfg1-app_name" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Nome da Plataforma SaaS</label>
+          <input id="cfg1-app_name" type="text" name="app_name" value="<?= htmlspecialchars($settings['app_name'] ?? 'ClyoNutri II') ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem; background-color: var(--admin-gray-50);" readonly>
         </div>
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Fuso Horário Operacional</label>
-          <input type="text" name="app_timezone" value="<?= htmlspecialchars(date_default_timezone_get()) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem; background-color: var(--admin-gray-50);" readonly>
+          <label for="cfg2-app_timezone" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Fuso Horário Operacional</label>
+          <input id="cfg2-app_timezone" type="text" name="app_timezone" value="<?= htmlspecialchars(date_default_timezone_get()) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem; background-color: var(--admin-gray-50);" readonly>
         </div>
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Timeout de Inatividade de Sessão (minutos)</label>
-          <input type="number" name="session_timeout_minutes" min="15" max="1440" value="<?= htmlspecialchars((string)($settings['session_timeout_minutes'] ?? '120')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
+          <label for="cfg3-session_timeout_minutes" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Timeout de Inatividade de Sessão (minutos)</label>
+          <input id="cfg3-session_timeout_minutes" type="number" name="session_timeout_minutes" min="15" max="1440" value="<?= htmlspecialchars((string)($settings['session_timeout_minutes'] ?? '120')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
         </div>
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">SLA Chamados Críticos P1 (horas)</label>
-          <input type="number" name="support_sla_p1_hours" min="1" max="48" value="<?= htmlspecialchars((string)($settings['support_sla_p1_hours'] ?? '4')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
+          <label for="cfg4-support_sla_p1_hours" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">SLA Chamados Críticos P1 (horas)</label>
+          <input id="cfg4-support_sla_p1_hours" type="number" name="support_sla_p1_hours" min="1" max="48" value="<?= htmlspecialchars((string)($settings['support_sla_p1_hours'] ?? '4')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
         </div>
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">SLA Chamados Padrão P2 (horas)</label>
-          <input type="number" name="support_sla_p2_hours" min="2" max="168" value="<?= htmlspecialchars((string)($settings['support_sla_p2_hours'] ?? '24')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
+          <label for="cfg5-support_sla_p2_hours" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">SLA Chamados Padrão P2 (horas)</label>
+          <input id="cfg5-support_sla_p2_hours" type="number" name="support_sla_p2_hours" min="2" max="168" value="<?= htmlspecialchars((string)($settings['support_sla_p2_hours'] ?? '24')) ?>" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;" required>
         </div>
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Modo de Manutenção da Plataforma</label>
-          <select name="maintenance_mode" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;">
+          <label for="cfg6-maintenance_mode" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-gray-700); margin-bottom: 0.35rem;">Modo de Manutenção da Plataforma</label>
+          <select id="cfg6-maintenance_mode" name="maintenance_mode" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;">
             <option value="0" <?= ($settings['maintenance_mode'] ?? '0') === '0' ? 'selected' : '' ?>>Inativo (Operação Normal)</option>
             <option value="1" <?= ($settings['maintenance_mode'] ?? '0') === '1' ? 'selected' : '' ?>>Ativo (Manutenção Agendada)</option>
           </select>
@@ -57,14 +57,14 @@
             <?php if ($canManage): ?>
               <input type="hidden" name="feature_flag_telehealth" value="0">
             <?php endif; ?>
-            <input type="checkbox" name="feature_flag_telehealth" value="1" <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>
+            <input type="checkbox" name="feature_flag_telehealth" value="1" <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>
             <div>
               <strong>Módulo de Teleconsulta &amp; Consultório Online (NI2-221)</strong>
               <div style="font-size: 0.78rem; color: var(--admin-gray-500);">Habilita salas seguras de vídeo e links de atendimento remoto nos consultórios.</div>
             </div>
           </label>
-          <span class="badge <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'badge--success' : 'badge--suspended' ?>">
-            <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'Habilitado' : 'Suspenso' ?>
+          <span class="badge <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'badge--success' : 'badge--suspended' ?>">
+            <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'Habilitado' : 'Suspenso' ?>
           </span>
         </div>
 

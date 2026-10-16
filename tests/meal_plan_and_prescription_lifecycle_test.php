@@ -73,22 +73,22 @@ $patientTenantB = (int)$db->lastInsertId();
 
 // Criar ou garantir alimentos TACO no banco
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (101, NULL, 'Arroz Branco Cozido TACO', 'Cereais', 'TACO', 128.00, 2.50, 28.10, 0.20, 1.60, 100.00, 'g', NULL)");
+VALUES (8101, NULL, 'Arroz Branco Cozido TACO', 'Cereais', 'TACO', 128.00, 2.50, 28.10, 0.20, 1.60, 100.00, 'g', NULL)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (102, NULL, 'Feijão Carioca Cozido TACO', 'Leguminosas', 'TACO', 76.00, 4.80, 13.60, 0.50, 8.50, 100.00, 'g', NULL)");
+VALUES (8102, NULL, 'Feijão Carioca Cozido TACO', 'Leguminosas', 'TACO', 76.00, 4.80, 13.60, 0.50, 8.50, 100.00, 'g', NULL)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (103, NULL, 'Peito de Frango Grelhado TACO', 'Carnes', 'TACO', 159.00, 32.00, 0.00, 2.50, 0.00, 100.00, 'g', NULL)");
+VALUES (8103, NULL, 'Peito de Frango Grelhado TACO', 'Carnes', 'TACO', 159.00, 32.00, 0.00, 2.50, 0.00, 100.00, 'g', NULL)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (104, NULL, 'Batata Doce Cozida TACO', 'Tubérculos', 'TACO', 77.00, 0.60, 18.40, 0.10, 2.20, 100.00, 'g', NULL)");
+VALUES (8104, NULL, 'Batata Doce Cozida TACO', 'Tubérculos', 'TACO', 77.00, 0.60, 18.40, 0.10, 2.20, 100.00, 'g', NULL)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (105, NULL, 'Tilápia Grelhada TACO', 'Pescados', 'TACO', 96.00, 20.10, 0.00, 1.70, 0.00, 100.00, 'g', 'peixe')");
+VALUES (8105, NULL, 'Tilápia Grelhada TACO', 'Pescados', 'TACO', 96.00, 20.10, 0.00, 1.70, 0.00, 100.00, 'g', 'peixe')");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, allergens)
-VALUES (106, NULL, 'Leite Desnatado TACO', 'Laticínios', 'TACO', 35.00, 3.40, 5.00, 0.10, 0.00, 100.00, 'ml', 'leite')");
+VALUES (8106, NULL, 'Leite Desnatado TACO', 'Laticínios', 'TACO', 35.00, 3.40, 5.00, 0.10, 0.00, 100.00, 'ml', 'leite')");
 
 // Definir contexto do Tenant 1
 TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist', 'name' => 'Dra. Luiza']);
@@ -146,13 +146,13 @@ echo "\n--> [NI2-77] Testando alimentos, cálculo proporcional determinístico e
 
 // Adicionar itens ao Almoço (meal2Id)
 // Arroz Branco: 150g (128 kcal/100g -> 192 kcal, P: 3.75g, C: 42.15g, G: 0.3g, F: 2.4g)
-$itemArrozId = $service->addItem($meal2Id, 101, 150.0, 'g', 'Arroz branco cozido bem solto');
+$itemArrozId = $service->addItem($meal2Id, 8101, 150.0, 'g', 'Arroz branco cozido bem solto');
 
 // Feijão Carioca: 100g (76 kcal/100g -> 76 kcal, P: 4.8g, C: 13.6g, G: 0.5g, F: 8.5g)
-$itemFeijaoId = $service->addItem($meal2Id, 102, 100.0, 'g', 'Feijão temperado com alho e louro');
+$itemFeijaoId = $service->addItem($meal2Id, 8102, 100.0, 'g', 'Feijão temperado com alho e louro');
 
 // Peito de Frango: 120g (159 kcal/100g -> 190.8 kcal, P: 38.4g, C: 0.0g, G: 3.0g, F: 0.0g)
-$itemFrangoId = $service->addItem($meal2Id, 103, 120.0, 'g', 'Grelhado com azeite mínimo');
+$itemFrangoId = $service->addItem($meal2Id, 8103, 120.0, 'g', 'Grelhado com azeite mínimo');
 
 // Verificar se totais do plano foram recalculados em cascata
 $tree = $service->getPlanWithDetails($planId);
@@ -172,7 +172,7 @@ assertTest(abs((float)$treeUpdated['daily_energy_kcal'] - $newExpectedKcal) < 0.
 // Rejeição de quantidade negativa ou zero
 $caughtNegativeError = false;
 try {
-    $service->addItem($meal2Id, 101, -50.0, 'g');
+    $service->addItem($meal2Id, 8101, -50.0, 'g');
 } catch (InvalidArgumentException $e) {
     $caughtNegativeError = true;
 }
@@ -185,11 +185,11 @@ echo "\n--> [NI2-78] Testando substituições vinculadas e isolamento de consumo
 
 // Adicionar Batata Doce (104) como substituição para o Arroz Branco (itemArrozId)
 // 150g de arroz (~192 kcal) -> 200g de batata doce (77 * 2.0 = 154 kcal)
-$subBatataId = $service->addSubstitution($itemArrozId, 104, 200.0, 'g', 'Opção para variar o carboidrato do almoço');
+$subBatataId = $service->addSubstitution($itemArrozId, 8104, 200.0, 'g', 'Opção para variar o carboidrato do almoço');
 assertTest($subBatataId > 0, "Substituição vinculada ao item cadastrada com ID {$subBatataId}");
 
 // Adicionar Tilápia (105) como substituição para o Frango (itemFrangoId)
-$subPeixeId = $service->addSubstitution($itemFrangoId, 105, 160.0, 'g', 'Opção de peixe magro');
+$subPeixeId = $service->addSubstitution($itemFrangoId, 8105, 160.0, 'g', 'Opção de peixe magro');
 assertTest($subPeixeId > 0, "Substituição de proteína vinculada ao peito de frango");
 
 // Garantir que a substituição NÃO soma no total diário da refeição (consumo alternativo)
@@ -287,7 +287,7 @@ assertTest($patientPublished['version_number'] === 1, "Versão entregue ao pacie
 // Rascunho NÃO aparece para o paciente
 $draftPlanOnly = $service->createPlan($patientId, 1, 'Rascunho Secreto Não Publicado');
 $draftMealId = $service->addMeal($draftPlanOnly['plan_id'], 'Café Secreto');
-$service->addItem($draftMealId, 101, 100.0, 'g');
+$service->addItem($draftMealId, 8101, 100.0, 'g');
 
 $patientViewAfterDraft = $service->getPatientPublishedPlan($patientId);
 assertTest($patientViewAfterDraft['meal_plan_id'] === $planId, "Rascunhos são estritamente invisíveis ao paciente; plano publicado v1 mantido");
@@ -326,7 +326,7 @@ assertTest($hasClonedSubs, "Substituições vinculadas clonadas com precisão");
 
 // 5.3 Modificar o novo rascunho sem alterar o plano publicado original
 $firstMealNewDraft = $newTree['meals'][0]['id'];
-$service->addItem($firstMealNewDraft, 106, 200.0, 'ml', 'Leite desnatado adicionado ao novo rascunho');
+$service->addItem($firstMealNewDraft, 8106, 200.0, 'ml', 'Leite desnatado adicionado ao novo rascunho');
 
 $newTreeModified = $service->getPlanWithDetails($newDraftId);
 $origPlanPostCheck = $service->getPlanWithDetails($planId);

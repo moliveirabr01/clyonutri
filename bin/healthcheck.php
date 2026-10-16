@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // v10: script só de linha de comando
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use ClyoNutri\Core\Database\Connection;
@@ -88,10 +89,10 @@ if (file_exists($heartbeatFile)) {
 }
 
 // 5. E-mail transacional (recuperação de senha) e URL pública dos links
-$mailInfo = (new \ClyoNutri\Core\Mail\Mailer())->describe();
+$mailInfo = \ClyoNutri\Core\Mail\MailerFactory::describe();
 $mailProblems = $mailInfo['problems'];
 if (!$mailProblems && !$mailInfo['delivers']) {
-    $mailProblems[] = "MAIL_DRIVER={$mailInfo['driver']} não entrega e-mails (só grava em log)";
+    $mailProblems[] = "MAIL_DRIVER={$mailInfo['driver']} não entrega e-mails (só grava em log ou descarta)";
 }
 $checks['mail'] = [
     'status' => $mailProblems ? 'WARNING' : 'OK',

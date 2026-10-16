@@ -17,7 +17,7 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use ClyoNutri\Core\Mail\MailMessage;
-use ClyoNutri\Core\Mail\Mailer;
+use ClyoNutri\Core\Mail\MailerFactory;
 use ClyoNutri\Core\Security\Env;
 
 Env::load(__DIR__ . '/../.env');
@@ -29,8 +29,7 @@ if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
     exit(1);
 }
 
-$mailer = new Mailer();
-$info = $mailer->describe();
+$info = MailerFactory::describe();
 echo "Configuração de e-mail:\n";
 foreach (['driver', 'host', 'port', 'encryption', 'from'] as $k) {
     printf("  %-11s %s\n", $k, $info[$k] === null || $info[$k] === '' ? '(não definido)' : (string)$info[$k]);
@@ -45,11 +44,12 @@ if (!$info['delivers']) {
 
 try {
     $started = microtime(true);
-    $mailer->send(new MailMessage(
+    MailerFactory::fromEnv()->send(new MailMessage(
         $to,
+        '',
         'Teste de e-mail — ClyoNutri',
-        "Este é um teste de envio do ClyoNutri.\nSe você recebeu, a recuperação de senha por e-mail está pronta para funcionar.\n",
-        '<p>Este é um teste de envio do <strong>ClyoNutri</strong>.</p><p>Se você recebeu, a recuperação de senha por e-mail está pronta para funcionar.</p>'
+        '<p>Este é um teste de envio do <strong>ClyoNutri</strong>.</p><p>Se você recebeu, a recuperação de senha por e-mail está pronta para funcionar.</p>',
+        "Este é um teste de envio do ClyoNutri.\nSe você recebeu, a recuperação de senha por e-mail está pronta para funcionar.\n"
     ));
     printf("\n✓ Mensagem entregue ao servidor em %.1f s. Confira a caixa de entrada (e o spam) de %s.\n", microtime(true) - $started, $to);
 } catch (Throwable $e) {

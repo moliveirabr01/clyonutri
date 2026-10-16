@@ -11,22 +11,42 @@
     const validate = () => input.setCustomValidity(select.value ? '' : 'Selecione um alimento nos resultados da busca.');
     validate();
     let page = 1, timer, controller, sequence = 0, started = false, foods = [];
+    // NI2-415 (UX-03): fonte, tipo (catálogo x personalizado da clínica), categoria, composição por 100 g e código
+    const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const fmt = v => Number(v || 0).toLocaleString('pt-BR', {maximumFractionDigits: 1});
     function render() {
       results.replaceChildren();
+      const counts = {};
+      foods.forEach(food => { const k = norm(food.name); counts[k] = (counts[k] || 0) + 1; });
       foods.forEach(food => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'food-result';
         button.setAttribute('aria-pressed', String(select.value === String(food.id)));
-        const name = document.createElement('strong'), energy = document.createElement('span');
+        const name = document.createElement('strong'), meta = document.createElement('span'), energy = document.createElement('span');
         name.textContent = food.name;
-        energy.textContent = Number(food.energy_kcal).toLocaleString('pt-BR') + ' kcal por 100 g';
-        button.append(name, energy);
+        const origin = food.is_custom ? 'Personalizado da sua clínica' : ('Catálogo ' + (food.source || ''));
+        const badge = document.createElement('span'); badge.className = 'food-result__badge' + (food.is_custom ? ' food-result__badge--custom' : ''); badge.textContent = origin.trim();
+        meta.className = 'food-result__meta';
+        meta.textContent = [food.category, 'Código ' + food.id].filter(Boolean).join(' · ');
+        energy.textContent = fmt(food.energy_kcal) + ' kcal · P ' + fmt(food.protein_g) + ' g · C ' + fmt(food.carbohydrate_g) + ' g · G ' + fmt(food.lipid_g) + ' g por 100 g';
+        button.append(name, badge, meta, energy);
+        if (counts[norm(food.name)] > 1) {
+          const dup = document.createElement('span'); dup.className = 'food-result__dup';
+          dup.textContent = 'Nome repetido no catálogo: compare código e composição antes de escolher.';
+          button.append(dup);
+        }
+        button.setAttribute('aria-label', food.name + ', ' + origin + ', ' + meta.textContent + ', ' + energy.textContent + (counts[norm(food.name)] > 1 ? ', nome repetido no catálogo' : ''));
         button.addEventListener('click', () => {
           select.value = String(food.id); validate(); render();
-          chosen.textContent = 'Selecionado: ' + food.name; chosen.hidden = false;
+          chosen.textContent = 'Selecionado: ' + food.name + ' (' + origin.trim() + ', código ' + food.id + ')'; chosen.hidden = false;
         });
         results.append(button);
       });
     }
+    box.closest?.('form')?.addEventListener('clyo:discard', () => {
+      controller?.abort(); sequence++; page = 1; foods = []; started = false;
+      select.replaceChildren(new Option('Selecione um alimento', '')); chosen.hidden = true; next.hidden = true; retry.hidden = true;
+      render(); validate(); status.textContent = '';
+    });
     async function load(append = false) {
       started = true; next.hidden = true; retry.hidden = true;
       const seq = ++sequence; controller?.abort(); controller = new AbortController();
@@ -54,23 +74,10 @@
     retry.addEventListener('click', () => load(page > 1));
     input.addEventListener('keydown', event => { if (event.key === 'ArrowDown' && results.firstElementChild) { event.preventDefault(); results.firstElementChild.focus(); } });
   });
-  let trigger;
-  const close = modal => { modal.style.display = 'none'; trigger?.focus(); };
+  // NI2-417 (UX-05): os diálogos de alimento usam o componente compartilhado (clinical-journeys.js)
   window.openFoodDialog = id => {
-    trigger = document.activeElement;
-    const modal = document.getElementById(id); modal.style.display = 'flex'; modal.querySelector('[data-food-query]').focus();
+    const modal = window.ClyoDialog ? window.ClyoDialog.open(id) : document.getElementById(id);
+    if (!window.ClyoDialog) modal.style.display = 'flex';
+    setTimeout(() => modal.querySelector('[data-food-query]').focus(), 0);
   };
-  document.querySelectorAll('.food-dialog-overlay').forEach(modal => {
-    modal.querySelector('[data-food-close]').addEventListener('click', () => close(modal));
-    modal.addEventListener('click', event => { if (event.target === modal) close(modal); });
-    modal.addEventListener('keydown', event => {
-      if (event.key === 'Escape') { event.preventDefault(); close(modal); }
-      if (event.key === 'Tab') {
-        const focusable = [...modal.querySelectorAll('button, input, select, [tabindex]')].filter(el => !el.disabled && el.offsetParent !== null && el.type !== 'hidden');
-        const first = focusable[0], last = focusable.at(-1);
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-      }
-    });
-  });
 })();

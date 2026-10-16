@@ -208,7 +208,7 @@ class DashboardController
 
         $p = $profile['patient'];
         $consents = (new \ClyoNutri\Domain\Privacy\ConsentManagementService())->getConsentAuditTrail($id);
-        $title = 'Perfil 360 — ' . $p['name'];
+        $title = 'Perfil do paciente — ' . $p['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -225,6 +225,7 @@ class DashboardController
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
         $latestAnamnesis = $anamnesisService->getLatestAnamnesis($id);
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
+        $careStep = (new AppointmentService())->careStepForPatient($id);
 
         ob_start();
         ?>
@@ -246,7 +247,7 @@ class DashboardController
               <a href="/pacientes" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar para Pacientes</a>
             </div>
             <h1><?= htmlspecialchars($p['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Perfil Clínico 360 • Acompanhamento Longitudinal</p>
+            <p style="color: var(--neutral-gray-500);">Perfil do paciente • Histórico de acompanhamento</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <a href="/chat?patient_id=<?= $p['id'] ?>" class="btn btn-secondary">Conversar via Chat</a>
@@ -264,15 +265,62 @@ class DashboardController
             <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="btn btn-secondary">
               Antropometria ➔
             </a>
-            <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+            <button type="button" class="btn btn-primary" data-call="openAnthroModal">
               + Nova Avaliação
             </button>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-6);">
+        <?php
+          $stepApp = $careStep['appointment'];
+          $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
+        ?>
+        <?php /* NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. */ ?>
+        <section class="card cn-next-step" aria-labelledby="proximo-passo-titulo" data-testid="care-next-step" data-state="<?= htmlspecialchars($careStep['state']) ?>">
+          <div>
+            <h2 id="proximo-passo-titulo" style="font-size: 1.05rem; margin: 0 0 4px;">Próximo passo com <?= htmlspecialchars($p['name']) ?></h2>
+            <p style="margin: 0; color: var(--neutral-gray-600, #475569); font-size: 0.9rem;">
+              <?php if ($careStep['state'] === 'continue'): ?>Atendimento em andamento desde <?= htmlspecialchars($stepWhen) ?>. Continue de onde parou: anamnese, avaliação e plano ficam vinculados a este paciente.
+              <?php elseif ($careStep['state'] === 'start_today'): ?>Consulta agendada para hoje (<?= htmlspecialchars(date('H:i', strtotime($stepApp['scheduled_at']))) ?>). Ao iniciar, a consulta passa para "em andamento".
+              <?php elseif ($careStep['state'] === 'upcoming'): ?>Próxima consulta em <?= htmlspecialchars($stepWhen) ?>. Você pode revisar a anamnese e os planos antes do atendimento.
+              <?php else: ?>Nenhuma consulta agendada. Agende o atendimento para iniciar a sequência anamnese → avaliação → plano.
+              <?php endif; ?>
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <?php if ($careStep['state'] === 'continue'): ?>
+              <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>" data-testid="care-continue">Continuar atendimento</a>
+            <?php elseif ($careStep['state'] === 'start_today'): ?>
+              <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" style="margin: 0;" data-no-dirty data-confirm="<?= htmlspecialchars('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?', ENT_QUOTES) ?>">
+                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="status" value="in_progress">
+                <button type="submit" class="btn btn-primary" data-testid="care-start">Iniciar atendimento</button>
+              </form>
+            <?php elseif ($careStep['state'] === 'upcoming'): ?>
+              <a class="btn btn-secondary" href="/agenda?view=day&amp;date=<?= htmlspecialchars(substr($stepApp['scheduled_at'], 0, 10)) ?>">Ver na agenda</a>
+              <a class="btn btn-primary" href="/pacientes/<?= (int)$p['id'] ?>/anamnese">Revisar anamnese</a>
+            <?php else: ?>
+              <a class="btn btn-primary" href="/agenda?novo=1&amp;paciente=<?= (int)$p['id'] ?>" data-testid="care-schedule">Agendar atendimento</a>
+            <?php endif; ?>
+          </div>
+        </section>
+        <nav aria-label="Seções do perfil">
+          <ul class="cn-section-nav">
+            <li><a href="#secao-dados">Dados</a></li>
+            <li><a href="#secao-prontuario">Prontuário</a></li>
+            <li><a href="#secao-anamnese">Anamnese</a></li>
+            <li><a href="#secao-planos">Planos</a></li>
+            <li><a href="#secao-avaliacoes">Avaliações</a></li>
+            <li><a href="#patient-appointments">Consultas</a></li>
+            <li><a href="#patient-checkins">Check-ins</a></li>
+            <li><a href="#patient-finance">Financeiro</a></li>
+            <li><a href="#patient-consents">Privacidade</a></li>
+          </ul>
+        </nav>
+
+        <div class="cn-split">
           <!-- Coluna 1: Dados Cadastrais -->
-          <div class="card">
+          <div class="card" id="secao-dados">
             <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Dados Essenciais</h3>
             <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
             <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
@@ -289,10 +337,10 @@ class DashboardController
           <!-- Coluna 2: Prontuário, Anamnese, Avaliações e Planos -->
           <div>
             <!-- Card 1: Prontuário Eletrônico & Evoluções -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-prontuario" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
-                  <h3 style="margin: 0; display: inline-block;">Prontuário Longitudinal</h3>
+                  <h3 style="margin: 0; display: inline-block;">Prontuário</h3>
                   <?php if ($integrity['is_valid'] && (int)$integrity['total_records'] > 0): ?>
                     <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ <?= !empty($integrity['legacy_records']) ? 'Conteúdo e encadeamento verificados' : 'Integridade dos registros verificada' ?></span>
                   <?php elseif (!$integrity['is_valid']): ?>
@@ -332,7 +380,7 @@ class DashboardController
             </div>
 
             <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-anamnese" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <div>
                   <h3 style="margin: 0; display: inline-block;">Anamnese Nutricional</h3>
@@ -392,10 +440,10 @@ class DashboardController
             </div>
 
             <!-- Card 3: Planos Alimentares -->
-            <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card" id="secao-planos" style="margin-bottom: var(--space-6);">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-new-plan-p360').style.display='flex'" style="font-size: 0.8rem; padding: 3px 8px;">
+                <button type="button" class="btn btn-secondary" data-show="modal-new-plan-p360" style="font-size: 0.8rem; padding: 3px 8px;">
                   + Novo Plano
                 </button>
               </div>
@@ -420,23 +468,23 @@ class DashboardController
             </div>
 
             <!-- Modal Novo Plano para Paciente -->
-            <div id="modal-new-plan-p360" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-              <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div id="modal-new-plan-p360" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+              <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
                 <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Nova Prescrição Alimentar</h3>
                 <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;">Paciente: <strong><?= htmlspecialchars($p['name']) ?></strong></p>
                 <form method="POST" action="/planos/novo">
                   <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                   <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
                   <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título do Plano *</label>
-                    <input type="text" name="title" required placeholder="Ex: Plano Alimentar Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                    <label for="dc1-title" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título do Plano *</label>
+                    <input id="dc1-title" type="text" name="title" required placeholder="Ex: Plano Alimentar Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   </div>
                   <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Iniciais (Opcional)</label>
-                    <textarea name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                    <label for="dc2-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Iniciais (Opcional)</label>
+                    <textarea id="dc2-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
                   </div>
                   <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                    <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-plan-p360').style.display='none'">Cancelar</button>
+                    <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan-p360">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Abrir Editor</button>
                   </div>
                 </form>
@@ -444,7 +492,7 @@ class DashboardController
             </div>
 
             <!-- Card de Avaliações Antropométricas com Indicadores OMS -->
-            <div class="card">
+            <div class="card" id="secao-avaliacoes">
               <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0;">Avaliações Antropométricas (<?= count($assessments) ?>)</h3>
                 <a href="/pacientes/<?= $p['id'] ?>/antropometria" style="font-size: 0.85rem; color: var(--brand-copper-600); font-weight: 600; text-decoration: none;">Análise Completa ➔</a>
@@ -453,7 +501,7 @@ class DashboardController
               <?php if (empty($assessments)): ?>
                 <div style="text-align: center; padding: var(--space-6); color: var(--neutral-gray-500);">
                   <p>Nenhuma avaliação antropométrica registrada ainda para este paciente.</p>
-                  <button type="button" class="btn btn-secondary" onclick="openAnthroModal()" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
+                  <button type="button" class="btn btn-secondary" data-call="openAnthroModal" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
                 </div>
               <?php else: ?>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -525,11 +573,11 @@ class DashboardController
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
-        <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
-          <div class="modal-dialog" style="max-width: 650px;">
+        <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
+          <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
               <h3>Nova Avaliação Antropométrica</h3>
-              <button class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
             <form method="POST" action="/pacientes/<?= $p['id'] ?>/antropometria">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -613,14 +661,14 @@ class DashboardController
               </div>
 
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openAnthroModal() {
             document.getElementById('anthroModal').classList.add('active');
             document.getElementById('ant_weight').focus();
@@ -705,12 +753,12 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Análise longitudinal de indicadores, composição corporal e comparativo clínico.</p>
+            <p style="color: var(--neutral-gray-500);">Evolução dos indicadores, composição corporal e comparação entre avaliações.</p>
           </div>
-          <button type="button" class="btn btn-primary" onclick="openAnthroModal()">
+          <button type="button" class="btn btn-primary" data-call="openAnthroModal">
             + Nova Avaliação
           </button>
         </div>
@@ -783,8 +831,8 @@ class DashboardController
           <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <h3>Série Histórica Ponto a Ponto</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
-              <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
-              <select aria-label="Medida da evolução antropométrica" onchange="location.href='/pacientes/<?= $patient['id'] ?>/antropometria?metric='+this.value" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
+              <label for="dc3-campo" style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
+              <select id="dc3-campo" aria-label="Medida da evolução antropométrica" data-nav-prefix="/pacientes/<?= (int)$patient['id'] ?>/antropometria?metric=" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
                 <option value="weight_kg" <?= $metric === 'weight_kg' ? 'selected' : '' ?>>Peso Corporal (kg)</option>
                 <option value="bmi" <?= $metric === 'bmi' ? 'selected' : '' ?>>IMC (kg/m²)</option>
                 <option value="waist_cm" <?= $metric === 'waist_cm' ? 'selected' : '' ?>>Cintura (cm)</option>
@@ -991,11 +1039,11 @@ class DashboardController
         </div>
 
         <!-- Modal Nova Avaliação Antropométrica -->
-        <div id="anthroModal" class="modal-overlay" onclick="if(event.target === this) closeAnthroModal()">
-          <div class="modal-dialog" style="max-width: 650px;">
+        <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
+          <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
             <div class="modal-header">
               <h3>Nova Avaliação Antropométrica</h3>
-              <button class="modal-close" onclick="closeAnthroModal()" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
             <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
@@ -1079,14 +1127,14 @@ class DashboardController
               </div>
 
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAnthroModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openAnthroModal() {
             document.getElementById('anthroModal').classList.add('active');
             document.getElementById('ant_weight').focus();
@@ -1228,7 +1276,7 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Prontuário Eletrônico & Evolução Clínica</h1>
             <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico de registros clínicos</p>
@@ -1245,7 +1293,7 @@ class DashboardController
             <a href="/pacientes/<?= $patient['id'] ?>/anamnese" class="btn btn-secondary">
               Ver Anamnese ➔
             </a>
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+            <button type="button" class="btn btn-primary" data-show="modal-new-record">
               + Nova Evolução / Anotação
             </button>
           </div>
@@ -1321,7 +1369,7 @@ class DashboardController
           <?php if (empty($timeline)): ?>
             <div style="text-align: center; padding: 32px; color: #64748B;">
               <p>Nenhuma entrada clínica registrada ainda neste prontuário.</p>
-              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-new-record').style.display='flex'">
+              <button type="button" class="btn btn-primary" data-show="modal-new-record">
                 Registrar Primeira Evolução
               </button>
             </div>
@@ -1346,7 +1394,7 @@ class DashboardController
                       </div>
                     </div>
                     <?php if (!$rec['is_retracted']): ?>
-                      <button type="button" class="btn btn-sm btn-outline" onclick="openRevisionModal(<?= $rec['id'] ?>, '<?= htmlspecialchars(addslashes($rec['title'])) ?>')" style="font-size: 0.75rem; padding: 3px 8px;">
+                      <button type="button" class="btn btn-sm btn-outline" data-call="openRevisionModal" data-args="[<?= $rec['id'] ?>, <?= htmlspecialchars(json_encode((string)$rec['title'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="font-size: 0.75rem; padding: 3px 8px;">
                         Retificar Formalmente (v<?= $rec['version'] + 1 ?>)
                       </button>
                     <?php endif; ?>
@@ -1395,19 +1443,19 @@ class DashboardController
         </div>
 
         <!-- Modal Nova Evolução / Observação Clínica -->
-        <div id="modal-new-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div id="modal-new-record" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Adicionar Entrada ao Prontuário</h3>
             <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">O registro será datado, assinado pelo profissional e preservado com garantia de autenticidade digital.</p>
             <form method="POST" action="/pacientes/<?= $patient['id'] ?>/prontuario">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Título da Entrada *</label>
-                <input type="text" name="title" required placeholder="Ex: Evolução Clínica de Retorno, Intercorrência, Orientação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc4-title" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Título da Entrada *</label>
+                <input id="dc4-title" type="text" name="title" required placeholder="Ex: Evolução Clínica de Retorno, Intercorrência, Orientação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Categoria</label>
-                <select name="category" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc5-category" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Categoria</label>
+                <select id="dc5-category" name="category" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="evolucao">Evolução Clínica / Atendimento</option>
                   <option value="observacao">Observação Clínica Geral</option>
                   <option value="retorno">Consulta de Retorno</option>
@@ -1415,11 +1463,11 @@ class DashboardController
                 </select>
               </div>
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Conteúdo / Conduta Nutricional (Máx. 10.000 caracteres) *</label>
-                <textarea name="content_text" required rows="6" maxlength="10000" placeholder="Descreva os achados, relato do paciente, metas nutricionais e conduta estabelecida..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
+                <label for="dc6-content_text" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Conteúdo / Conduta Nutricional (Máx. 10.000 caracteres) *</label>
+                <textarea id="dc6-content_text" name="content_text" required rows="6" maxlength="10000" placeholder="Descreva os achados, relato do paciente, metas nutricionais e conduta estabelecida..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-record').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-record">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Assinar & Gravar no Prontuário</button>
               </div>
             </form>
@@ -1427,8 +1475,8 @@ class DashboardController
         </div>
 
         <!-- Modal Retificação Formal Versionada -->
-        <div id="modal-revise-record" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div id="modal-revise-record" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Retificação Formal de Registro Clínico</h3>
             <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">
               Conforme as normas do CFN e integridade médica, o registro anterior será marcado como superado, mas permanecerá preservado no histórico. Uma nova versão será gravada com a justificativa obrigatória.
@@ -1436,22 +1484,22 @@ class DashboardController
             <form id="form-revise-record" method="POST" action="">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Justificativa Formal da Retificação (Mín. 10 caracteres) *</label>
-                <input type="text" name="revision_reason" minlength="10" required placeholder="Ex: Correção de digitação no percentual de gordura acordado..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc7-revision_reason" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Justificativa Formal da Retificação (Mín. 10 caracteres) *</label>
+                <input id="dc7-revision_reason" type="text" name="revision_reason" minlength="10" required placeholder="Ex: Correção de digitação no percentual de gordura acordado..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Novo Texto Corrigido *</label>
-                <textarea name="revised_text" required rows="6" maxlength="10000" placeholder="Insira o texto retificado e atualizado para este atendimento..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
+                <label for="dc8-revised_text" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Novo Texto Corrigido *</label>
+                <textarea id="dc8-revised_text" name="revised_text" required rows="6" maxlength="10000" placeholder="Insira o texto retificado e atualizado para este atendimento..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-revise-record').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-revise-record">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="background: #D97706; border-color: #D97706;">Publicar Retificação Versionada</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openRevisionModal(recId, title) {
             var form = document.getElementById('form-revise-record');
             form.action = '/pacientes/<?= $patient['id'] ?>/prontuario/' + recId + '/retificar';
@@ -1696,7 +1744,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div role="status" aria-live="polite" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ Anamnese gravada com sucesso! Nova versão versionada e preservada no histórico longitudinal.
+            ✓ Anamnese salva. As versões anteriores continuam disponíveis no histórico.
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -1708,10 +1756,10 @@ class DashboardController
         <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao Perfil 360</a>
+              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
             </div>
             <h1>Anamnese Nutricional Estruturada</h1>
-            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Coleta clínica versionada e imutável</p>
+            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Cada conclusão gera uma nova versão; as anteriores ficam no histórico</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
@@ -1782,8 +1830,22 @@ class DashboardController
             <?php endif; ?>
           </div>
 
-          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese">
+          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese" id="anamnesis-form" aria-describedby="anamnesis-progress">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+            <?php /* NI2-420 (UX-08): índice acessível das seções; não impõe ordem clínica */ ?>
+            <nav class="cn-anamnesis-index" aria-label="Seções da anamnese">
+              <p id="anamnesis-progress" role="status" aria-live="polite" style="margin: 0 0 6px; font-size: 0.8rem; color: #475569;"></p>
+              <ol>
+                <li><a href="#sec-objetivos" data-sec="objectives">Objetivos</a></li>
+                <li><a href="#sec-alergias" data-sec="allergy_assessment,allergies">Alergias</a></li>
+                <li><a href="#sec-restricoes" data-sec="restrictions">Restrições</a></li>
+                <li><a href="#sec-preferencias" data-sec="food_preferences">Preferências</a></li>
+                <li><a href="#sec-sintomas" data-sec="symptoms">Sintomas</a></li>
+                <li><a href="#sec-rotina" data-sec="routine,habits">Rotina e hábitos</a></li>
+                <li><a href="#sec-historico" data-sec="clinical_history,water_intake_ml">Histórico e hidratação</a></li>
+                <li><a href="#sec-notas" data-sec="notes">Notas e conduta</a></li>
+              </ol>
+            </nav>
             <?php if ($revisionFrom): ?>
               <input type="hidden" name="revision_from" value="<?= (int)$revisionFrom['version'] ?>">
               <p role="status">Esta gravação criará uma nova versão. A versão de origem será preservada.</p>
@@ -1792,7 +1854,7 @@ class DashboardController
             <?php endif; ?>
 
             <!-- 1. Objetivos & Metas -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-objetivos" style="margin-bottom: 16px;">
               <label for="anamnesis_objectives" id="label_anamnesis_objectives" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 1. Objetivos & Metas do Paciente
               </label>
@@ -1802,8 +1864,8 @@ class DashboardController
             <!-- 2. Alergias & Restrições (Crítico para Prescrição) -->
             <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
+              <div class="cn-form-grid">
+                <div id="sec-alergias" style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
                   <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #B91C1C;">
                     ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
                   </label>
@@ -1816,7 +1878,7 @@ class DashboardController
                   <textarea id="anamnesis_allergies" name="allergies" aria-labelledby="label_anamnesis_allergies" aria-describedby="anamnesis_allergies_help" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
                   <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
                 </div>
-                <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
+                <div id="sec-restricoes" style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
                   <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #92400E;">
                     ⚠️ 3. Restrições Alimentares & Intolerâncias
                   </label>
@@ -1827,7 +1889,7 @@ class DashboardController
             </fieldset>
 
             <!-- 3. Preferências & Aversões -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-preferencias" style="margin-bottom: 16px;">
               <label for="anamnesis_food_preferences" id="label_anamnesis_food_preferences" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 4. Preferências Alimentares & Aversões
               </label>
@@ -1835,7 +1897,7 @@ class DashboardController
             </div>
 
             <!-- 4. Sinais & Sintomas Clínicos -->
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" id="sec-sintomas" style="margin-bottom: 16px;">
               <label for="anamnesis_symptoms" id="label_anamnesis_symptoms" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 5. Sinais & Sintomas Gastrointestinais / Gerais
               </label>
@@ -1843,9 +1905,9 @@ class DashboardController
             </div>
 
             <!-- 5. Rotina & Hábitos -->
-            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <fieldset id="sec-rotina" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Rotina Diária & Hábitos de Vida</legend>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="cn-form-grid">
                 <div class="form-group">
                   <label for="anamnesis_routine" id="label_anamnesis_routine" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                     6. Rotina Diária & Horários
@@ -1862,7 +1924,7 @@ class DashboardController
             </fieldset>
 
             <!-- 6. Histórico Clínico & Hidratação -->
-            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <fieldset id="sec-historico" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Histórico Clínico & Meta Hídrica Prescrita</legend>
               <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
                 <div class="form-group">
@@ -1882,23 +1944,51 @@ class DashboardController
             </fieldset>
 
             <!-- 7. Anotações Adicionais -->
-            <div class="form-group" style="margin-bottom: 24px;">
+            <div class="form-group" id="sec-notas" style="margin-bottom: 24px;">
               <label for="anamnesis_notes" id="label_anamnesis_notes" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
                 10. Notas & Conduta Inicial do Nutricionista
               </label>
               <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
             </div>
 
-            <!-- Botões de Ação com Suporte a Rascunho Parcial -->
-            <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--neutral-gray-200); padding-top: 16px;">
-              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;">
-                Salvar como Rascunho Parcial
+            <?php /* NI2-420 (UX-08) / NI2-419 (UX-07): barra de ações sempre alcançável, com estado de salvamento */ ?>
+            <div class="cn-sticky-actions" role="group" aria-label="Salvar anamnese">
+              <p class="cn-sticky-actions__status" id="anamnesis-save-status" aria-live="polite">
+                <?php if ($latest): ?>Última gravação: v<?= (int)$latest['version'] ?> <?= !empty($latest['is_draft']) ? '(rascunho)' : '(concluída)' ?> em <?= date('d/m/Y H:i', strtotime($latest['created_at'])) ?>.<?php else: ?>Nada salvo ainda para este paciente.<?php endif; ?>
+              </p>
+              <span id="anamnesis-actions-help" class="sr-only">Salvar rascunho guarda a coleta parcial para continuar depois. Concluir anamnese registra uma nova versão; as versões anteriores continuam no histórico.</span>
+              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;" aria-describedby="anamnesis-actions-help">
+                Salvar rascunho
               </button>
-              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
-                Finalizar & Gerar Nova Versão Imutável
+              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;" aria-describedby="anamnesis-actions-help">
+                Concluir anamnese
               </button>
+              <p style="flex-basis: 100%; margin: 0; text-align: right; font-size: 0.75rem; color: #64748B;">Concluir registra uma nova versão. As versões anteriores continuam no histórico.</p>
             </div>
           </form>
+          <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
+          (() => {
+            const form = document.getElementById('anamnesis-form'); if (!form) return;
+            const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status'), initial = status.textContent.trim();
+            const assessLabel = {not_assessed: 'não avaliado', denied: 'nega alergias', recorded: 'alergia registrada'};
+            const update = () => {
+              let filled = 0; const links = [...form.querySelectorAll('.cn-anamnesis-index a[data-sec]')];
+              links.forEach(a => {
+                const names = a.dataset.sec.split(','), isAllergy = names.includes('allergy_assessment');
+                const has = names.some(n => { const el = form.elements[n]; return el && el.value.trim() !== '' && !(n === 'allergy_assessment' && el.value === 'not_assessed'); });
+                a.dataset.filled = String(has); if (has) filled++;
+                const base = a.textContent.replace(/ \(.*\)$/, '');
+                a.textContent = isAllergy ? base + ' (' + (assessLabel[form.elements.allergy_assessment?.value] || 'não avaliado') + ')' : base;
+                a.setAttribute('aria-label', a.textContent + (isAllergy ? '' : (has ? ', com conteúdo' : ', sem conteúdo')));
+              });
+              progress.textContent = filled + ' de ' + links.length + ' seções com conteúdo. Seção vazia significa "não registrado", não negação.';
+              const dirty = window.ClyoForms ? window.ClyoForms.isDirty(form) : false;
+              status.textContent = dirty ? 'Alterações não salvas. ' + initial : initial;
+            };
+            form.addEventListener('input', update); form.addEventListener('change', update); update();
+            window.addEventListener('load', update);
+          })();
+          </script>
         </div>
 
         <?php endif; ?>
@@ -2269,11 +2359,13 @@ class DashboardController
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
               <?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?>
             </span>
+            <?php if (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($app['type'] ?? null)): /* NI2-221 F19: só consulta online */ ?>
             <a href="/teleconsulta/sessao-agenda/<?= (int)$app['id'] ?>" class="btn btn-primary" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
               <span>Consultório Online</span>
             </a>
+            <?php endif; ?>
             <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
-              Ver Perfil 360 ↗
+              Ver perfil do paciente ↗
             </a>
           </div>
         </div>
@@ -2371,12 +2463,12 @@ class DashboardController
                   </h4>
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
                     <div>
-                      <label style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Peso Atual (kg)</label>
-                      <input type="number" step="0.1" name="weight_kg" placeholder="Ex: 68.5" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                      <label for="dc9-weight_kg" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Peso Atual (kg)</label>
+                      <input id="dc9-weight_kg" type="number" step="0.1" name="weight_kg" placeholder="Ex: 68.5" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     </div>
                     <div>
-                      <label style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Circunf. Cintura (cm)</label>
-                      <input type="number" step="0.5" name="waist_cm" placeholder="Ex: 78.0" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                      <label for="dc10-waist_cm" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Circunf. Cintura (cm)</label>
+                      <input id="dc10-waist_cm" type="number" step="0.5" name="waist_cm" placeholder="Ex: 78.0" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     </div>
                   </div>
                 </div>
@@ -2494,10 +2586,13 @@ class DashboardController
             $this->scheduleError(400, 'Data inválida. Selecione uma data existente no formato AAAA-MM-DD.', 'agenda');
             return;
         }
-        $view = $_GET['view'] ?? 'day';
+        $view = ($_GET['view'] ?? 'day') === 'week' ? 'week' : 'day';
 
-        $prevDate = date('Y-m-d', strtotime($currentDate . ' -1 day'));
-        $nextDate = date('Y-m-d', strtotime($currentDate . ' +1 day'));
+        // NI2-413 (UX-01): passo de navegação depende da visão (7 dias na semanal, 1 na diária)
+        $todayDate = $appointmentService->todayDate();
+        $nav = \ClyoNutri\Core\Time\AgendaNavigation::forView($view, $currentDate, $todayDate);
+        $prevDate = $nav['prev'];
+        $nextDate = $nav['next'];
 
         try {
             if ($view === 'week') {
@@ -2530,7 +2625,7 @@ class DashboardController
         <?php endif; ?>
         <?php if (!empty($_GET['status_updated'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ Status da consulta atualizado com sucesso no histórico de auditoria!
+            ✓ Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -2551,12 +2646,14 @@ class DashboardController
           <div class="agenda-controls-layout" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <!-- Navegação por Data -->
             <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
-              <a href="/agenda?view=<?= $view ?>&date=<?= $prevDate ?>" class="btn btn-secondary" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;">←</a>
-              <a href="/agenda?view=<?= $view ?>&date=<?= date('Y-m-d') ?>" class="btn btn-secondary" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px; font-weight: 600;">Hoje</a>
-              <a href="/agenda?view=<?= $view ?>&date=<?= $nextDate ?>" class="btn btn-secondary" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;">→</a>
+              <a href="/agenda?view=<?= $view ?>&date=<?= $prevDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['prev_label']) ?>" title="<?= htmlspecialchars($nav['prev_label']) ?>" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;"><span aria-hidden="true">←</span></a>
+              <a href="/agenda?view=<?= $view ?>&date=<?= $todayDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['today_label']) ?>" <?= $nav['is_current'] ? 'aria-current="date"' : '' ?> style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px; font-weight: 600;">Hoje</a>
+              <a href="/agenda?view=<?= $view ?>&date=<?= $nextDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['next_label']) ?>" title="<?= htmlspecialchars($nav['next_label']) ?>" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;"><span aria-hidden="true">→</span></a>
             </div>
+            <span class="sr-only" role="status" id="agenda-period"><?= htmlspecialchars($nav['period_label']) ?></span>
 
-            <input type="date" value="<?= $currentDate ?>" onchange="location.href='/agenda?view=<?= $view ?>&date='+this.value" style="padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem; background: #fff;">
+            <label class="sr-only" for="agenda-date-picker">Ir para a data</label>
+            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" data-nav-prefix="/agenda?view=<?= $view ?>&date=" style="padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem; background: #fff;">
 
             <!-- Alternância de Visão Dia / Semana -->
             <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
@@ -2565,40 +2662,41 @@ class DashboardController
             </div>
 
             <!-- Botão Novo Agendamento -->
-            <button type="button" onclick="var m = document.getElementById('card-novo-agendamento'); m.style.display = m.style.display === 'none' ? 'block' : 'none';" class="btn btn-accent" style="min-height: 38px;">
+            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-accent" style="min-height: 38px;">
               + Nova Consulta
             </button>
           </div>
         </div>
 
         <!-- Formulário Retrátil de Novo Agendamento -->
-        <div id="card-novo-agendamento" class="card" style="display: none; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
+        <?php $prefillPatient = (isset($_GET['paciente']) && ctype_digit((string)$_GET['paciente'])) ? (int)$_GET['paciente'] : 0; $openNew = ($_GET['novo'] ?? '') === '1'; ?>
+        <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: <?= $openNew ? 'block' : 'none' ?>; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
           <div class="card__header">
             <h3>Agendar Nova Consulta</h3>
-            <button type="button" onclick="document.getElementById('card-novo-agendamento').style.display='none'" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
+            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
           </div>
           <form action="/agenda" method="POST" style="margin-top: 16px;">
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
               <div>
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Paciente *</label>
-                <select name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc11-patient_id" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Paciente *</label>
+                <select id="dc11-patient_id" name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o paciente...</option>
                   <?php foreach ($patients as $pt): ?>
-                    <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['name']) ?></option>
+                    <option value="<?= $pt['id'] ?>" <?= ((int)$pt['id'] === $prefillPatient) ? 'selected' : '' ?>><?= htmlspecialchars($pt['name']) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
 
               <div>
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Data e Horário *</label>
-                <input type="datetime-local" name="scheduled_at" required value="<?= $currentDate ?>T09:00" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc12-scheduled_at" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Data e Horário *</label>
+                <input id="dc12-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= $currentDate ?>T09:00" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
 
               <div>
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
-                <select name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc13-duration_minutes" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
+                <select id="dc13-duration_minutes" name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <?php $durationChoices=array_unique([30,45,60,90,120,$defaultDuration]);sort($durationChoices);foreach($durationChoices as $minutes): ?>
                   <option value="<?= $minutes ?>" <?= $minutes===$defaultDuration?'selected':'' ?>><?= $minutes ?> minutos<?= $minutes===$defaultDuration?' (Padrão)':'' ?></option>
                   <?php endforeach; ?>
@@ -2606,8 +2704,8 @@ class DashboardController
               </div>
 
               <div>
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Tipo de Atendimento</label>
-                <select name="type" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc14-type" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Tipo de Atendimento</label>
+                <select id="dc14-type" name="type" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="first_visit">Primeira Consulta / Anamnese</option>
                   <option value="follow_up">Retorno / Acompanhamento</option>
                   <option value="telehealth">Teleconsulta</option>
@@ -2616,8 +2714,8 @@ class DashboardController
             </div>
 
             <div style="margin-bottom: 16px;">
-              <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Observações</label>
-              <textarea name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              <label for="dc15-notes" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Observações</label>
+              <textarea id="dc15-notes" name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: 12px;">
@@ -2627,7 +2725,7 @@ class DashboardController
               </label>
 
               <div style="display: flex; gap: 8px;">
-                <button type="button" onclick="document.getElementById('card-novo-agendamento').style.display='none'" class="btn btn-secondary">Cancelar</button>
+                <button type="button" data-dialog-close data-hide="card-novo-agendamento" class="btn btn-secondary">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Confirmar Agendamento</button>
               </div>
             </div>
@@ -2701,12 +2799,12 @@ class DashboardController
 
                             <!-- Menu de Estados da Consulta -->
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Deseja marcar como Não Compareceu?');">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Deseja marcar como Não Compareceu?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="no_show">
                                 <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #DC2626;" title="Não compareceu">Não compareceu</button>
                               </form>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" onsubmit="return confirm('Confirmar cancelamento da consulta?');">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Confirmar cancelamento da consulta?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="cancelled">
                                 <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #64748B;" title="Cancelar consulta">Cancelar</button>
@@ -2732,7 +2830,7 @@ class DashboardController
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px;">
               <?php foreach ($weekData['days'] as $dayDate => $dayApps): ?>
                 <?php 
-                  $isToday = $dayDate === date('Y-m-d');
+                  $isToday = $dayDate === $todayDate;
                   $dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][date('w', strtotime($dayDate))];
                 ?>
                 <div style="background: <?= $isToday ? '#FFF4ED' : '#F8FAFC' ?>; border: 1px solid <?= $isToday ? 'var(--brand-copper-500)' : 'var(--neutral-gray-200)' ?>; border-radius: 8px; padding: 12px; min-height: 220px; display: flex; flex-direction: column;">
@@ -2816,9 +2914,9 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Prescrições e Planos Alimentares</h1>
-            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Editor por refeições, alimentos, substituições, totais nutricionais e versionamento imutável.</p>
+            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Monte refeições, alimentos e substituições e acompanhe os totais. Cada publicação gera uma nova versão; as anteriores ficam no histórico.</p>
           </div>
-          <button class="btn btn-primary" onclick="document.getElementById('modal-new-plan').style.display='flex'">
+          <button class="btn btn-primary" data-show="modal-new-plan">
             + Novo Plano Alimentar
           </button>
         </div>
@@ -2881,7 +2979,7 @@ class DashboardController
                         <a href="/planos/<?= $pl['id'] ?>" class="btn btn-sm btn-outline" style="text-decoration: none; padding: 4px 10px; font-size: 0.8rem; margin-right: 4px;">
                           <?= $pl['status'] === 'draft' ? 'Editar' : 'Visualizar' ?>
                         </a>
-                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" onsubmit="return confirm('Deseja duplicar este plano para um novo rascunho?');">
+                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" data-confirm="Deseja duplicar este plano para um novo rascunho?">
                           <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                           <button type="submit" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Duplicar</button>
                         </form>
@@ -2895,14 +2993,14 @@ class DashboardController
         </div>
 
         <!-- Modal Novo Plano -->
-        <div id="modal-new-plan" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Criar Novo Plano Alimentar</h2>
+        <div id="modal-new-plan" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Novo plano alimentar</h2>
             <form method="POST" action="/planos/novo">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Paciente *</label>
-                <select name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc16-patient_id" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Paciente *</label>
+                <select id="dc16-patient_id" name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                   <option value="">Selecione o paciente...</option>
                   <?php foreach ($patients as $p): ?>
                     <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
@@ -2910,15 +3008,15 @@ class DashboardController
                 </select>
               </div>
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título da Prescrição *</label>
-                <input type="text" name="title" required placeholder="Ex: Plano Hipertrofia Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc17-title" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título da Prescrição *</label>
+                <input id="dc17-title" type="text" name="title" required placeholder="Ex: Plano Hipertrofia Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Gerais do Plano (Opcional)</label>
-                <textarea name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                <label for="dc18-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Gerais do Plano (Opcional)</label>
+                <textarea id="dc18-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-new-plan').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Iniciar Prescrição</button>
               </div>
             </form>
@@ -3003,7 +3101,7 @@ class DashboardController
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
               <a href="/planos" style="text-decoration: none; color: #475569; font-size: 0.9rem;">← Voltar para lista</a>
               <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#def7ec' ?>; color: <?= $isDraft ? '#854d0e' : '#03543f' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
-                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (Imutável v' . (int)$plan['version'] . ')' ?>
+                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (versão ' . (int)$plan['version'] . ', somente leitura)' ?>
               </span>
             </div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;"><?= htmlspecialchars($plan['title']) ?></h1>
@@ -3012,13 +3110,13 @@ class DashboardController
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a href="/planos/<?= (int)$planId ?>/imprimir" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">Imprimir plano</a>
             <?php if ($canEditItems): ?>
-            <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
+            <form method="POST" action="/planos/<?= $planId ?>/duplicar" data-confirm="Deseja criar um novo rascunho a partir deste plano?">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;"><?= $isDraft ? 'Duplicar como Rascunho' : 'Criar nova versão para editar' ?></button>
             </form>
             <?php endif; ?>
             <?php if ($isDraft): ?>
-              <button class="btn btn-primary" onclick="document.getElementById('modal-publish-plan').style.display='flex'">
+              <button class="btn btn-primary" data-show="modal-publish-plan">
                 Revisar & Publicar
               </button>
             <?php endif; ?>
@@ -3127,7 +3225,7 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Refeições do Dia</h2>
           <?php if ($isDraft): ?>
-            <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-add-meal').style.display='flex'">
+            <button class="btn btn-sm btn-outline" data-show="modal-add-meal">
               + Adicionar Refeição
             </button>
           <?php endif; ?>
@@ -3137,7 +3235,7 @@ class DashboardController
           <div class="card" style="padding: 32px; text-align: center; color: #64748b;">
             <p style="margin-bottom: 12px;">Nenhuma refeição adicionada a esta prescrição.</p>
             <?php if ($isDraft): ?>
-              <button class="btn btn-primary" onclick="document.getElementById('modal-add-meal').style.display='flex'">Adicionar Primeira Refeição</button>
+              <button class="btn btn-primary" data-show="modal-add-meal">Adicionar Primeira Refeição</button>
             <?php endif; ?>
           </div>
         <?php else: ?>
@@ -3156,8 +3254,8 @@ class DashboardController
                     <strong><?= number_format((float)$m['totals']['energy_kcal'], 0) ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1) ?>g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1) ?>g | G: <?= number_format((float)$m['totals']['lipid_g'], 1) ?>g
                   </span>
                   <?php if ($isDraft): ?>
-                    <button class="btn btn-sm btn-outline" onclick="openAddItemModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>')" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
-                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Deseja excluir esta refeição e seus itens?');">
+                    <button class="btn btn-sm btn-outline" data-call="openAddItemModal" data-args="[<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
+                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" data-confirm="Deseja excluir esta refeição e seus itens?">
                       <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                       <button type="submit" class="btn btn-sm" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
                     </form>
@@ -3196,10 +3294,10 @@ class DashboardController
                           </td>
                           <td style="padding: 12px 20px; text-align: right; width: 15%;">
                             <?php if ($isDraft): ?>
-                              <button class="btn btn-sm btn-outline" onclick="openAddSubModal(<?= $it['id'] ?>, '<?= htmlspecialchars(addslashes($it['food_name'])) ?>')" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
+                              <button class="btn btn-sm btn-outline" data-call="openAddSubModal" data-args="[<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
                                 + Substituição
                               </button>
-                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover este alimento?');">
+                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" data-confirm="Remover este alimento?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <button type="submit" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
                               </form>
@@ -3211,7 +3309,7 @@ class DashboardController
                         <tr><td colspan="4" style="padding: var(--space-3) var(--space-4);">
                           <details data-testid="edit-plan-item-<?= (int)$it['id'] ?>">
                             <summary style="cursor: pointer; color: var(--brand-navy-900); font-weight: 600;">Editar porção e orientação</summary>
-                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').textContent='Salvando…';">
+                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" data-busy-text="Salvando…">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
                               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);">
@@ -3220,7 +3318,7 @@ class DashboardController
                               </div>
                               <div class="form-group"><label class="form-label" for="item-notes-<?= (int)$it['id'] ?>">Orientação</label><textarea class="form-control" id="item-notes-<?= (int)$it['id'] ?>" name="notes"><?= htmlspecialchars($it['notes'] ?? '', ENT_QUOTES) ?></textarea></div>
                               <button type="submit" class="btn btn-primary">Salvar alterações</button>
-                              <button type="button" class="btn btn-secondary" onclick="this.form.reset(); this.closest('details').open=false">Cancelar</button>
+                              <button type="button" class="btn btn-secondary" data-reset-close-details>Cancelar</button>
                             </form>
                           </details>
                         </td></tr>
@@ -3247,7 +3345,7 @@ class DashboardController
                               </td>
                               <td style="padding: 8px 20px; text-align: right;">
                                 <?php if ($isDraft): ?>
-                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" onsubmit="return confirm('Remover substituição?');">
+                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" data-confirm="Remover substituição?">
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                     <button type="submit" style="color: #57534E; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
                                   </form>
@@ -3267,25 +3365,25 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Modal Adicionar Refeição -->
-        <div id="modal-add-meal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div id="modal-add-meal" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Adicionar Refeição</h2>
             <form method="POST" action="/planos/<?= $planId ?>/refeicoes">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
-                <input type="text" name="name" required placeholder="Ex: Café da Manhã, Almoço, Ceia" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc19-name" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
+                <input id="dc19-name" type="text" name="name" required placeholder="Ex: Café da Manhã, Almoço, Ceia" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Horário Sugerido (HH:MM)</label>
-                <input type="text" name="time_of_day" placeholder="Ex: 08:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc20-time_of_day" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Horário Sugerido (HH:MM)</label>
+                <input id="dc20-time_of_day" type="text" name="time_of_day" placeholder="Ex: 08:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Clínicas da Refeição</label>
-                <textarea name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                <label for="dc21-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Clínicas da Refeição</label>
+                <textarea id="dc21-notes" name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-add-meal').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-add-meal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Refeição</button>
               </div>
             </form>
@@ -3293,8 +3391,8 @@ class DashboardController
         </div>
 
         <!-- Modal Adicionar Alimento -->
-        <div id="modal-add-item" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-item-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="food-dialog-panel">
+        <div id="modal-add-item" data-dialog="modal" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-item-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel food-dialog-panel">
             <h2 id="modal-add-item-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar alimento</h2>
             <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/itens">
@@ -3318,12 +3416,12 @@ class DashboardController
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
-                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade *</label>
-                  <input type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc22-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade *</label>
+                  <input id="dc22-amount" type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                 </div>
                 <div>
-                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
-                  <select name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc23-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
+                  <select id="dc23-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     <option value="g">g (gramas)</option>
                     <option value="ml">ml (mililitros)</option>
                     <option value="colher de sopa">colher de sopa</option>
@@ -3335,11 +3433,11 @@ class DashboardController
                 </div>
               </div>
               <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Observação / Orientação do Item</label>
-                <input type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc24-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Observação / Orientação do Item</label>
+                <input id="dc24-notes" type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" data-food-close>Cancelar</button>
+                <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
                 <button type="submit" class="btn btn-primary">Adicionar ao Plano</button>
               </div>
             </form>
@@ -3347,8 +3445,8 @@ class DashboardController
         </div>
 
         <!-- Modal Adicionar Substituição -->
-        <div id="modal-add-sub" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-sub-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="food-dialog-panel">
+        <div id="modal-add-sub" data-dialog="modal" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-sub-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel food-dialog-panel">
             <h2 id="modal-add-sub-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar substituição</h2>
             <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
             <form method="POST" action="/planos/<?= $planId ?>/substituicoes">
@@ -3372,12 +3470,12 @@ class DashboardController
               </div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
-                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade Equivalente *</label>
-                  <input type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc25-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade Equivalente *</label>
+                  <input id="dc25-amount" type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                 </div>
                 <div>
-                  <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
-                  <select name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc26-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
+                  <select id="dc26-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     <option value="g">g (gramas)</option>
                     <option value="ml">ml (mililitros)</option>
                     <option value="colher de sopa">colher de sopa</option>
@@ -3389,11 +3487,11 @@ class DashboardController
                 </div>
               </div>
               <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientação da Substituição</label>
-                <input type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc27-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientação da Substituição</label>
+                <input id="dc27-notes" type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
               </div>
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" data-food-close>Cancelar</button>
+                <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Opção</button>
               </div>
             </form>
@@ -3401,11 +3499,11 @@ class DashboardController
         </div>
 
         <!-- Modal Publicar Versão -->
-        <div id="modal-publish-plan" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div id="modal-publish-plan" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">Revisar e Publicar Versão</h2>
             <p style="color: #475569; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
-              A publicação torna este plano a <strong>prescrição ativa e vigente</strong> para o paciente no aplicativo móvel. Um snapshot imutável será gravado com número de versão e registro de auditoria clínica.
+              Ao publicar, este plano passa a ser a <strong>prescrição ativa</strong> que o paciente vê no aplicativo. Ele vira uma nova versão numerada e não poderá mais ser editado; para mudar depois, crie uma cópia. As versões anteriores continuam no histórico.
             </p>
 
             <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
@@ -3434,7 +3532,7 @@ class DashboardController
               <?php endif; ?>
 
               <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-publish-plan').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-publish-plan">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Confirmar e Publicar Versão</button>
               </div>
             </form>
@@ -3442,7 +3540,7 @@ class DashboardController
         </div>
 
         <script src="/assets/js/food-picker.js" defer></script>
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
           document.getElementById('add-item-meal-name').innerText = 'Refeição: ' + mealName;
@@ -3628,7 +3726,7 @@ class DashboardController
 
         try {
             $res = $service->publishPlan($planId, $allowAllergenOverride, true);
-            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! Snapshot imutável gerado.";
+            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro na publicação: " . $e->getMessage();
         }
@@ -3720,7 +3818,7 @@ class DashboardController
             <p style="color: var(--neutral-gray-600); margin: 0;">Recebíveis de consultas, controle de honorários, baixas e emissão de recibos.</p>
           </div>
           <div>
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'" style="display: inline-flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel" style="display: inline-flex; align-items: center; gap: 8px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               <span>+ Novo Lançamento Financeiro</span>
             </button>
@@ -3782,7 +3880,7 @@ class DashboardController
               Os recebíveis financeiros representam honorários de consultas clínicas e planos de acompanhamento nutricional. Eles são gerados a partir dos agendamentos na agenda ou registrados manualmente aqui para qualquer paciente da sua clínica.
             </p>
             <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 32px;">
-              <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-novo-recebivel').style.display='flex'">
+              <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel">
                 + Novo Lançamento Financeiro
               </button>
               <a href="/agenda" class="btn btn-outline" style="text-decoration: none;">
@@ -3853,10 +3951,10 @@ class DashboardController
                         <?php if (in_array($rc['status'], ['pending', 'partially_paid'], true)): ?>
                           <div style="display: inline-flex; align-items: center; gap: 8px;">
                             <button type="button" class="btn btn-sm btn-outline" style="color: var(--semantic-success); border-color: var(--semantic-success);"
-                                    onclick="openPayModal(<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, '<?= htmlspecialchars(addslashes($rc['description'])) ?>')">
+                                    data-call="openPayModal" data-args="[<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, <?= htmlspecialchars(json_encode((string)$rc['description'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]">
                               Dar Baixa
                             </button>
-                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" onsubmit="return confirm('Deseja realmente cancelar este recebível?');">
+                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" data-confirm="Deseja realmente cancelar este recebível?">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <button type="submit" class="btn btn-sm" style="color: var(--neutral-gray-500); background: transparent; border: none; cursor: pointer; text-decoration: underline; font-size: 0.8rem;">
                                 Cancelar
@@ -3878,24 +3976,24 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Modal: Novo Lançamento Financeiro -->
-        <div id="modal-novo-recebivel" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
-          <div class="card" style="width: 100%; max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
+        <div id="modal-novo-recebivel" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+          <div class="cn-dialog__panel card" style="width: 100%; max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Novo Lançamento Financeiro</h3>
-              <button type="button" onclick="document.getElementById('modal-novo-recebivel').style.display='none'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+              <button type="button" data-dialog-close data-hide="modal-novo-recebivel" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
             </div>
             
             <form method="POST" action="/financeiro/recebiveis/novo">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Paciente *</label>
+                <label for="rcv-patient" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Paciente *</label>
                 <?php if (empty($patients)): ?>
                   <div style="padding: 10px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 6px; font-size: 0.85rem; color: #991b1b;">
                     Nenhum paciente ativo cadastrado nesta clínica. <a href="/pacientes/novo" style="font-weight: 600; color: #991b1b; text-decoration: underline;">Cadastre um paciente primeiro</a>.
                   </div>
                 <?php else: ?>
-                  <select name="patient_id" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <select id="rcv-patient" name="patient_id" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
                     <option value="">Selecione o paciente...</option>
                     <?php foreach ($patients as $p): ?>
                       <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['name']) ?><?= !empty($p['email']) ? ' (' . htmlspecialchars($p['email']) . ')' : '' ?></option>
@@ -3905,25 +4003,25 @@ class DashboardController
               </div>
 
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Descrição do Lançamento *</label>
-                <input type="text" name="description" required placeholder="Ex: Consulta Nutricional Inicial, Plano Trimestral" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                <label for="dc28-description" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Descrição do Lançamento *</label>
+                <input id="dc28-description" type="text" name="description" required placeholder="Ex: Consulta Nutricional Inicial, Plano Trimestral" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
               </div>
 
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
-                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor (R$) *</label>
-                  <input type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <label for="dc29-amount" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor (R$) *</label>
+                  <input id="dc29-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
                 </div>
                 <div>
-                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Data de Vencimento *</label>
-                  <input type="date" name="due_date" value="<?= date('Y-m-d') ?>" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <label for="dc30-due_date" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Data de Vencimento *</label>
+                  <input id="dc30-due_date" type="date" name="due_date" value="<?= date('Y-m-d') ?>" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
                 </div>
               </div>
 
               <?php if (!empty($appointments)): ?>
                 <div style="margin-bottom: 20px;">
-                  <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Vincular à Consulta (Opcional)</label>
-                  <select name="appointment_id" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <label for="dc31-appointment_id" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Vincular à Consulta (Opcional)</label>
+                  <select id="dc31-appointment_id" name="appointment_id" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
                     <option value="">Nenhuma consulta vinculada</option>
                     <?php foreach ($appointments as $a): ?>
                       <option value="<?= (int)$a['id'] ?>">#<?= (int)$a['id'] ?> - <?= htmlspecialchars($a['patient_name']) ?> (<?= date('d/m/Y H:i', strtotime($a['scheduled_at'])) ?>)</option>
@@ -3933,7 +4031,7 @@ class DashboardController
               <?php endif; ?>
 
               <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-novo-recebivel').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-novo-recebivel">Cancelar</button>
                 <button type="submit" class="btn btn-primary" <?= empty($patients) ? 'disabled' : '' ?>>Salvar Lançamento</button>
               </div>
             </form>
@@ -3941,11 +4039,11 @@ class DashboardController
         </div>
 
         <!-- Modal: Dar Baixa / Registrar Pagamento -->
-        <div id="modal-dar-baixa" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
-          <div class="card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
+        <div id="modal-dar-baixa" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+          <div class="cn-dialog__panel card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Dar Baixa no Recebível</h3>
-              <button type="button" onclick="document.getElementById('modal-dar-baixa').style.display='none'" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+              <button type="button" data-dialog-close data-hide="modal-dar-baixa" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
             </div>
             
             <form id="form-dar-baixa" method="POST" action="">
@@ -3957,8 +4055,8 @@ class DashboardController
               </div>
 
               <div style="margin-bottom: 16px;">
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Forma de Pagamento *</label>
-                <select name="payment_method" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                <label for="dc32-payment_method" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Forma de Pagamento *</label>
+                <select id="dc32-payment_method" name="payment_method" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
                   <option value="pix">PIX (Transferência Instantânea)</option>
                   <option value="credit_card">Cartão de Crédito</option>
                   <option value="debit_card">Cartão de Débito</option>
@@ -3968,19 +4066,19 @@ class DashboardController
               </div>
 
               <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor Recebido (R$) *</label>
+                <label for="pay-modal-amount" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor Recebido (R$) *</label>
                 <input id="pay-modal-amount" type="number" step="0.01" min="0.01" name="amount" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
               </div>
 
               <div style="display: flex; justify-content: flex-end; gap: 12px;">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-dar-baixa').style.display='none'">Cancelar</button>
+                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-dar-baixa">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #10b981); border-color: var(--semantic-success, #10b981);">Confirmar Recebimento</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openPayModal(id, amountCents, description) {
           var form = document.getElementById('form-dar-baixa');
           form.action = '/financeiro/recebiveis/' + id + '/pagar';
@@ -4217,7 +4315,7 @@ class DashboardController
             $onboardingPct = (int)round($onboardingDone / self::ONBOARDING_TOTAL_STEPS * 100);
         }
 
-        $title = 'Dashboard';
+        $title = 'Visão geral';
         $activeNav = 'dashboard';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -4258,8 +4356,50 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <!-- Cards de Métricas Consolidadas -->
-        <div class="dashboard-metrics">
+        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
+        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
+          <div class="card__header">
+            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
+            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
+          </div>
+          <?php if (empty($attentionItems)): ?>
+            <div class="attention-panel__empty">
+              <svg class="icon-inline icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>
+              Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
+            </div>
+          <?php else: ?>
+            <ul class="attention-list">
+              <?php foreach ($attentionVisible as $att): ?>
+                <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
+                  <div class="attention-item__text">
+                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge">
+                      <?= htmlspecialchars($att['title']) ?>
+                    </span>
+                    <span class="attention-item__description">
+                      <?= htmlspecialchars($att['description']) ?>
+                    </span>
+                  </div>
+                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
+                    <?= htmlspecialchars($att['action_label']) ?>
+                    <?= $arrowIcon ?>
+                  </a>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php if ($attentionHidden > 0): ?>
+              <div class="attention-panel__footer">
+                <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
+                <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
+                <?php if ($draftPatientsCount > 0): ?>
+                  <a href="/planos?status=draft" class="btn btn-outline btn-touch" data-testid="attention-see-all">Ver todos os rascunhos (<?= $draftPlansTotal ?>)</a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          <?php endif; ?>
+        </section>
+
+        <?php /* Cards de Métricas Consolidadas (NI2-421: depois das prioridades) */ ?>
+        <div class="dashboard-metrics cn-metrics-5" role="region" aria-label="Indicadores da clínica">
           <div class="card metric-card">
             <div class="metric-card__label">CONSULTAS HOJE</div>
             <div class="metric-card__value tabular-nums">
@@ -4316,48 +4456,6 @@ class DashboardController
             <?php endif; ?>
           </div>
         </div>
-
-        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
-        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
-          <div class="card__header">
-            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
-            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
-          </div>
-          <?php if (empty($attentionItems)): ?>
-            <div class="attention-panel__empty">
-              <svg class="icon-inline icon-success" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>
-              Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
-            </div>
-          <?php else: ?>
-            <ul class="attention-list">
-              <?php foreach ($attentionVisible as $att): ?>
-                <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
-                  <div class="attention-item__text">
-                    <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge">
-                      <?= htmlspecialchars($att['title']) ?>
-                    </span>
-                    <span class="attention-item__description">
-                      <?= htmlspecialchars($att['description']) ?>
-                    </span>
-                  </div>
-                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
-                    <?= htmlspecialchars($att['action_label']) ?>
-                    <?= $arrowIcon ?>
-                  </a>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-            <?php if ($attentionHidden > 0): ?>
-              <div class="attention-panel__footer">
-                <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
-                <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
-                <?php if ($draftPatientsCount > 0): ?>
-                  <a href="/planos?status=draft" class="btn btn-outline btn-touch" data-testid="attention-see-all">Ver todos os rascunhos (<?= $draftPlansTotal ?>)</a>
-                <?php endif; ?>
-              </div>
-            <?php endif; ?>
-          <?php endif; ?>
-        </section>
 
         <!-- Grid de Conteúdo Principal -->
         <div class="dashboard-main-grid">
@@ -4463,7 +4561,9 @@ class DashboardController
         $createdId = $_SESSION['patient_created_id'] ?? null;
         unset($_SESSION['patient_created_id']);
         $duplicateId = $_SESSION['patient_duplicate_id'] ?? null;
-        unset($_SESSION['patient_error'], $_SESSION['patient_duplicate_id']);
+        // NI2-414 (V4-UX-01): o preenchimento devolvido após erro é exibido uma única vez, junto com o erro.
+        // Se o usuário descartar, recarregar ou voltar depois, os dados não reaparecem como se fossem estado limpo.
+        unset($_SESSION['patient_error'], $_SESSION['patient_duplicate_id'], $_SESSION['patient_form']);
         $title = 'Pacientes';
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
@@ -4473,7 +4573,7 @@ class DashboardController
         ?>
         <?php if (!empty($_GET['success'])): ?>
           <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(24, 121, 78, 0.2);">
-            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado com sucesso! Prontuário e Perfil 360 iniciados.' ?>
+            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado. Próximo passo: abra o perfil para agendar ou iniciar o atendimento.' ?>
             <?php if ($createdId): ?><a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a><?php endif; ?>
           </div>
         <?php endif; ?>
@@ -4484,9 +4584,9 @@ class DashboardController
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
           <div>
             <h1>Gestão de Pacientes</h1>
-            <p style="color: var(--neutral-gray-500);">Acompanhamento longitudinal, Perfil 360 e prontuários.</p>
+            <p style="color: var(--neutral-gray-500);">Cadastro, histórico de acompanhamento e prontuários.</p>
           </div>
-          <button class="btn btn-primary" onclick="openPatientModal()">
+          <button type="button" class="btn btn-primary" aria-haspopup="dialog" aria-controls="patientModal" data-call="openPatientModal">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>Cadastrar Paciente</span>
           </button>
@@ -4551,7 +4651,7 @@ class DashboardController
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
                       <td><span class="badge <?= $p['status'] === 'active' ? 'badge-success' : 'badge-secondary' ?>"><?= ['active'=>'Ativo','inactive'=>'Inativo','anonymized'=>'Anonimizado'][$p['status']] ?? 'Não informado' ?></span></td>
                       <td>
-                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver Perfil 360</a>
+                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver perfil</a>
                         <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
                       </td>
                     </tr>
@@ -4568,18 +4668,18 @@ class DashboardController
           <span>Página <?= $listing['page'] ?> de <?= $listing['pages'] ?></span>
           <?php if ($listing['page'] < $listing['pages']): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']+1])) ?>">Próxima</a><?php endif; ?>
         </nav>
-        <script>document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
 
         <!-- Modal Cadastrar Paciente (Design System Premium) -->
-        <div id="patientModal" class="modal-overlay" onclick="if(event.target === this) closePatientModal()">
-          <div class="modal-dialog">
+        <div id="patientModal" data-dialog="modal" class="modal-overlay" data-call-self="closePatientModal">
+          <div class="cn-dialog__panel modal-dialog">
             <div class="modal-header">
               <h3>Novo Paciente</h3>
-              <button class="modal-close" onclick="closePatientModal()" aria-label="Fechar modal">
+              <button type="button" data-dialog-close class="modal-close" data-call="closePatientModal" aria-label="Fechar modal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <form method="POST" action="/pacientes">
+            <form method="POST" action="/pacientes"<?= $patientError ? ' data-start-dirty' : '' ?>>
               <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
               <input type="hidden" name="_submission_id" value="<?= $submissionId ?>">
               <div class="modal-body">
@@ -4605,13 +4705,14 @@ class DashboardController
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="p_gender">Gênero / Sexo biológico</label>
-                  <select id="p_gender" name="gender" class="form-control">
+                  <label class="form-label" for="p_gender">Gênero / Sexo biológico (opcional)</label>
+                  <select id="p_gender" name="gender" class="form-control" aria-describedby="p_gender_help">
                     <option value="">Selecione...</option>
                     <option value="Feminino">Feminino</option>
                     <option value="Masculino">Masculino</option>
                     <option value="Outro">Outro / Não informado</option>
                   </select>
+                  <small id="p_gender_help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</small>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">
@@ -4621,14 +4722,14 @@ class DashboardController
                 <?php require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closePatientModal()">Cancelar</button>
+                <button data-dialog-close type="button" class="btn btn-secondary" data-call="closePatientModal">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Salvar Paciente</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           function openPatientModal() {
             document.getElementById('patientModal').classList.add('active');
             document.getElementById('p_name').focus();
@@ -4636,9 +4737,6 @@ class DashboardController
           function closePatientModal() {
             document.getElementById('patientModal').classList.remove('active');
           }
-          document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closePatientModal();
-          });
           const patientForm = <?= json_encode($patientForm, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
           Object.entries(patientForm).forEach(([key,value]) => { const input=document.querySelector('#patientModal [name="'+key+'"]'); if(input)input.value=value; });
           <?php if ($patientError || ($_GET['novo'] ?? '') === '1'): ?>openPatientModal();<?php endif; ?>
@@ -4653,8 +4751,46 @@ class DashboardController
     {
         $foodService = new FoodCatalogService();
         $foodService->seedTacoReference();
+
         $query = trim((string)($_GET['q'] ?? ''));
-        $foods = $foodService->search($query);
+        $category = trim((string)($_GET['category'] ?? ''));
+        $source = trim((string)($_GET['source'] ?? ''));
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPageRaw = (int)($_GET['per_page'] ?? 50);
+        $perPage = in_array($perPageRaw, FoodCatalogService::PER_PAGE_ALLOWED, true) ? $perPageRaw : 50;
+
+        $listing = $foodService->paginate([
+            'q' => $query,
+            'category' => $category,
+            'source' => $source,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+        $foods = $listing['foods'];
+        $categories = $foodService->listCategories();
+
+        $qs = static function (array $overrides = []) use ($listing): string {
+            $base = [
+                'q' => $listing['q'],
+                'category' => $listing['category'],
+                'source' => $listing['source'],
+                'per_page' => $listing['per_page'],
+                'page' => $listing['page'],
+            ];
+            $merged = array_merge($base, $overrides);
+            foreach (['q', 'category', 'source'] as $k) {
+                if ($merged[$k] === '' || $merged[$k] === null) {
+                    unset($merged[$k]);
+                }
+            }
+            if ((int)$merged['per_page'] === 50) {
+                unset($merged['per_page']);
+            }
+            if ((int)$merged['page'] === 1) {
+                unset($merged['page']);
+            }
+            return http_build_query($merged);
+        };
 
         $title = 'Base de Alimentos';
         $activeNav = 'alimentos';
@@ -4663,31 +4799,69 @@ class DashboardController
 
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <div class="foods-page-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Tabela de Alimentos (TACO)</h1>
             <p style="color: var(--neutral-gray-600); margin: 0; font-size: 0.95rem;">Referência analítica por 100g da Tabela Brasileira de Composição de Alimentos com cálculo proporcional por medida caseira.</p>
           </div>
-          <form method="GET" action="/alimentos" style="display: flex; gap: 8px; align-items: center;">
-            <label for="food-search-input" class="sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);">Buscar alimento</label>
-            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="Buscar alimento ou categoria..." class="form-control" style="width: 260px; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-            <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Buscar</button>
-            <?php if ($query !== ''): ?>
-              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none;">Limpar</a>
-            <?php endif; ?>
-          </form>
         </div>
+
+        <form method="GET" action="/alimentos" class="foods-filters" data-busy-text="Buscando…" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: var(--space-4);">
+          <div style="flex: 1 1 200px; min-width: 160px;">
+            <label for="food-search-input" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Buscar</label>
+            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($listing['q']) ?>" placeholder="Alimento ou categoria…" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+          </div>
+          <div style="flex: 0 1 220px; min-width: 140px;">
+            <label for="food-category-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Grupo TACO</label>
+            <select id="food-category-filter" name="category" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <option value="">Todos os grupos</option>
+              <?php foreach ($categories as $cat): ?>
+                <option value="<?= htmlspecialchars($cat) ?>" <?= $listing['category'] === $cat ? 'selected' : '' ?>><?= htmlspecialchars($cat) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="flex: 0 1 160px; min-width: 120px;">
+            <label for="food-source-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Fonte</label>
+            <select id="food-source-filter" name="source" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <option value="" <?= $listing['source'] === '' ? 'selected' : '' ?>>Todas</option>
+              <option value="TACO" <?= $listing['source'] === 'TACO' ? 'selected' : '' ?>>TACO</option>
+              <option value="clinic" <?= $listing['source'] === 'clinic' ? 'selected' : '' ?>>Minha clínica</option>
+            </select>
+          </div>
+          <div style="flex: 0 1 120px; min-width: 100px;">
+            <label for="food-per-page" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Por página</label>
+            <select id="food-per-page" name="per_page" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <?php foreach (FoodCatalogService::PER_PAGE_ALLOWED as $n): ?>
+                <option value="<?= $n ?>" <?= (int)$listing['per_page'] === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="submit" class="btn btn-primary" style="padding: 8px 16px; min-height: 44px;">Buscar</button>
+            <?php if ($listing['q'] !== '' || $listing['category'] !== '' || $listing['source'] !== '' || (int)$listing['per_page'] !== 50): ?>
+              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Limpar</a>
+            <?php endif; ?>
+          </div>
+        </form>
 
         <!-- Banner Explicativo de Integridade Clínica (PX-16) -->
         <div class="card" style="padding: 16px 20px; background: rgba(15, 39, 71, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem; margin-bottom: 4px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             Diferença entre Referência Padrão (100g) e Medida Caseira
           </div>
           <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.5;">
             Os dados laboratoriais oficiais (TACO) são mensurados na <strong>base fixa de 100g</strong>. Na coluna <em>Medida Caseira</em>, a quantidade em gramas/ml e a energia resultante são calculadas proporcionalmente para orientar prescrições clínicas seguras sem confusão métrica.
           </p>
         </div>
+
+        <p class="foods-result-summary" style="margin: 0 0 12px; color: var(--neutral-gray-600); font-size: 0.9rem;" aria-live="polite">
+          <?php if ($listing['total'] === 0): ?>
+            Nenhum alimento encontrado.
+          <?php else: ?>
+            Mostrando <?= (int)$listing['from'] ?>–<?= (int)$listing['to'] ?> de <?= (int)$listing['total'] ?>
+          <?php endif; ?>
+        </p>
 
         <div class="card" style="padding: 0; overflow: hidden;">
           <div class="table-responsive">
@@ -4712,14 +4886,16 @@ class DashboardController
                     </td>
                   </tr>
                 <?php else: ?>
-                  <?php foreach ($foods as $f): 
+                  <?php foreach ($foods as $f):
                     $servingG = (float)($f['serving_size_g'] > 0 ? $f['serving_size_g'] : 100);
                     $energy100 = (float)$f['energy_kcal'];
                     $portionKcal = round(($energy100 * $servingG) / 100, 1);
                     $servingUnit = htmlspecialchars($f['serving_unit'] ?? 'g');
                   ?>
                     <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?></td>
+                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?><?php if (!empty($f['taco_code'])): ?>
+                        <span style="display: block; font-weight: 400; font-size: 0.75rem; color: var(--neutral-gray-500);">TACO nº <?= (int)$f['taco_code'] ?><?= !empty($f['nutrient_flags']) ? ' · ' . htmlspecialchars(str_replace(['protein_g', 'lipid_g', 'carbohydrate_g', 'fiber_g', 'energy_kcal', 'em_branco', ';', '='], ['proteína', 'lipídios', 'carboidratos', 'fibra', 'energia', 'não analisado', ', ', ': '], (string)$f['nutrient_flags'])) : '' ?></span>
+                      <?php endif; ?></td>
                       <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span></td>
                       <td>
                         <span style="font-weight: 500; color: var(--neutral-gray-800);">
@@ -4740,9 +4916,44 @@ class DashboardController
             </table>
           </div>
         </div>
+
+        <?php if ($listing['pages'] > 1 || $listing['total'] > 0): ?>
+        <nav class="foods-pagination" aria-label="Paginação da base de alimentos" style="display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; align-items:center; justify-content:space-between;">
+          <span style="color: var(--neutral-gray-600); font-size: 0.9rem;">Página <?= (int)$listing['page'] ?> de <?= (int)$listing['pages'] ?></span>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+            <?php if ($listing['page'] > 1): ?>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => 1])) ?>">Primeira</a>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] - 1])) ?>" rel="prev">Anterior</a>
+            <?php endif; ?>
+            <?php
+              $window = 2;
+              $startP = max(1, $listing['page'] - $window);
+              $endP = min($listing['pages'], $listing['page'] + $window);
+              for ($p = $startP; $p <= $endP; $p++):
+                $isCurrent = $p === (int)$listing['page'];
+            ?>
+              <?php if ($isCurrent): ?>
+                <span class="btn btn-primary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none;" aria-current="page"><?= $p ?></span>
+              <?php else: ?>
+                <a class="btn btn-secondary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $p])) ?>"><?= $p ?></a>
+              <?php endif; ?>
+            <?php endfor; ?>
+            <?php if ($listing['page'] < $listing['pages']): ?>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] + 1])) ?>" rel="next">Próxima</a>
+              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['pages']])) ?>">Última</a>
+            <?php endif; ?>
+          </div>
+        </nav>
+        <?php endif; ?>
+
+        <p class="taco-attribution" style="margin: 12px 0 0; color: var(--neutral-gray-500); font-size: 0.8rem; line-height: 1.5;">
+          Fonte dos alimentos marcados com nº TACO: NEPA-UNICAMP. <cite>Tabela Brasileira de Composição de Alimentos – TACO</cite>, 4ª ed. revisada e ampliada. Campinas: NEPA-UNICAMP, 2011. Valores por 100 g de parte comestível.
+          Tr (traço) e NA (não aplicável) aparecem como 0; "*" (análise em reavaliação na TACO) e "não analisado" também aparecem como 0 e ficam indicados abaixo do nome.
+        </p>
         <?php
         $content = ob_get_clean();
 
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
+
 }

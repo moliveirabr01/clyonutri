@@ -58,7 +58,7 @@ class RecipeService
         $this->db->beginTransaction();
         try {
             // 1. Calcular Composição Nutricional Rastreável
-            $nutritionTotals = $this->calculateIngredientsNutrition($ingredients);
+            $nutritionTotals = $this->calculateIngredientsNutrition($ingredients, $clinicId);
 
             $kcalPerServing = round($nutritionTotals['energy_kcal'] / $servings, 2);
             $proteinPerServing = round($nutritionTotals['protein_g'] / $servings, 2);
@@ -192,7 +192,7 @@ class RecipeService
             }
 
             // 6. Persistir Alergênicos (Derivados do catálogo TACO + especificados)
-            $allAllergens = $this->resolveRecipeAllergens($ingredients, $allergens);
+            $allAllergens = $this->resolveRecipeAllergens($ingredients, $allergens, $clinicId);
             if (!empty($allAllergens)) {
                 $alStmt = $this->db->prepare("
                     INSERT INTO recipe_allergens (recipe_id, allergen_group, risk_level, verified_by_professional, notes)
@@ -333,7 +333,7 @@ class RecipeService
             $ingredients = $iStmt->fetchAll();
         }
 
-        $nutritionTotals = $this->calculateIngredientsNutrition($ingredients);
+        $nutritionTotals = $this->calculateIngredientsNutrition($ingredients, $clinicId ?? (TenantContext::hasClinic() ? TenantContext::getClinicId() : null));
         $kcalPerServing = round($nutritionTotals['energy_kcal'] / $servings, 2);
         $proteinPerServing = round($nutritionTotals['protein_g'] / $servings, 2);
         $carbsPerServing = round(($nutritionTotals['carbohydrate_g'] ?? $nutritionTotals['carbs_g'] ?? 0) / $servings, 2);
@@ -766,6 +766,76 @@ class RecipeService
     }
 
     /**
+     * F01 (auditoria 14/10/2026): fluxo completo de prescrição a partir do formulário web.
+     *
+     * 1. Valida paciente e profissional na clínica da sessão ANTES de qualquer leitura/escrita de plano.
+     * 2. Busca o plano por clinic_id + patient_id (nunca só por patient_id).
+     * 3. Criação do plano (se necessária) + prescrição numa única transação, com rollback em qualquer erro.
+     *
+     * @throws TenantSecurityException (403) paciente/profissional/plano de outra clínica ou inexistente
+     */
+    public function prescribeRecipeWithPlan(
+        int $clinicId,
+        int $professionalId,
+        int $patientId,
+        int $mealPlanId,
+        int $recipeId,
+        float $servings = 1.0,
+        ?string $instructionsOverride = null,
+        ?string $mealName = null
+    ): array {
+        if ($clinicId <= 0 || $patientId <= 0) {
+            throw new TenantSecurityException("Acesso negado: paciente inválido para a clínica ativa.", 403);
+        }
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        if ($professionalId > 0) {
+            TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        } else {
+            throw new TenantSecurityException("Acesso negado: profissional sem vínculo com a clínica ativa.", 403);
+        }
+
+        if ($mealPlanId > 0) {
+            $chk = $this->db->prepare("SELECT id FROM meal_plans WHERE id = :id AND clinic_id = :cid AND patient_id = :pid");
+            $chk->execute(['id' => $mealPlanId, 'cid' => $clinicId, 'pid' => $patientId]);
+            if (!$chk->fetchColumn()) {
+                throw new TenantSecurityException("Acesso negado: plano alimentar não pertence a este paciente/clínica.", 403);
+            }
+        }
+
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+        try {
+            if ($mealPlanId <= 0) {
+                $stmt = $this->db->prepare("SELECT id FROM meal_plans WHERE clinic_id = :cid AND patient_id = :pid ORDER BY id DESC LIMIT 1");
+                $stmt->execute(['cid' => $clinicId, 'pid' => $patientId]);
+                $mealPlanId = (int)$stmt->fetchColumn();
+
+                if ($mealPlanId <= 0) {
+                    $cStmt = $this->db->prepare("
+                        INSERT INTO meal_plans (clinic_id, patient_id, professional_id, title, status, created_at, updated_at)
+                        VALUES (:cid, :pid, :prid, 'Plano Alimentar Individualizado', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ");
+                    $cStmt->execute(['cid' => $clinicId, 'pid' => $patientId, 'prid' => $professionalId]);
+                    $mealPlanId = (int)$this->db->lastInsertId();
+                }
+            }
+
+            $result = $this->prescribeRecipe($clinicId, $mealPlanId, null, $patientId, $recipeId, $servings, $instructionsOverride, $mealName);
+            if ($ownTx) {
+                $this->db->commit();
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
      * Prescreve uma receita em uma refeição do plano alimentar do paciente (NI2-275).
      */
     public function prescribeRecipe(
@@ -798,7 +868,7 @@ class RecipeService
         $versionId = $version ? (int)$version['id'] : null;
 
         // Verificar conflitos com alergias do paciente
-        $conflicts = $this->checkPatientAllergenConflicts($patientId, $recipe['allergens']);
+        $conflicts = $this->checkPatientAllergenConflicts($patientId, $recipe['allergens'], $clinicId);
 
         $stmt = $this->db->prepare("
             INSERT INTO recipe_prescriptions (
@@ -1002,6 +1072,17 @@ class RecipeService
      */
     public function togglePatientFavorite(int $patientId, int $recipeId): bool
     {
+        // Reauditoria (varredura): o paciente só pode favoritar receita visível à própria clínica
+        // (da clínica ou pública). Receita privada de outra clínica ou inexistente: mesma exceção.
+        $pc = $this->db->prepare("SELECT clinic_id FROM patients WHERE id = :pid");
+        $pc->execute(['pid' => $patientId]);
+        $patientClinic = $pc->fetchColumn();
+        $vis = $this->db->prepare("SELECT id FROM recipes WHERE id = :rid AND (clinic_id = :cid OR visibility = 'public')");
+        $vis->execute(['rid' => $recipeId, 'cid' => (int)$patientClinic]);
+        if ($patientClinic === false || !$vis->fetchColumn()) {
+            throw new TenantSecurityException('Receita não encontrada.', 404);
+        }
+
         $stmt = $this->db->prepare("SELECT id FROM recipe_patient_favorites WHERE patient_id = :pid AND recipe_id = :rid");
         $stmt->execute(['pid' => $patientId, 'rid' => $recipeId]);
         $existing = $stmt->fetchColumn();
@@ -1025,7 +1106,8 @@ class RecipeService
         $stmt = $this->db->prepare("
             SELECT r.* FROM recipes r
             JOIN recipe_patient_favorites f ON f.recipe_id = r.id
-            WHERE f.patient_id = :pid
+            JOIN patients p ON p.id = f.patient_id
+            WHERE f.patient_id = :pid AND (r.clinic_id = p.clinic_id OR r.visibility = 'public')
             ORDER BY f.created_at DESC
         ");
         $stmt->execute(['pid' => $patientId]);
@@ -1041,10 +1123,41 @@ class RecipeService
     }
 
     /**
+     * Lista de alimentos visíveis para a clínica: catálogo global (clinic_id NULL)
+     * + alimentos particulares da própria clínica. Mesma regra do FoodCatalogService (F02).
+     */
+    public function listFoodsForClinic(?int $clinicId, int $limit = 300): array
+    {
+        $limit = max(1, min(1000, $limit));
+        $stmt = $this->db->prepare("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods WHERE (clinic_id IS NULL OR clinic_id = :clinic_id) ORDER BY name ASC LIMIT {$limit}");
+        $stmt->execute(['clinic_id' => $clinicId ?? 0]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Rejeita IDs de alimentos que não sejam globais nem da clínica informada (F02).
+     * Não diferencia "inexistente" de "de outra clínica" para não revelar catálogos alheios.
+     */
+    public function assertFoodsAvailableForClinic(array $foodIds, ?int $clinicId): void
+    {
+        foreach (array_unique($foodIds) as $foodId) {
+            $foodId = (int)$foodId;
+            $stmt = $this->db->prepare("SELECT 1 FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :clinic_id)");
+            $stmt->execute(['id' => $foodId, 'clinic_id' => $clinicId ?? 0]);
+            if (!$stmt->fetchColumn()) {
+                throw new InvalidArgumentException("Alimento ID #{$foodId} não encontrado no catálogo disponível para esta clínica.");
+            }
+        }
+    }
+
+    /**
      * Calcula a composição nutricional dos ingredientes usando alimentos oficiais (TACO).
      */
-    private function calculateIngredientsNutrition(array &$ingredients): array
+    private function calculateIngredientsNutrition(array &$ingredients, ?int $clinicId = null): array
     {
+        // F02 (auditoria 14/10/2026): todos os IDs são autorizados ANTES de qualquer cálculo.
+        $this->assertFoodsAvailableForClinic(array_map(static fn($i) => (int)($i['food_id'] ?? 0), $ingredients), $clinicId);
+
         $totalWeightG = 0.0;
         $totalKcal = 0.0;
         $totalProt = 0.0;
@@ -1058,8 +1171,8 @@ class RecipeService
             $amount = (float)($ing['amount'] ?? $ing['quantity'] ?? 0);
             $unit = trim((string)($ing['measure_unit'] ?? $ing['unit'] ?? 'g'));
 
-            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id");
-            $fStmt->execute(['id' => $foodId]);
+            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :clinic_id)");
+            $fStmt->execute(['id' => $foodId, 'clinic_id' => $clinicId ?? 0]);
             $food = $fStmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$food) {
@@ -1117,14 +1230,14 @@ class RecipeService
     /**
      * Identifica alergênicos nos ingredientes cadastrados.
      */
-    private function resolveRecipeAllergens(array $ingredients, array $explicitAllergens = []): array
+    private function resolveRecipeAllergens(array $ingredients, array $explicitAllergens = [], ?int $clinicId = null): array
     {
         $resolved = [];
         $seen = [];
 
         foreach ($ingredients as $ing) {
-            $fStmt = $this->db->prepare("SELECT allergens FROM foods WHERE id = :id");
-            $fStmt->execute(['id' => (int)$ing['food_id']]);
+            $fStmt = $this->db->prepare("SELECT allergens FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :clinic_id)");
+            $fStmt->execute(['id' => (int)$ing['food_id'], 'clinic_id' => $clinicId ?? 0]);
             $raw = (string)$fStmt->fetchColumn();
 
             if (!empty($raw)) {
@@ -1159,12 +1272,44 @@ class RecipeService
     }
 
     /**
+     * Contexto clínico do paciente para o formulário de prescrição (reauditoria V2-01).
+     * Exige tenant: valida o paciente contra a clínica informada (TenantGuard) antes de ler
+     * planos e anamnese, e as consultas filtram clinic_id como segunda barreira.
+     *
+     * @return array{plans: list<array{id:int,title:string}>, allergies: list<string>}
+     * @throws TenantSecurityException paciente inexistente ou de outra clínica
+     */
+    public function getPrescriptionPatientContext(int $patientId, int $clinicId): array
+    {
+        if ($patientId <= 0 || $clinicId <= 0) {
+            throw new TenantSecurityException('Paciente não encontrado.', 404);
+        }
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $pl = $this->db->prepare("SELECT id, title FROM meal_plans WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC");
+        $pl->execute(['pid' => $patientId, 'cid' => $clinicId]);
+        $plans = $pl->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $an = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
+        $an->execute(['pid' => $patientId, 'cid' => $clinicId]);
+        $row = $an->fetch(PDO::FETCH_ASSOC);
+        $allergies = [];
+        if ($row) {
+            $raw = trim((string)($row['allergies'] ?? '') . ' ' . (string)($row['restrictions'] ?? ''));
+            if ($raw !== '') {
+                $allergies = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $raw))));
+            }
+        }
+        return ['plans' => $plans, 'allergies' => $allergies];
+    }
+
+    /**
      * Verifica possíveis incompatibilidades entre alergênicos da receita e anamnese do paciente.
      */
-    private function checkPatientAllergenConflicts(int $patientId, array $recipeAllergens): array
+    private function checkPatientAllergenConflicts(int $patientId, array $recipeAllergens, int $clinicId): array
     {
-        $stmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-        $stmt->execute(['pid' => $patientId]);
+        $stmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
+        $stmt->execute(['pid' => $patientId, 'cid' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {

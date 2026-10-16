@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Migration 33: Rascunho da evolução durante a teleconsulta (NI2-249).
+ * Migration 37 (era a 33 do WIP do Maicon): Rascunho da evolução durante a teleconsulta (NI2-249).
  * Um rascunho por sessão e profissional, com versão para controle de conflito.
  * O rascunho é apagado quando a evolução é finalizada no prontuário.
  */

@@ -252,19 +252,20 @@ try {
     // -------------------------------------------------------------------------
     echo "--> [5/7] Validando Consultório Online (Teleconsulta) e Central de Ajuda...\n";
 
-    // 1. Teleconsulta
+    // 1. Teleconsulta (merge v11 + Consultório Online do Maicon: só consulta online, só o responsável, convite com hash + janela)
     $teleService = new TeleconsultationService($db);
-    $teleSession = $teleService->scheduleSession($appId, $clinicId1);
+    $presencialRecusada = false;
+    try { $teleService->scheduleSession($appId, $profId1, $clinicId1); } catch (\ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationStateException $e) { $presencialRecusada = true; }
+    assertBenchmark($presencialRecusada, "Consulta presencial não cria sala de teleconsulta (NI2-221 F19)");
+    $appOnline = $appService->schedule($patientId, $profId1, date('Y-m-d H:i:s', time() + 600), 'online', 50, 'Teleconsulta benchmark');
+    $teleSession = $teleService->scheduleSession((int)$appOnline['id'], $profId1, $clinicId1);
     $teleSessionId = (int)$teleSession['session_id'];
-    assertBenchmark($teleSessionId > 0, "Sessão de teleconsulta deve ser vinculada ao agendamento");
-    assertBenchmark(!empty($teleSession['raw_patient_token']), "Token criptográfico do paciente deve ser gerado");
-    
-    // Teste de sala de espera e consentimento
+    assertBenchmark($teleSessionId > 0, "Sessão de teleconsulta deve ser vinculada ao agendamento online");
+    assertBenchmark(strlen((string)$teleSession['raw_patient_token']) === 64, "Convite do paciente gerado (banco guarda só o hash)");
     $checked = $teleService->submitDeviceCheck($teleSession['raw_patient_token'], ['camera_ok' => true, 'microphone_ok' => true]);
-    assertBenchmark(!empty($checked['success']), "Check de dispositivo do paciente deve ser validado");
-    
-    $consented = $teleService->acceptConsent($teleSession['raw_patient_token'], 'v1.0-benchmark');
-    assertBenchmark(!empty($consented), "Consentimento LGPD/CFN da teleconsulta registrado");
+    assertBenchmark(!empty($checked), "Check de dispositivo do paciente deve ser validado");
+    $consented = $teleService->acceptConsent($teleSession['raw_patient_token'], '2026.2', '127.0.0.1', 'benchmark');
+    assertBenchmark(!empty($consented), "Consentimento da teleconsulta registrado");
     logBenchmarkPass('TELECONSULTATION', 'Sessão de teleconsulta ligada à agenda com sala de espera e tokens seguros');
 
     // 2. Central de Ajuda & Service Desk
@@ -366,6 +367,7 @@ try {
     
     if ($teleSessionId > 0) {
         $db->exec("DELETE FROM teleconsultation_events WHERE session_id = {$teleSessionId}");
+        $db->exec("DELETE FROM patient_consents WHERE patient_id = {$patientId}");
         $db->exec("DELETE FROM teleconsultation_sessions WHERE id = {$teleSessionId}");
     }
     if ($ticketId > 0) {

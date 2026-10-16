@@ -20,6 +20,7 @@ class TelehealthService
         $this->db = $db ?? Connection::getInstance();
     }
 
+    /** @throws \RuntimeException sempre: não há mais geração de link fictício. */
     public function generateSession(int $appointmentId, string $provider = 'clyo_meet'): array
     {
         $clinicId = TenantContext::getClinicId();
@@ -29,14 +30,9 @@ class TelehealthService
         throw new \LogicException('TelehealthService::generateSession foi descontinuado; use o Consultório Online (TeleconsultationService).');
     }
 
+    /** Sempre null: o modelo legado não é mais lido (evita exibir URL fictícia). */
     public function getSessionByAppointment(int $appointmentId): ?array
     {
-        $clinicId = TenantContext::getClinicId();
-        $stmt = $this->db->prepare("
-            SELECT * FROM telehealth_sessions WHERE appointment_id = :app_id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['app_id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $session = $stmt->fetch();
-        return $session ?: null;
+        return null;
     }
 }

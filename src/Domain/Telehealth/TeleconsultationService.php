@@ -49,6 +49,14 @@ class TeleconsultationService
     public const REJECT_REASONS = ['identity_not_confirmed', 'wrong_patient', 'patient_request', 'other'];
 
     /** 'completed' e 'in_progress' são valores legados (antes de 15/10/2026). */
+    /** v11 (NI2-221 F19): tipos de agendamento que são consulta online. */
+    public const ONLINE_TYPES = ['teleconsultation', 'telehealth', 'teleconsulta', 'online', 'video'];
+
+    public static function isOnlineType(?string $type): bool
+    {
+        return in_array(strtolower(trim((string)$type)), self::ONLINE_TYPES, true);
+    }
+
     public const TERMINAL_STATUSES = ['ended', 'rejected', 'cancelled', 'expired', 'completed'];
 
     private const TRANSITIONS = [
@@ -115,6 +123,10 @@ class TeleconsultationService
 
         if (!in_array($appointment['status'], ['scheduled', 'confirmed', 'in_progress'], true)) {
             throw new TeleconsultationStateException("Consulta #{$appointmentId} está '{$appointment['status']}' e não pode receber teleconsulta.");
+        }
+        // v11 (NI2-221 F19): consulta presencial não ganha sala de teleconsulta.
+        if (!self::isOnlineType($appointment['type'] ?? null)) {
+            throw new TeleconsultationStateException("Consulta #{$appointmentId} é presencial; a teleconsulta só vale para consulta online.");
         }
 
         [$opensAt, $closesAt] = $this->joinWindow($appointment);

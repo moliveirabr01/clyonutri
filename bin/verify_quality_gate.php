@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // v10: script só de linha de comando
 /**
  * ==============================================================================
  * CLYONUTRI II — VERIFICADOR INDEPENDENTE DE QUALIDADE & RELEASE GATE (NI2-178)

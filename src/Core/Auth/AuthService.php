@@ -101,6 +101,27 @@ class AuthService
     }
 
     /**
+     * Login web com limitador persistente (F03): a tentativa é reservada ANTES do password_verify.
+     * Retorna ['status' => 'ok'|'invalid'|'locked', 'user' => ?array, 'retry_after' => int].
+     * Conta inexistente e senha errada produzem o mesmo 'invalid' e consomem o mesmo limite.
+     */
+    public function attemptWithRateLimit(string $email, string $password, string $ip, ?\ClyoNutri\Core\Security\LoginRateLimiter $limiter = null): array
+    {
+        $limiter ??= new \ClyoNutri\Core\Security\LoginRateLimiter($this->db);
+        $gate = $limiter->attempt('staff', $email, $ip);
+        if (!$gate['allowed']) {
+            return ['status' => 'locked', 'user' => null, 'retry_after' => (int)$gate['retry_after']];
+        }
+        $user = $this->attempt($email, $password);
+        if ($user === null) {
+            $limiter->failure('staff', $email, $ip);
+            return ['status' => 'invalid', 'user' => null, 'retry_after' => 0];
+        }
+        $limiter->success('staff', $email, $ip);
+        return ['status' => 'ok', 'user' => $user, 'retry_after' => 0];
+    }
+
+    /**
      * Autenticação segura com verificação de tenant
      */
     public function attempt(string $email, string $password): ?array
@@ -196,6 +217,21 @@ class AuthService
         $validRoles = ['admin', 'nutritionist', 'operator', 'support_agent', 'receptionist'];
         if (!in_array($newRole, $validRoles, true)) {
             throw new \InvalidArgumentException("Papel de usuário inválido: {$newRole}");
+        }
+
+        // Papéis de plataforma (users.role 'admin' = administrador da PLATAFORMA, operator, support_agent)
+        // só podem ser concedidos por equipe da plataforma; CLI (bin/) conta como plataforma.
+        if (in_array($newRole, \ClyoNutri\Core\Security\RoleModel::PLATFORM_ROLES, true)) {
+            $grantorRole = null;
+            if ($changedByUserId !== null) {
+                $g = $this->db->prepare("SELECT role FROM users WHERE id = :id AND status = 'active'");
+                $g->execute(['id' => $changedByUserId]);
+                $grantorRole = (string)$g->fetchColumn();
+            }
+            $isCli = PHP_SAPI === 'cli' && $changedByUserId === null;
+            if (!$isCli && !\ClyoNutri\Core\Security\RoleModel::canGrantUserRole($grantorRole, $newRole)) {
+                throw new \ClyoNutri\Core\Security\AuthorizationException("Somente a equipe da plataforma pode conceder o papel {$newRole}.");
+            }
         }
 
         $stmtOld = $this->db->prepare("SELECT role FROM users WHERE id = :id");

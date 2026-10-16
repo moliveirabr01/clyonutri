@@ -24,7 +24,7 @@ test('pedido de recuperação envia e-mail com link válido; o banco guarda só 
   await shot(page, testInfo, '40-recuperacao-solicitada');
 
   const mail = await waitMail(nutri.email);
-  expect(mail.subject).toBe('Redefinição de senha — ClyoNutri');
+  expect(mail.subject).toBe('Redefinição de senha — Clyo Nutri');
   expect(mail.from).toContain('ClyoNutri');
   expect(mail.headers['reply-to']).toBe('suporte@gate.test');
   link = mail.text.match(/https?:\/\/\S+\/recuperar-senha\/[a-f0-9]{64}/)?.[0];

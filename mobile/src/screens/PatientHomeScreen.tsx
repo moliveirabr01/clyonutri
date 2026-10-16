@@ -436,6 +436,10 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                     >
                       <Text style={styles.telehealthButtonText}>📹 Entrar na Teleconsulta</Text>
                     </TouchableOpacity>
+                  ) : nextApp.is_online ? (
+                    <Text style={styles.appointmentDoctor} accessibilityRole="text">
+                      Consulta online: o vídeo ainda não está disponível pelo app. A clínica envia o link de acesso.
+                    </Text>
                   ) : null}
                   {nextApp.status !== 'confirmed' && (
                     <TouchableOpacity

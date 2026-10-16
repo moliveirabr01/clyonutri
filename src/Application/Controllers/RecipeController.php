@@ -124,12 +124,12 @@ class RecipeController
         <div class="card" style="padding: var(--space-4); margin-bottom: var(--space-6);">
           <form method="GET" action="/receitas" style="display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: flex-end;">
             <div style="flex: 2; min-width: 220px; display: flex; flex-direction: column; gap: var(--space-1);">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Buscar Receita ou Ingrediente</label>
-              <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Ex: Omelete, Mingau de Aveia, Frango..." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
+              <label for="rc1-q" style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Buscar Receita ou Ingrediente</label>
+              <input id="rc1-q" type="text" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Ex: Omelete, Mingau de Aveia, Frango..." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
             </div>
             <div style="flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: var(--space-1);">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Refeição</label>
-              <select name="meal_type" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
+              <label for="rc2-meal_type" style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Refeição</label>
+              <select id="rc2-meal_type" name="meal_type" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
                 <option value="">Todas as refeições</option>
                 <option value="Café da Manhã" <?= $mealType === 'Café da Manhã' ? 'selected' : '' ?>>Café da Manhã</option>
                 <option value="Almoço" <?= $mealType === 'Almoço' ? 'selected' : '' ?>>Almoço</option>
@@ -142,8 +142,8 @@ class RecipeController
               </select>
             </div>
             <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: var(--space-1);">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Dificuldade</label>
-              <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
+              <label for="rc3-difficulty" style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Dificuldade</label>
+              <select id="rc3-difficulty" name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%; background: #fff;">
                 <option value="">Qualquer dificuldade</option>
                 <option value="fácil" <?= $difficulty === 'fácil' ? 'selected' : '' ?>>Fácil</option>
                 <option value="média" <?= $difficulty === 'média' ? 'selected' : '' ?>>Média</option>
@@ -151,8 +151,8 @@ class RecipeController
               </select>
             </div>
             <div style="flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: var(--space-1);">
-              <label style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Kcal Máxima / Porção</label>
-              <input type="number" step="10" name="max_kcal" value="<?= $maxKcal !== null ? (int)$maxKcal : '' ?>" placeholder="Ex: 400" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
+              <label for="rc4-max_kcal" style="font-size: 0.8rem; font-weight: 600; color: var(--brand-navy-900);">Kcal Máxima / Porção</label>
+              <input id="rc4-max_kcal" type="number" step="10" name="max_kcal" value="<?= $maxKcal !== null ? (int)$maxKcal : '' ?>" placeholder="Ex: 400" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; font-family: var(--font-body); width: 100%;">
             </div>
             <div>
               <button type="submit" class="btn btn-secondary" style="min-height: 42px;">Filtrar</button>
@@ -313,7 +313,7 @@ class RecipeController
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 Prescrever ao Paciente
               </a>
-              <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" onsubmit="return confirm('Deseja criar uma variante supervisionada desta receita?');">
+              <form method="POST" action="/receitas/<?= (int)$recipe['id'] ?>/duplicar" style="display:inline;" data-confirm="Deseja criar uma variante supervisionada desta receita?">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <button type="submit" class="btn btn-secondary">Duplicar Variante</button>
               </form>
@@ -456,8 +456,8 @@ class RecipeController
         $auth = $this->getAuthInfo();
 
         // Buscar alimentos do catálogo TACO oficial para autocomplete/select
-        $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
-        $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // F02: somente catálogo global + alimentos particulares da própria clínica.
+        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
 
         $title = 'Nova Receita Culinária';
         $activeNav = 'receitas';
@@ -483,19 +483,19 @@ class RecipeController
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
-              <input type="text" name="title" required placeholder="Ex: Crepioca Funcional de Frango com Queijo Minas" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              <label for="rc5-title" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
+              <input id="rc5-title" type="text" name="title" required placeholder="Ex: Crepioca Funcional de Frango com Queijo Minas" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
             </div>
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
-              <input type="text" name="summary" placeholder="Ex: Opção prática e rica em proteínas para pré-treino ou café da manhã." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              <label for="rc6-summary" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
+              <input id="rc6-summary" type="text" name="summary" placeholder="Ex: Opção prática e rica em proteínas para pré-treino ou café da manhã." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
-                <select name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <label for="rc7-meal_type" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
+                <select id="rc7-meal_type" name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                   <option value="Café da Manhã">Café da Manhã</option>
                   <option value="Almoço">Almoço</option>
                   <option value="Lanche da Tarde">Lanche da Tarde</option>
@@ -507,8 +507,8 @@ class RecipeController
                 </select>
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
-                <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <label for="rc8-difficulty" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
+                <select id="rc8-difficulty" name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                   <option value="fácil">Fácil</option>
                   <option value="média">Média</option>
                   <option value="difícil">Difícil</option>
@@ -518,23 +518,23 @@ class RecipeController
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
-                <input type="number" name="servings" min="1" value="1" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc9-servings" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
+                <input id="rc9-servings" type="number" name="servings" min="1" value="1" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
-                <input type="text" name="serving_size_name" value="porção" placeholder="Ex: fatia, unidade, tigela" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc10-serving_size_name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
+                <input id="rc10-serving_size_name" type="text" name="serving_size_name" value="porção" placeholder="Ex: fatia, unidade, tigela" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
-                <input type="number" name="prep_time_minutes" min="1" value="15" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc11-prep_time_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
+                <input id="rc11-prep_time_minutes" type="number" name="prep_time_minutes" min="1" value="15" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
-                <input type="number" name="cook_time_minutes" min="0" value="10" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc12-cook_time_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
+                <input id="rc12-cook_time_minutes" type="number" name="cook_time_minutes" min="0" value="10" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
             </div>
 
@@ -545,7 +545,7 @@ class RecipeController
                   <h4 style="color: var(--brand-navy-900); margin: 0;">Ingredientes Oficiais (Tabela TACO) *</h4>
                   <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Selecione os alimentos e a medida caseira correspondente.</span>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="addIngredientRow()">+ Adicionar Ingrediente</button>
+                <button type="button" class="btn btn-secondary" data-call="addIngredientRow">+ Adicionar Ingrediente</button>
               </div>
 
               <div id="ingredientsContainer" style="display: flex; flex-direction: column; gap: 8px;">
@@ -566,7 +566,7 @@ class RecipeController
                     <option value="fatia">fatia</option>
                     <option value="ml">ml</option>
                   </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
                 </div>
               </div>
             </div>
@@ -578,13 +578,13 @@ class RecipeController
                   <h4 style="color: var(--brand-navy-900); margin: 0;">Modo de Preparo (Passos Ordenados)</h4>
                   <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Descreva as etapas para orientação do paciente.</span>
                 </div>
-                <button type="button" class="btn btn-secondary" onclick="addStepRow()">+ Adicionar Passo</button>
+                <button type="button" class="btn btn-secondary" data-call="addStepRow">+ Adicionar Passo</button>
               </div>
 
               <div id="stepsContainer" style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 8px;">
                   <input type="text" name="steps[]" placeholder="Passo 1: Em uma tigela, misture os ingredientes até homogenizar..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
                 </div>
               </div>
             </div>
@@ -592,12 +592,12 @@ class RecipeController
             <!-- Tags e Visibilidade -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Marcadores (separados por vírgula)</label>
-                <input type="text" name="tags" placeholder="Ex: rico em proteínas, rápido, low carb, sem lactose" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc13-tags" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Marcadores (separados por vírgula)</label>
+                <input id="rc13-tags" type="text" name="tags" placeholder="Ex: rico em proteínas, rápido, low carb, sem lactose" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Visibilidade</label>
-                <select name="visibility" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <label for="rc14-visibility" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Visibilidade</label>
+                <select id="rc14-visibility" name="visibility" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                   <option value="clinic">Privada da Clínica</option>
                   <option value="public">Pública / Compartilhada</option>
                 </select>
@@ -611,13 +611,18 @@ class RecipeController
           </form>
         </div>
 
-        <script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
           let ingredientIndex = 1;
-          const foodOptionsHtml = `<?php
-              foreach ($foods as $f) {
-                  echo '<option value="' . (int)$f['id'] . '">' . htmlspecialchars(addslashes($f['name'])) . '</option>';
-              }
-          ?>`;
+          // XSS (auditoria 14/10/2026): dados via JSON com escapes HEX e <option> criado por DOM/textContent.
+          const foodOptions = <?= json_encode(array_map(static fn($f) => ['id' => (int)$f['id'], 'name' => (string)$f['name']], $foods), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+          function fillFoodOptions(select) {
+              foodOptions.forEach(function (f) {
+                  const opt = document.createElement('option');
+                  opt.value = String(f.id);
+                  opt.textContent = f.name;
+                  select.appendChild(opt);
+              });
+          }
 
           function addIngredientRow() {
               const container = document.getElementById('ingredientsContainer');
@@ -627,7 +632,6 @@ class RecipeController
               row.innerHTML = `
                   <select name="ingredients[${ingredientIndex}][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
                       <option value="">Selecione o alimento TACO...</option>
-                      ${foodOptionsHtml}
                   </select>
                   <input type="number" step="0.1" name="ingredients[${ingredientIndex}][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
                   <select name="ingredients[${ingredientIndex}][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
@@ -639,8 +643,9 @@ class RecipeController
                       <option value="fatia">fatia</option>
                       <option value="ml">ml</option>
                   </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
               `;
+              fillFoodOptions(row.querySelector('select'));
               container.appendChild(row);
               ingredientIndex++;
           }
@@ -652,7 +657,7 @@ class RecipeController
               row.style.cssText = 'display: flex; gap: 8px;';
               row.innerHTML = `
                   <input type="text" name="steps[]" placeholder="Passo ${stepNum}: ..." required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" onclick="this.parentElement.remove()">✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
               `;
               container.appendChild(row);
           }
@@ -759,24 +764,20 @@ class RecipeController
 
         $selectedPatientId = (int)($_GET['patient_id'] ?? ($patients[0]['id'] ?? 0));
 
-        // Buscar planos do paciente selecionado
+        // V2-01 (reauditoria): o paciente é validado contra a clínica da sessão ANTES de qualquer
+        // leitura clínica. Paciente de outra clínica e ID inexistente recebem a MESMA resposta 404.
         $plans = [];
         $patientAllergies = [];
         if ($selectedPatientId > 0) {
-            $plStmt = $this->db->prepare("SELECT id, title FROM meal_plans WHERE patient_id = :pid ORDER BY id DESC");
-            $plStmt->execute(['pid' => $selectedPatientId]);
-            $plans = $plStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Verificar histórico de anamnese / alergias
-            $anStmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-            $anStmt->execute(['pid' => $selectedPatientId]);
-            $anamnese = $anStmt->fetch(PDO::FETCH_ASSOC);
-            if ($anamnese) {
-                $rawAllergies = trim((string)($anamnese['allergies'] ?? '') . ' ' . (string)($anamnese['restrictions'] ?? ''));
-                if ($rawAllergies !== '') {
-                    $patientAllergies = array_filter(array_map('trim', preg_split('/[,;\n]+/', $rawAllergies)));
-                }
+            try {
+                $context = $this->recipeService->getPrescriptionPatientContext($selectedPatientId, (int)$auth['clinicId']);
+            } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+                http_response_code(404);
+                echo "Paciente não encontrado.";
+                return;
             }
+            $plans = $context['plans'];
+            $patientAllergies = $context['allergies'];
         }
 
         $title = 'Prescrever Receita — ' . $recipe['title'];
@@ -812,8 +813,8 @@ class RecipeController
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Paciente *</label>
-              <select name="patient_id" required onchange="window.location.href='/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=' + this.value" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+              <label for="rc15-patient_id" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Paciente *</label>
+              <select id="rc15-patient_id" name="patient_id" required data-nav-prefix="/receitas/<?= (int)$recipe['id'] ?>/prescrever?patient_id=" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                 <?php foreach ($patients as $p): ?>
                   <option value="<?= (int)$p['id'] ?>" <?= ((int)$p['id'] === $selectedPatientId) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($p['name']) ?>
@@ -823,8 +824,8 @@ class RecipeController
             </div>
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Plano Alimentar de Destino *</label>
-              <select name="meal_plan_id" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+              <label for="rc16-meal_plan_id" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Plano Alimentar de Destino *</label>
+              <select id="rc16-meal_plan_id" name="meal_plan_id" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                 <?php if (empty($plans)): ?>
                   <option value="0">Plano Ativo Padrão</option>
                 <?php else: ?>
@@ -836,8 +837,8 @@ class RecipeController
             </div>
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição Prescrita *</label>
-              <select name="meal_name" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+              <label for="rc17-meal_name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição Prescrita *</label>
+              <select id="rc17-meal_name" name="meal_name" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                 <option value="Café da Manhã" <?= ($recipe['meal_type'] === 'Café da Manhã') ? 'selected' : '' ?>>Café da Manhã</option>
                 <option value="Colação">Colação</option>
                 <option value="Almoço" <?= ($recipe['meal_type'] === 'Almoço') ? 'selected' : '' ?>>Almoço</option>
@@ -850,13 +851,13 @@ class RecipeController
             </div>
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Quantidade de Porções a Consumir *</label>
-              <input type="number" step="0.5" name="servings" value="1.0" min="0.5" max="10.0" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              <label for="rc18-servings" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Quantidade de Porções a Consumir *</label>
+              <input id="rc18-servings" type="number" step="0.5" name="servings" value="1.0" min="0.5" max="10.0" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
             </div>
 
             <div style="margin-bottom: var(--space-6);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Orientações Clínicas Personalizadas</label>
-              <textarea name="instructions" rows="3" placeholder="Ex: Consumir morno. Substituir sal por ervas finas desidratadas." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);"></textarea>
+              <label for="rc19-instructions" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Orientações Clínicas Personalizadas</label>
+              <textarea id="rc19-instructions" name="instructions" rows="3" placeholder="Ex: Consumir morno. Substituir sal por ervas finas desidratadas." style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);"></textarea>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
@@ -891,44 +892,44 @@ class RecipeController
         $servings = (float)($_POST['servings'] ?? 1.0);
         $instructions = trim((string)($_POST['instructions'] ?? ''));
 
-        // Se meal_plan_id for 0, buscar ou criar plano ativo
-        if ($mealPlanId <= 0) {
-            $stmt = $this->db->prepare("SELECT id FROM meal_plans WHERE patient_id = :pid ORDER BY id DESC LIMIT 1");
-            $stmt->execute(['pid' => $patientId]);
-            $mealPlanId = (int)$stmt->fetchColumn();
-
-            if ($mealPlanId <= 0) {
-                $cStmt = $this->db->prepare("
-                    INSERT INTO meal_plans (clinic_id, patient_id, professional_id, title, status, created_at, updated_at)
-                    VALUES (:cid, :pid, :prid, 'Plano Alimentar Individualizado', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ");
-                $cStmt->execute([
-                    'cid' => $auth['clinicId'],
-                    'pid' => $patientId,
-                    'prid' => $auth['profId'],
-                ]);
-                $mealPlanId = (int)$this->db->lastInsertId();
-            }
-        }
-
+        // F01: autorização de paciente/profissional/plano + transação ficam no serviço.
+        $status = 303;
         try {
-            $this->recipeService->prescribeRecipe(
-                $auth['clinicId'],
-                $mealPlanId,
-                null,
+            $this->recipeService->prescribeRecipeWithPlan(
+                (int)$auth['clinicId'],
+                (int)$auth['profId'],
                 $patientId,
+                $mealPlanId,
                 $recipeId,
                 $servings,
                 $instructions,
                 $mealName
             );
-
-            header('Location: /receitas?prescrito=1');
-            exit;
         } catch (\Throwable $e) {
-            http_response_code(400);
-            echo "Erro ao prescrever receita: " . htmlspecialchars($e->getMessage());
+            $status = self::httpStatusForException($e);
+            http_response_code($status);
+            echo $status === 403
+                ? "Acesso negado: paciente ou plano não pertence à sua clínica."
+                : "Erro ao prescrever receita: " . htmlspecialchars($e->getMessage());
+            return;
         }
+
+        header('Location: /receitas?prescrito=1');
+        exit;
+    }
+
+    /**
+     * Mapeia exceções de domínio para status HTTP (F01). Público para teste.
+     */
+    public static function httpStatusForException(\Throwable $e): int
+    {
+        if ($e instanceof \ClyoNutri\Core\Security\TenantSecurityException) {
+            return 403;
+        }
+        if ($e instanceof \InvalidArgumentException && stripos($e->getMessage(), 'não encontrad') !== false) {
+            return 404;
+        }
+        return 400;
     }
 
     /**
@@ -981,8 +982,8 @@ class RecipeController
             return;
         }
 
-        $stmt = $this->db->query("SELECT id, name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g FROM foods ORDER BY name ASC LIMIT 300");
-        $foods = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // F02: somente catálogo global + alimentos particulares da própria clínica.
+        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
 
         $title = 'Editar Receita — ' . $recipe['title'];
         $activeNav = 'receitas';
@@ -1008,27 +1009,27 @@ class RecipeController
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
-              <input type="text" name="title" required value="<?= htmlspecialchars($recipe['title']) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              <label for="rc20-title" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Título da Receita *</label>
+              <input id="rc20-title" type="text" name="title" required value="<?= htmlspecialchars($recipe['title']) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
             </div>
 
             <div style="margin-bottom: var(--space-4);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
-              <input type="text" name="summary" value="<?= htmlspecialchars($recipe['summary'] ?? '') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+              <label for="rc21-summary" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Resumo / Descrição Clínica</label>
+              <input id="rc21-summary" type="text" name="summary" value="<?= htmlspecialchars($recipe['summary'] ?? '') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
-                <select name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <label for="rc22-meal_type" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Refeição / Categoria *</label>
+                <select id="rc22-meal_type" name="meal_type" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                   <?php foreach (['Café da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar', 'Ceia', 'Pré-Treino', 'Pós-Treino', 'Sobremesa'] as $mt): ?>
                     <option value="<?= $mt ?>" <?= ($recipe['meal_type'] ?? '') === $mt ? 'selected' : '' ?>><?= $mt ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
-                <select name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
+                <label for="rc23-difficulty" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Dificuldade</label>
+                <select id="rc23-difficulty" name="difficulty" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); background: #fff;">
                   <?php foreach (['fácil', 'média', 'difícil'] as $df): ?>
                     <option value="<?= $df ?>" <?= ($recipe['difficulty'] ?? '') === $df ? 'selected' : '' ?>><?= ucfirst($df) ?></option>
                   <?php endforeach; ?>
@@ -1038,30 +1039,30 @@ class RecipeController
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
-                <input type="number" name="servings" min="1" value="<?= (int)($recipe['servings'] ?? 1) ?>" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc24-servings" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Rendimento (Porções) *</label>
+                <input id="rc24-servings" type="number" name="servings" min="1" value="<?= (int)($recipe['servings'] ?? 1) ?>" required style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
-                <input type="text" name="serving_size_name" value="<?= htmlspecialchars($recipe['serving_size_name'] ?? 'porção') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc25-serving_size_name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Unidade da Porção</label>
+                <input id="rc25-serving_size_name" type="text" name="serving_size_name" value="<?= htmlspecialchars($recipe['serving_size_name'] ?? 'porção') ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
-                <input type="number" name="prep_time_minutes" min="1" value="<?= (int)($recipe['prep_time_minutes'] ?? 15) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc26-prep_time_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Preparo (min)</label>
+                <input id="rc26-prep_time_minutes" type="number" name="prep_time_minutes" min="1" value="<?= (int)($recipe['prep_time_minutes'] ?? 15) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
-                <input type="number" name="cook_time_minutes" min="0" value="<?= (int)($recipe['cook_time_minutes'] ?? 0) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
+                <label for="rc27-cook_time_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Cozimento / Fogo (min)</label>
+                <input id="rc27-cook_time_minutes" type="number" name="cook_time_minutes" min="0" value="<?= (int)($recipe['cook_time_minutes'] ?? 0) ?>" style="padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body);">
               </div>
             </div>
 
             <!-- Instruções de Preparo -->
             <div style="margin-bottom: var(--space-6);">
-              <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Modo de Preparo / Instruções *</label>
-              <textarea name="instructions" required rows="6" style="padding: 12px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); line-height: 1.5;"><?= htmlspecialchars($recipe['instructions'] ?? '') ?></textarea>
+              <label for="rc28-instructions" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Modo de Preparo / Instruções *</label>
+              <textarea id="rc28-instructions" name="instructions" required rows="6" style="padding: 12px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; width: 100%; font-family: var(--font-body); line-height: 1.5;"><?= htmlspecialchars($recipe['instructions'] ?? '') ?></textarea>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">

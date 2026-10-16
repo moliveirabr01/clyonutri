@@ -94,8 +94,9 @@ class AllergenSafetyValidator
         }
 
         $placeholders = implode(',', array_fill(0, count($uniqueIds), '?'));
-        $stmt = $this->db->prepare("SELECT id, name, category, allergens FROM foods WHERE id IN ({$placeholders})");
-        $stmt->execute($uniqueIds);
+        // Reauditoria (varredura): alimentos particulares de outra clínica nunca entram no resultado.
+        $stmt = $this->db->prepare("SELECT id, name, category, allergens FROM foods WHERE id IN ({$placeholders}) AND (clinic_id IS NULL OR clinic_id = ?)");
+        $stmt->execute([...$uniqueIds, TenantContext::getClinicId()]);
         $foods = $stmt->fetchAll();
 
         $conflicts = [];

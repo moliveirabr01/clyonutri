@@ -111,7 +111,7 @@
     <section class="final-section"><div class="container final-inner"><div><p class="eyebrow">CLYO NUTRI</p><h2>Clareza que acompanha<br>o cuidado.</h2></div><div><a href="/cadastro" class="btn-primary">Criar minha conta →</a><a class="final-login" href="/login">Já tenho conta · Entrar</a></div></div></section>
   </main>
   <footer class="footer"><div class="container footer-grid"><div><a href="/" class="logo" aria-label="ClyoNutri Página Inicial"><img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri" width="260" height="64" loading="lazy"></a><p>Ferramentas para o atendimento nutricional.<br>Contexto para cuidar.</p></div><nav aria-label="Informações e contato"><a href="/privacidade">Privacidade</a><a href="/termos">Termos de uso</a><a href="mailto:<?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?>"><?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?></a></nav></div><div class="container footer-bottom"><p>© 2026 ClyoNutri.</p><a href="/login">Acessar meu consultório →</a></div></footer>
-  <script>
+  <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
     const menuButton = document.querySelector('.mobile-toggle');
     const menu = document.getElementById('mobile-menu');
     function closeMenu(restoreFocus = false) {

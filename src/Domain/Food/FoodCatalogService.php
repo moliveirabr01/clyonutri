@@ -100,6 +100,7 @@ class FoodCatalogService
         }
     }
 
+    /** Autocomplete / callers existentes: até 50 resultados, contrato inalterado. */
     public function search(string $term): array
     {
         $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
@@ -119,6 +120,141 @@ class FoodCatalogService
         ]);
 
         return $stmt->fetchAll();
+    }
+
+    /** Tamanhos de página permitidos na Base de Alimentos. */
+    public const PER_PAGE_ALLOWED = [25, 50, 100];
+
+    private const ACCENTS = [
+        'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
+        'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+        'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+        'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+        'ç' => 'c',
+        'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A',
+        'É' => 'E', 'Ê' => 'E', 'Í' => 'I',
+        'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O',
+        'Ú' => 'U', 'Ç' => 'C',
+    ];
+
+    /**
+     * Listagem paginada da Base de Alimentos (somente globais + da própria clínica).
+     *
+     * @param array{q?:string,category?:string,source?:string,page?:int,per_page?:int} $opts
+     * @return array{
+     *   foods: list<array>,
+     *   total: int,
+     *   page: int,
+     *   per_page: int,
+     *   pages: int,
+     *   from: int,
+     *   to: int,
+     *   q: string,
+     *   category: string,
+     *   source: string
+     * }
+     */
+    public function paginate(array $opts = []): array
+    {
+        $allowed = self::PER_PAGE_ALLOWED;
+        $perPage = (int)($opts['per_page'] ?? 50);
+        if (!in_array($perPage, $allowed, true)) {
+            $perPage = 50;
+        }
+        $page = max(1, (int)($opts['page'] ?? 1));
+        $q = trim((string)($opts['q'] ?? ''));
+        $category = trim((string)($opts['category'] ?? ''));
+        $source = trim((string)($opts['source'] ?? ''));
+        if (!in_array($source, ['', 'TACO', 'clinic'], true)) {
+            $source = '';
+        }
+
+        $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
+
+        $where = '(is_custom = 0 OR clinic_id = :clinic_id)';
+        $params = ['clinic_id' => $clinicId];
+
+        if ($q !== '') {
+            $normalized = mb_strtolower(strtr($q, self::ACCENTS));
+            $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $normalized) . '%';
+            $nameSql = 'name';
+            foreach (self::ACCENTS as $from => $to) {
+                $nameSql = 'REPLACE(' . $nameSql . ', ' . $this->db->quote($from) . ', ' . $this->db->quote($to) . ')';
+            }
+            $nameSql = 'LOWER(' . $nameSql . ')';
+            // Também busca na categoria (placeholder da UI: "alimento ou categoria")
+            $catSql = "COALESCE(category, '')";
+            foreach (self::ACCENTS as $from => $to) {
+                $catSql = 'REPLACE(' . $catSql . ', ' . $this->db->quote($from) . ', ' . $this->db->quote($to) . ')';
+            }
+            $catSql = 'LOWER(' . $catSql . ')';
+            $where .= " AND ({$nameSql} LIKE :term ESCAPE '!' OR {$catSql} LIKE :term_cat ESCAPE '!')";
+            $params['term'] = $like;
+            $params['term_cat'] = $like;
+        }
+
+        if ($category !== '') {
+            $where .= ' AND category = :category';
+            $params['category'] = $category;
+        }
+
+        if ($source === 'TACO') {
+            $where .= " AND source = 'TACO' AND (clinic_id IS NULL AND is_custom = 0)";
+        } elseif ($source === 'clinic') {
+            $where .= ' AND clinic_id = :clinic_id_src AND is_custom = 1';
+            $params['clinic_id_src'] = $clinicId;
+        }
+
+        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM foods WHERE {$where}");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+        $pages = max(1, (int)ceil($total / $perPage));
+        $page = max(1, min($pages, $page));
+        $offset = ($page - 1) * $perPage;
+
+        $sql = "SELECT * FROM foods WHERE {$where} ORDER BY name ASC, id ASC LIMIT :limit OFFSET :offset";
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $foods = $stmt->fetchAll();
+
+        $from = $total === 0 ? 0 : $offset + 1;
+        $to = $total === 0 ? 0 : min($offset + count($foods), $total);
+
+        return [
+            'foods' => $foods,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'pages' => $pages,
+            'from' => $from,
+            'to' => $to,
+            'q' => $q,
+            'category' => $category,
+            'source' => $source,
+        ];
+    }
+
+    /** Categorias distintas visíveis para a clínica (globais + próprias), ordenadas. */
+    public function listCategories(): array
+    {
+        $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
+        $stmt = $this->db->prepare("
+            SELECT DISTINCT category FROM foods
+            WHERE (is_custom = 0 OR clinic_id = :clinic_id)
+              AND category IS NOT NULL AND TRIM(category) <> ''
+            ORDER BY category ASC
+        ");
+        $stmt->execute(['clinic_id' => $clinicId]);
+        return array_values(array_filter(array_map(
+            static fn($r) => (string)$r['category'],
+            $stmt->fetchAll()
+        )));
     }
 
     public function addCustomFood(array $data): array

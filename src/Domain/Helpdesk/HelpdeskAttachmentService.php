@@ -148,7 +148,8 @@ class HelpdeskAttachmentService
         // 3. Usuário que fez o upload
         $isAuthor = ((int)$row['ticket_author_id'] === $userId);
         $isSameClinic = ((int)$row['clinic_id'] === $clinicId);
-        $isSupportOperator = in_array($userRole, ['admin', 'operator', 'support_agent'], true);
+        // $userRole é users.role (papel de plataforma). clinic_members.role 'admin' não concede suporte global.
+        $isSupportOperator = \ClyoNutri\Core\Security\RoleModel::isPlatformSupport($userRole);
 
         if (!$isSupportOperator && !($isSameClinic && $isAuthor) && ((int)$row['uploaded_by_user_id'] !== $userId)) {
             throw new RuntimeException('Acesso negado: Você não tem autorização para visualizar este anexo.');

@@ -7,16 +7,12 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
-use ClyoNutri\Core\Mail\Mailer;
-use ClyoNutri\Core\Mail\PasswordResetMail;
 use ClyoNutri\Core\Security\Csrf;
-use ClyoNutri\Core\Security\Env;
 
 class AuthController
 {
     private AuthService $authService;
     private PasswordResetService $resetService;
-    private ?Mailer $mailer = null;
 
     public function __construct(?AuthService $authService = null, ?PasswordResetService $resetService = null)
     {
@@ -59,7 +55,16 @@ class AuthController
             exit;
         }
 
-        $user = $this->authService->attempt($email, $password);
+        // F03: limitador persistente por conta+IP e por IP, antes da verificação do hash.
+        $result = $this->authService->attemptWithRateLimit($email, $password, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'));
+        if ($result['status'] === 'locked') {
+            $_SESSION['flash_error'] = 'Muitas tentativas de acesso. Por segurança, o acesso com este e-mail foi pausado temporariamente; aguarde alguns minutos e tente novamente.';
+            $_SESSION['old_email'] = $email;
+            header('Retry-After: ' . max(1, (int)$result['retry_after']));
+            header('Location: /login');
+            exit;
+        }
+        $user = $result['user'];
 
         if (!$user) {
             $_SESSION['flash_error'] = 'E-mail ou senha incorretos.';
@@ -175,8 +180,8 @@ class AuthController
             exit;
         }
 
-        if (strlen($password) < 8) {
-            $_SESSION['flash_error'] = 'A senha deve possuir pelo menos 8 dígitos.';
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            $_SESSION['flash_error'] = 'A senha deve ter pelo menos 8 caracteres.';
             $_SESSION['old_input'] = $_POST;
             header('Location: /cadastro');
             exit;
@@ -251,14 +256,25 @@ class AuthController
         try {
             $ip = $_SERVER['REMOTE_ADDR'] ?? null;
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            // O serviço envia o link por e-mail; a resposta é sempre a mesma mensagem genérica
+            // (não revela se a conta existe nem se o envio falhou) e nunca contém o token.
+            // O envio é agendado e só roda depois que o redirecionamento sai, para que o tempo de
+            // resposta também não revele se a conta existe.
+            $pending = [];
+            $this->resetService->deferEmailDelivery(static function (\Closure $job) use (&$pending): void {
+                $pending[] = $job;
+            });
             $res = $this->resetService->requestReset($email, $ip, $ua);
+            $this->resetService->deferEmailDelivery(null);
 
-            // Mesma resposta exista ou não a conta (não-enumerável). O e-mail é enviado depois
-            // que a resposta sai, para que o tempo de resposta também não revele a existência da conta.
             $_SESSION['flash_success'] = $res['message'];
-            $this->redirectAndContinue('/recuperar-senha');
-            if (!empty($res['user_found']) && !empty($res['token'])) {
-                $this->deliverResetEmail($res, $ip);
+            if ($pending) {
+                $this->redirectAndContinue('/recuperar-senha');
+                foreach ($pending as $job) {
+                    $job(); // nunca lança: falhas vão para error_log + auditoria
+                }
+            } else {
+                header('Location: /recuperar-senha');
             }
             exit;
         } catch (\InvalidArgumentException $e) {
@@ -286,6 +302,11 @@ class AuthController
         if (!empty($_SESSION['user_id'])) {
             header('Location: /dashboard');
             exit;
+        }
+
+        // O token está na URL: impede que vaze via cabeçalho Referer para recursos/links externos.
+        if (!headers_sent()) {
+            header('Referrer-Policy: no-referrer');
         }
 
         $token = trim((string)($params['token'] ?? $_GET['token'] ?? ''));
@@ -327,8 +348,8 @@ class AuthController
             exit;
         }
 
-        if (strlen($password) < 8) {
-            $_SESSION['flash_error'] = 'A senha deve possuir pelo menos 8 dígitos.';
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            $_SESSION['flash_error'] = 'A senha deve ter pelo menos 8 caracteres.';
             header("Location: /recuperar-senha/{$tokenParam}");
             exit;
         }
@@ -350,48 +371,6 @@ class AuthController
             header('Location: /recuperar-senha');
             exit;
         }
-    }
-
-    /** Envia o link por e-mail e registra o resultado na auditoria. Nunca expõe o token em logs. */
-    private function deliverResetEmail(array $res, ?string $ip): void
-    {
-        $userId = (int)($res['user_id'] ?? 0);
-        try {
-            $url = self::appBaseUrl() . '/recuperar-senha/' . rawurlencode((string)$res['token']);
-            $support = trim((string)Env::get('APP_SUPPORT_EMAIL', ''));
-            $message = PasswordResetMail::build(
-                (string)$res['email'],
-                (string)($res['user_name'] ?? ''),
-                $url,
-                intdiv(PasswordResetService::TOKEN_VALIDITY_SECONDS, 60),
-                filter_var($support, FILTER_VALIDATE_EMAIL) ? $support : null
-            );
-            ($this->mailer ?? new Mailer())->send($message);
-            $this->resetService->recordEmailDelivery($userId, (string)$res['email'], true, null, $ip);
-        } catch (\Throwable $e) {
-            error_log('[ClyoNutri] Falha ao enviar e-mail de redefinição de senha: ' . $e->getMessage());
-            try {
-                $this->resetService->recordEmailDelivery($userId, (string)$res['email'], false, $e->getMessage(), $ip);
-            } catch (\Throwable) {
-            }
-        }
-    }
-
-    /**
-     * URL pública do sistema para montar links de e-mail. Em produção exige APP_URL:
-     * usar o cabeçalho Host permitiria envenenar o link (host header injection).
-     */
-    public static function appBaseUrl(): string
-    {
-        $url = rtrim(trim((string)Env::get('APP_URL', '')), '/');
-        if ($url !== '' && preg_match('#^https?://[A-Za-z0-9.\-]+(:\d+)?$#', $url)) {
-            return $url;
-        }
-        if ((string)Env::get('APP_ENV', 'production') === 'production') {
-            throw new \RuntimeException('APP_URL não configurado (ex.: https://clyonutri.com).');
-        }
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        return $scheme . '://' . preg_replace('/[^A-Za-z0-9.\-:]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
     }
 
     /** Envia o redirecionamento ao navegador e continua o processamento em segundo plano. */

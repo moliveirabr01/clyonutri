@@ -57,16 +57,16 @@ TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist', 'name' => 'Dra. Fern
 
 // Garantir alimentos TACO
 $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-VALUES (301, 'Arroz Integral Cozido TACO', 'Cereais', 'TACO', 124.00, 2.60, 25.80, 1.00, 2.70)");
+VALUES (8301, 'Arroz Integral Cozido TACO', 'Cereais', 'TACO', 124.00, 2.60, 25.80, 1.00, 2.70)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-VALUES (302, 'Lentilha Cozida TACO', 'Leguminosas', 'TACO', 93.00, 6.30, 16.30, 0.50, 7.90)");
+VALUES (8302, 'Lentilha Cozida TACO', 'Leguminosas', 'TACO', 93.00, 6.30, 16.30, 0.50, 7.90)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-VALUES (303, 'Filé de Salmão Grelhado TACO', 'Pescados', 'TACO', 229.00, 23.90, 0.00, 14.00, 0.00)");
+VALUES (8303, 'Filé de Salmão Grelhado TACO', 'Pescados', 'TACO', 229.00, 23.90, 0.00, 14.00, 0.00)");
 
 $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-VALUES (304, 'Tofu Grelhado TACO', 'Leguminosas', 'TACO', 64.00, 6.60, 2.10, 4.00, 0.40)");
+VALUES (8304, 'Tofu Grelhado TACO', 'Leguminosas', 'TACO', 64.00, 6.60, 2.10, 4.00, 0.40)");
 
 // -----------------------------------------------------------------------------
 // PASSO 2: CADASTRO DO PACIENTE
@@ -176,14 +176,14 @@ $mJantarId = $mealPlanService->addMeal($planId, 'Jantar Leve', '19:30', 'Mastiga
 
 // Adicionar Itens no Almoço:
 // 150g de Arroz Integral (124 * 1.5 = 186 kcal)
-$itArroz = $mealPlanService->addItem($mAlmocoId, 301, 150.0, 'g');
+$itArroz = $mealPlanService->addItem($mAlmocoId, 8301, 150.0, 'g');
 // 100g de Lentilha (93 kcal)
-$itLentilha = $mealPlanService->addItem($mAlmocoId, 302, 100.0, 'g');
+$itLentilha = $mealPlanService->addItem($mAlmocoId, 8302, 100.0, 'g');
 // 120g de Salmão (229 * 1.2 = 274.8 kcal)
-$itSalmao = $mealPlanService->addItem($mAlmocoId, 303, 120.0, 'g');
+$itSalmao = $mealPlanService->addItem($mAlmocoId, 8303, 120.0, 'g');
 
 // Adicionar Substituição vinculada ao Salmão (Tofu 150g = 64 * 1.5 = 96 kcal)
-$subTofu = $mealPlanService->addSubstitution($itSalmao, 304, 150.0, 'g', 'Opção vegetal para dias sem peixe');
+$subTofu = $mealPlanService->addSubstitution($itSalmao, 8304, 150.0, 'g', 'Opção vegetal para dias sem peixe');
 assertJourney($subTofu > 0, "Opção de substituição vinculada configurada");
 
 // Total esperado no Almoço: 186 + 93 + 274.8 = 553.8 kcal (sem somar substituição)

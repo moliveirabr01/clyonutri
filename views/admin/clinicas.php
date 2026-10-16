@@ -65,10 +65,10 @@
                   <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken ?? '') ?>">
                   <?php if ($c['status'] === 'active'): ?>
                     <input type="hidden" name="status" value="suspended">
-                    <button type="submit" class="btn btn--danger btn--sm" onclick="return confirm('Tem certeza que deseja suspender esta clínica?')">Suspender</button>
+                    <button type="submit" class="btn btn--danger btn--sm" data-confirm="Tem certeza que deseja suspender esta clínica?">Suspender</button>
                   <?php else: ?>
                     <input type="hidden" name="status" value="active">
-                    <button type="submit" class="btn btn--primary btn--sm" onclick="return confirm('Deseja reativar esta clínica?')">Reativar</button>
+                    <button type="submit" class="btn btn--primary btn--sm" data-confirm="Deseja reativar esta clínica?">Reativar</button>
                   <?php endif; ?>
                 </form>
               </td>

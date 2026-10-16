@@ -75,6 +75,12 @@
     .auth-footer a:hover {
       text-decoration: underline;
     }
+  
+    .password-field { position: relative; }
+    .password-field input { padding-right: 88px; }
+    .password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; min-width: 72px; border: 1px solid var(--neutral-gray-300, #CBD5E1); background: #fff; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--brand-navy-900, #0F2747); }
+    .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #A3532A); outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
 </head>
 <body>
@@ -104,7 +110,7 @@
 
           <div class="form-group">
             <label class="form-label" for="password">Nova senha de acesso</label>
-            <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required minlength="8" autofocus>
+            <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" required minlength="8" autocomplete="new-password" data-password-toggle autofocus>
             <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">
               Mínimo de 8 caracteres. Recomendamos combinar letras, números e símbolos.
             </div>
@@ -112,7 +118,7 @@
 
           <div class="form-group" style="margin-top: var(--space-4);">
             <label class="form-label" for="password_confirmation">Confirmar nova senha</label>
-            <input type="password" id="password_confirmation" name="password_confirmation" class="form-control" placeholder="••••••••••••" required minlength="8">
+            <input type="password" id="password_confirmation" name="password_confirmation" class="form-control" placeholder="••••••••••••" required minlength="8" autocomplete="new-password" data-password-toggle>
           </div>
 
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-6);">
@@ -145,5 +151,6 @@
       </div>
     </div>
   </div>
+  <script src="/assets/js/password-toggle.js" defer></script>
 </body>
 </html>

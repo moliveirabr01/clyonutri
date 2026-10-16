@@ -250,9 +250,13 @@ class AppointmentService
                 "Consulta editada / reagendada para {$scheduledAt}"
             );
 
-            // Teleconsulta (NI2-236/250): reagendar revoga o convite; trocar o profissional encerra a sessão.
-            if ($professionalId !== (int)$current['professional_id']) {
-                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'professional_reassigned');
+            // Teleconsulta (NI2-236/250 + v11 F04): trocar profissional/paciente ou deixar de ser online encerra a sessão;
+            // reagendar (horário/duração) revoga o convite e recalcula a janela.
+            if ($professionalId !== (int)$current['professional_id'] || $patientId !== (int)$current['patient_id']) {
+                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'participant_reassigned');
+            } elseif (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)($current['type'] ?? ''))
+                && !\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)$type)) {
+                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'modality_changed');
             } elseif ($scheduledAt !== $current['scheduled_at'] || $duration !== (int)$current['duration_minutes']) {
                 $this->teleconsultation()->onAppointmentRescheduled($appointmentId, $clinicId);
             }
@@ -313,8 +317,8 @@ class AppointmentService
             'clinic_id' => $clinicId,
         ]);
 
-        if ($success && in_array($newStatus, [self::STATUS_CANCELLED, self::STATUS_NO_SHOW], true)) {
-            // Teleconsulta (NI2-236): cancelamento e falta revogam acesso e liberam a sala.
+        if ($success && in_array($newStatus, [self::STATUS_CANCELLED, self::STATUS_NO_SHOW, self::STATUS_COMPLETED], true)) {
+            // Teleconsulta (NI2-236 + v11 F04): cancelar, falta ou concluir revoga o acesso e libera a sala.
             $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, $newStatus);
         }
 
@@ -440,6 +444,35 @@ class AppointmentService
     /**
      * Lista consultas de um dia específico com filtros e ordenação horária (NI2-83).
      */
+    /**
+     * NI2-418 (UX-06): próximo passo de atendimento do paciente, somente leitura e escopo de clínica.
+     * Ordem: consulta em andamento (continuar) > consulta de hoje agendada/confirmada (iniciar, com POST) >
+     * próxima consulta futura > nenhuma (agendar). Não altera estado.
+     * @return array{state:string,appointment:?array}
+     */
+    public function careStepForPatient(int $patientId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        $base = "SELECT id, patient_id, scheduled_at, status, type, duration_minutes FROM appointments WHERE clinic_id = :c AND patient_id = :p";
+        $q = $this->db->prepare($base . " AND status = 'in_progress' ORDER BY scheduled_at DESC, id DESC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'continue', 'appointment' => $row];
+        }
+        $day = $this->calendar->day($this->todayDate());
+        $q = $this->db->prepare($base . " AND status IN ('scheduled','confirmed') AND scheduled_at >= :s AND scheduled_at < :e ORDER BY scheduled_at ASC, id ASC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId, 's' => $day['start'], 'e' => $day['end']]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'start_today', 'appointment' => $row];
+        }
+        $q = $this->db->prepare($base . " AND status IN ('scheduled','confirmed') AND scheduled_at >= :e ORDER BY scheduled_at ASC, id ASC LIMIT 1");
+        $q->execute(['c' => $clinicId, 'p' => $patientId, 'e' => $day['end']]);
+        if ($row = $q->fetch(\PDO::FETCH_ASSOC)) {
+            return ['state' => 'upcoming', 'appointment' => $row];
+        }
+        return ['state' => 'none', 'appointment' => null];
+    }
+
     public function listByDay(string $date, ?int $professionalId = null): array
     {
         $clinicId = TenantContext::getClinicId();

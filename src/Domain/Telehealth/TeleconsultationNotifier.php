@@ -123,7 +123,7 @@ class TeleconsultationNotifier
         $message = TeleconsultationInviteMail::build($kind, $email, (string)$session['patient_name'], (string)$session['professional_name'], $when, $base . '/teleconsulta/sala-espera/' . $ticket);
 
         try {
-            ($this->mailer ?? new Mailer())->send($message);
+            ($this->mailer ?? \ClyoNutri\Core\Mail\MailerFactory::fromEnv())->send($message);
         } catch (\Throwable $e) {
             $this->service->recordSystemEvent($sessionId, $clinicId, $event . 'failed', $actorType, $actorId, [
                 'generation' => $generation,

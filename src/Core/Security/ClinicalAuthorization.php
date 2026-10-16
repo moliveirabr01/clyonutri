@@ -17,15 +17,8 @@ final class ClinicalAuthorization
     {
         // Rotas do console administrativo da plataforma SaaS (/admin/...) (NI2-347)
         if ($path === '/admin' || str_starts_with($path, '/admin/')) {
-            $isPlatformAdmin = in_array($actor['user_role'] ?? '', [
-                'superadmin',
-                'admin_operacional',
-                'admin',
-                'operator',
-                'support_agent',
-                'finance_admin',
-                'security_auditor'
-            ], true);
+            // users.role (plataforma) — nunca member_role (clínica). Ver RoleModel.
+            $isPlatformAdmin = RoleModel::isPlatformConsole($actor['user_role'] ?? '');
             if (!$isPlatformAdmin) {
                 self::deny($db);
             }
@@ -34,13 +27,7 @@ final class ClinicalAuthorization
 
         // Rotas operacionais do Service Desk / Backoffice (/suporte/...) exigem perfil de suporte canônico (NI2-256 / F01)
         if (str_starts_with($path, '/suporte/')) {
-            $isSupport = in_array($actor['user_role'] ?? '', [
-                'superadmin',
-                'admin_operacional',
-                'admin',
-                'operator',
-                'support_agent'
-            ], true);
+            $isSupport = RoleModel::isPlatformSupport($actor['user_role'] ?? '');
             if (!$isSupport) {
                 self::deny($db);
             }

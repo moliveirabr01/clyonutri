@@ -58,6 +58,7 @@ TXT;
 </body></html>
 HTML;
 
-        return new MailMessage($to, $subject, trim($text) . "\n", $html, $patientName ?: null);
+        // merge v11: assinatura do MailMessage do pacote v6 (to, toName, subject, html, text).
+        return new MailMessage($to, $patientName, $subject, $html, trim($text) . "\n");
     }
 }
