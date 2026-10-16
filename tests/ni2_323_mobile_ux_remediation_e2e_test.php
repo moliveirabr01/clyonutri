@@ -417,7 +417,7 @@ $db->prepare("
 ")->execute([$clinicId, $appId, $patientId, $profId, hash('sha256', 'gate4-' . $testRunId)]);
 $homeResp3 = apiRequest('GET', '/api/v1/patient/home', null, $patientToken);
 $ticketUrl = (string)($homeResp3['json']['next_appointment']['meeting_url'] ?? '');
-assert($ticketUrl === '' || preg_match('#/teleconsulta/sala-espera/p\.\d+\.\d+\.\d+\.\d+\.[A-Za-z0-9_-]{43}$#', $ticketUrl) === 1,
+assert($ticketUrl === '' || preg_match('#/teleconsulta/sala-espera/q\.\d+\.\d+\.\d+\.\d+\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$#', $ticketUrl) === 1,
     "Link do app deve ser o bilhete assinado do Consultório Online: {$ticketUrl}");
 echo "✓ GATE 4 PASS: link legado bloqueado; app recebe " . ($ticketUrl !== '' ? 'bilhete assinado da sala de espera' : 'nenhum link (APP_KEY ausente no ambiente de teste)') . "\n";
 

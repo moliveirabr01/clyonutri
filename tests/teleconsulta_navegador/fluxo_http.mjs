@@ -125,12 +125,56 @@ ok(inbox.json && inbox.json.messages.length === 1 && inbox.json.messages[0].type
 const forged = await pat.req('GET', `/teleconsulta/sinal/${roomName}?after=0`, { headers: { 'x-teleconsulta-credential': 'x.y' } });
 ok(forged.status === 403, `credencial forjada recusada (HTTP ${forged.status})`);
 
+// v13: código de acesso do app (meeting_url) é de uso único e preso ao navegador que o trocou.
+const api = async (method, url, { json, token, headers = {} } = {}) => pat2.req(method, url, { json, headers: { accept: 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers } });
+const plog = await api('POST', '/api/v1/auth/patient-login', { json: { email: 'p@ex.test', password: 'Senha-Forte-2026!' } });
+ok(plog.status === 200 && !!plog.json.token, `login do paciente pela API do app (HTTP ${plog.status})`);
+const home1 = await api('GET', '/api/v1/patient/home', { token: plog.json.token });
+const na1 = home1.json.next_appointment || {};
+ok(na1.id === ids.appointment, `próxima consulta ignora a consulta passada (#${ids.past_appointment}) e mostra a futura (#${na1.id})`);
+ok(na1.is_online === true && na1.video_status === 'sala_disponivel', `app recebe video_status sala_disponivel (${na1.video_status})`);
+const t1 = (String(na1.meeting_url || '').match(/\/teleconsulta\/sala-espera\/(q\.[^/]+)$/) || [])[1];
+ok(!!t1, 'meeting_url traz código de uso único (q.)');
+const home2 = await api('GET', '/api/v1/patient/home', { token: plog.json.token });
+const t2 = (String(home2.json.next_appointment.meeting_url || '').match(/\/teleconsulta\/sala-espera\/(q\.[^/]+)$/) || [])[1];
+ok(!!t2 && t2 !== t1, 'cada leitura de meeting_url gera um código novo');
+const appA = new Browser(), appB = new Browser(), appC = new Browser();
+const ex1 = await appA.req('GET', `/teleconsulta/sala-espera/${t1}`);
+const ckA = (ex1.setCookie.find(c => c.startsWith('clyo_tele=')) || '');
+ok(ex1.status === 303 && /^\/teleconsulta\/sala(-espera)?$/.test(ex1.location) && /HttpOnly/i.test(ckA), `1º uso do código: 303 + cookie (HTTP ${ex1.status} → ${ex1.location}; ${ckA.replace(/=[^;]+/, "=…")})`);
+ok(!ckA.includes(t1 + ';'), 'cookie não é o código puro (leva a chave do navegador)');
+ok((await appA.req('GET', ex1.location)).status === 200, 'navegador que trocou o código abre a sala');
+const reuse = await appB.req('GET', `/teleconsulta/sala-espera/${t1}`);
+ok(reuse.status === 403 && /já foi usado/.test(reuse.text) && /aplicativo/.test(reuse.text), `mesmo código em outro navegador: 403 com página amigável (HTTP ${reuse.status})`);
+const reuseSame = await appA.req('GET', `/teleconsulta/sala-espera/${t1}`);
+ok(reuseSame.status === 403, `código também não é trocado de novo no mesmo navegador (HTTP ${reuseSame.status})`);
+appC.cookies['clyo_tele'] = encodeURIComponent(t2);
+ok((await appC.req('GET', '/teleconsulta/sala-espera')).status === 403, 'código puro colocado no cookie não vale (só pela troca)');
+appC.cookies = {};
+const forgedKey = new Browser(); forgedKey.cookies['clyo_tele'] = t1 + '~' + 'A'.repeat(43);
+ok((await forgedKey.req('GET', '/teleconsulta/sala-espera')).status === 403, 'cookie com chave de navegador forjada recusado');
+const ex2 = await appC.req('GET', `/teleconsulta/sala-espera/${t2}`);
+ok(ex2.status === 303, `paciente toca de novo no app: código novo funciona (HTTP ${ex2.status})`);
+// preflight CORS do app web (v13: 204 sem corpo, sem erro 500)
+const pf = await api('OPTIONS', '/api/v1/patient/home', { headers: { origin: 'https://app.ex.test', 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization,content-type' } });
+ok(pf.status === 204, `preflight de origem permitida responde 204 (HTTP ${pf.status})`);
+const pfRaw = await handler.request({ method: 'OPTIONS', url: '/api/v1/patient/home', headers: { origin: 'https://app.ex.test' } });
+ok((pfRaw.headers['access-control-allow-origin'] || [])[0] === 'https://app.ex.test', 'preflight devolve Access-Control-Allow-Origin da origem permitida');
+const pfBad = await handler.request({ method: 'OPTIONS', url: '/api/v1/patient/home', headers: { origin: 'https://evil.example' } });
+ok(pfBad.httpStatusCode === 204 && !pfBad.headers['access-control-allow-origin'], `origem não permitida não recebe CORS (HTTP ${pfBad.httpStatusCode})`);
+// consulta passada não ganha sala
+const pastPage = await pro.req('GET', `/teleconsulta/sessao-agenda/${ids.past_appointment}`);
+const pastCsrf = (pastPage.text.match(/name="_csrf" value="([^"]+)"/) || [])[1] || proCsrf;
+const pastOpen = await pro.req('POST', `/teleconsulta/sessao-agenda/${ids.past_appointment}`, { form: { _csrf: pastCsrf } });
+ok(!/\/teleconsulta\/\d+\/atendimento/.test(pastOpen.location), `consulta passada não cria sala (HTTP ${pastOpen.status} → ${pastOpen.location || 'sem redirect'})`);
+
 const end = await pro.req('POST', `/teleconsulta/${sid}/encerrar`, { form: { _csrf: proCsrf } });
 ok(end.status === 302 && end.location.startsWith(`/consulta/${ids.appointment}`), `encerrar leva à conclusão clínica (${end.location})`);
 const after = await pat.req('GET', `/teleconsulta/sinal/${roomName}?after=0`, { headers: { 'x-teleconsulta-credential': patCred.json.token } });
 ok(after.status === 403, `sinalização cortada após encerrar (HTTP ${after.status})`);
 const link = await pat.req('GET', `/teleconsulta/sala-espera/${invite}`);
 ok(link.status === 403 || link.status === 409, `convite inutilizado após encerrar (HTTP ${link.status})`);
+ok((await appA.req('GET', '/teleconsulta/sala-espera')).status !== 200, 'cookie do código do app perde o acesso após encerrar');
 const clean = await pat.req('GET', '/teleconsulta/sala-espera');
 ok(clean.status === 403 || clean.status === 409, `cookie também perde o acesso após encerrar (HTTP ${clean.status})`);
 

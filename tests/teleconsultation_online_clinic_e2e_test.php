@@ -292,13 +292,16 @@ step('F03: app recebe bilhete curto da sala de espera; link legado não é expos
     $db->prepare("INSERT INTO telehealth_sessions (clinic_id, appointment_id, meeting_url, provider, status) VALUES (?, ?, 'https://meet.clyonutri.com.br/room/fake', 'clyo_meet', 'ready')")->execute([$clinicA, $appt]);
     $svc->scheduleSession($appt, $nutriA['pro'], $clinicA);
     $ticket = $svc->issuePortalTicket($patientA, $appt, $clinicA);
-    check($ticket !== null && str_starts_with($ticket, 'p.'), 'bilhete emitido');
+    // v13: bilhete do app é de uso único ("q."), trocado por um cookie preso ao navegador.
+    check($ticket !== null && str_starts_with($ticket, 'q.'), 'bilhete emitido');
     check($svc->issuePortalTicket($patientB, $appt, $clinicA) === null, 'outro paciente não recebe bilhete');
-    check($svc->checkWaitingRoomStatus($ticket)['status'] === 'scheduled', 'bilhete abre a sala de espera');
     $forged = substr($ticket, 0, -2) . (substr($ticket, -2) === 'AA' ? 'BB' : 'AA');
-    expectThrows(TenantSecurityException::class, fn() => $svc->getSessionByPatientToken($forged), 'bilhete adulterado');
+    expectThrows(TenantSecurityException::class, fn() => $svc->redeemPatientLink($forged), 'bilhete adulterado');
     $late = new TeleconsultationService($db, $p2p, null, $after);
-    expectThrows(TenantSecurityException::class, fn() => $late->getSessionByPatientToken($ticket), 'bilhete expirado');
+    expectThrows(TenantSecurityException::class, fn() => $late->redeemPatientLink($ticket), 'bilhete expirado');
+    [, $cookie] = $svc->redeemPatientLink($ticket);
+    check($svc->checkWaitingRoomStatus($cookie)['status'] === 'scheduled', 'bilhete abre a sala de espera');
+    expectThrows(TenantSecurityException::class, fn() => $late->getSessionByPatientToken($cookie), 'acesso expirado após a janela');
     TenantContext::setClinicId($clinicA);
     $next = (new \ClyoNutri\Domain\PatientPortal\PatientPortalService($db))->getNextAppointment($patientA);
     check(!str_contains((string)($next['meeting_url'] ?? ''), 'meet.clyonutri'), 'URL legada não é exposta');

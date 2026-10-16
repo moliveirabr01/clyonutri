@@ -8,6 +8,7 @@ foreach ([
     'DB_CONNECTION' => 'sqlite',
     'DB_DATABASE' => '/work/storage/teleconsulta_navegador.sqlite',
     'TELECONSULT_PROVIDER' => 'webrtc_p2p',
+    'MOBILE_WEB_ORIGINS' => 'https://app.ex.test', // v13: preflight CORS do app web
     'TELECONSULT_STUN_URLS' => 'none', // ambiente de teste sem rede externa: só candidatos locais
 ] as $k => $v) {
     putenv("{$k}={$v}");

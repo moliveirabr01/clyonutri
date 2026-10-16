@@ -83,8 +83,8 @@ $db->exec("
 // Criar consulta agendada para 901
 $db->exec("
     INSERT INTO appointments (id, clinic_id, patient_id, professional_id, scheduled_at, status)
-    VALUES (9001, 991, 901, 981, '2026-10-15 14:00:00', 'scheduled');
-");
+    VALUES (9001, 991, 901, 981, '" . date('Y-m-d 14:00:00', strtotime('+2 days')) . "', 'scheduled');
+"); // v13: data relativa — a próxima consulta não inclui consultas passadas
 
 $passed = 0;
 $failed = 0;
