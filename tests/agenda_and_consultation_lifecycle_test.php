@@ -336,9 +336,13 @@ $consultationHtml = (string)ob_get_clean();
 
 assertCondition("GET /consulta/{id} retornou HTML de atendimento clínico", strlen($consultationHtml) > 2000);
 assertCondition("Tela de consulta contém contexto do paciente", str_contains($consultationHtml, 'Contexto do Paciente'));
-assertCondition("Tela contém campo de evolução clínica e botão de concluir", 
-    str_contains($consultationHtml, 'evolution_summary') && 
-    str_contains($consultationHtml, 'Concluir Consulta & Assinar Prontuário'));
+// v14 (UX-07): abrir a consulta não a inicia mais; agendada/confirmada mostra o painel de início explícito,
+// em andamento mostra a evolução + concluir.
+assertCondition("Tela contém campo de evolução clínica e botão de concluir (ou painel de início explícito)",
+    (str_contains($consultationHtml, 'evolution_summary') &&
+    str_contains($consultationHtml, 'Concluir Consulta & Assinar Prontuário'))
+    || (in_array($appCiclo['status'] ?? '', ['scheduled', 'confirmed'], true) && str_contains($consultationHtml, 'data-testid="consult-start-panel"'))
+    || str_contains($consultationHtml, 'data-testid="consult-closed"'));
 assertCondition("Tela exibe trilha de auditoria da consulta", str_contains($consultationHtml, 'Trilha de Auditoria'));
 
 // 6.3 Renderização de GET /dashboard

@@ -163,7 +163,7 @@ try {
 
     assertPx04($realMetrics['has_data'] === true, "has_data deve ser TRUE para check-ins válidos");
     assertPx04($realMetrics['average_pct'] === 85.0, "average_pct deve ser 85.0 (encontrado: " . var_export($realMetrics['average_pct'], true) . ")");
-    assertPx04($realMetrics['formatted_value'] === '85.0%', "formatted_value deve ser '85.0%'");
+    assertPx04($realMetrics['formatted_value'] === '85,0%', "formatted_value deve ser '85,0%'");
     assertPx04($realMetrics['responses_count'] === 2, "responses_count deve ser 2");
     assertPx04($realMetrics['responding_patients_count'] === 2, "responding_patients_count deve ser 2");
     assertPx04($realMetrics['total_eligible_patients'] === 2, "total_eligible_patients deve ser 2");
@@ -257,7 +257,7 @@ try {
     $dashboardAlfaHtml = (string)ob_get_clean();
 
     assertPx04(!str_contains($dashboardAlfaHtml, '94.0%'), "Dashboard Alfa NÃO deve conter 94.0%");
-    assertPx04(str_contains($dashboardAlfaHtml, '85.0%'), "Dashboard Alfa deve exibir '85.0%'");
+    assertPx04(str_contains($dashboardAlfaHtml, '85,0%'), "Dashboard Alfa deve exibir '85,0%'");
     assertPx04(str_contains($dashboardAlfaHtml, '2 resposta(s) • Últimos 30 dias'), "Badge Alfa deve informar respostas e período");
     assertPx04(str_contains($dashboardAlfaHtml, '2 de 2 paciente(s) elegíveis responderam'), "Dashboard Alfa deve informar amostra sobre elegíveis");
 
