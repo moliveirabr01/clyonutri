@@ -338,6 +338,8 @@ $router->post('/agenda/{id}/editar', $requireAuth([$dashCtrl, 'editAppointment']
 $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointmentStatus']));
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
+$router->get('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftGet']));   // UX-03 (v14)
+$router->post('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftSave'])); // UX-03 (v14)
 
 // 3.1 Consultório Online & Teleconsulta (NI2-221 / NI2-411)
 // v11 (NI2-221): criação só por POST; o link do paciente vira cookie e redireciona para URL limpa.

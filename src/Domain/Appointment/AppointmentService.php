@@ -424,6 +424,44 @@ class AppointmentService
         return $app;
     }
 
+    /** UX-07 (v14): minutos de antecedência a partir dos quais iniciar exige confirmação. */
+    public const EARLY_START_TOLERANCE_MINUTES = 15;
+
+    public static function isEarlyStart(string $scheduledAt, ?int $now = null): bool
+    {
+        $ts = strtotime($scheduledAt);
+        return $ts !== false && $ts - ($now ?? time()) > self::EARLY_START_TOLERANCE_MINUTES * 60;
+    }
+
+    public static function humanUntil(string $scheduledAt, ?int $now = null): string
+    {
+        $min = max(0, (int)ceil((strtotime($scheduledAt) - ($now ?? time())) / 60));
+        if ($min >= 1440) {
+            $d = intdiv($min, 1440);
+            return $d . ($d === 1 ? ' dia' : ' dias');
+        }
+        $h = intdiv($min, 60); $m = $min % 60;
+        return $h > 0 ? sprintf('%d h %02d min', $h, $m) : $min . ' min';
+    }
+
+    /**
+     * UX-07 (v14): horários distintos de agendamento, início real e conclusão, a partir da trilha.
+     * @return array{scheduled_at: ?string, started_at: ?string, completed_at: ?string}
+     */
+    public static function executionTimeline(array $app): array
+    {
+        $started = null; $completed = null;
+        foreach ($app['history'] ?? [] as $h) {
+            if (($h['to_status'] ?? '') === self::STATUS_IN_PROGRESS && ($h['from_status'] ?? '') !== self::STATUS_IN_PROGRESS) {
+                $started = $started ?? ($h['created_at'] ?? null);
+            }
+            if (($h['to_status'] ?? '') === self::STATUS_COMPLETED) {
+                $completed = $h['created_at'] ?? null;
+            }
+        }
+        return ['scheduled_at' => $app['scheduled_at'] ?? null, 'started_at' => $started, 'completed_at' => $completed];
+    }
+
     /**
      * Retorna o histórico de auditoria de transições de status da consulta (NI2-82).
      */
@@ -793,7 +831,7 @@ class AppointmentService
                     changed_by_user_id, notes, created_at
                 ) VALUES (
                     :clinic_id, :app_id, :from_status, :to_status,
-                    :user_id, :notes, CURRENT_TIMESTAMP
+                    :user_id, :notes, :created_at
                 )
             ");
             $stmt->execute([
@@ -803,6 +841,8 @@ class AppointmentService
                 'to_status' => $toStatus,
                 'user_id' => $userId,
                 'notes' => $notes,
+                // UX-07 (v14): horário no fuso da aplicação (o mesmo de scheduled_at), também no SQLite.
+                'created_at' => date('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable $e) {
             // Em caso de falha no registro de histórico, não interrompe se for tabela não criada em dev antigo

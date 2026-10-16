@@ -274,13 +274,23 @@ class DashboardController
         <?php
           $stepApp = $careStep['appointment'];
           $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
+          // UX-07 (v14): "em andamento" mostra o início real (trilha), separado do horário agendado.
+          $stepStarted = null;
+          if ($stepApp && $careStep['state'] === 'continue') {
+              try {
+                  $stepTimeline = AppointmentService::executionTimeline(['scheduled_at' => $stepApp['scheduled_at'], 'history' => (new AppointmentService())->getStatusHistory((int)$stepApp['id'])]);
+                  $stepStarted = $stepTimeline['started_at'] ? date('d/m/Y \à\s H:i', strtotime($stepTimeline['started_at'])) : null;
+              } catch (\Throwable $e) {
+                  $stepStarted = null;
+              }
+          }
         ?>
         <?php /* NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. */ ?>
         <section class="card cn-next-step" aria-labelledby="proximo-passo-titulo" data-testid="care-next-step" data-state="<?= htmlspecialchars($careStep['state']) ?>">
           <div>
             <h2 id="proximo-passo-titulo" style="font-size: 1.05rem; margin: 0 0 4px;">Próximo passo com <?= htmlspecialchars($p['name']) ?></h2>
             <p style="margin: 0; color: var(--neutral-gray-600, #475569); font-size: 0.9rem;">
-              <?php if ($careStep['state'] === 'continue'): ?>Atendimento em andamento desde <?= htmlspecialchars($stepWhen) ?>. Continue de onde parou: anamnese, avaliação e plano ficam vinculados a este paciente.
+              <?php if ($careStep['state'] === 'continue'): ?>Atendimento em andamento<?= $stepStarted ? ' — iniciado em ' . htmlspecialchars($stepStarted) : '' ?> (agendado para <?= htmlspecialchars($stepWhen) ?>). Continue de onde parou: anamnese, avaliação e plano ficam vinculados a este paciente.
               <?php elseif ($careStep['state'] === 'start_today'): ?>Consulta agendada para hoje (<?= htmlspecialchars(date('H:i', strtotime($stepApp['scheduled_at']))) ?>). Ao iniciar, a consulta passa para "em andamento".
               <?php elseif ($careStep['state'] === 'upcoming'): ?>Próxima consulta em <?= htmlspecialchars($stepWhen) ?>. Você pode revisar a anamnese e os planos antes do atendimento.
               <?php else: ?>Nenhuma consulta agendada. Agende o atendimento para iniciar a sequência anamnese → avaliação → plano.
@@ -2293,6 +2303,17 @@ class DashboardController
 
         $service = new AppointmentService();
         try {
+            // UX-07 (v14): início antecipado (> 15 min antes do horário marcado) exige confirmação explícita.
+            if ($newStatus === AppointmentService::STATUS_IN_PROGRESS) {
+                $current = $service->getAppointment($id);
+                if ($current && AppointmentService::isEarlyStart((string)$current['scheduled_at'])) {
+                    if (empty($_POST['confirm_early'])) {
+                        header("Location: /consulta/{$id}?inicio_antecipado=1");
+                        exit;
+                    }
+                    $notes = trim(($notes ?? '') . ' Início antecipado confirmado (agendada para ' . date('d/m/Y H:i', strtotime((string)$current['scheduled_at'])) . ').');
+                }
+            }
             $service->updateStatus($id, $newStatus, $notes);
 
             if ($newStatus === AppointmentService::STATUS_IN_PROGRESS) {
@@ -2322,15 +2343,25 @@ class DashboardController
             exit;
         }
 
-        // Se estiver agendada ou confirmada, avança para in_progress ao abrir a tela de atendimento
-        if ($app['status'] === AppointmentService::STATUS_SCHEDULED || $app['status'] === AppointmentService::STATUS_CONFIRMED) {
+        // UX-07 (v14): abrir a tela NÃO inicia mais a consulta. Agendada/confirmada mostra um painel de
+        // início explícito (POST /agenda/{id}/status); início antecipado pede confirmação.
+        $timeline = AppointmentService::executionTimeline($app);
+        $canStart = in_array($app['status'], [AppointmentService::STATUS_SCHEDULED, AppointmentService::STATUS_CONFIRMED], true);
+        $isEarly = $canStart && AppointmentService::isEarlyStart((string)$app['scheduled_at']);
+        $inProgress = $app['status'] === AppointmentService::STATUS_IN_PROGRESS;
+
+        // UX-03 (v14): rascunho por consulta + usuário, restaurado ao retomar.
+        $draft = ['evolution_summary' => null, 'weight_kg' => null, 'waist_cm' => null, 'version' => 0, 'updated_at_utc' => null];
+        if ($inProgress) {
             try {
-                $service->updateStatus($id, AppointmentService::STATUS_IN_PROGRESS, 'Profissional iniciou a consulta');
-                $app['status'] = AppointmentService::STATUS_IN_PROGRESS;
+                $draft = (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->get($id, (int)TenantContext::getUserId(), (int)TenantContext::getClinicId());
             } catch (\Throwable $e) {
-                // Silencioso se já estiver no status
+                error_log('[consulta] rascunho indisponível: ' . get_class($e));
             }
         }
+        $draftSavedLocal = !empty($draft['updated_at_utc'])
+            ? (new \DateTimeImmutable((string)$draft['updated_at_utc'], new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('d/m/Y \à\s H:i')
+            : null;
 
         $repo = new PatientRepository();
         $profile = $repo->getProfile360((int)$app['patient_id']);
@@ -2351,9 +2382,13 @@ class DashboardController
             </div>
             <h1>Atendimento Clínico — <?= htmlspecialchars($app['patient_name']) ?></h1>
             <p style="color: var(--neutral-gray-500);">
-              Horário: <strong><?= date('d/m/Y H:i', strtotime($app['scheduled_at'])) ?></strong> (<?= $app['duration_minutes'] ?> min) • 
-              Tipo: <?= htmlspecialchars($app['type']) ?>
+              Tipo: <?= htmlspecialchars(LabelMap::appointmentType($app['type'] ?? null)) ?> • Duração prevista: <?= (int)$app['duration_minutes'] ?> min
             </p>
+            <dl class="cn-consult-times" data-testid="consult-times" style="display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 0; font-size: 0.875rem;">
+              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Agendada para</dt><dd style="margin: 0;" data-time="scheduled"><strong><?= date('d/m/Y H:i', strtotime($app['scheduled_at'])) ?></strong></dd></div>
+              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Iniciada em</dt><dd style="margin: 0;" data-time="started"><strong><?= $timeline['started_at'] ? date('d/m/Y H:i', strtotime($timeline['started_at'])) : 'Não iniciada' ?></strong></dd></div>
+              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Concluída em</dt><dd style="margin: 0;" data-time="completed"><strong><?= $timeline['completed_at'] ? date('d/m/Y H:i', strtotime($timeline['completed_at'])) : 'Não concluída' ?></strong></dd></div>
+            </dl>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
             <span class="badge badge-warning" style="font-size: 0.875rem; padding: 6px 12px;">
@@ -2448,14 +2483,34 @@ class DashboardController
                 Ao concluir a consulta, a evolução será assinada e registrada de forma autêntica no prontuário eletrônico do paciente, garantindo integridade e conformidade com as diretrizes do CFN.
               </p>
 
-              <form action="/consulta/<?= $app['id'] ?>/concluir" method="POST">
+              <?php if ($canStart): ?>
+              <section class="cn-start-consult" data-testid="consult-start-panel" style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 16px; background: <?= $isEarly ? '#FFF7E6' : '#F8FAFC' ?>;">
+                <h4 style="margin: 0 0 6px;">Esta consulta ainda não foi iniciada</h4>
+                <p style="margin: 0 0 10px; font-size: 0.9rem;">Agendada para <strong><?= date('d/m/Y \à\s H:i', strtotime($app['scheduled_at'])) ?></strong>. Ao iniciar, o horário real de início é registrado na trilha de auditoria.</p>
+                <form method="POST" action="/agenda/<?= (int)$app['id'] ?>/status" data-no-dirty style="margin: 0;">
+                  <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                  <input type="hidden" name="status" value="in_progress">
+                  <?php if ($isEarly): ?>
+                    <p role="alert" data-testid="early-start-warning" style="margin: 0 0 8px; color: #8A5300; font-weight: 600;">Início antecipado: faltam <?= htmlspecialchars(AppointmentService::humanUntil((string)$app['scheduled_at'])) ?> para o horário marcado.</p>
+                    <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;"><input type="checkbox" name="confirm_early" value="1" required> Confirmo que quero iniciar antes do horário agendado</label>
+                  <?php endif; ?>
+                  <button type="submit" class="btn btn-primary" data-testid="consult-start">Iniciar atendimento agora</button>
+                  <a href="/agenda" class="btn btn-secondary">Voltar à agenda</a>
+                </form>
+              </section>
+              <?php elseif (!$inProgress): ?>
+              <p data-testid="consult-closed" style="padding: 12px; background: #F8FAFC; border-radius: 8px;">Consulta com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong>; não há anotações em andamento.</p>
+              <?php else: ?>
+              <form action="/consulta/<?= $app['id'] ?>/concluir" method="POST" data-no-dirty data-consult-draft
+                    data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
+                <p id="consulta-draft-status" role="status" aria-live="polite" data-testid="draft-status" style="font-size: 0.8125rem; color: var(--neutral-gray-600, #475569); margin: 0 0 8px;"><?= $draftSavedLocal ? 'Rascunho recuperado (salvo em ' . htmlspecialchars($draftSavedLocal) . '). Continue de onde parou.' : 'As anotações são salvas automaticamente como rascunho enquanto você digita.' ?></p>
                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
                 <div class="form-group" style="margin-bottom: var(--space-4);">
                   <label for="evolution_summary" style="display: block; font-weight: 600; margin-bottom: 6px;">
                     Anotações Clínicas / Resumo da Evolução <span style="color: #DC2626;">*</span>
                   </label>
-                  <textarea id="evolution_summary" name="evolution_summary" rows="8" required style="width: 100%; padding: 12px; border: 1px solid var(--neutral-gray-300); border-radius: 8px; font-family: inherit; font-size: 0.9375rem; line-height: 1.5;" placeholder="Descreva os tópicos abordados (anamnese alimentar, queixas gastrointestinais, rotina, metas acordadas e ajustes na prescrição)..."></textarea>
+                  <textarea id="evolution_summary" name="evolution_summary" rows="8" required style="width: 100%; padding: 12px; border: 1px solid var(--neutral-gray-300); border-radius: 8px; font-family: inherit; font-size: 0.9375rem; line-height: 1.5;" placeholder="Descreva os tópicos abordados (anamnese alimentar, queixas gastrointestinais, rotina, metas acordadas e ajustes na prescrição)..."><?= htmlspecialchars((string)($draft['evolution_summary'] ?? '')) ?></textarea>
                 </div>
 
                 <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 16px; margin-bottom: var(--space-6);">
@@ -2465,23 +2520,25 @@ class DashboardController
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
                     <div>
                       <label for="dc9-weight_kg" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Peso Atual (kg)</label>
-                      <input id="dc9-weight_kg" type="number" step="0.1" name="weight_kg" placeholder="Ex: 68.5" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                      <input id="dc9-weight_kg" type="number" step="0.1" name="weight_kg" value="<?= htmlspecialchars((string)($draft['weight_kg'] ?? '')) ?>" placeholder="Ex: 68,5" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     </div>
                     <div>
                       <label for="dc10-waist_cm" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Circunf. Cintura (cm)</label>
-                      <input id="dc10-waist_cm" type="number" step="0.5" name="waist_cm" placeholder="Ex: 78.0" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                      <input id="dc10-waist_cm" type="number" step="0.5" name="waist_cm" value="<?= htmlspecialchars((string)($draft['waist_cm'] ?? '')) ?>" placeholder="Ex: 78,0" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                     </div>
                   </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
-                  <a href="/agenda" class="btn btn-secondary">Pausar e Voltar à Agenda</a>
+                  <a href="/agenda" class="btn btn-secondary" data-draft-pause>Pausar e Voltar à Agenda</a>
                   <button type="submit" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Concluir Consulta & Assinar Prontuário
                   </button>
                 </div>
               </form>
+              <script src="/assets/js/consulta-rascunho.js" defer></script>
+              <?php endif; ?>
             </div>
 
             <!-- Histórico de Transições da Consulta -->
@@ -2511,6 +2568,49 @@ class DashboardController
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /** UX-03 (v14): GET JSON do rascunho da consulta. */
+    public function consultationDraftGet(array $params): void
+    {
+        $this->consultationDraftJson(fn() => (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())
+            ->get((int)($params['id'] ?? 0), (int)TenantContext::getUserId(), (int)TenantContext::getClinicId()));
+    }
+
+    /** UX-03 (v14): POST JSON (X-CSRF-Token) — salvamento automático com versão. */
+    public function consultationDraftSave(array $params): void
+    {
+        $this->consultationDraftJson(function () use ($params) {
+            if (!Csrf::validate(isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? (string)$_SERVER['HTTP_X_CSRF_TOKEN'] : null)) {
+                http_response_code(403);
+                return ['error' => 'Sessão da página expirada. Recarregue a página (o texto digitado continua na tela).'];
+            }
+            $input = json_decode((string)file_get_contents('php://input'), true);
+            $input = is_array($input) ? $input : [];
+            $result = (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->save(
+                (int)($params['id'] ?? 0), (int)TenantContext::getUserId(), (int)TenantContext::getClinicId(), (int)($input['version'] ?? 0), $input
+            );
+            if ($result['status'] === 'conflict') {
+                http_response_code(409);
+            }
+            return $result;
+        });
+    }
+
+    private function consultationDraftJson(callable $work): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        try {
+            echo json_encode($work(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(422);
+            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            error_log('[consulta] rascunho falhou: ' . get_class($e));
+            http_response_code(500);
+            echo json_encode(['error' => 'Não foi possível salvar o rascunho agora.'], JSON_UNESCAPED_UNICODE);
+        }
     }
 
     public function completeConsultation(array $params): void
@@ -2546,6 +2646,11 @@ class DashboardController
 
         try {
             $result = $service->completeConsultation($id, $summary, $details, TenantContext::getUserId());
+            try {
+                (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->discard($id, (int)TenantContext::getUserId(), (int)TenantContext::getClinicId());
+            } catch (\Throwable $e) {
+                error_log('[consulta] rascunho não apagado: ' . get_class($e));
+            }
 
             // Se registrou peso, salva também na tabela de avaliações do paciente
             if (!empty($_POST['weight_kg'])) {
