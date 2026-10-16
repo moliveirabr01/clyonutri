@@ -135,10 +135,12 @@
     const form = [...document.forms].find(f => new URL(f.action).pathname === saved.action && f.method.toLowerCase() === 'post');
     if (form) {
       for (const field of form.elements) {
-        const name = field.name.replace(/\[\]$/, ''); if (!(name in saved.values) || field.type === 'hidden') continue;
+        const name = field.name.replace(/\[\]$/, ''); if (!name || field.type === 'hidden' || ['submit', 'button', 'reset', 'file'].includes(field.type)) continue;
+        // UX-02 (v14): checkbox desmarcado não é enviado no POST; ausência = desmarcado (não volta ao padrão do HTML).
+        if (field.type === 'checkbox' || field.type === 'radio') { const value = saved.values[name]; field.checked = name in saved.values && (Array.isArray(value) ? value.includes(field.value) : value === field.value); continue; }
+        if (!(name in saved.values)) continue;
         const value = saved.values[name];
-        if (field.type === 'checkbox' || field.type === 'radio') field.checked = Array.isArray(value) ? value.includes(field.value) : value === field.value;
-        else if (typeof value === 'string') field.value = value;
+        if (typeof value === 'string') field.value = value;
       }
       const notice = document.createElement('p'); notice.setAttribute('role', 'status'); notice.setAttribute('data-recovery-notice', ''); notice.textContent = 'Preenchimento recuperado após a falha. Confira os dados antes de salvar. Disponível nesta sessão por até uma hora.'; form.prepend(notice);
       const modal = dialogs.find(x => x.contains(form)); if (modal) show(modal);

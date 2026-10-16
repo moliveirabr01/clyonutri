@@ -33,12 +33,18 @@ class AnthropometryService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
+        // UX-01 (v14): campos opcionais vazios chegam do formulário como '' e, com strict_types,
+        // derrubavam o salvamento (TypeError). Normaliza vazio -> null e vírgula decimal -> ponto.
+        foreach (['weight_kg', 'height_cm', 'waist_cm', 'hip_cm', 'neck_cm', 'chest_cm', 'arm_cm', 'thigh_cm', 'calf_cm', 'body_fat_pct', 'muscle_mass_pct'] as $numericField) {
+            $data[$numericField] = self::normalizeNumber($data[$numericField] ?? null);
+        }
+
         // 1. Validação de presença obrigatória
         if (!isset($data['weight_kg']) || !is_numeric($data['weight_kg'])) {
-            throw new InvalidAnthropometricDataException("O peso corporal (weight_kg) é obrigatório e deve ser numérico.");
+            throw new InvalidAnthropometricDataException("Informe o peso em kg (ex.: 72,5). Nenhum outro dado do paciente é necessário para salvar.");
         }
         if (!isset($data['height_cm']) || !is_numeric($data['height_cm'])) {
-            throw new InvalidAnthropometricDataException("A altura (height_cm) é obrigatória e deve ser numérica.");
+            throw new InvalidAnthropometricDataException("Informe a altura em cm (ex.: 168) ou em metros (ex.: 1,68).");
         }
 
         $weight = (float)$data['weight_kg'];
@@ -76,10 +82,22 @@ class AnthropometryService
         $whtr = AnthropometryCalculator::calculateWhtr($waist, $height);
         $comp = AnthropometryCalculator::calculateBodyComposition($weight, $bodyFatPct, $muscleMassPct);
 
-        $assessedAt = !empty($data['assessed_at']) ? $data['assessed_at'] : date('Y-m-d H:i:s');
+        $assessedAt = self::normalizeAssessedAt($data['assessed_at'] ?? null);
         $notes = !empty($data['notes']) ? trim((string)$data['notes']) : null;
         $isShared = !empty($data['is_shared']) ? 1 : 0;
         $sharedAt = $isShared ? date('Y-m-d H:i:s') : null;
+
+        // UX-01 (v14): reenvio idêntico (retry após falha/duplo clique) não duplica a avaliação.
+        $dup = $this->db->prepare("SELECT id FROM anthropometric_assessments
+            WHERE clinic_id = :c AND patient_id = :p AND professional_id = :pr AND assessed_at = :a
+              AND weight_kg = :w AND height_cm = :h AND COALESCE(notes, '') = :n ORDER BY id LIMIT 1");
+        $dup->execute(['c' => $clinicId, 'p' => $patientId, 'pr' => $professionalId, 'a' => $assessedAt,
+            'w' => round($weight, 2), 'h' => round($height, 2), 'n' => (string)($notes ?? '')]);
+        $existingId = $dup->fetchColumn();
+        if ($existingId !== false) {
+            return ['id' => (int)$existingId, 'patient_id' => $patientId, 'duplicate' => true, 'weight_kg' => $weight,
+                'height_cm' => $height, 'bmi' => $bmi, 'is_shared' => (bool)$isShared, 'assessed_at' => $assessedAt];
+        }
 
         // 4. Persistência relacional
         $stmt = $this->db->prepare("
@@ -503,6 +521,39 @@ class AnthropometryService
         $row['is_shared'] = !empty($row['is_shared']);
 
         return $row;
+    }
+
+    /** UX-01: '' / espaço -> null; "70,5" -> "70.5"; mantém outros valores para a validação existente. */
+    private static function normalizeNumber(mixed $value): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '') {
+                return null;
+            }
+            if (preg_match('/^-?\d{1,3}(\.\d{3})*,\d+$/', $value) === 1) {
+                $value = str_replace('.', '', $value);
+            }
+            $value = str_replace(',', '.', $value);
+            return is_numeric($value) ? (float)$value : $value;
+        }
+        return is_int($value) || is_float($value) ? (float)$value : $value;
+    }
+
+    /** UX-01: datetime-local ("2026-10-15T23:57") -> "2026-10-15 23:57:00"; inválido -> agora. */
+    private static function normalizeAssessedAt(mixed $value): string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return date('Y-m-d H:i:s');
+        }
+        $ts = strtotime(str_replace('T', ' ', trim($value)));
+        if ($ts === false) {
+            throw new InvalidAnthropometricDataException('Data da avaliação inválida. Use o formato dia/mês/ano e hora.');
+        }
+        return date('Y-m-d H:i:s', $ts);
     }
 
     private function validateCircumference(?float $val, string $fieldName): ?float

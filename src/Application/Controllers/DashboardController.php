@@ -654,7 +654,7 @@ class DashboardController
 
                 <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
-                    <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
+                    <input type="checkbox" name="is_shared" value="1" style="width: 16px; height: 16px;"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
                     Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
@@ -740,7 +740,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação registrada com sucesso!' : 'Permissão de compartilhamento atualizada com sucesso!' ?>
+            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação registrada com sucesso!' : ($_GET['success'] === 'avaliacao_ja_registrada' ? 'Esta avaliação já estava registrada; o reenvio não criou duplicata.' : 'Permissão de compartilhamento atualizada com sucesso!') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -1120,7 +1120,7 @@ class DashboardController
 
                 <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
-                    <input type="checkbox" name="is_shared" value="1" checked style="width: 16px; height: 16px;">
+                    <input type="checkbox" name="is_shared" value="1" style="width: 16px; height: 16px;"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
                     Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
@@ -1171,14 +1171,15 @@ class DashboardController
         $service = new AnthropometryService();
 
         try {
-            $service->recordAssessment($patientId, $profId, $_POST, $userId);
+            $saved = $service->recordAssessment($patientId, $profId, $_POST, $userId);
             \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'antropometria');
-            header("Location: /pacientes/{$patientId}/antropometria?success=avaliacao_registrada");
+            header("Location: /pacientes/{$patientId}/antropometria?success=" . (!empty($saved['duplicate']) ? 'avaliacao_ja_registrada' : 'avaliacao_registrada'));
             exit;
         } catch (InvalidAnthropometricDataException $e) {
             header("Location: /pacientes/{$patientId}/antropometria?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
+            error_log('[antropometria] falha ao salvar: ' . get_class($e) . ' em ' . basename($e->getFile()) . ':' . $e->getLine());
             header("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
             exit;
         }
