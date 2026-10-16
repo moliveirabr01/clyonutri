@@ -57,14 +57,14 @@
             <?php if ($canManage): ?>
               <input type="hidden" name="feature_flag_telehealth" value="0">
             <?php endif; ?>
-            <input type="checkbox" name="feature_flag_telehealth" value="1" <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>
+            <input type="checkbox" name="feature_flag_telehealth" value="1" <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>
             <div>
               <strong>Módulo de Teleconsulta &amp; Consultório Online (NI2-221)</strong>
               <div style="font-size: 0.78rem; color: var(--admin-gray-500);">Habilita salas seguras de vídeo e links de atendimento remoto nos consultórios.</div>
             </div>
           </label>
-          <span class="badge <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'badge--success' : 'badge--suspended' ?>">
-            <?= ($settings['feature_flag_telehealth'] ?? '1') === '1' ? 'Habilitado' : 'Suspenso' ?>
+          <span class="badge <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'badge--success' : 'badge--suspended' ?>">
+            <?= ($settings['feature_flag_telehealth'] ?? '0') === '1' ? 'Habilitado' : 'Suspenso' ?>
           </span>
         </div>
 
