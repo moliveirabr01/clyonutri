@@ -1,11 +1,10 @@
 /* Sala de vídeo do paciente (NI2-245). Dados via data-* no <body>; sem script inline. */
 (function () {
   'use strict';
-  var token = document.body.getAttribute('data-tc-token');
   var statusEl = document.getElementById('tc-status');
   var call = ClyoTeleconsulta.start({
     role: 'patient', csrf: document.body.getAttribute('data-tc-csrf'),
-    credentialUrl: '/teleconsulta/sala/' + encodeURIComponent(token) + '/midia',
+    credentialUrl: '/teleconsulta/sala/midia',
     signalBase: '/teleconsulta/sinal/',
     localVideo: document.getElementById('tc-local'),
     remoteVideo: document.getElementById('tc-remote'),

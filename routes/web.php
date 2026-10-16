@@ -67,6 +67,8 @@ $router->post('/teleconsulta/{id}/rejeitar', [TeleconsultationController::class,
 $router->post('/teleconsulta/{id}/evoluir', [TeleconsultationController::class, 'recordEvolution'])->name('teleconsultation.evolve');
 $router->post('/teleconsulta/{id}/encerrar', [TeleconsultationController::class, 'end'])->name('teleconsultation.end');
 $router->get('/teleconsulta/{id}/estado', [TeleconsultationController::class, 'professionalState'])->name('teleconsultation.state');
+// F05: rota do paciente (cookie) antes de /teleconsulta/{id}/midia, senão 'sala' casaria como {id}
+$router->post('/teleconsulta/sala/midia', [TeleconsultationController::class, 'patientMedia'])->name('teleconsultation.patient_media');
 $router->post('/teleconsulta/{id}/midia', [TeleconsultationController::class, 'professionalMedia'])->name('teleconsultation.media');
 $router->post('/teleconsulta/{id}/convite', [TeleconsultationController::class, 'issueInvite'])->name('teleconsultation.invite');
 $router->post('/teleconsulta/{id}/convite-email', [TeleconsultationController::class, 'emailInvite'])->name('teleconsultation.invite_email');
@@ -74,13 +76,14 @@ $router->get('/teleconsulta/{id}/rascunho', [TeleconsultationController::class, 
 $router->post('/teleconsulta/{id}/rascunho', [TeleconsultationController::class, 'draftSave'])->name('teleconsultation.draft_save');
 
 // Jornada do Paciente (Convite Seguro & Sala de Espera)
-$router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
-$router->post('/teleconsulta/sala-espera/{token}/dispositivo', [TeleconsultationController::class, 'patientSubmitDeviceCheck'])->name('teleconsultation.device');
-$router->post('/teleconsulta/sala-espera/{token}/consentir', [TeleconsultationController::class, 'patientAcceptConsent'])->name('teleconsultation.consent');
-$router->post('/teleconsulta/sala-espera/{token}/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
-$router->get('/teleconsulta/sala-espera/{token}/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
-$router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
-$router->post('/teleconsulta/sala/{token}/midia', [TeleconsultationController::class, 'patientMedia'])->name('teleconsultation.patient_media');
+$router->get('/teleconsulta/sala-espera', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
+$router->get('/teleconsulta/sala-espera/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
+$router->post('/teleconsulta/sala-espera/dispositivo', [TeleconsultationController::class, 'patientSubmitDeviceCheck'])->name('teleconsultation.device');
+$router->post('/teleconsulta/sala-espera/consentir', [TeleconsultationController::class, 'patientAcceptConsent'])->name('teleconsultation.consent');
+$router->post('/teleconsulta/sala-espera/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
+$router->get('/teleconsulta/sala', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
+$router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientLinkExchange'])->name('teleconsultation.link');
+$router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientLinkExchange'])->name('teleconsultation.room_link');
 $router->post('/teleconsulta/sinal/{room}', [TeleconsultationController::class, 'signalSend'])->name('teleconsultation.signal_send');
 $router->get('/teleconsulta/sinal/{room}', [TeleconsultationController::class, 'signalPoll'])->name('teleconsultation.signal_poll');
 

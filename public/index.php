@@ -347,18 +347,25 @@ $router->post('/teleconsulta/{id}/rejeitar', $requireAuth($requireTelehealth([$t
 $router->post('/teleconsulta/{id}/evoluir', $requireAuth($requireTelehealth([$teleCtrl, 'recordEvolution'])));
 $router->post('/teleconsulta/{id}/encerrar', $requireAuth($requireTelehealth([$teleCtrl, 'end'])));
 $router->get('/teleconsulta/{id}/estado', $requireAuth($requireTelehealth([$teleCtrl, 'professionalState'])));
+// F05: rota do paciente (cookie) antes de /teleconsulta/{id}/midia, senão 'sala' casaria como {id}
+$router->post('/teleconsulta/sala/midia', $requireTelehealth([$teleCtrl, 'patientMedia']));
 $router->post('/teleconsulta/{id}/midia', $requireAuth($requireTelehealth([$teleCtrl, 'professionalMedia'])));
 $router->post('/teleconsulta/{id}/convite', $requireAuth($requireTelehealth([$teleCtrl, 'issueInvite'])));
 $router->post('/teleconsulta/{id}/convite-email', $requireAuth($requireTelehealth([$teleCtrl, 'emailInvite'])));
 $router->get('/teleconsulta/{id}/rascunho', $requireAuth($requireTelehealth([$teleCtrl, 'draftGet'])));
 $router->post('/teleconsulta/{id}/rascunho', $requireAuth($requireTelehealth([$teleCtrl, 'draftSave'])));
-$router->get('/teleconsulta/sala-espera/{token}', $requireTelehealth([$teleCtrl, 'patientWaitingRoom']));
-$router->post('/teleconsulta/sala-espera/{token}/dispositivo', $requireTelehealth([$teleCtrl, 'patientSubmitDeviceCheck']));
-$router->post('/teleconsulta/sala-espera/{token}/consentir', $requireTelehealth([$teleCtrl, 'patientAcceptConsent']));
-$router->post('/teleconsulta/sala-espera/{token}/entrar', $requireTelehealth([$teleCtrl, 'patientEnterWaiting']));
-$router->get('/teleconsulta/sala-espera/{token}/status', $requireTelehealth([$teleCtrl, 'patientStatus']));
-$router->get('/teleconsulta/sala/{token}', $requireTelehealth([$teleCtrl, 'patientConsultationRoom']));
-$router->post('/teleconsulta/sala/{token}/midia', $requireTelehealth([$teleCtrl, 'patientMedia']));
+// Paciente (F05: convite vira cookie; rotas limpas antes das com {token})
+$router->get('/teleconsulta/sala-espera', $requireTelehealth([$teleCtrl, 'patientWaitingRoom']));
+$router->get('/teleconsulta/sala-espera/status', $requireTelehealth([$teleCtrl, 'patientStatus']));
+$router->post('/teleconsulta/sala-espera/dispositivo', $requireTelehealth([$teleCtrl, 'patientSubmitDeviceCheck']));
+$router->post('/teleconsulta/sala-espera/consentir', $requireTelehealth([$teleCtrl, 'patientAcceptConsent']));
+$router->post('/teleconsulta/sala-espera/entrar', $requireTelehealth([$teleCtrl, 'patientEnterWaiting']));
+$router->get('/teleconsulta/sala', $requireTelehealth([$teleCtrl, 'patientConsultationRoom']));
+$router->get('/teleconsulta/sala-espera/{token}', $requireTelehealth([$teleCtrl, 'patientLinkExchange']));
+$router->get('/teleconsulta/sala/{token}', $requireTelehealth([$teleCtrl, 'patientLinkExchange']));
+$router->get('/teleconsulta/sala-espera/{token}/status', $requireTelehealth([$teleCtrl, 'patientLegacyTokenApi']));
+$router->post('/teleconsulta/sala-espera/{token}/{acao}', $requireTelehealth([$teleCtrl, 'patientLegacyTokenApi']));
+$router->post('/teleconsulta/sala/{token}/midia', $requireTelehealth([$teleCtrl, 'patientLegacyTokenApi']));
 // Sinalização WebRTC P2P (credencial de mídia no cabeçalho; revalidada a cada chamada)
 $router->post('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalSend']));
 $router->get('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalPoll']));

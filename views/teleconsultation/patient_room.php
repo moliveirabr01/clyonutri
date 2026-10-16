@@ -1,5 +1,5 @@
 <?php
-/** @var array $session @var string $token @var string $csrf */
+/** @var array $session @var string $csrf */
 $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 ?><!DOCTYPE html>
 <html lang="pt-BR">
@@ -10,8 +10,8 @@ $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
   <title>Teleconsulta com <?= $e($session['professional_name']) ?></title>
   <link rel="stylesheet" href="/assets/css/teleconsulta.css">
 </head>
-<body data-tc-token="<?= $e($token) ?>
-<a class="tc-skip" href="#tc-conteudo">Pular para o conteúdo</a>" data-tc-csrf="<?= $e($csrf) ?>">
+<body data-tc-csrf="<?= $e($csrf) ?>">
+<a class="tc-skip" href="#tc-conteudo">Pular para o conteúdo</a>
 <header class="tc-header">
   <h1 class="tc-brand">Teleconsulta · <?= $e($session['professional_name']) ?></h1>
   <div class="tc-meta">Sem gravação</div>

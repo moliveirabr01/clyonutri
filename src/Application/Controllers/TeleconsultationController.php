@@ -10,6 +10,7 @@ use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Core\Security\Env;
 use ClyoNutri\Core\Security\TenantSecurityException;
 use ClyoNutri\Domain\Telehealth\Exceptions\ExternalMediaProviderBlockedException;
+use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationLegacyRouteException;
 use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationRateLimitException;
 use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationStateException;
 use ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter;
@@ -255,13 +256,43 @@ class TeleconsultationController
     // Paciente (convite por token)
     // ================================================================
 
-    public function patientWaitingRoom(array $params = []): void
+    /** Nome do cookie do convite do paciente (F05: o token sai da URL). */
+    public const PATIENT_COOKIE = 'clyo_tele';
+    private const PATIENT_COOKIE_PATH = '/teleconsulta/';
+
+    /**
+     * F05 (portado do v11): GET /teleconsulta/sala-espera/{token} e /teleconsulta/sala/{token}.
+     * Valida o convite (ou o bilhete do app), grava-o num cookie HttpOnly/SameSite=Lax/Secure (em HTTPS),
+     * restrito a /teleconsulta/, e redireciona (303) para a URL limpa — o token sai da barra de endereço,
+     * do histórico e de qualquer Referer. Todo uso seguinte revalida o convite no servidor
+     * (hash, geração, revogação, janela e estado).
+     */
+    public function patientLinkExchange(array $params = []): void
     {
         $token = (string)($params['token'] ?? '');
+        $this->securityHeaders();
         try {
             $this->patientRateLimit($token);
             $session = $this->service->getSessionByPatientToken($token);
         } catch (\Throwable $e) {
+            $this->clearPatientCookie();
+            $this->patientErrorPage($e);
+            return;
+        }
+        $this->setPatientCookie($token);
+        $target = in_array($session['status'], ['admitted', 'in_progress'], true) ? '/teleconsulta/sala' : '/teleconsulta/sala-espera';
+        header('Location: ' . $target, true, 303);
+        exit;
+    }
+
+    public function patientWaitingRoom(array $params = []): void
+    {
+        $token = $this->patientCookieToken();
+        try {
+            $this->patientRateLimit($token);
+            $session = $this->service->getSessionByPatientToken($token);
+        } catch (\Throwable $e) {
+            $this->clearPatientCookie();
             $this->patientErrorPage($e);
             return;
         }
@@ -303,20 +334,30 @@ class TeleconsultationController
 
     public function patientConsultationRoom(array $params = []): void
     {
-        $token = (string)($params['token'] ?? '');
+        $token = $this->patientCookieToken();
         try {
             $this->patientRateLimit($token);
             $session = $this->service->getSessionByPatientToken($token);
         } catch (\Throwable $e) {
+            $this->clearPatientCookie();
             $this->patientErrorPage($e);
             return;
         }
         if (!in_array($session['status'], ['admitted', 'in_progress'], true)) {
-            $this->redirect('/teleconsulta/sala-espera/' . $token);
+            $this->redirect('/teleconsulta/sala-espera');
         }
         $csrf = Csrf::generate();
         $this->securityHeaders();
         require __DIR__ . '/../../../views/teleconsultation/patient_room.php';
+    }
+
+    /** POST com token na URL (rotas antigas): não existem mais; contam no rate limit e devolvem 404. */
+    public function patientLegacyTokenApi(array $params = []): void
+    {
+        $this->json(function () use ($params) {
+            $this->patientRateLimit((string)($params['token'] ?? ''));
+            throw new TeleconsultationLegacyRouteException();
+        });
     }
 
     // ================================================================
@@ -382,7 +423,7 @@ class TeleconsultationController
 
     private function patientJson(array $params, callable $action, bool $mutating = true): void
     {
-        $token = (string)($params['token'] ?? '');
+        $token = $this->patientCookieToken(); // F05: o convite vem do cookie, nunca da URL
         $this->json(function () use ($token, $action, $mutating) {
             $this->patientRateLimit($token);
             if ($mutating) {
@@ -439,6 +480,7 @@ class TeleconsultationController
     private function statusFor(\Throwable $e): int
     {
         return match (true) {
+            $e instanceof TeleconsultationLegacyRouteException => 404,
             $e instanceof TenantSecurityException => 403,
             $e instanceof TeleconsultationStateException => 409,
             $e instanceof TeleconsultationRateLimitException => 429,
@@ -453,6 +495,9 @@ class TeleconsultationController
     {
         if ($e instanceof ExternalMediaProviderBlockedException) {
             return 'Vídeo indisponível no momento: o serviço de mídia não está configurado ou não respondeu.';
+        }
+        if ($e instanceof TeleconsultationLegacyRouteException) {
+            return 'Teleconsulta indisponível.';
         }
         if ($e instanceof TenantSecurityException || $e instanceof TeleconsultationStateException
             || $e instanceof TeleconsultationRateLimitException || $e instanceof \InvalidArgumentException) {
@@ -510,13 +555,58 @@ class TeleconsultationController
         return $base . '/teleconsulta/sala-espera/' . $raw;
     }
 
+    private function patientCookieToken(): string
+    {
+        $raw = $_COOKIE[self::PATIENT_COOKIE] ?? '';
+        return is_string($raw) ? $raw : '';
+    }
+
+    private function setPatientCookie(string $token): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+        setcookie(self::PATIENT_COOKIE, $token, [
+            'expires' => 0, // cookie de sessão; validade real é a do convite (revalidada no servidor)
+            'path' => self::PATIENT_COOKIE_PATH,
+            'secure' => self::isHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax', // Lax: o link chega por e-mail/app (navegação de outro site)
+        ]);
+        $_COOKIE[self::PATIENT_COOKIE] = $token;
+    }
+
+    private function clearPatientCookie(): void
+    {
+        unset($_COOKIE[self::PATIENT_COOKIE]);
+        if (headers_sent()) {
+            return;
+        }
+        setcookie(self::PATIENT_COOKIE, '', [
+            'expires' => time() - 3600,
+            'path' => self::PATIENT_COOKIE_PATH,
+            'secure' => self::isHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    private static function isHttps(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return true;
+        }
+        return strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https'
+            || str_starts_with(strtolower((string)Env::get('APP_URL', '')), 'https://');
+    }
+
     private function securityHeaders(): void
     {
         if (headers_sent()) {
             return;
         }
         header('Cache-Control: no-store');
-        header('Referrer-Policy: no-referrer'); // o token do convite está na URL
+        header('Referrer-Policy: no-referrer'); // o link de convite traz o token até a troca pelo cookie
         header('X-Frame-Options: DENY');
         header('X-Content-Type-Options: nosniff');
         header('Permissions-Policy: camera=(self), microphone=(self), display-capture=(self)');

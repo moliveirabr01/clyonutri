@@ -92,12 +92,13 @@ const sid = open.headers.location[0].match(/teleconsulta\/(\d+)/)[1];
 const roomHtml = (await pro.request('GET', `/teleconsulta/${sid}/atendimento`)).text;
 const invite = roomHtml.match(/sala-espera\/([a-f0-9]{64})/)[1];
 const proCsrf = roomHtml.match(/name="_csrf" value="([^"]+)"/)[1];
-const waitHtml = (await pat.request('GET', `/teleconsulta/sala-espera/${invite}`)).text;
+await pat.request('GET', `/teleconsulta/sala-espera/${invite}`); // F05: troca o link pelo cookie
+const waitHtml = (await pat.request('GET', '/teleconsulta/sala-espera')).text;
 const patCsrf = waitHtml.match(/data-tc-csrf="([^"]+)"/)[1];
 const pj = { 'content-type': 'application/json', 'x-csrf-token': patCsrf };
-await pat.request('POST', `/teleconsulta/sala-espera/${invite}/dispositivo`, pj, JSON.stringify({ camera_ok: true, microphone_ok: true }));
-await pat.request('POST', `/teleconsulta/sala-espera/${invite}/consentir`, pj, '{}');
-await pat.request('POST', `/teleconsulta/sala-espera/${invite}/entrar`, pj, '{}');
+await pat.request('POST', '/teleconsulta/sala-espera/dispositivo', pj, JSON.stringify({ camera_ok: true, microphone_ok: true }));
+await pat.request('POST', '/teleconsulta/sala-espera/consentir', pj, '{}');
+await pat.request('POST', '/teleconsulta/sala-espera/entrar', pj, '{}');
 await pro.form('POST', `/teleconsulta/${sid}/admitir`, { _csrf: proCsrf });
 
 // --- Dois pares executando o script das telas ---
@@ -112,7 +113,7 @@ const mk = (b, role, credentialUrl, csrf) => b.lib.start({
 });
 const callPro = mk(P, 'professional', `/teleconsulta/${sid}/midia`, proCsrf);
 await new Promise(r => setTimeout(r, 1500));
-const callPat = mk(Q, 'patient', `/teleconsulta/sala/${invite}/midia`, patCsrf);
+const callPat = mk(Q, 'patient', '/teleconsulta/sala/midia', patCsrf);
 
 const waitFor = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (fn()) return true; await new Promise(r => setTimeout(r, 200)); } return false; };
 const connected = await waitFor(() => callPro.pc?.connectionState === 'connected' && callPat.pc?.connectionState === 'connected', 20000);
@@ -135,9 +136,9 @@ ok(JSON.stringify(shareEvents) === '["screen_share_started","screen_share_stoppe
 // Reconexão: paciente recarrega (novo par) e o nutricionista renegocia.
 callPat.stop(false);
 const Q2 = browserContext(pat, 'paciente-recarregado');
-const reloadHtml = (await pat.request('GET', `/teleconsulta/sala/${invite}`)).text;
+const reloadHtml = (await pat.request('GET', '/teleconsulta/sala')).text;
 const patCsrf2 = reloadHtml.match(/data-tc-csrf="([^"]+)"/)[1];
-const callPat2 = mk(Q2, 'patient', `/teleconsulta/sala/${invite}/midia`, patCsrf2);
+const callPat2 = mk(Q2, 'patient', '/teleconsulta/sala/midia', patCsrf2);
 const reconnected = await waitFor(() => callPat2.pc?.connectionState === 'connected' && callPro.pc?.connectionState === 'connected', 60000);
 ok(reconnected, 'paciente recarrega a página e a chamada se restabelece');
 

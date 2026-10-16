@@ -27,7 +27,7 @@ class Browser {
     const res = await handler.request({ method, url, headers: h, body });
     for (const sc of res.headers['set-cookie'] || []) { const [kv] = sc.split(';'); const i = kv.indexOf('='); this.cookies[kv.slice(0, i)] = kv.slice(i + 1); }
     let data = null; try { data = JSON.parse(res.text); } catch {}
-    return { status: res.httpStatusCode, location: (res.headers.location || [])[0] || '', text: res.text, json: data };
+    return { status: res.httpStatusCode, location: (res.headers.location || [])[0] || '', setCookie: res.headers['set-cookie'] || [], referrer: (res.headers['referrer-policy'] || []).join(','), cache: (res.headers['cache-control'] || []).join(','), text: res.text, json: data };
   }
 }
 const pro = new Browser(), pat = new Browser(), sec = new Browser();
@@ -67,18 +67,27 @@ ok(secRoom.status === 403, `secretaria bloqueada na sala (HTTP ${secRoom.status}
 const anon = await pat.req('GET', `/teleconsulta/${sid}/estado`);
 ok(anon.status !== 200, `estado do profissional sem login recusado (HTTP ${anon.status})`);
 
-const wait = await pat.req('GET', `/teleconsulta/sala-espera/${invite}`);
+// F05: o link troca o token por cookie HttpOnly e redireciona para a URL limpa.
+const exch = await pat.req('GET', `/teleconsulta/sala-espera/${invite}`);
+const ck = exch.setCookie.find(c => c.startsWith('clyo_tele=')) || '';
+ok(exch.status === 303 && exch.location === '/teleconsulta/sala-espera', `link vira redirect 303 para URL limpa (${exch.status} → ${exch.location})`);
+ok(/HttpOnly/i.test(ck) && /SameSite=Lax/i.test(ck) && /Path=\/teleconsulta\//i.test(ck), `cookie do convite HttpOnly, SameSite=Lax, Path=/teleconsulta/ (${ck.replace(/=[a-f0-9]{64}/, '=…')})`);
+ok(/no-referrer/i.test(exch.referrer) && /no-store/i.test(exch.cache), `troca do link com Referrer-Policy no-referrer e no-store (${exch.referrer} / ${exch.cache})`);
+const noCookie = await pat2.req('GET', '/teleconsulta/sala-espera');
+ok(noCookie.status === 403, `URL limpa sem cookie não abre nada (HTTP ${noCookie.status})`);
+const wait = await pat.req('GET', '/teleconsulta/sala-espera');
+ok(!wait.text.includes(invite), 'token não aparece no HTML da sala de espera');
 const patCsrf = (wait.text.match(/data-tc-csrf="([^"]+)"/) || [])[1];
 ok(wait.status === 200 && !!patCsrf, 'paciente abre a sala de espera');
-const noCsrf = await pat.req('POST', `/teleconsulta/sala-espera/${invite}/dispositivo`, { json: { camera_ok: true, microphone_ok: true } });
+const noCsrf = await pat.req('POST', '/teleconsulta/sala-espera/dispositivo', { json: { camera_ok: true, microphone_ok: true } });
 ok(noCsrf.status === 403, `ação do paciente sem CSRF recusada (HTTP ${noCsrf.status})`);
 const H = { 'x-csrf-token': patCsrf };
-ok((await pat.req('POST', `/teleconsulta/sala-espera/${invite}/dispositivo`, { json: { camera_ok: true, microphone_ok: true, browser: 'Chrome/130' }, headers: H })).status === 200, 'teste de dispositivo registrado');
-ok((await pat.req('POST', `/teleconsulta/sala-espera/${invite}/consentir`, { json: {}, headers: H })).status === 200, 'consentimento registrado');
-ok((await pat.req('POST', `/teleconsulta/sala-espera/${invite}/entrar`, { json: {}, headers: H })).status === 200, 'paciente entra na sala de espera');
-const st = await pat.req('GET', `/teleconsulta/sala-espera/${invite}/status`);
+ok((await pat.req('POST', '/teleconsulta/sala-espera/dispositivo', { json: { camera_ok: true, microphone_ok: true, browser: 'Chrome/130' }, headers: H })).status === 200, 'teste de dispositivo registrado');
+ok((await pat.req('POST', '/teleconsulta/sala-espera/consentir', { json: {}, headers: H })).status === 200, 'consentimento registrado');
+ok((await pat.req('POST', '/teleconsulta/sala-espera/entrar', { json: {}, headers: H })).status === 200, 'paciente entra na sala de espera');
+const st = await pat.req('GET', '/teleconsulta/sala-espera/status');
 ok(st.status === 200 && JSON.stringify(Object.keys(st.json)) === '["status","is_admitted"]', `status do lobby sem sala/credencial: ${st.text}`);
-const early = await pat.req('POST', `/teleconsulta/sala/${invite}/midia`, { json: {}, headers: H });
+const early = await pat.req('POST', '/teleconsulta/sala/midia', { json: {}, headers: H });
 ok(early.status === 409, `credencial do paciente antes da admissão recusada (HTTP ${early.status})`);
 
 // Rascunho da evolução (NI2-249) pela rota real
@@ -95,12 +104,14 @@ const proState = await pro.req('GET', `/teleconsulta/${sid}/estado`);
 ok(proState.json && proState.json.patient_waiting === true, 'painel do nutricionista vê o paciente aguardando');
 const adm = await pro.req('POST', `/teleconsulta/${sid}/admitir`, { form: { _csrf: proCsrf } });
 ok(adm.status === 302, `admissão (HTTP ${adm.status})`);
-const st2 = await pat.req('GET', `/teleconsulta/sala-espera/${invite}/status`);
+const st2 = await pat.req('GET', '/teleconsulta/sala-espera/status');
 ok(st2.json && st2.json.is_admitted === true, 'paciente vê que foi admitido');
-ok((await pat.req('GET', `/teleconsulta/sala/${invite}`)).status === 200, 'paciente abre a sala de vídeo');
+ok((await pat.req('GET', '/teleconsulta/sala')).status === 200, 'paciente abre a sala de vídeo (URL limpa)');
+const legacy = await pat.req('POST', `/teleconsulta/sala-espera/${invite}/entrar`, { json: {}, headers: H });
+ok(legacy.status === 404, `rota antiga com token na URL não existe mais (HTTP ${legacy.status})`);
 
 const proCred = await pro.req('POST', `/teleconsulta/${sid}/midia`, { json: {}, headers: { 'x-csrf-token': proCsrf } });
-const patCred = await pat.req('POST', `/teleconsulta/sala/${invite}/midia`, { json: {}, headers: H });
+const patCred = await pat.req('POST', '/teleconsulta/sala/midia', { json: {}, headers: H });
 ok(proCred.status === 200 && patCred.status === 200, `credenciais emitidas (${proCred.status}/${patCred.status})`);
 ok(proCred.json.provider === 'webrtc_p2p' && Array.isArray(proCred.json.ice_servers) && proCred.json.token.split('.').length === 2, 'credencial WebRTC P2P assinada com servidores ICE');
 const roomName = proCred.json.room_name;
@@ -117,6 +128,8 @@ const after = await pat.req('GET', `/teleconsulta/sinal/${roomName}?after=0`, { 
 ok(after.status === 403, `sinalização cortada após encerrar (HTTP ${after.status})`);
 const link = await pat.req('GET', `/teleconsulta/sala-espera/${invite}`);
 ok(link.status === 403 || link.status === 409, `convite inutilizado após encerrar (HTTP ${link.status})`);
+const clean = await pat.req('GET', '/teleconsulta/sala-espera');
+ok(clean.status === 403 || clean.status === 409, `cookie também perde o acesso após encerrar (HTTP ${clean.status})`);
 
 console.log(failures ? `\n${failures} FALHA(S) HTTP` : '\nFLUXO HTTP DO CONSULTÓRIO ONLINE APROVADO');
 process.exit(failures ? 1 : 0);

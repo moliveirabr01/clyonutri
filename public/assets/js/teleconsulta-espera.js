@@ -1,9 +1,8 @@
 /* Sala de espera do paciente (NI2-238/247/248). Dados via data-* no <body>; sem script inline. */
 (function () {
   'use strict';
-  var token = document.body.getAttribute('data-tc-token');
   var csrf = document.body.getAttribute('data-tc-csrf');
-  var base = '/teleconsulta/sala-espera/' + encodeURIComponent(token);
+  var base = '/teleconsulta/sala-espera'; // F05: o convite vai no cookie HttpOnly
   var deviceOk = false, consentOk = false, preview = null;
 
   function post(path, body) {
@@ -54,7 +53,7 @@
       if (!res.ok) { say('tc-wait-status', res.body.error || 'A teleconsulta não está mais disponível.', 'error'); return; }
       if (res.body.is_admitted) {
         if (preview) preview.getTracks().forEach(function (t) { t.stop(); });
-        location.href = '/teleconsulta/sala/' + encodeURIComponent(token);
+        location.href = '/teleconsulta/sala';
         return;
       }
       setTimeout(poll, 3000);
