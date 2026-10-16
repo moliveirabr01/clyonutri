@@ -232,7 +232,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro gravado com sucesso no prontuário!' : 'Operação realizada com sucesso!') ?>
+            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro gravado com sucesso no prontuário!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Operação realizada com sucesso!')) ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -306,8 +306,10 @@ class DashboardController
                 <input type="hidden" name="status" value="in_progress">
                 <button type="submit" class="btn btn-primary" data-testid="care-start">Iniciar atendimento</button>
               </form>
+              <a class="btn btn-secondary" href="/agenda/<?= (int)$stepApp['id'] ?>/reagendar?de=paciente" data-testid="care-reschedule">Reagendar</a>
             <?php elseif ($careStep['state'] === 'upcoming'): ?>
               <a class="btn btn-secondary" href="/agenda?view=day&amp;date=<?= htmlspecialchars(substr($stepApp['scheduled_at'], 0, 10)) ?>">Ver na agenda</a>
+              <a class="btn btn-secondary" href="/agenda/<?= (int)$stepApp['id'] ?>/reagendar?de=paciente" data-testid="care-reschedule">Reagendar</a>
               <a class="btn btn-primary" href="/pacientes/<?= (int)$p['id'] ?>/anamnese">Revisar anamnese</a>
             <?php else: ?>
               <a class="btn btn-primary" href="/agenda?novo=1&amp;paciente=<?= (int)$p['id'] ?>" data-testid="care-schedule">Agendar atendimento</a>
@@ -2254,13 +2256,118 @@ class DashboardController
             header("Location: /agenda?date={$targetDate}&success=agendado");
             exit;
         } catch (AppointmentConflictException $e) {
-            $targetDate = date('Y-m-d', strtotime($scheduledAt));
-            header("Location: /agenda?date={$targetDate}&error=conflito&msg=" . urlencode($e->getMessage()));
+            // UX-05 (v14): conflito mantém o formulário aberto, preenchido e com o horário destacado.
+            $targetDate = date('Y-m-d', strtotime($scheduledAt) ?: time());
+            $this->rememberAgendaForm('new', $e->getMessage(), true);
+            header("Location: /agenda?date={$targetDate}&novo=1&error=conflito#card-novo-agendamento");
             exit;
         } catch (\Throwable $e) {
-            header("Location: /agenda?error=falha&msg=" . urlencode($e->getMessage()));
+            $this->rememberAgendaForm('new', $e->getMessage(), false);
+            header("Location: /agenda?novo=1&error=falha#card-novo-agendamento");
             exit;
         }
+    }
+
+    /** UX-04/05 (v14): guarda o preenchimento do agendamento na sessão (uma leitura, até 1 h). */
+    private function rememberAgendaForm(string $scope, string $message, bool $conflict): void
+    {
+        $values = [];
+        foreach (['patient_id', 'scheduled_at', 'duration_minutes', 'type', 'notes', 'reschedule_reason'] as $k) {
+            if (isset($_POST[$k]) && is_scalar($_POST[$k])) {
+                $values[$k] = mb_substr((string)$_POST[$k], 0, 2000);
+            }
+        }
+        $_SESSION['agenda_form_recovery'] = ['scope' => $scope, 'values' => $values, 'error' => $message, 'conflict' => $conflict, 'at' => time()];
+    }
+
+    /** Lê (e consome) o preenchimento guardado para este escopo. */
+    private function takeAgendaForm(string $scope): ?array
+    {
+        $saved = $_SESSION['agenda_form_recovery'] ?? null;
+        if (!is_array($saved) || ($saved['scope'] ?? '') !== $scope || time() - (int)($saved['at'] ?? 0) > 3600) {
+            return null;
+        }
+        unset($_SESSION['agenda_form_recovery']);
+        return $saved;
+    }
+
+    /** UX-04 (v14): GET /agenda/{id}/reagendar — formulário pré-preenchido; envia para /agenda/{id}/editar. */
+    public function rescheduleAppointmentForm(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $service = new AppointmentService();
+        $app = $service->getAppointment($id);
+        if (!$app) {
+            header('Location: /agenda?error=falha&msg=' . urlencode('Consulta não encontrada.'));
+            exit;
+        }
+        $reschedulable = in_array($app['status'], [AppointmentService::STATUS_SCHEDULED, AppointmentService::STATUS_CONFIRMED], true);
+        $recovered = $this->takeAgendaForm('reschedule:' . $id);
+        $v = $recovered['values'] ?? [];
+        $scheduledValue = $v['scheduled_at'] ?? date('Y-m-d\TH:i', strtotime((string)$app['scheduled_at']));
+        $durationValue = (int)($v['duration_minutes'] ?? $app['duration_minutes'] ?? 60);
+        $reasonValue = (string)($v['reschedule_reason'] ?? '');
+        $from = (string)($_GET['de'] ?? '');
+        $backUrl = $from === 'paciente' ? '/pacientes/' . (int)$app['patient_id'] : '/agenda?date=' . substr((string)$app['scheduled_at'], 0, 10);
+
+        $title = 'Reagendar consulta — ' . ($app['patient_name'] ?? 'Paciente');
+        $activeNav = 'agenda';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
+        $csrfToken = Csrf::generate();
+        ob_start();
+        ?>
+        <div style="font-size: 0.85rem; margin-bottom: 4px;"><a href="<?= htmlspecialchars($backUrl) ?>" style="color: var(--brand-copper-600);">← Voltar</a></div>
+        <h1>Reagendar consulta</h1>
+        <p style="color: var(--neutral-gray-500);"><?= htmlspecialchars($app['patient_name']) ?> • <?= htmlspecialchars(LabelMap::appointmentType($app['type'] ?? null)) ?> • horário atual: <strong data-testid="current-slot"><?= date('d/m/Y H:i', strtotime((string)$app['scheduled_at'])) ?></strong></p>
+        <?php if (!$reschedulable): ?>
+          <div role="alert" class="card" style="border-left: 4px solid #DC2626;">Consultas com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong> não podem ser reagendadas. Para um novo atendimento, use <a href="/agenda?novo=1&amp;paciente=<?= (int)$app['patient_id'] ?>">Nova consulta</a>.</div>
+        <?php else: ?>
+        <div class="card" id="card-reagendar" style="border-top: 4px solid var(--brand-copper-500); max-width: 720px;">
+          <?php if ($recovered): ?>
+            <div role="alert" data-testid="agenda-form-error" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; color: #B91C1C;">
+              <strong><?= !empty($recovered['conflict']) ? 'Horário indisponível.' : 'Não foi possível reagendar.' ?></strong> <?= htmlspecialchars((string)$recovered['error']) ?> Seus dados foram mantidos; escolha outro horário<?= !empty($recovered['conflict']) ? ' ou marque o encaixe' : '' ?>.
+            </div>
+          <?php endif; ?>
+          <form action="/agenda/<?= (int)$app['id'] ?>/editar" method="POST" <?= $recovered ? 'data-start-dirty' : '' ?>>
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <input type="hidden" name="origin" value="reagendar">
+            <input type="hidden" name="de" value="<?= htmlspecialchars($from === 'paciente' ? 'paciente' : 'agenda') ?>">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
+              <div>
+                <label for="rs-scheduled_at" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Novo dia e horário *</label>
+                <input id="rs-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= htmlspecialchars($scheduledValue) ?>"
+                  <?= !empty($recovered['conflict']) ? 'aria-invalid="true" aria-describedby="rs-scheduled_at-erro" autofocus data-conflict-highlight style="width: 100%; padding: 8px 12px; border: 2px solid #DC2626; border-radius: 6px; background: #FEF2F2;"' : 'style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"' ?>>
+                <?php if (!empty($recovered['conflict'])): ?><p id="rs-scheduled_at-erro" class="field-error" style="color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0;">Conflita com outra consulta. Escolha outro horário.</p><?php endif; ?>
+              </div>
+              <div>
+                <label for="rs-duration" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
+                <select id="rs-duration" name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <?php $choices = array_unique([30, 45, 60, 90, 120, $durationValue]); sort($choices); foreach ($choices as $m): ?>
+                    <option value="<?= (int)$m ?>" <?= (int)$m === $durationValue ? 'selected' : '' ?>><?= (int)$m ?> minutos</option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <label for="rs-reason" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Motivo do reagendamento (opcional, fica na trilha da consulta)</label>
+              <input id="rs-reason" type="text" name="reschedule_reason" maxlength="300" value="<?= htmlspecialchars($reasonValue) ?>" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+            </div>
+            <p style="font-size: 0.8rem; color: var(--neutral-gray-500);">A consulta continua a mesma (mesmo paciente, tipo, histórico e vínculos). Se for teleconsulta, o convite anterior deixa de valer e um novo convite deve ser enviado ao paciente.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: 12px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #64748B;"><input type="checkbox" name="allow_conflict" value="1"> Permitir sobreposição de horário (encaixe)</label>
+              <div style="display: flex; gap: 8px;">
+                <a href="<?= htmlspecialchars($backUrl) ?>" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary" data-testid="reschedule-submit">Confirmar reagendamento</button>
+              </div>
+            </div>
+          </form>
+          <p style="font-size: 0.8rem; margin-top: 10px;"><a href="/ajuda/artigo/como-reagendar-uma-consulta">Como reagendar uma consulta</a></p>
+        </div>
+        <?php endif; ?>
+        <?php
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     public function editAppointment(array $params): void
@@ -2275,15 +2382,47 @@ class DashboardController
         $allowConflict = !empty($_POST['allow_conflict']);
 
         $service = new AppointmentService();
+        $isReschedule = ($_POST['origin'] ?? '') === 'reagendar';
+        $back = "/agenda/{$id}/reagendar" . (($_POST['de'] ?? '') === 'paciente' ? '?de=paciente' : '');
         try {
-            $updated = $service->edit($id, $_POST, $allowConflict);
+            $data = $_POST;
+            if ($isReschedule) {
+                // UX-04 (v14): reagendar só altera horário/duração (+ motivo na trilha), apenas de consulta agendada/confirmada e para o futuro.
+                $current = $service->getAppointment($id);
+                if (!$current || !in_array($current['status'], [AppointmentService::STATUS_SCHEDULED, AppointmentService::STATUS_CONFIRMED], true)) {
+                    throw new \InvalidArgumentException('Só é possível reagendar consultas agendadas ou confirmadas.');
+                }
+                $newTs = strtotime(str_replace('T', ' ', (string)($_POST['scheduled_at'] ?? '')));
+                if ($newTs === false) {
+                    throw new \InvalidArgumentException('Informe o novo dia e horário.');
+                }
+                if ($newTs < time()) {
+                    throw new \InvalidArgumentException('O novo horário já passou. Escolha um horário futuro.');
+                }
+                $data = array_intersect_key($_POST, array_flip(['scheduled_at', 'duration_minutes', 'reschedule_reason']));
+            }
+            $updated = $service->edit($id, $data, $allowConflict);
             $targetDate = date('Y-m-d', strtotime($updated['scheduled_at']));
-            header("Location: /agenda?date={$targetDate}&success=editado");
+            if ($isReschedule && ($_POST['de'] ?? '') === 'paciente') {
+                header('Location: /pacientes/' . (int)$updated['patient_id'] . '?success=reagendado');
+                exit;
+            }
+            header("Location: /agenda?date={$targetDate}&success=" . ($isReschedule ? 'reagendado' : 'editado'));
             exit;
         } catch (AppointmentConflictException $e) {
+            if ($isReschedule) {
+                $this->rememberAgendaForm('reschedule:' . $id, $e->getMessage(), true);
+                header("Location: {$back}");
+                exit;
+            }
             header("Location: /agenda?error=conflito&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
+            if ($isReschedule) {
+                $this->rememberAgendaForm('reschedule:' . $id, $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Tente novamente.', false);
+                header("Location: {$back}");
+                exit;
+            }
             header("Location: /agenda?error=falha&msg=" . urlencode($e->getMessage()));
             exit;
         }
@@ -2726,7 +2865,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'agendado' ? 'Consulta agendada com sucesso!' : 'Consulta atualizada com sucesso!' ?>
+            ✓ <?= $_GET['success'] === 'agendado' ? 'Consulta agendada com sucesso!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Consulta atualizada com sucesso!') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['status_updated'])): ?>
@@ -2734,7 +2873,7 @@ class DashboardController
             ✓ Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
           </div>
         <?php endif; ?>
-        <?php if (!empty($_GET['error'])): ?>
+        <?php if (!empty($_GET['error']) && !(($_GET['novo'] ?? '') === '1' && empty($_GET['msg']))): ?>
           <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
             <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
           </div>
@@ -2775,13 +2914,25 @@ class DashboardController
         </div>
 
         <!-- Formulário Retrátil de Novo Agendamento -->
-        <?php $prefillPatient = (isset($_GET['paciente']) && ctype_digit((string)$_GET['paciente'])) ? (int)$_GET['paciente'] : 0; $openNew = ($_GET['novo'] ?? '') === '1'; ?>
+        <?php $prefillPatient = (isset($_GET['paciente']) && ctype_digit((string)$_GET['paciente'])) ? (int)$_GET['paciente'] : 0; $openNew = ($_GET['novo'] ?? '') === '1';
+          // UX-05 (v14): preenchimento devolvido após conflito/falha.
+          $agendaRecovered = $this->takeAgendaForm('new'); $rv = $agendaRecovered['values'] ?? [];
+          if ($agendaRecovered) { $openNew = true; $prefillPatient = (int)($rv['patient_id'] ?? $prefillPatient); }
+          $newConflict = !empty($agendaRecovered['conflict']);
+          $newScheduled = $rv['scheduled_at'] ?? ($currentDate . 'T09:00');
+          if (isset($rv['duration_minutes'])) { $defaultDuration = (int)$rv['duration_minutes']; }
+          $newType = (string)($rv['type'] ?? 'first_visit'); ?>
         <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: <?= $openNew ? 'block' : 'none' ?>; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
           <div class="card__header">
             <h3>Agendar Nova Consulta</h3>
             <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
           </div>
-          <form action="/agenda" method="POST" style="margin-top: 16px;">
+          <?php if ($agendaRecovered): ?>
+            <div role="alert" data-testid="agenda-form-error" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 10px 14px; border-radius: 6px; margin-top: 12px; color: #B91C1C;">
+              <strong><?= $newConflict ? 'Horário indisponível.' : 'Não foi possível agendar.' ?></strong> <?= htmlspecialchars((string)$agendaRecovered['error']) ?> Seus dados foram mantidos; ajuste o horário<?= $newConflict ? ' ou marque o encaixe' : '' ?> e confirme de novo.
+            </div>
+          <?php endif; ?>
+          <form action="/agenda" method="POST" style="margin-top: 16px;" <?= $agendaRecovered ? 'data-start-dirty' : '' ?>>
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
@@ -2797,7 +2948,8 @@ class DashboardController
 
               <div>
                 <label for="dc12-scheduled_at" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Data e Horário *</label>
-                <input id="dc12-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= $currentDate ?>T09:00" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <input id="dc12-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= htmlspecialchars($newScheduled) ?>" <?= $newConflict ? 'aria-invalid="true" aria-describedby="dc12-scheduled_at-erro" autofocus data-conflict-highlight style="width: 100%; padding: 8px 12px; border: 2px solid #DC2626; border-radius: 6px; background: #FEF2F2;"' : 'style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"' ?>>
+                <?php if ($newConflict): ?><p id="dc12-scheduled_at-erro" class="field-error" style="color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0;">Conflita com outra consulta. Escolha outro horário.</p><?php endif; ?>
               </div>
 
               <div>
@@ -2812,16 +2964,16 @@ class DashboardController
               <div>
                 <label for="dc14-type" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Tipo de Atendimento</label>
                 <select id="dc14-type" name="type" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <option value="first_visit">Primeira Consulta / Anamnese</option>
-                  <option value="follow_up">Retorno / Acompanhamento</option>
-                  <option value="telehealth">Teleconsulta</option>
+                  <option value="first_visit" <?= $newType === 'first_visit' ? 'selected' : '' ?>>Primeira Consulta / Anamnese</option>
+                  <option value="follow_up" <?= $newType === 'follow_up' ? 'selected' : '' ?>>Retorno / Acompanhamento</option>
+                  <option value="telehealth" <?= $newType === 'telehealth' ? 'selected' : '' ?>>Teleconsulta</option>
                 </select>
               </div>
             </div>
 
             <div style="margin-bottom: 16px;">
               <label for="dc15-notes" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Observações</label>
-              <textarea id="dc15-notes" name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              <textarea id="dc15-notes" name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars((string)($rv['notes'] ?? '')) ?></textarea>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: 12px;">
@@ -2905,6 +3057,7 @@ class DashboardController
 
                             <!-- Menu de Estados da Consulta -->
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
+                              <a href="/agenda/<?= (int)$a['id'] ?>/reagendar" class="btn btn-secondary" data-testid="agenda-reschedule" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px;">Reagendar</a>
                               <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Deseja marcar como Não Compareceu?">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="no_show">

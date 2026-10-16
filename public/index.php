@@ -334,6 +334,7 @@ $router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Applicati
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
 $router->post('/agenda', $requireAuth([$dashCtrl, 'saveAppointment']));
+$router->get('/agenda/{id}/reagendar', $requireAuth([$dashCtrl, 'rescheduleAppointmentForm'])); // UX-04 (v14)
 $router->post('/agenda/{id}/editar', $requireAuth([$dashCtrl, 'editAppointment']));
 $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointmentStatus']));
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));

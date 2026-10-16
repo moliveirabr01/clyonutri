@@ -103,6 +103,7 @@ class KnowledgeBaseService
     {
         $this->db = $db ?? Connection::getInstance();
         $this->ensureDefaultArticlesSeeded();
+        $this->ensureRescheduleArticle();
     }
 
     /**
@@ -223,6 +224,42 @@ class KnowledgeBaseService
         $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** UX-04 (v14): artigo "Como reagendar uma consulta" (o mesmo texto vai no SQL v14). */
+    public const RESCHEDULE_ARTICLE = [
+        'category' => 'agenda',
+        'slug' => 'como-reagendar-uma-consulta',
+        'title' => 'Como reagendar uma consulta?',
+        'summary' => 'Mude o dia ou horário de uma consulta agendada sem perder o histórico nem os vínculos com o paciente.',
+        'content_markdown' => "### Reagendar uma consulta
+
+1. Na **Agenda**, na linha da consulta (agendada ou confirmada), clique em **Reagendar**. No perfil do paciente, use **Reagendar** no quadro *Próximo passo*.
+2. O formulário já vem com o horário e a duração atuais. Escolha o novo dia e horário e, se quiser, informe o motivo.
+3. Clique em **Confirmar reagendamento**.
+
+#### O que acontece
+- A consulta continua a mesma: paciente, tipo, observações, anamnese, avaliações e planos vinculados não mudam.
+- A trilha da consulta registra o horário anterior, o novo horário, o motivo e quem reagendou.
+- Se o novo horário conflitar com outra consulta, o formulário continua aberto e preenchido, com o horário destacado. Escolha outro horário ou marque **Permitir sobreposição (encaixe)**.
+- Não é possível reagendar para um horário que já passou, nem reagendar consultas concluídas, canceladas ou com falta.
+- Teleconsulta: o convite anterior deixa de valer; envie um novo convite ao paciente.",
+    ];
+
+    public function ensureRescheduleArticle(): void
+    {
+        try {
+            $check = $this->db->prepare('SELECT COUNT(*) FROM helpdesk_articles WHERE slug = :slug');
+            $check->execute(['slug' => self::RESCHEDULE_ARTICLE['slug']]);
+            if ((int)$check->fetchColumn() > 0) {
+                return;
+            }
+            $this->db->prepare("INSERT INTO helpdesk_articles (category, slug, title, summary, content_markdown, is_published, view_count, created_at, updated_at)
+                VALUES (:category, :slug, :title, :summary, :content_markdown, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+                ->execute(self::RESCHEDULE_ARTICLE);
+        } catch (\PDOException $e) {
+            // Artigo de ajuda é acessório: não derruba a central de ajuda (tabela antiga/sem permissão).
+        }
     }
 
     /**

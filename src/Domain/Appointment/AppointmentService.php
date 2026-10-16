@@ -247,7 +247,11 @@ class AppointmentService
                 $current['status'],
                 $current['status'],
                 $userId ?? TenantContext::getUserId(),
-                "Consulta editada / reagendada para {$scheduledAt}"
+                // UX-04 (v14): trilha legível com horário anterior, novo horário e motivo (se informado).
+                ($scheduledAt !== $current['scheduled_at']
+                    ? 'Consulta reagendada de ' . date('d/m/Y H:i', strtotime((string)$current['scheduled_at'])) . ' para ' . date('d/m/Y H:i', strtotime($scheduledAt))
+                    : "Consulta editada (horário mantido: " . date('d/m/Y H:i', strtotime($scheduledAt)) . ')')
+                . (trim((string)($data['reschedule_reason'] ?? '')) !== '' ? '. Motivo: ' . mb_substr(trim((string)$data['reschedule_reason']), 0, 300) : '')
             );
 
             // Teleconsulta (NI2-236/250 + v11 F04): trocar profissional/paciente ou deixar de ser online encerra a sessão;
