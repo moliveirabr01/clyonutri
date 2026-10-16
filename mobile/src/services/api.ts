@@ -182,7 +182,9 @@ export interface Appointment {
   status: 'scheduled' | 'confirmed' | 'cancelled';
   notes?: string;
   professional_name?: string;
-  meeting_url?: string;
+  meeting_url?: string | null;
+  is_online?: boolean;
+  video_status?: 'indisponivel_no_app' | 'presencial';
 }
 
 export interface PatientRecipePrescription {

@@ -8,6 +8,11 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use PDO;
 
+/**
+ * LEGADO (tabela telehealth_sessions). Desativado na v11 (NI2-221 F02):
+ * gerava a URL fictícia meet.clyonutri.com.br, que não existe. O modelo único é teleconsultation_sessions
+ * (TeleconsultationService). Nada novo é gravado em telehealth_sessions; a tabela fica intacta (sem DROP).
+ */
 class TelehealthService
 {
     private PDO $db;
@@ -17,41 +22,17 @@ class TelehealthService
         $this->db = $db ?? Connection::getInstance();
     }
 
+    /** @throws \RuntimeException sempre: não há mais geração de link fictício. */
     public function generateSession(int $appointmentId, string $provider = 'clyo_meet'): array
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-        $roomCode = 'clyo-' . bin2hex(random_bytes(6));
-        $meetingUrl = "https://meet.clyonutri.com.br/room/{$roomCode}";
-
-        $stmt = $this->db->prepare("
-            INSERT INTO telehealth_sessions (clinic_id, appointment_id, meeting_url, provider, status)
-            VALUES (:clinic_id, :appointment_id, :meeting_url, :provider, 'ready')
-        ");
-
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'appointment_id' => $appointmentId,
-            'meeting_url' => $meetingUrl,
-            'provider' => $provider,
-        ]);
-
-        return [
-            'id' => (int)$this->db->lastInsertId(),
-            'appointment_id' => $appointmentId,
-            'meeting_url' => $meetingUrl,
-            'provider' => $provider,
-        ];
+        throw new \RuntimeException('Teleconsulta legada desativada: use a sala de teleconsulta da agenda (vídeo depende de provedor configurado).');
     }
 
+    /** Sempre null: o modelo legado não é mais lido (evita exibir URL fictícia). */
     public function getSessionByAppointment(int $appointmentId): ?array
     {
-        $clinicId = TenantContext::getClinicId();
-        $stmt = $this->db->prepare("
-            SELECT * FROM telehealth_sessions WHERE appointment_id = :app_id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['app_id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $session = $stmt->fetch();
-        return $session ?: null;
+        return null;
     }
 }

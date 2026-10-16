@@ -388,17 +388,24 @@ class PatientPortalService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
-            SELECT a.*, u.name AS professional_name, t.meeting_url
+            SELECT a.*, u.name AS professional_name, NULL AS meeting_url
             FROM appointments a
             LEFT JOIN professionals p ON p.id = a.professional_id
             LEFT JOIN users u ON u.id = p.user_id
-            LEFT JOIN telehealth_sessions t ON t.appointment_id = a.id
             WHERE a.patient_id = :patient_id AND a.clinic_id = :clinic_id AND a.status IN ('scheduled', 'confirmed')
             ORDER BY a.scheduled_at ASC LIMIT 1
         ");
         $stmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: null;
+        if (!$row) {
+            return null;
+        }
+        // NI2-221 F02 (v11): o portal/app não recebe mais a URL fictícia da tabela legada telehealth_sessions.
+        // Estado honesto: consulta online, vídeo indisponível pelo app; o link vem da clínica (F03 em aberto).
+        $row['meeting_url'] = null;
+        $row['is_online'] = \ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($row['type'] ?? null);
+        $row['video_status'] = $row['is_online'] ? 'indisponivel_no_app' : 'presencial';
+        return $row;
     }
 
     public function confirmAppointment(int $patientId, int $appointmentId): bool

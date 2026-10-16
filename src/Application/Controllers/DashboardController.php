@@ -2298,9 +2298,11 @@ class DashboardController
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
               <?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?>
             </span>
+            <?php if (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($app['type'] ?? null)): /* NI2-221 F19: só consulta online */ ?>
             <a href="/teleconsulta/sessao-agenda/<?= $app['id'] ?>" class="btn btn-primary" style="background-color: #059669; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
-              <span>📹 Consultório Online</span>
+              <span>📹 Teleconsulta</span>
             </a>
+            <?php endif; ?>
             <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
               Ver perfil do paciente ↗
             </a>
