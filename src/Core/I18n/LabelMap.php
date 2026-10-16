@@ -311,7 +311,8 @@ class LabelMap
     {
         return match ($value) {
             'waiting_room' => 'Na sala de espera', 'device_checked' => 'Dispositivo verificado',
-            'scheduled' => 'Agendada', 'in_progress','active','started' => 'Em atendimento',
+            'scheduled' => 'Agendada', 'in_progress','active','started','admitted' => 'Em atendimento',
+            'rejected' => 'Entrada recusada',
             'completed','ended' => 'Encerrada', 'cancelled','canceled' => 'Cancelada',
             'expired' => 'Expirada', default => 'Em acompanhamento',
         };

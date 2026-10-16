@@ -11,542 +11,939 @@ use ClyoNutri\Core\Security\TenantSecurityException;
 use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Telehealth\Contracts\VideoConferenceProviderInterface;
 use ClyoNutri\Domain\Telehealth\Exceptions\ExternalMediaProviderBlockedException;
-use ClyoNutri\Domain\Telehealth\Providers\DailyVideoProvider;
+use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationStateException;
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 use PDO;
-use RuntimeException;
 
 /**
- * Serviço de Domínio para Gestão do Consultório Online / Teleconsulta.
- * Implementa a jornada clínica de teleconsulta em conformidade com as resoluções
- * do CFN (Conselho Federal de Nutricionistas), LGPD e normas de segurança da informação.
+ * Consultório Online — serviço de domínio (NI2-235/236/237/243/244/247/249/431).
+ *
+ * Contratos:
+ * - Uma sessão por agendamento; criação idempotente.
+ * - Estados e transições explícitos (TRANSITIONS); toda transição grava evento
+ *   de auditoria na mesma transação — se a auditoria falhar, a ação falha.
+ * - Instantes novos em UTC (colunas *_utc). A janela de entrada deriva do horário
+ *   da consulta, interpretado no fuso da aplicação (APP_TIMEZONE).
+ * - Convite (token do paciente) guardado só como hash, com janela e geração;
+ *   cancelamento, reagendamento, recusa e encerramento revogam a geração atual.
+ * - Credenciais de mídia são emitidas sob demanda e nunca persistidas;
+ *   o paciente só recebe credencial depois de admitido.
+ * - Encerrar a mídia NÃO conclui a consulta nem publica nada: a conclusão
+ *   clínica segue pelo fluxo da agenda (/consulta/{id}).
+ * - Somente o nutricionista responsável pelo agendamento opera a sessão;
+ *   outros membros do tenant (inclusive secretaria) não acessam sala nem notas.
  */
 class TeleconsultationService
 {
+    public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_DEVICE_CHECKED = 'device_checked';
+    public const STATUS_WAITING_ROOM = 'waiting_room';
+    public const STATUS_ADMITTED = 'admitted';
+    public const STATUS_ENDED = 'ended';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_EXPIRED = 'expired';
+
+    public const REJECT_REASONS = ['identity_not_confirmed', 'wrong_patient', 'patient_request', 'other'];
+
+    /** 'completed' e 'in_progress' são valores legados (antes de 15/10/2026). */
+    public const TERMINAL_STATUSES = ['ended', 'rejected', 'cancelled', 'expired', 'completed'];
+
+    private const TRANSITIONS = [
+        'scheduled' => ['device_checked', 'waiting_room', 'cancelled', 'expired', 'scheduled'],
+        'device_checked' => ['waiting_room', 'cancelled', 'expired', 'scheduled'],
+        'waiting_room' => ['admitted', 'rejected', 'cancelled', 'expired', 'scheduled'],
+        'admitted' => ['ended', 'cancelled'],
+        'in_progress' => ['ended', 'cancelled'],
+        'rejected' => ['scheduled'],
+        'expired' => ['scheduled'],
+        'ended' => [],
+        'cancelled' => [],
+        'completed' => [],
+    ];
+
     private PDO $db;
     private VideoConferenceProviderInterface $videoProvider;
     private ClinicalRecordService $clinicalRecordService;
+    private ?DateTimeImmutable $fixedNow;
 
     public function __construct(
         ?PDO $db = null,
         ?VideoConferenceProviderInterface $videoProvider = null,
-        ?ClinicalRecordService $clinicalRecordService = null
+        ?ClinicalRecordService $clinicalRecordService = null,
+        ?DateTimeImmutable $now = null
     ) {
         $this->db = $db ?? Connection::getInstance();
-        $this->videoProvider = $videoProvider ?? new DailyVideoProvider();
+        $this->videoProvider = $videoProvider ?? TeleconsultationProviderFactory::make($this->db);
         $this->clinicalRecordService = $clinicalRecordService ?? new ClinicalRecordService($this->db);
+        $this->fixedNow = $now;
     }
 
     /**
-     * Agenda e provisiona uma sessão de teleconsulta para um agendamento existente.
-     * Vínculo estrito com paciente, profissional e tenant.
+     * Converte o usuário autenticado (users.id) no profissional (professionals.id)
+     * habilitado no tenant. Nunca use user_id como professional_id.
      */
-    public function scheduleSession(int $appointmentId, ?int $clinicId = null): array
+    public function resolveProfessionalIdForUser(int $userId, ?int $clinicId = null): int
     {
-        $tenantClinicId = $clinicId ?? TenantContext::getClinicId();
-        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $tenantClinicId, $this->db);
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $stmt = $this->db->prepare('SELECT id FROM professionals WHERE user_id = :uid');
+        $stmt->execute(['uid' => $userId]);
+        $professionalId = (int)($stmt->fetchColumn() ?: 0);
+        if ($professionalId === 0) {
+            throw new TenantSecurityException('Usuário sem perfil de nutricionista não pode operar o Consultório Online.');
+        }
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        return $professionalId;
+    }
 
-        // 1. Obter detalhes da consulta
-        $stmtApp = $this->db->prepare("
-            SELECT a.id, a.clinic_id, a.patient_id, a.professional_id, a.scheduled_at, a.status,
-                   p.name AS patient_name, u.name AS professional_name, pr.crn AS council_number
-            FROM appointments a
-            INNER JOIN patients p ON p.id = a.patient_id
-            INNER JOIN professionals pr ON pr.id = a.professional_id
-            INNER JOIN users u ON u.id = pr.user_id
-            WHERE a.id = :app_id AND a.clinic_id = :clinic_id
-        ");
-        $stmtApp->execute(['app_id' => $appointmentId, 'clinic_id' => $tenantClinicId]);
-        $appointment = $stmtApp->fetch();
+    /**
+     * Cria (ou devolve) a sessão do agendamento. Idempotente.
+     * O convite em claro só é retornado quando a sessão é criada;
+     * depois disso use issueInvite().
+     */
+    public function scheduleSession(int $appointmentId, int $professionalId, ?int $clinicId = null): array
+    {
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $appointment = $this->loadAppointmentForProfessional($appointmentId, $professionalId, $clinicId);
 
-        if (!$appointment) {
-            throw new InvalidArgumentException("Agendamento {$appointmentId} não encontrado no tenant {$tenantClinicId}.");
+        $existing = $this->findSessionIdByAppointment($appointmentId, $clinicId);
+        if ($existing !== null) {
+            return ['session_id' => $existing, 'created' => false, 'raw_patient_token' => null];
         }
 
-        // 2. Verificar se já existe sessão ativa para este agendamento (impede duplicação)
-        $stmtExisting = $this->db->prepare("
-            SELECT id, status, patient_token_hash FROM teleconsultation_sessions 
-            WHERE appointment_id = :app_id AND clinic_id = :clinic_id
-        ");
-        $stmtExisting->execute(['app_id' => $appointmentId, 'clinic_id' => $tenantClinicId]);
-        $existing = $stmtExisting->fetch();
-
-        if ($existing) {
-            throw new RuntimeException("Já existe uma sessão de teleconsulta criada para o agendamento #{$appointmentId}.");
+        if (!in_array($appointment['status'], ['scheduled', 'confirmed', 'in_progress'], true)) {
+            throw new TeleconsultationStateException("Consulta #{$appointmentId} está '{$appointment['status']}' e não pode receber teleconsulta.");
         }
 
-        // 3. Gerar tokens seguros de acesso
-        $rawPatientToken = bin2hex(random_bytes(32));
-        $patientTokenHash = hash('sha256', $rawPatientToken);
+        [$opensAt, $closesAt] = $this->joinWindow($appointment);
+        $rawToken = bin2hex(random_bytes(32));
+        $now = $this->nowSql();
 
-        $rawProfessionalToken = bin2hex(random_bytes(32));
-        $professionalTokenHash = hash('sha256', $rawProfessionalToken);
-
-        $roomName = "clyo-tele-{$tenantClinicId}-{$appointmentId}-" . bin2hex(random_bytes(4));
-        $externalRoomId = null;
-        $externalRoomUrl = null;
-        $mediaProviderStatus = 'unconfigured';
-
-        // 4. Tentar provisionar sala no provedor de vídeo real
+        $sessionId = 0;
         try {
-            $roomData = $this->videoProvider->createRoom($roomName, 7200);
-            $externalRoomId = $roomData['room_id'];
-            $externalRoomUrl = $roomData['room_url'];
-            $mediaProviderStatus = 'active';
-        } catch (ExternalMediaProviderBlockedException $e) {
-            // Documentar formalmente o estado BLOCKED do provedor sem usar URLs falsas
-            $mediaProviderStatus = 'BLOCKED: ' . $e->getMessage();
+            $this->transaction(function () use (&$sessionId, $clinicId, $appointmentId, $appointment, $professionalId, $rawToken, $opensAt, $closesAt, $now): void {
+                $this->db->prepare("
+                    INSERT INTO teleconsultation_sessions (
+                        clinic_id, appointment_id, patient_id, professional_id, provider, provider_status,
+                        patient_token_hash, professional_token_hash, status,
+                        join_opens_at_utc, join_closes_at_utc, invite_generation, invite_issued_at_utc,
+                        created_at, updated_at
+                    ) VALUES (
+                        :clinic_id, :appointment_id, :patient_id, :professional_id, :provider, 'pending',
+                        :token_hash, NULL, 'scheduled',
+                        :opens, :closes, 1, :now, :now, :now
+                    )
+                ")->execute([
+                    'clinic_id' => $clinicId,
+                    'appointment_id' => $appointmentId,
+                    'patient_id' => (int)$appointment['patient_id'],
+                    'professional_id' => $professionalId,
+                    'provider' => $this->videoProvider->getProviderName(),
+                    'token_hash' => hash('sha256', $rawToken),
+                    'opens' => $opensAt->format('Y-m-d H:i:s'),
+                    'closes' => $closesAt->format('Y-m-d H:i:s'),
+                    'now' => $now,
+                ]);
+                $sessionId = (int)$this->db->lastInsertId();
+                $this->recordEvent($sessionId, $clinicId, 'session_created', 'professional', $professionalId, [
+                    'appointment_id' => $appointmentId,
+                    'invite_generation' => 1,
+                ]);
+            });
+        } catch (\PDOException $e) {
+            // Corrida: outra requisição criou a sessão do mesmo agendamento.
+            $raced = $this->findSessionIdByAppointment($appointmentId, $clinicId);
+            if ($raced !== null) {
+                return ['session_id' => $raced, 'created' => false, 'raw_patient_token' => null];
+            }
+            throw $e;
         }
-
-        // 5. Persistir sessão no banco de dados de produção
-        $insertStmt = $this->db->prepare("
-            INSERT INTO teleconsultation_sessions (
-                clinic_id, appointment_id, patient_id, professional_id, provider,
-                external_room_id, external_room_url, patient_token_hash, professional_token_hash,
-                status, created_at, updated_at
-            ) VALUES (
-                :clinic_id, :appointment_id, :patient_id, :professional_id, :provider,
-                :external_room_id, :external_room_url, :patient_token_hash, :professional_token_hash,
-                'scheduled', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            )
-        ");
-
-        $insertStmt->execute([
-            'clinic_id' => $tenantClinicId,
-            'appointment_id' => $appointmentId,
-            'patient_id' => (int)$appointment['patient_id'],
-            'professional_id' => (int)$appointment['professional_id'],
-            'provider' => $this->videoProvider->getProviderName(),
-            'external_room_id' => $externalRoomId,
-            'external_room_url' => $externalRoomUrl,
-            'patient_token_hash' => $patientTokenHash,
-            'professional_token_hash' => $professionalTokenHash,
-        ]);
-
-        $sessionId = (int)$this->db->lastInsertId();
-
-        // 6. Registrar trilha de auditoria
-        $this->recordEvent($sessionId, $tenantClinicId, 'session_created', 'professional', (int)$appointment['professional_id'], [
-            'appointment_id' => $appointmentId,
-            'media_provider_status' => $mediaProviderStatus,
-        ]);
 
         return [
             'session_id' => $sessionId,
-            'appointment_id' => $appointmentId,
-            'patient_id' => (int)$appointment['patient_id'],
-            'professional_id' => (int)$appointment['professional_id'],
-            'status' => 'scheduled',
-            'raw_patient_token' => $rawPatientToken,
-            'patient_invite_url' => "/teleconsulta/sala-espera/{$rawPatientToken}",
-            'media_provider_status' => $mediaProviderStatus,
-            'external_room_url' => $externalRoomUrl,
+            'created' => true,
+            'raw_patient_token' => $rawToken,
+            'patient_invite_path' => '/teleconsulta/sala-espera/' . $rawToken,
+            'join_opens_at_utc' => $opensAt->format('Y-m-d H:i:s'),
+            'join_closes_at_utc' => $closesAt->format('Y-m-d H:i:s'),
         ];
     }
 
     /**
-     * Valida o token e retorna a sessão para o paciente.
+     * Emite novo convite, revogando o anterior (nova geração). Volta a sessão para
+     * 'scheduled' e exige novo teste de dispositivo. Não vale para sessões
+     * encerradas ou canceladas.
      */
-    public function getSessionByPatientToken(string $rawToken): array
+    public function issueInvite(int $sessionId, int $professionalId, ?int $clinicId = null): array
     {
-        $tokenHash = hash('sha256', $rawToken);
-
-        $stmt = $this->db->prepare("
-            SELECT s.*, p.name AS patient_name, u.name AS professional_name, pr.crn AS council_number,
-                   a.scheduled_at, c.name AS clinic_name
-            FROM teleconsultation_sessions s
-            INNER JOIN patients p ON p.id = s.patient_id
-            INNER JOIN professionals pr ON pr.id = s.professional_id
-            INNER JOIN users u ON u.id = pr.user_id
-            INNER JOIN appointments a ON a.id = s.appointment_id
-            INNER JOIN clinics c ON c.id = s.clinic_id
-            WHERE s.patient_token_hash = :hash
-        ");
-        $stmt->execute(['hash' => $tokenHash]);
-        $session = $stmt->fetch();
-
-        if (!$session) {
-            throw new TenantSecurityException("Convite de teleconsulta inválido, inexistente ou expirado.");
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        $appointment = $this->loadAppointmentForProfessional((int)$session['appointment_id'], $professionalId, $clinicId);
+        if (!in_array($appointment['status'], ['scheduled', 'confirmed', 'in_progress'], true)) {
+            throw new TeleconsultationStateException('A consulta não está ativa; não é possível emitir convite.');
         }
+        $this->assertTransition($session['status'], self::STATUS_SCHEDULED);
 
-        if (in_array($session['status'], ['completed', 'cancelled', 'rejected'], true)) {
-            throw new TenantSecurityException("Esta sessão de teleconsulta foi encerrada ou cancelada (Status: {$session['status']}).");
-        }
+        [$opensAt, $closesAt] = $this->joinWindow($appointment);
+        $rawToken = bin2hex(random_bytes(32));
+        $generation = (int)$session['invite_generation'] + 1;
+        $now = $this->nowSql();
 
-        return $session;
+        $this->transaction(function () use ($sessionId, $clinicId, $session, $rawToken, $generation, $now, $opensAt, $closesAt, $professionalId): void {
+            $this->guardedUpdate($sessionId, $clinicId, $session['status'], [
+                'patient_token_hash' => hash('sha256', $rawToken),
+                'invite_generation' => $generation,
+                'invite_issued_at_utc' => $now,
+                'invite_revoked_at_utc' => null,
+                'join_opens_at_utc' => $opensAt->format('Y-m-d H:i:s'),
+                'join_closes_at_utc' => $closesAt->format('Y-m-d H:i:s'),
+                'device_check_passed' => 0,
+                'status' => self::STATUS_SCHEDULED,
+            ]);
+            $this->recordEvent($sessionId, $clinicId, 'invite_reissued', 'professional', $professionalId, [
+                'invite_generation' => $generation,
+                'previous_status' => $session['status'],
+            ]);
+        });
+
+        return [
+            'session_id' => $sessionId,
+            'raw_patient_token' => $rawToken,
+            'patient_invite_path' => '/teleconsulta/sala-espera/' . $rawToken,
+            'invite_generation' => $generation,
+            'join_opens_at_utc' => $opensAt->format('Y-m-d H:i:s'),
+            'join_closes_at_utc' => $closesAt->format('Y-m-d H:i:s'),
+        ];
     }
 
-    /**
-     * Retorna a sessão pelo ID garantindo isolamento estrito de tenant.
-     */
+    /** Sessão vista pelo profissional responsável (aplica expiração). */
+    public function getSessionForProfessional(int $sessionId, int $professionalId, ?int $clinicId = null): array
+    {
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        $session = $this->getSessionById($sessionId, $clinicId);
+        if ((int)$session['professional_id'] !== $professionalId) {
+            throw new TenantSecurityException('Apenas o nutricionista responsável pelo agendamento acessa esta teleconsulta.');
+        }
+        return $this->applyExpiry($session);
+    }
+
+    /** Leitura escopada ao tenant, sem checagem de responsável (uso interno/auditoria). */
     public function getSessionById(int $sessionId, ?int $clinicId = null): array
     {
-        $tenantClinicId = $clinicId ?? TenantContext::getClinicId();
-
-        $stmt = $this->db->prepare("
-            SELECT s.*, p.name AS patient_name, p.email AS patient_email, 
-                   u.name AS professional_name, pr.crn AS council_number,
-                   a.scheduled_at, a.notes AS appointment_notes
-            FROM teleconsultation_sessions s
-            INNER JOIN patients p ON p.id = s.patient_id
-            INNER JOIN professionals pr ON pr.id = s.professional_id
-            INNER JOIN users u ON u.id = pr.user_id
-            INNER JOIN appointments a ON a.id = s.appointment_id
-            WHERE s.id = :id AND s.clinic_id = :clinic_id
-        ");
-        $stmt->execute(['id' => $sessionId, 'clinic_id' => $tenantClinicId]);
-        $session = $stmt->fetch();
-
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $stmt = $this->db->prepare(self::SESSION_SELECT . ' WHERE s.id = :id AND s.clinic_id = :clinic_id');
+        $stmt->execute(['id' => $sessionId, 'clinic_id' => $clinicId]);
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$session) {
             throw new TenantSecurityException("Sessão de teleconsulta #{$sessionId} não encontrada no tenant.");
         }
-
         return $session;
     }
 
-    /**
-     * Registra a realização do teste pré-consulta de dispositivos de mídia (câmera/microfone).
-     */
-    public function submitDeviceCheck(string $rawToken, array $metrics): array
+    /** Estado resumido para o painel do profissional (polling). */
+    public function professionalState(int $sessionId, int $professionalId, ?int $clinicId = null): array
     {
-        $session = $this->getSessionByPatientToken($rawToken);
-
-        $cameraOk = !empty($metrics['camera_ok']);
-        $micOk = !empty($metrics['microphone_ok']);
-
-        if (!$cameraOk || !$micOk) {
-            throw new InvalidArgumentException("O teste de dispositivo requer confirmação operacional de câmera e microfone.");
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET device_check_passed = 1,
-                status = CASE WHEN status = 'scheduled' THEN 'device_checked' ELSE status END,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id
-        ");
-        $stmt->execute(['id' => $session['id']]);
-
-        $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'device_checked', 'patient', (int)$session['patient_id'], [
-            'camera_ok' => $cameraOk,
-            'microphone_ok' => $micOk,
-            'browser' => $metrics['browser'] ?? 'unknown',
-        ]);
-
-        return ['success' => true, 'device_check_passed' => 1];
-    }
-
-    /**
-     * Registra o consentimento informado da teleconsulta (LGPD e Resoluções CFN).
-     */
-    public function acceptConsent(string $rawToken, string $termVersion, ?string $ipAddress = null, ?string $userAgent = null): array
-    {
-        $session = $this->getSessionByPatientToken($rawToken);
-
-        if (empty(trim($termVersion))) {
-            throw new InvalidArgumentException("Versão do termo de consentimento é obrigatória.");
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET consent_term_version = :version,
-                consent_accepted_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id
-        ");
-        $stmt->execute(['version' => $termVersion, 'id' => $session['id']]);
-
-        // Registrar também na tabela geral de consentimentos LGPD se disponível
-        try {
-            $stmtLgpd = $this->db->prepare("
-                INSERT INTO patient_consents (patient_id, consent_type, agreed, agreed_at, ip_address, user_agent)
-                VALUES (:patient_id, 'telehealth', 1, CURRENT_TIMESTAMP, :ip, :ua)
-            ");
-            $stmtLgpd->execute([
-                'patient_id' => $session['patient_id'],
-                'ip' => $ipAddress,
-                'ua' => $userAgent,
-            ]);
-        } catch (\Throwable $e) {
-            // Continua mesmo se a tabela de consentimentos genérica tiver campos divergentes
-        }
-
-        $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'consent_signed', 'patient', (int)$session['patient_id'], [
-            'term_version' => $termVersion,
-            'ip' => $ipAddress,
-        ]);
-
-        return ['success' => true, 'term_version' => $termVersion];
-    }
-
-    /**
-     * Paciente ingressa na sala de espera virtual (lobby).
-     */
-    public function enterWaitingRoom(string $rawToken): array
-    {
-        $session = $this->getSessionByPatientToken($rawToken);
-
-        if ((int)$session['device_check_passed'] !== 1) {
-            throw new RuntimeException("É obrigatório concluir o teste de áudio e vídeo antes de entrar na sala de espera.");
-        }
-
-        if (empty($session['consent_accepted_at'])) {
-            throw new RuntimeException("É obrigatório aceitar o termo de consentimento antes de ingressar no consultório.");
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET status = 'waiting_room',
-                waiting_room_entered_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND status IN ('scheduled', 'device_checked', 'waiting_room')
-        ");
-        $stmt->execute(['id' => $session['id']]);
-
-        $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'waiting_room_entered', 'patient', (int)$session['patient_id'], [
-            'timestamp' => date('Y-m-d H:i:s'),
-        ]);
-
-        return [
-            'session_id' => $session['id'],
-            'status' => 'waiting_room',
-            'patient_name' => $session['patient_name'],
-            'professional_name' => $session['professional_name'],
-        ];
-    }
-
-    /**
-     * Consulta o status da sala de espera pelo paciente.
-     */
-    public function checkWaitingRoomStatus(string $rawToken): array
-    {
-        $session = $this->getSessionByPatientToken($rawToken);
-
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
         return [
             'session_id' => (int)$session['id'],
             'status' => $session['status'],
-            'is_admitted' => in_array($session['status'], ['admitted', 'in_progress'], true),
-            'external_room_url' => $session['external_room_url'],
-            'media_provider' => $session['provider'],
+            'patient_waiting' => $session['status'] === self::STATUS_WAITING_ROOM,
+            'media_ready' => $this->roomReady($session),
+            'provider_status' => $session['provider_status'],
         ];
     }
 
     /**
-     * Profissional admite o paciente da sala de espera para a consulta ativa.
+     * Acesso do paciente autenticado (app/portal): bilhete assinado, curto e sem
+     * rotacionar o convite do nutricionista. Só existe se a sessão já foi aberta
+     * pelo nutricionista e não está encerrada. O bilhete é revalidado a cada uso.
      */
+    public function issuePortalTicket(int $patientId, int $appointmentId, int $clinicId, int $maxTtlSeconds = 7200): ?string
+    {
+        $session = $this->findSessionRowByAppointment($appointmentId, $clinicId);
+        if ($session === null || (int)$session['patient_id'] !== $patientId) {
+            return null;
+        }
+        $session = $this->applyExpiry($session);
+        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+            return null;
+        }
+        $key = self::ticketKey();
+        if ($key === null) {
+            return null;
+        }
+        $exp = min(
+            $this->utc((string)$session['join_closes_at_utc'])->getTimestamp(),
+            $this->now()->getTimestamp() + max(60, $maxTtlSeconds)
+        );
+        // Geração do convite no bilhete: emitir novo convite invalida bilhetes (app e e-mail) antigos.
+        $body = 'p.' . (int)$session['id'] . '.' . $patientId . '.' . (int)$session['invite_generation'] . '.' . $exp;
+        return $body . '.' . rtrim(strtr(base64_encode(hash_hmac('sha256', $body, $key, true)), '+/', '-_'), '=');
+    }
+
+    /** Valida o convite (hash de 64 hex) ou o bilhete do app; estado não terminal e janela. */
+    public function getSessionByPatientToken(string $rawToken): array
+    {
+        if (preg_match('/^p\.(\d{1,10})\.(\d{1,10})\.(\d{1,6})\.(\d{1,12})\.([A-Za-z0-9_-]{43})$/', $rawToken, $m)) {
+            $key = self::ticketKey();
+            $body = "p.{$m[1]}.{$m[2]}.{$m[3]}.{$m[4]}";
+            $expected = rtrim(strtr(base64_encode(hash_hmac('sha256', $body, (string)$key, true)), '+/', '-_'), '=');
+            if ($key === null || !hash_equals($expected, $m[5]) || (int)$m[4] < $this->now()->getTimestamp()) {
+                throw new TenantSecurityException('Este acesso à teleconsulta expirou. Abra novamente pelo aplicativo ou peça um novo convite.');
+            }
+            $stmt = $this->db->prepare(self::SESSION_SELECT . ' WHERE s.id = :id AND s.patient_id = :pid');
+            $stmt->execute(['id' => (int)$m[1], 'pid' => (int)$m[2]]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$session || (int)$session['invite_generation'] !== (int)$m[3]) {
+                throw new TenantSecurityException('Convite de teleconsulta inválido ou substituído.');
+            }
+        } else {
+            if (!preg_match('/^[a-f0-9]{64}$/', $rawToken)) {
+                throw new TenantSecurityException('Convite de teleconsulta inválido.');
+            }
+            $stmt = $this->db->prepare(self::SESSION_SELECT . ' WHERE s.patient_token_hash = :hash');
+            $stmt->execute(['hash' => hash('sha256', $rawToken)]);
+            $session = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$session || !empty($session['invite_revoked_at_utc'])) {
+                throw new TenantSecurityException('Convite de teleconsulta inválido, substituído ou revogado.');
+            }
+        }
+        $session = $this->applyExpiry($session);
+        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+            throw new TeleconsultationStateException('Esta teleconsulta não está mais disponível. Fale com seu nutricionista.');
+        }
+        return $session;
+    }
+
+    public function submitDeviceCheck(string $rawToken, array $metrics): array
+    {
+        $session = $this->getSessionByPatientToken($rawToken);
+        if (empty($metrics['camera_ok']) || empty($metrics['microphone_ok'])) {
+            throw new InvalidArgumentException('O teste precisa confirmar câmera e microfone funcionando.');
+        }
+        $target = $session['status'] === self::STATUS_SCHEDULED ? self::STATUS_DEVICE_CHECKED : $session['status'];
+        if ($target !== $session['status']) {
+            $this->assertTransition($session['status'], $target);
+        }
+
+        $this->transaction(function () use ($session, $target, $metrics): void {
+            $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
+                'device_check_passed' => 1,
+                'status' => $target,
+            ]);
+            $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'device_checked', 'patient', (int)$session['patient_id'], [
+                'browser_family' => self::browserFamily((string)($metrics['browser'] ?? '')),
+            ]);
+        });
+        return ['device_check_passed' => true, 'status' => $target];
+    }
+
+    public function acceptConsent(string $rawToken, string $termVersion, ?string $ipAddress = null, ?string $userAgent = null): array
+    {
+        $session = $this->getSessionByPatientToken($rawToken);
+        $termVersion = trim($termVersion);
+        if (!preg_match('/^[0-9A-Za-z.\-]{1,20}$/', $termVersion)) {
+            throw new InvalidArgumentException('Versão do termo de consentimento inválida.');
+        }
+        $now = $this->nowSql();
+
+        $this->transaction(function () use ($session, $termVersion, $ipAddress, $userAgent, $now): void {
+            $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
+                'consent_term_version' => $termVersion,
+                'consent_accepted_at' => $now,
+            ]);
+            // Evidência no registro LGPD do paciente, com tenant (antes falhava em silêncio).
+            $this->db->prepare("
+                INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, source_channel, user_agent)
+                VALUES (:clinic_id, :patient_id, :type, 1, :ip, :at, 'teleconsultation', :ua)
+            ")->execute([
+                'clinic_id' => (int)$session['clinic_id'],
+                'patient_id' => (int)$session['patient_id'],
+                'type' => 'telehealth:' . $termVersion,
+                'ip' => $ipAddress,
+                'at' => $now,
+                'ua' => $userAgent !== null ? mb_substr($userAgent, 0, 255) : null,
+            ]);
+            $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'consent_signed', 'patient', (int)$session['patient_id'], [
+                'term_version' => $termVersion,
+            ]);
+        });
+        return ['term_version' => $termVersion];
+    }
+
+    public function enterWaitingRoom(string $rawToken): array
+    {
+        $session = $this->getSessionByPatientToken($rawToken);
+        if ((int)$session['device_check_passed'] !== 1) {
+            throw new TeleconsultationStateException('Conclua o teste de câmera e microfone antes de entrar na sala de espera.');
+        }
+        if (empty($session['consent_accepted_at'])) {
+            throw new TeleconsultationStateException('Aceite o termo da teleconsulta antes de entrar na sala de espera.');
+        }
+        if ($this->now() < $this->utc((string)$session['join_opens_at_utc'])) {
+            throw new TeleconsultationStateException('A sala de espera ainda não abriu. Ela abre pouco antes do horário da consulta.');
+        }
+        if ($session['status'] === self::STATUS_WAITING_ROOM) {
+            return ['session_id' => (int)$session['id'], 'status' => self::STATUS_WAITING_ROOM];
+        }
+        $this->assertTransition($session['status'], self::STATUS_WAITING_ROOM);
+
+        $this->transaction(function () use ($session): void {
+            $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
+                'status' => self::STATUS_WAITING_ROOM,
+                'waiting_room_entered_at' => $this->nowSql(),
+            ]);
+            $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'waiting_room_entered', 'patient', (int)$session['patient_id']);
+        });
+        return ['session_id' => (int)$session['id'], 'status' => self::STATUS_WAITING_ROOM];
+    }
+
+    /** Estado para o paciente: nunca inclui sala ou credencial. */
+    public function checkWaitingRoomStatus(string $rawToken): array
+    {
+        $session = $this->getSessionByPatientToken($rawToken);
+        return [
+            'status' => $session['status'],
+            'is_admitted' => $this->isAdmitted($session),
+        ];
+    }
+
+    /** Credencial de mídia do paciente — somente após admissão e com sala pronta. */
+    public function issuePatientMediaCredential(string $rawToken): array
+    {
+        $session = $this->getSessionByPatientToken($rawToken);
+        if (!$this->isAdmitted($session)) {
+            throw new TeleconsultationStateException('Aguarde a admissão pelo nutricionista.');
+        }
+        if (!$this->roomReady($session)) {
+            throw new ExternalMediaProviderBlockedException('Sala de vídeo indisponível para esta sessão.');
+        }
+        return $this->issueCredential($session, 'patient', (string)$session['patient_name'], 'patient-' . (int)$session['patient_id'], (int)$session['patient_id']);
+    }
+
+    /**
+     * Credencial de mídia do profissional (moderador). Provisiona a sala se
+     * ainda não existir. Fail-closed se o provedor não estiver configurado.
+     */
+    public function issueProfessionalMediaCredential(int $sessionId, int $professionalId, ?int $clinicId = null): array
+    {
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+            throw new TeleconsultationStateException('Teleconsulta encerrada.');
+        }
+        $session = $this->ensureRoom($session, $professionalId);
+        return $this->issueCredential($session, 'professional', (string)$session['professional_name'], 'professional-' . $professionalId, $professionalId);
+    }
+
+    /**
+     * Autoriza uma operação de mídia/sinalização apresentada com credencial.
+     * Revalida o estado da sessão a cada chamada: encerrar, cancelar ou recusar
+     * corta o acesso imediatamente, mesmo com credencial ainda no prazo.
+     *
+     * @return array{session: array, role: string}
+     */
+    public function authorizeMediaAccess(string $roomName, string $credential): array
+    {
+        if (!$this->videoProvider instanceof Contracts\VerifiableCredentialProviderInterface) {
+            throw new TenantSecurityException('Este provedor não usa sinalização própria.');
+        }
+        $claims = $this->videoProvider->verifyMeetingToken($roomName, $credential, $this->now()->getTimestamp());
+
+        $stmt = $this->db->prepare(self::SESSION_SELECT . " WHERE s.external_room_name = :room AND s.provider_status = 'provisioned'");
+        $stmt->execute(['room' => $roomName]);
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$session) {
+            throw new TenantSecurityException('Sala de teleconsulta encerrada ou inexistente.');
+        }
+        $session = $this->applyExpiry($session);
+
+        $role = $claims['role'];
+        $allowed = $role === 'professional'
+            ? !in_array($session['status'], self::TERMINAL_STATUSES, true) && $claims['ref'] === 'professional-' . (int)$session['professional_id']
+            : $this->isAdmitted($session) && $claims['ref'] === 'patient-' . (int)$session['patient_id'];
+        if (!$allowed) {
+            throw new TenantSecurityException('Acesso à sala de teleconsulta não autorizado neste momento.');
+        }
+        return ['session' => $session, 'role' => $role];
+    }
+
+    /** Admite o paciente que está na sala de espera. Exige sala provisionada. */
     public function admitPatient(int $sessionId, int $professionalId): array
     {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
-
-        $session = $this->getSessionById($sessionId, $clinicId);
-
-        if ((int)$session['professional_id'] !== $professionalId) {
-            throw new TenantSecurityException("Apenas o nutricionista responsável agendado pode admitir o paciente nesta sessão.");
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        if ($session['status'] === self::STATUS_ADMITTED) {
+            return ['session_id' => $sessionId, 'status' => self::STATUS_ADMITTED];
         }
-
-        if ($session['status'] === 'completed' || $session['status'] === 'cancelled') {
-            throw new RuntimeException("Não é possível admitir paciente em sessão com status {$session['status']}.");
+        if ($session['status'] !== self::STATUS_WAITING_ROOM) {
+            throw new TeleconsultationStateException('Só é possível admitir um paciente que está na sala de espera.');
         }
+        // Provisiona antes: admitir sem sala deixaria o paciente sem mídia.
+        $session = $this->ensureRoom($session, $professionalId);
+        $now = $this->nowSql();
 
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET status = 'admitted',
-                admitted_at = CURRENT_TIMESTAMP,
-                started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['id' => $sessionId, 'clinic_id' => $clinicId]);
-
-        $this->recordEvent($sessionId, $clinicId, 'patient_admitted', 'professional', $professionalId, [
-            'patient_id' => $session['patient_id'],
-        ]);
-
-        return [
-            'session_id' => $sessionId,
-            'status' => 'admitted',
-            'admitted_at' => date('Y-m-d H:i:s'),
-            'external_room_url' => $session['external_room_url'],
-        ];
+        $this->transaction(function () use ($sessionId, $clinicId, $session, $now, $professionalId): void {
+            $this->guardedUpdate($sessionId, $clinicId, self::STATUS_WAITING_ROOM, [
+                'status' => self::STATUS_ADMITTED,
+                'admitted_at' => $now,
+                'started_at' => $session['started_at'] ?: $now,
+            ]);
+            $this->recordEvent($sessionId, $clinicId, 'patient_admitted', 'professional', $professionalId);
+        });
+        return ['session_id' => $sessionId, 'status' => self::STATUS_ADMITTED];
     }
 
-    /**
-     * Profissional rejeita ou recusa a admissão do paciente.
-     */
+    /** Recusa a entrada: estado terminal e convite revogado (reabrir = issueInvite). */
     public function rejectPatient(int $sessionId, int $professionalId, string $reason): array
     {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        $this->assertTransition($session['status'], self::STATUS_REJECTED);
 
-        $session = $this->getSessionById($sessionId, $clinicId);
-
-        if ((int)$session['professional_id'] !== $professionalId) {
-            throw new TenantSecurityException("Apenas o profissional responsável pode rejeitar a admissão.");
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET status = 'rejected',
-                ended_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['id' => $sessionId, 'clinic_id' => $clinicId]);
-
-        $this->recordEvent($sessionId, $clinicId, 'patient_rejected', 'professional', $professionalId, [
-            'reason' => $reason,
-        ]);
-
-        return [
-            'session_id' => $sessionId,
-            'status' => 'rejected',
-            'reason' => $reason,
-        ];
+        $this->transaction(function () use ($sessionId, $clinicId, $session, $reason, $professionalId): void {
+            $this->guardedUpdate($sessionId, $clinicId, $session['status'], [
+                'status' => self::STATUS_REJECTED,
+                'invite_revoked_at_utc' => $this->nowSql(),
+            ]);
+            // Motivo como código fixo: texto livre na auditoria poderia carregar dado pessoal.
+            $this->recordEvent($sessionId, $clinicId, 'patient_rejected', 'professional', $professionalId, [
+                'reason' => in_array($reason, self::REJECT_REASONS, true) ? $reason : 'other',
+            ]);
+        });
+        return ['session_id' => $sessionId, 'status' => self::STATUS_REJECTED];
     }
 
     /**
-     * Registra evolução clínica no prontuário eletrônico durante a teleconsulta.
-     * Encadeamento imutável e criptográfico com ClinicalRecordService.
-     * Notas clínicas NUNCA são compartilhadas com o cliente de vídeo ou o paciente.
+     * Registra evolução no prontuário durante ou logo após a chamada.
+     * Não altera o estado da sessão nem conclui a consulta.
      */
     public function recordClinicalEvolution(int $sessionId, int $professionalId, string $title, array $evolutionData): array
     {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
-
-        $session = $this->getSessionById($sessionId, $clinicId);
-
-        if ((int)$session['professional_id'] !== $professionalId) {
-            throw new TenantSecurityException("Apenas o profissional responsável pode lavrar registros no prontuário desta sessão.");
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        if (in_array($session['status'], [self::STATUS_CANCELLED, self::STATUS_REJECTED], true)) {
+            throw new TeleconsultationStateException('Não há atendimento para registrar nesta sessão.');
         }
-
-        // Salvar via ClinicalRecordService oficial append-only
+        if (trim((string)($evolutionData['notes'] ?? '')) === '') {
+            throw new InvalidArgumentException('A anotação clínica não pode ficar vazia.');
+        }
         $evolutionData['teleconsultation_session_id'] = $sessionId;
         $evolutionData['appointment_id'] = (int)$session['appointment_id'];
         $evolutionData['recorded_during_telehealth'] = true;
 
-        $record = $this->clinicalRecordService->appendRecord(
-            (int)$session['patient_id'],
-            $professionalId,
-            $title,
-            $evolutionData
-        );
+        $record = $this->clinicalRecordService->appendRecord((int)$session['patient_id'], $professionalId, $title, $evolutionData);
+        // Finalizou: o rascunho da chamada deixa de existir (NI2-249).
+        $this->db->prepare('DELETE FROM teleconsultation_note_drafts WHERE session_id = :s AND professional_id = :p AND clinic_id = :c')
+            ->execute(['s' => $sessionId, 'p' => $professionalId, 'c' => $clinicId]);
 
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET clinical_record_id = :record_id,
-                status = 'in_progress',
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute([
-            'record_id' => $record['id'],
-            'id' => $sessionId,
-            'clinic_id' => $clinicId,
-        ]);
-
-        $this->recordEvent($sessionId, $clinicId, 'clinical_note_appended', 'professional', $professionalId, [
-            'clinical_record_id' => $record['id'],
-            'record_hash' => $record['record_hash'],
-        ]);
-
+        $this->transaction(function () use ($sessionId, $clinicId, $session, $record, $professionalId): void {
+            $this->guardedUpdate($sessionId, $clinicId, $session['status'], ['clinical_record_id' => (int)$record['id']]);
+            $this->recordEvent($sessionId, $clinicId, 'clinical_note_appended', 'professional', $professionalId, [
+                'clinical_record_id' => (int)$record['id'],
+            ]);
+        });
         return $record;
     }
 
     /**
-     * Encerra a teleconsulta, atualiza prontuário e agenda, e invalida a sala.
+     * Encerra a MÍDIA: estado 'ended', convite revogado, sala liberada.
+     * Não muda o status da consulta na agenda nem publica plano (NI2-431).
      */
-    public function endTeleconsultation(int $sessionId, int $professionalId): array
+    public function endMedia(int $sessionId, int $professionalId): array
     {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
-
-        $session = $this->getSessionById($sessionId, $clinicId);
-
-        if ((int)$session['professional_id'] !== $professionalId) {
-            throw new TenantSecurityException("Apenas o profissional responsável pode finalizar esta teleconsulta.");
+        $session = $this->getSessionForProfessional($sessionId, $professionalId, $clinicId);
+        $result = ['session_id' => $sessionId, 'status' => self::STATUS_ENDED, 'appointment_id' => (int)$session['appointment_id']];
+        if ($session['status'] === self::STATUS_ENDED) {
+            return $result;
         }
+        $this->assertTransition($session['status'], self::STATUS_ENDED);
+        $now = $this->nowSql();
 
-        $now = date('Y-m-d H:i:s');
+        $this->transaction(function () use ($sessionId, $clinicId, $session, $now, $professionalId): void {
+            $this->guardedUpdate($sessionId, $clinicId, $session['status'], [
+                'status' => self::STATUS_ENDED,
+                'ended_at' => $now,
+                'media_ended_at_utc' => $now,
+                'invite_revoked_at_utc' => $now,
+            ]);
+            $this->recordEvent($sessionId, $clinicId, 'call_ended', 'professional', $professionalId);
+        });
+        $this->releaseRoom($session, $clinicId);
+        return $result;
+    }
 
-        // Atualizar teleconsultation_sessions
-        $stmt = $this->db->prepare("
-            UPDATE teleconsultation_sessions
-            SET status = 'completed',
-                ended_at = :ended_at,
-                updated_at = :ended_at
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['ended_at' => $now, 'id' => $sessionId, 'clinic_id' => $clinicId]);
-
-        // Atualizar o status da consulta em appointments
-        $stmtApp = $this->db->prepare("
-            UPDATE appointments
-            SET status = 'completed',
-                updated_at = :ended_at
-            WHERE id = :app_id AND clinic_id = :clinic_id
-        ");
-        $stmtApp->execute(['ended_at' => $now, 'app_id' => $session['appointment_id'], 'clinic_id' => $clinicId]);
-
-        // Fechar sala no provedor de vídeo se aplicável
-        if (!empty($session['external_room_id'])) {
-            $this->videoProvider->deleteRoom($session['external_room_id']);
+    /** Cancelamento / não comparecimento na agenda: cancela a sessão e revoga o acesso. */
+    public function onAppointmentCancelled(int $appointmentId, int $clinicId, string $appointmentStatus): void
+    {
+        $session = $this->findSessionRowByAppointment($appointmentId, $clinicId);
+        if ($session === null || in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+            return;
         }
+        $now = $this->nowSql();
+        $this->transaction(function () use ($session, $clinicId, $now, $appointmentStatus): void {
+            $this->guardedUpdate((int)$session['id'], $clinicId, $session['status'], [
+                'status' => self::STATUS_CANCELLED,
+                'ended_at' => $now,
+                'invite_revoked_at_utc' => $now,
+            ]);
+            $this->recordEvent((int)$session['id'], $clinicId, 'session_cancelled', 'system', null, [
+                'appointment_status' => $appointmentStatus,
+            ]);
+            $this->releaseRoom($session, $clinicId);
+        });
+    }
 
-        $this->recordEvent($sessionId, $clinicId, 'call_ended', 'professional', $professionalId, [
-            'ended_at' => $now,
+    /** Reagendamento: revoga o convite atual e recalcula a janela; exige novo convite. */
+    public function onAppointmentRescheduled(int $appointmentId, int $clinicId): void
+    {
+        $session = $this->findSessionRowByAppointment($appointmentId, $clinicId);
+        if ($session === null || in_array($session['status'], self::TERMINAL_STATUSES, true) || $this->isAdmitted($session)) {
+            return;
+        }
+        $stmt = $this->db->prepare('SELECT * FROM appointments WHERE id = :id AND clinic_id = :c');
+        $stmt->execute(['id' => $appointmentId, 'c' => $clinicId]);
+        [$opensAt, $closesAt] = $this->joinWindow($stmt->fetch(PDO::FETCH_ASSOC));
+
+        $this->transaction(function () use ($session, $clinicId, $opensAt, $closesAt): void {
+        $this->releaseRoom($session, $clinicId);
+        $this->guardedUpdate((int)$session['id'], $clinicId, $session['status'], [
+            'status' => self::STATUS_SCHEDULED,
+            'invite_revoked_at_utc' => $this->nowSql(),
+            'device_check_passed' => 0,
+            'join_opens_at_utc' => $opensAt->format('Y-m-d H:i:s'),
+            'join_closes_at_utc' => $closesAt->format('Y-m-d H:i:s'),
+            'external_room_id' => null,
+            'external_room_name' => null,
+            'external_room_url' => null,
+            'provider_status' => 'pending',
         ]);
+        $this->recordEvent((int)$session['id'], $clinicId, 'invite_revoked', 'system', null, ['reason' => 'appointment_rescheduled']);
+        });
+    }
 
+    /** Evento de auditoria sem dados pessoais, para serviços do módulo (ex.: e-mails). */
+    public function recordSystemEvent(int $sessionId, int $clinicId, string $eventType, string $actorType, ?int $actorId, array $details = []): void
+    {
+        if (!preg_match('/^[a-z_]{3,40}$/', $eventType)) {
+            throw new InvalidArgumentException('Tipo de evento inválido.');
+        }
+        $this->recordEvent($sessionId, $clinicId, $eventType, $actorType, $actorId, $details);
+    }
+
+    public function getSessionEvents(int $sessionId, ?int $clinicId = null): array
+    {
+        $clinicId = $clinicId ?? TenantContext::getClinicId();
+        $stmt = $this->db->prepare('SELECT * FROM teleconsultation_events WHERE session_id = :id AND clinic_id = :c ORDER BY id ASC');
+        $stmt->execute(['id' => $sessionId, 'c' => $clinicId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ------------------------------------------------------------------
+    // Internos
+    // ------------------------------------------------------------------
+
+    private const SESSION_SELECT = "
+        SELECT s.*, p.name AS patient_name, u.name AS professional_name, pr.crn AS council_number,
+               a.scheduled_at, a.duration_minutes, a.status AS appointment_status, c.name AS clinic_name
+        FROM teleconsultation_sessions s
+        INNER JOIN patients p ON p.id = s.patient_id AND p.clinic_id = s.clinic_id
+        INNER JOIN professionals pr ON pr.id = s.professional_id
+        INNER JOIN users u ON u.id = pr.user_id
+        INNER JOIN appointments a ON a.id = s.appointment_id AND a.clinic_id = s.clinic_id
+        INNER JOIN clinics c ON c.id = s.clinic_id";
+
+    private function loadAppointmentForProfessional(int $appointmentId, int $professionalId, int $clinicId): array
+    {
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        $stmt = $this->db->prepare('SELECT * FROM appointments WHERE id = :id AND clinic_id = :c');
+        $stmt->execute(['id' => $appointmentId, 'c' => $clinicId]);
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$appointment || (int)$appointment['professional_id'] !== $professionalId) {
+            throw new TenantSecurityException('Apenas o nutricionista responsável pelo agendamento pode abrir a teleconsulta.');
+        }
+        return $appointment;
+    }
+
+    private function findSessionIdByAppointment(int $appointmentId, int $clinicId): ?int
+    {
+        $row = $this->findSessionRowByAppointment($appointmentId, $clinicId);
+        return $row === null ? null : (int)$row['id'];
+    }
+
+    private function findSessionRowByAppointment(int $appointmentId, int $clinicId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM teleconsultation_sessions WHERE appointment_id = :a AND clinic_id = :c');
+        $stmt->execute(['a' => $appointmentId, 'c' => $clinicId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /** @return array{0: DateTimeImmutable, 1: DateTimeImmutable} janela de entrada em UTC */
+    private function joinWindow(array $appointment): array
+    {
+        $appTz = new DateTimeZone(date_default_timezone_get());
+        $start = (new DateTimeImmutable((string)$appointment['scheduled_at'], $appTz))->setTimezone(new DateTimeZone('UTC'));
+        $duration = max(15, (int)($appointment['duration_minutes'] ?? 60));
+        $early = self::intEnv('TELECONSULT_JOIN_EARLY_MINUTES', 15, 0, 120);
+        $grace = self::intEnv('TELECONSULT_JOIN_GRACE_MINUTES', 30, 0, 240);
+        return [$start->modify("-{$early} minutes"), $start->modify('+' . ($duration + $grace) . ' minutes')];
+    }
+
+    private function credentialExpiry(array $session): int
+    {
+        $closes = $this->utc((string)$session['join_closes_at_utc'])->getTimestamp();
+        $cap = $this->now()->getTimestamp() + self::intEnv('TELECONSULT_CREDENTIAL_TTL_MINUTES', 90, 5, 240) * 60;
+        return min($closes, $cap);
+    }
+
+    private function issueCredential(array $session, string $role, string $displayName, string $ref, int $actorId): array
+    {
+        $credential = $this->videoProvider->issueMeetingToken(
+            (string)$session['external_room_name'],
+            $role,
+            $displayName,
+            $ref,
+            $this->credentialExpiry($session)
+        );
+        $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'media_credential_issued', $role, $actorId, [
+            'expires_at_unix' => $credential['expires_at_unix'],
+        ]);
+        $iceServers = $this->videoProvider instanceof Contracts\VerifiableCredentialProviderInterface
+            ? $this->videoProvider->iceServers() : [];
+        $hasTurn = false;
+        foreach ($iceServers as $server) {
+            foreach ((array)$server['urls'] as $url) {
+                $hasTurn = $hasTurn || preg_match('/^turns?:/', (string)$url) === 1;
+            }
+        }
         return [
-            'session_id' => $sessionId,
-            'status' => 'completed',
-            'ended_at' => $now,
+            'provider' => $this->videoProvider->getProviderName(),
+            'room_name' => (string)$session['external_room_name'],
+            'room_url' => (string)($session['external_room_url'] ?? ''),
+            'token' => $credential['token'],
+            'expires_at_unix' => $credential['expires_at_unix'],
+            'ice_servers' => $iceServers,
+            'has_turn' => $hasTurn,
         ];
     }
 
-    /**
-     * Lista eventos de auditoria da sessão para verificação e governança clínica.
-     */
-    public function getSessionEvents(int $sessionId, ?int $clinicId = null): array
+    private function isAdmitted(array $session): bool
     {
-        $tenantClinicId = $clinicId ?? TenantContext::getClinicId();
-
-        $stmt = $this->db->prepare("
-            SELECT * FROM teleconsultation_events
-            WHERE session_id = :id AND clinic_id = :clinic_id
-            ORDER BY id ASC
-        ");
-        $stmt->execute(['id' => $sessionId, 'clinic_id' => $tenantClinicId]);
-        return $stmt->fetchAll();
+        return in_array($session['status'], [self::STATUS_ADMITTED, 'in_progress'], true);
     }
 
-    private function recordEvent(
-        int $sessionId,
-        int $clinicId,
-        string $eventType,
-        string $actorType,
-        ?int $actorId,
-        array $details = []
-    ): void {
-        try {
-            $stmt = $this->db->prepare("
-                INSERT INTO teleconsultation_events (
-                    clinic_id, session_id, event_type, actor_type, actor_id, details_json, created_at
-                ) VALUES (
-                    :clinic_id, :session_id, :event_type, :actor_type, :actor_id, :details, CURRENT_TIMESTAMP
-                )
-            ");
-            $stmt->execute([
-                'clinic_id' => $clinicId,
-                'session_id' => $sessionId,
-                'event_type' => $eventType,
-                'actor_type' => $actorType,
-                'actor_id' => $actorId,
-                'details' => json_encode($details, JSON_UNESCAPED_UNICODE),
-            ]);
-        } catch (\Throwable $e) {
-            // Falha não bloqueante de log
+    private function roomReady(array $session): bool
+    {
+        return !empty($session['external_room_name']) && $session['provider_status'] === 'provisioned';
+    }
+
+    /** Marca como expirada a sessão cuja janela fechou sem atendimento em curso. */
+    private function applyExpiry(array $session): array
+    {
+        if (in_array($session['status'], self::TERMINAL_STATUSES, true) || $this->isAdmitted($session)
+            || empty($session['join_closes_at_utc'])
+            || $this->now() <= $this->utc((string)$session['join_closes_at_utc'])) {
+            return $session;
         }
+        try {
+            $this->transaction(function () use ($session): void {
+                $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
+                    'status' => self::STATUS_EXPIRED,
+                    'invite_revoked_at_utc' => $this->nowSql(),
+                ]);
+                $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'session_expired', 'system', null);
+            });
+        } catch (TeleconsultationStateException $e) {
+            // Outra requisição já alterou o estado.
+        }
+        $session['status'] = self::STATUS_EXPIRED;
+        $session['invite_revoked_at_utc'] = $this->nowSql();
+        return $session;
+    }
+
+    private function ensureRoom(array $session, int $professionalId): array
+    {
+        if ($this->roomReady($session)) {
+            return $session;
+        }
+        $clinicId = (int)$session['clinic_id'];
+        $roomName = 'cn-' . bin2hex(random_bytes(12)); // sem ids de tenant/paciente no nome
+        $expiresAt = $this->utc((string)$session['join_closes_at_utc'])->getTimestamp();
+
+        try {
+            $room = $this->videoProvider->createRoom($roomName, $expiresAt);
+        } catch (ExternalMediaProviderBlockedException $e) {
+            $this->db->prepare("UPDATE teleconsultation_sessions SET provider_status = 'blocked', updated_at = :now WHERE id = :id AND clinic_id = :c")
+                ->execute(['now' => $this->nowSql(), 'id' => $session['id'], 'c' => $clinicId]);
+            $this->recordEvent((int)$session['id'], $clinicId, 'provider_blocked', 'system', null, ['provider' => $this->videoProvider->getProviderName()]);
+            throw $e;
+        }
+
+        $this->transaction(function () use ($session, $clinicId, $room, $professionalId): void {
+            $this->db->prepare("
+                UPDATE teleconsultation_sessions
+                SET external_room_id = :rid, external_room_name = :rname, external_room_url = :rurl,
+                    provider_status = 'provisioned', updated_at = :now
+                WHERE id = :id AND clinic_id = :c
+            ")->execute([
+                'rid' => $room['room_id'], 'rname' => $room['room_name'], 'rurl' => $room['room_url'],
+                'now' => $this->nowSql(), 'id' => $session['id'], 'c' => $clinicId,
+            ]);
+            $this->recordEvent((int)$session['id'], $clinicId, 'room_provisioned', 'professional', $professionalId, [
+                'provider' => $this->videoProvider->getProviderName(),
+                'expires_at_unix' => $room['expires_at_unix'],
+            ]);
+        });
+
+        $session['external_room_id'] = $room['room_id'];
+        $session['external_room_name'] = $room['room_name'];
+        $session['external_room_url'] = $room['room_url'];
+        $session['provider_status'] = 'provisioned';
+        return $session;
+    }
+
+    private function releaseRoom(array $session, int $clinicId): void
+    {
+        if (empty($session['external_room_name'])) {
+            return;
+        }
+        // Fecha a sala para novas gravações de sinal antes de apagar o que existe.
+        $this->db->prepare("UPDATE teleconsultation_sessions SET provider_status = 'releasing' WHERE id = :id AND clinic_id = :c")
+            ->execute(['id' => $session['id'], 'c' => $clinicId]);
+        try {
+            $released = $this->videoProvider->deleteRoom((string)$session['external_room_name']);
+        } catch (\Throwable $e) {
+            $released = false;
+        }
+        $this->db->prepare("UPDATE teleconsultation_sessions SET provider_status = :ps WHERE id = :id AND clinic_id = :c")
+            ->execute(['ps' => $released ? 'released' : 'release_failed', 'id' => $session['id'], 'c' => $clinicId]);
+        $this->recordEvent((int)$session['id'], $clinicId, $released ? 'room_released' : 'room_release_failed', 'system', null);
+    }
+
+    private function assertTransition(string $from, string $to): void
+    {
+        if (!in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
+            throw new TeleconsultationStateException("Transição inválida da teleconsulta: '{$from}' → '{$to}'.");
+        }
+    }
+
+    /**
+     * UPDATE condicionado ao estado lido (controle otimista): se outra requisição
+     * mudou o estado no meio, nada é gravado e a ação falha.
+     */
+    private function guardedUpdate(int $sessionId, int $clinicId, string $expectedStatus, array $fields): void
+    {
+        $fields['updated_at'] = $this->nowSql();
+        $sets = [];
+        $params = ['id' => $sessionId, 'c' => $clinicId, 'expected' => $expectedStatus];
+        foreach ($fields as $column => $value) {
+            if (!preg_match('/^[a-z_]+$/', $column)) {
+                throw new InvalidArgumentException('Coluna inválida.');
+            }
+            $sets[] = "{$column} = :f_{$column}";
+            $params["f_{$column}"] = $value;
+        }
+        $stmt = $this->db->prepare('UPDATE teleconsultation_sessions SET ' . implode(', ', $sets)
+            . ' WHERE id = :id AND clinic_id = :c AND status = :expected');
+        $stmt->execute($params);
+        if ($stmt->rowCount() !== 1) {
+            throw new TeleconsultationStateException('A teleconsulta mudou de estado durante a operação. Atualize a página.');
+        }
+    }
+
+    private int $savepointDepth = 0;
+
+    /**
+     * Executa em transação própria ou, se o chamador já abriu uma (ex.: agenda),
+     * em SAVEPOINT — a falha desfaz só esta unidade e é propagada.
+     */
+    private function transaction(callable $work): void
+    {
+        if ($this->db->inTransaction()) {
+            $name = 'tc_sp_' . (++$this->savepointDepth);
+            $this->db->exec("SAVEPOINT {$name}");
+            try {
+                $work();
+                $this->db->exec("RELEASE SAVEPOINT {$name}");
+            } catch (\Throwable $e) {
+                $this->db->exec("ROLLBACK TO SAVEPOINT {$name}");
+                $this->db->exec("RELEASE SAVEPOINT {$name}");
+                throw $e;
+            } finally {
+                $this->savepointDepth--;
+            }
+            return;
+        }
+        $this->db->beginTransaction();
+        try {
+            $work();
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /** Auditoria obrigatória: falha aqui interrompe a ação. Sem PII em details. */
+    private function recordEvent(int $sessionId, int $clinicId, string $eventType, string $actorType, ?int $actorId, array $details = []): void
+    {
+        $this->db->prepare("
+            INSERT INTO teleconsultation_events (clinic_id, session_id, event_type, actor_type, actor_id, details_json, created_at)
+            VALUES (:c, :s, :t, :at, :aid, :d, :now)
+        ")->execute([
+            'c' => $clinicId, 's' => $sessionId, 't' => $eventType, 'at' => $actorType, 'aid' => $actorId,
+            'd' => json_encode($details, JSON_UNESCAPED_UNICODE), 'now' => $this->nowSql(),
+        ]);
+    }
+
+    private function now(): DateTimeImmutable
+    {
+        return $this->fixedNow ?? new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    }
+
+    private function nowSql(): string
+    {
+        return $this->now()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    }
+
+    private function utc(string $value): DateTimeImmutable
+    {
+        return new DateTimeImmutable($value, new DateTimeZone('UTC'));
+    }
+
+    private static function intEnv(string $key, int $default, int $min, int $max): int
+    {
+        $raw = getenv($key);
+        if ($raw === false || $raw === '') {
+            $raw = $_ENV[$key] ?? null;
+        }
+        return ($raw === null || !is_numeric($raw)) ? $default : max($min, min($max, (int)$raw));
+    }
+
+    private static function ticketKey(): ?string
+    {
+        $appKey = getenv('APP_KEY');
+        if ($appKey === false || $appKey === '') {
+            $appKey = $_ENV['APP_KEY'] ?? null;
+        }
+        return ($appKey === null || strlen((string)$appKey) < 16)
+            ? null : hash_hmac('sha256', 'clyonutri-teleconsulta-portal-v1', (string)$appKey, true);
+    }
+
+    private static function browserFamily(string $userAgent): string
+    {
+        foreach (['Edg/' => 'edge', 'Firefox/' => 'firefox', 'Chrome/' => 'chrome', 'Safari/' => 'safari'] as $needle => $family) {
+            if (str_contains($userAgent, $needle)) {
+                return $family;
+            }
+        }
+        return 'other';
     }
 }

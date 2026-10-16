@@ -1,0 +1,17 @@
+/* Plano alimentar para impressão — complementa prontuario-impressao.css. */
+.mp-meal { break-inside: avoid; }
+.mp-meal h2 { display: flex; align-items: baseline; gap: 8px; }
+.mp-time { font-variant-numeric: tabular-nums; color: var(--copper-dark); }
+.mp-kcal { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
+.mp-items { list-style: none; padding: 0; margin: 0; }
+.mp-items > li { padding: 6px 0; border-bottom: 1px dotted var(--border); }
+.mp-items > li:last-child { border-bottom: 0; }
+.mp-line { display: flex; justify-content: space-between; gap: 12px; }
+.mp-food { font-weight: 600; }
+.mp-qty { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mp-note { font-size: 12.5px; margin: 2px 0 0; color: var(--text); }
+.mp-text { margin: 0; }
+.mp-subs { font-size: 12.5px; margin-top: 4px; padding-left: 12px; border-left: 2px solid var(--border); }
+.mp-subs-label { color: var(--muted); }
+.mp-subs ul { margin: 2px 0 0; padding-left: 18px; }
+.pi-table td { text-align: center; }

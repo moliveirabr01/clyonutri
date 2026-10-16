@@ -44,3 +44,9 @@ storage/homologation-local/
 tests/homologation/node_modules/
 mobile/node_modules/
 mobile/dist/
+
+# Testes de navegador da teleconsulta (dependências npm locais) e sessões de teste
+tests/teleconsulta_navegador/node_modules/
+storage/sessions/
+tests/prontuario_impressao/node_modules
+tests/plano_impressao/node_modules

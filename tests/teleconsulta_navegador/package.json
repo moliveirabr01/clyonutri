@@ -1,0 +1,12 @@
+{
+  "name": "clyonutri-teleconsulta-navegador",
+  "private": true,
+  "type": "module",
+  "description": "Testes do Consultório Online pelo public/index.php real (PHP em WebAssembly) e chamada WebRTC entre dois pares executando o script das telas.",
+  "dependencies": {
+    "@php-wasm/node": "^3.1.58",
+    "@php-wasm/universal": "^3.1.58",
+    "@php-wasm/cli": "^3.1.58",
+    "werift": "^0.25.0"
+  }
+}

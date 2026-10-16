@@ -1234,6 +1234,10 @@ class DashboardController
             <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico de registros clínicos</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <a href="/pacientes/<?= (int)$patient['id'] ?>/prontuario/imprimir" target="_blank" rel="noopener" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Imprimir prontuário
+            </a>
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario/exportar" target="_blank" class="btn btn-secondary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar histórico de registros
@@ -1525,6 +1529,63 @@ class DashboardController
             header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
             exit;
         }
+    }
+
+    /** Plano alimentar para impressão (documento do paciente). */
+    public function printMealPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        try {
+            $doc = (new \ClyoNutri\Domain\MealPlan\MealPlanPrintService())->build(
+                $planId,
+                (int)TenantContext::getUserId(),
+                ($_GET['nutricional'] ?? '') === '1'
+            );
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException | \InvalidArgumentException $e) {
+            http_response_code(404);
+            echo 'Plano alimentar não encontrado.';
+            return;
+        }
+        if (!headers_sent()) {
+            header('Cache-Control: no-store');
+            header('Referrer-Policy: same-origin');
+            header('X-Frame-Options: DENY');
+        }
+        require __DIR__ . '/../../../views/meal_plans/print.php';
+    }
+
+    /**
+     * Prontuário para impressão (A4 / salvar em PDF pelo navegador).
+     * Rota sob /pacientes: perfis não clínicos (ex.: secretaria) já são barrados pela autorização web.
+     */
+    public function printMedicalRecord(array $params): void
+    {
+        $patientId = (int)($params['id'] ?? 0);
+        $userId = (int)TenantContext::getUserId();
+        try {
+            $doc = (new \ClyoNutri\Domain\Clinical\MedicalRecordPrintService())->build(
+                $patientId,
+                $userId,
+                isset($_GET['de']) ? (string)$_GET['de'] : null,
+                isset($_GET['ate']) ? (string)$_GET['ate'] : null,
+                ($_GET['historico'] ?? '') === '1'
+            );
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(422);
+            echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><title>Prontuário</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px">'
+                . '<p>' . htmlspecialchars($e->getMessage()) . '</p><p><a href="/pacientes/' . $patientId . '/prontuario/imprimir">Voltar</a></p></body></html>';
+            return;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(404);
+            echo 'Paciente não encontrado.';
+            return;
+        }
+        if (!headers_sent()) {
+            header('Cache-Control: no-store');
+            header('Referrer-Policy: same-origin');
+            header('X-Frame-Options: DENY');
+        }
+        require __DIR__ . '/../../../views/patients/medical_record_print.php';
     }
 
     public function exportMedicalRecord(array $params): void
@@ -2208,8 +2269,8 @@ class DashboardController
               <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
               <?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?>
             </span>
-            <a href="/teleconsulta/sessao-agenda/<?= $app['id'] ?>" class="btn btn-primary" style="background-color: #059669; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
-              <span>📹 Consultório Online</span>
+            <a href="/teleconsulta/sessao-agenda/<?= (int)$app['id'] ?>" class="btn btn-primary" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+              <span>Consultório Online</span>
             </a>
             <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
               Ver Perfil 360 ↗
@@ -2948,7 +3009,8 @@ class DashboardController
             <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;"><?= htmlspecialchars($plan['title']) ?></h1>
             <p style="color: var(--neutral-gray-500); margin-top: 4px;">Paciente: <strong><?= htmlspecialchars($plan['patient_name']) ?></strong> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
           </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <a href="/planos/<?= (int)$planId ?>/imprimir" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">Imprimir plano</a>
             <?php if ($canEditItems): ?>
             <form method="POST" action="/planos/<?= $planId ?>/duplicar" onsubmit="return confirm('Deseja criar um novo rascunho a partir deste plano?');">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">

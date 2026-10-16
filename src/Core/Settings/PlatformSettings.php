@@ -39,7 +39,7 @@ class PlatformSettings
             'support_sla_p2_hours' => '24',
             'session_timeout_minutes' => '120',
             'security_max_login_attempts' => '5',
-            'feature_flag_telehealth' => '1',
+            'feature_flag_telehealth' => '0', // fail-closed (NI2-221/F12): liga só se configurado
             'feature_flag_chat' => '1',
             'feature_flag_audit_immutable' => '1',
         ];
@@ -114,7 +114,8 @@ class PlatformSettings
      */
     public static function isTelehealthEnabled(?PDO $db = null): bool
     {
-        return (string)self::get('feature_flag_telehealth', '1', $db) === '1';
+        // Fail-closed (NI2-221/F12): sem configuração explícita, o módulo fica desligado.
+        return (string)self::get('feature_flag_telehealth', '0', $db) === '1';
     }
 
     /**

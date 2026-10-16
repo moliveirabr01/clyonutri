@@ -233,8 +233,8 @@ if (str_contains($ni26Output, 'TODOS OS CRITÉRIOS DE ACEITE DO ÉPICO NI2-6 FOR
 }
 
 $teleOutput = (string)shell_exec("php " . escapeshellarg($rootDir . '/tests/teleconsultation_online_clinic_e2e_test.php') . " 2>&1");
-if (str_contains($teleOutput, 'TODOS OS GATES DA TELECONSULTA FORAM EXECUTADOS COM SUCESSO')) {
-    recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'PASS', 'Sessão ligada à agenda, pré-consulta, sala de espera, admissão, evolução SHA-256 e fail-closed WebRTC aprovados');
+if (str_contains($teleOutput, 'CONTRATOS DE DOMÍNIO DA TELECONSULTA APROVADOS')) {
+    recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'PASS', 'Contratos de domínio, acesso por participante, convite/janela/revogação, sinalização WebRTC e encerramento desacoplado aprovados. Mídia real entre dois dispositivos: NOT TESTED (homologação NI2-254)');
 } else {
     recordCheck('E2E_JOURNEYS', 'Consultório Online & Teleconsulta E2E (NI2-221)', 'FAIL', 'Falha na suíte de teleconsulta: ' . substr($teleOutput, 0, 200));
 }

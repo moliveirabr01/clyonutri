@@ -8,6 +8,9 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use PDO;
 
+/**
+ * @deprecated NI2-221 — substituído por TeleconsultationService. Mantido só para leitura legada.
+ */
 class TelehealthService
 {
     private PDO $db;
@@ -21,27 +24,9 @@ class TelehealthService
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-        $roomCode = 'clyo-' . bin2hex(random_bytes(6));
-        $meetingUrl = "https://meet.clyonutri.com.br/room/{$roomCode}";
-
-        $stmt = $this->db->prepare("
-            INSERT INTO telehealth_sessions (clinic_id, appointment_id, meeting_url, provider, status)
-            VALUES (:clinic_id, :appointment_id, :meeting_url, :provider, 'ready')
-        ");
-
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'appointment_id' => $appointmentId,
-            'meeting_url' => $meetingUrl,
-            'provider' => $provider,
-        ]);
-
-        return [
-            'id' => (int)$this->db->lastInsertId(),
-            'appointment_id' => $appointmentId,
-            'meeting_url' => $meetingUrl,
-            'provider' => $provider,
-        ];
+        // Descontinuado (NI2-221): gerava URL fictícia (meet.clyonutri.com.br) sem sala real.
+        // Fail-closed: a teleconsulta usa TeleconsultationService + provedor real.
+        throw new \LogicException('TelehealthService::generateSession foi descontinuado; use o Consultório Online (TeleconsultationService).');
     }
 
     public function getSessionByAppointment(int $appointmentId): ?array

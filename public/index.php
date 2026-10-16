@@ -315,6 +315,7 @@ $router->get('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'patientMedi
 $router->post('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'savePatientMedicalRecord']));
 $router->post('/pacientes/{id}/prontuario/{recId}/retificar', $requireAuth([$dashCtrl, 'revisePatientMedicalRecord']));
 $router->get('/pacientes/{id}/prontuario/exportar', $requireAuth([$dashCtrl, 'exportMedicalRecord']));
+$router->get('/pacientes/{id}/prontuario/imprimir', $requireAuth([$dashCtrl, 'printMedicalRecord']));
 $router->get('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'patientAnamnesis']));
 $router->post('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'savePatientAnamnesis']));
 $router->get('/pacientes/{id}/resumo-prescricao', $requireAuth([$dashCtrl, 'prescriptionSummary']));
@@ -333,19 +334,31 @@ $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsu
 
 // 3.1 Consultório Online & Teleconsulta (NI2-221 / NI2-411)
 $router->get('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'openFromAppointment'])));
+$router->post('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'createFromAppointment'])));
 $router->get('/teleconsulta/{id}/atendimento', $requireAuth($requireTelehealth([$teleCtrl, 'professionalRoom'])));
 $router->post('/teleconsulta/{id}/admitir', $requireAuth($requireTelehealth([$teleCtrl, 'admit'])));
 $router->post('/teleconsulta/{id}/rejeitar', $requireAuth($requireTelehealth([$teleCtrl, 'reject'])));
 $router->post('/teleconsulta/{id}/evoluir', $requireAuth($requireTelehealth([$teleCtrl, 'recordEvolution'])));
 $router->post('/teleconsulta/{id}/encerrar', $requireAuth($requireTelehealth([$teleCtrl, 'end'])));
+$router->get('/teleconsulta/{id}/estado', $requireAuth($requireTelehealth([$teleCtrl, 'professionalState'])));
+$router->post('/teleconsulta/{id}/midia', $requireAuth($requireTelehealth([$teleCtrl, 'professionalMedia'])));
+$router->post('/teleconsulta/{id}/convite', $requireAuth($requireTelehealth([$teleCtrl, 'issueInvite'])));
+$router->post('/teleconsulta/{id}/convite-email', $requireAuth($requireTelehealth([$teleCtrl, 'emailInvite'])));
+$router->get('/teleconsulta/{id}/rascunho', $requireAuth($requireTelehealth([$teleCtrl, 'draftGet'])));
+$router->post('/teleconsulta/{id}/rascunho', $requireAuth($requireTelehealth([$teleCtrl, 'draftSave'])));
 $router->get('/teleconsulta/sala-espera/{token}', $requireTelehealth([$teleCtrl, 'patientWaitingRoom']));
 $router->post('/teleconsulta/sala-espera/{token}/dispositivo', $requireTelehealth([$teleCtrl, 'patientSubmitDeviceCheck']));
 $router->post('/teleconsulta/sala-espera/{token}/consentir', $requireTelehealth([$teleCtrl, 'patientAcceptConsent']));
 $router->post('/teleconsulta/sala-espera/{token}/entrar', $requireTelehealth([$teleCtrl, 'patientEnterWaiting']));
 $router->get('/teleconsulta/sala-espera/{token}/status', $requireTelehealth([$teleCtrl, 'patientStatus']));
 $router->get('/teleconsulta/sala/{token}', $requireTelehealth([$teleCtrl, 'patientConsultationRoom']));
+$router->post('/teleconsulta/sala/{token}/midia', $requireTelehealth([$teleCtrl, 'patientMedia']));
+// Sinalização WebRTC P2P (credencial de mídia no cabeçalho; revalidada a cada chamada)
+$router->post('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalSend']));
+$router->get('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalPoll']));
 $router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
 $router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
+$router->get('/planos/{id}/imprimir', $requireAuth([$dashCtrl, 'printMealPlan']));
 $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
 $router->post('/planos/{id}/refeicoes', $requireAuth([$dashCtrl, 'addMealToPlan']));
 $router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl, 'deleteMealFromPlan']));
@@ -407,6 +420,7 @@ $router->post('/receitas/{id}/duplicar', $requireAuth([$recipeCtrl, 'duplicate']
 // 3.5 Console Administrativo SaaS da Plataforma (NI2-346 / NI2-347 a NI2-361)
 $router->get('/admin', $requireAuth([$adminCtrl, 'index']));
 $router->get('/admin/dashboard', $requireAuth([$adminCtrl, 'dashboard']));
+$router->get('/admin/teleconsulta/metricas', $requireAuth([$adminCtrl, 'teleconsultationMetrics']));
 $router->get('/admin/clinicas', $requireAuth([$adminCtrl, 'clinics']));
 $router->post('/admin/clinicas/{id}/status', $requireAuth([$adminCtrl, 'updateClinicStatus']));
 $router->get('/admin/usuarios', $requireAuth([$adminCtrl, 'users']));

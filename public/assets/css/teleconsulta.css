@@ -1,0 +1,61 @@
+/* Consultório Online — tokens do Design System ClyoNutri (navy/cobre, Inter). */
+:root {
+  --navy: #0F2747; --copper-dark: #B94F1F; --surface: #FFFFFF; --app-bg: #F4F5F6;
+  --border: #E5E7EB; --text: #1F2937; --muted: #667085;
+  --success: #18794E; --warning: #946200; --error: #B42318; --info: #175CD3;
+  --r-input: 8px; --r-button: 10px; --r-card: 12px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--text); background: var(--app-bg); line-height: 1.5; }
+.tc-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.tc-brand { font-weight: 600; color: var(--navy); font-size: 18px; margin: 0; }
+.tc-meta { color: var(--muted); font-size: 14px; }
+.tc-main { max-width: 1440px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 1024px) { .tc-main.tc-split { grid-template-columns: 7fr 5fr; } }
+.tc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); padding: 20px; }
+.tc-card h2 { font-size: 18px; margin: 0 0 8px; color: var(--navy); }
+.tc-narrow { max-width: 680px; margin: 24px auto; padding: 0 16px; display: grid; gap: 16px; }
+.tc-video { position: relative; background: #0B1220; border-radius: var(--r-card); aspect-ratio: 16 / 9; overflow: hidden; }
+.tc-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tc-video .tc-self { position: absolute; right: 12px; bottom: 12px; width: 28%; max-width: 220px; aspect-ratio: 4 / 3; border: 2px solid #fff; border-radius: 8px; background: #111; }
+.tc-video .tc-daily { position: absolute; inset: 0; }
+.tc-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tc-btn { min-height: 44px; padding: 0 16px; border-radius: var(--r-button); border: 1px solid var(--border); background: var(--surface); color: var(--navy); font: inherit; font-weight: 600; cursor: pointer; }
+.tc-btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.tc-btn-danger { background: var(--error); border-color: var(--error); color: #fff; }
+.tc-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.tc-btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--copper-dark); outline-offset: 3px; }
+.tc-status { margin-top: 12px; padding: 10px 12px; border-radius: var(--r-input); font-size: 14px; border: 1px solid var(--border); background: #F8FAFC; }
+.tc-status[data-tone="ok"] { border-color: var(--success); color: var(--success); }
+.tc-status[data-tone="warn"] { border-color: var(--warning); color: var(--warning); }
+.tc-status[data-tone="error"] { border-color: var(--error); color: var(--error); }
+.tc-notice { padding: 12px; border-radius: var(--r-input); background: #EFF4FF; border: 1px solid var(--info); color: var(--navy); }
+.tc-field { display: grid; gap: 6px; margin-bottom: 12px; }
+.tc-field label { font-weight: 600; font-size: 14px; }
+.tc-field input, .tc-field textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-input); min-height: 44px; width: 100%; }
+.tc-invite { display: flex; gap: 8px; flex-wrap: wrap; }
+.tc-invite input { flex: 1 1 260px; font-family: ui-monospace, monospace; font-size: 13px; }
+.tc-steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+.tc-hidden { display: none !important; }
+.tc-small { font-size: 13px; color: var(--muted); }
+.tc-records { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* NI2-252: acessibilidade e celular */
+.tc-skip { position: absolute; left: -9999px; top: 8px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: var(--r-button); z-index: 10; }
+.tc-skip:focus { left: 16px; }
+select:focus-visible, .tc-term:focus-visible, .tc-check:focus-visible, a:focus-visible { outline: 3px solid var(--copper-dark); outline-offset: 3px; }
+.tc-term { max-height: 160px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.tc-check-label { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; min-height: 44px; cursor: pointer; }
+.tc-check { width: 22px; height: 22px; margin-top: 2px; flex: none; }
+.tc-unmute { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; }
+select.tc-btn { padding-right: 32px; }
+@media (max-width: 640px) {
+  .tc-header { padding: 10px 16px; }
+  .tc-main, .tc-narrow { padding-left: 16px; padding-right: 16px; }
+  .tc-card { padding: 16px; }
+  .tc-controls .tc-btn { flex: 1 1 auto; }
+  .tc-video { aspect-ratio: 3 / 4; } /* vídeo em pé no celular */
+  .tc-video .tc-self { width: 34%; }
+}
+@media (forced-colors: active) { .tc-btn, .tc-status, .tc-card { border: 1px solid CanvasText; } }

@@ -46,6 +46,7 @@ class HostGatorCronScheduler
         $this->drainDatabaseQueue();
         $this->pruneExpiredTokens();
         $this->pruneOldLogs();
+        $this->sendTeleconsultationReminders();
 
         $elapsed = round(microtime(true) - $startTime, 3);
         $this->executionLog['duration_seconds'] = $elapsed;
@@ -108,6 +109,20 @@ class HostGatorCronScheduler
         }
     }
 
+    /** Lembrete por e-mail da teleconsulta ~1h antes da abertura da sala (NI2-250). */
+    private function sendTeleconsultationReminders(): void
+    {
+        try {
+            if (!\ClyoNutri\Core\Settings\PlatformSettings::isTelehealthEnabled()) {
+                $this->executionLog['teleconsultation_reminders'] = 'module_disabled';
+                return;
+            }
+            $this->executionLog['teleconsultation_reminders'] = (new \ClyoNutri\Domain\Telehealth\TeleconsultationNotifier())->sendDueReminders(60);
+        } catch (\Throwable $e) {
+            $this->executionLog['teleconsultation_reminders'] = 'error: ' . get_class($e);
+        }
+    }
+
     private function pruneExpiredTokens(): void
     {
         // Purga sessões e tokens com mais de 30 dias
@@ -141,6 +156,8 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     $report = $scheduler->run();
     echo " Heartbeat : " . $report['heartbeat'] . "\n";
     echo " Fila      : " . ($report['queue']['status'] ?? 'OK') . "\n";
+    $tele = $report['teleconsultation_reminders'] ?? 'n/d';
+    echo " Lembretes : " . (is_array($tele) ? "enviados {$tele['sent']}, falhas {$tele['failed']}, sem e-mail {$tele['skipped']}" : $tele) . "\n";
     echo " Duração   : " . $report['duration_seconds'] . "s\n";
     echo " Status    : ✓ Concluído dentro da janela de compliance da HostGator.\n";
     echo "========================================================================\n";

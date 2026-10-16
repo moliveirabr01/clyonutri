@@ -58,6 +58,7 @@ use ClyoNutri\Application\Controllers\TeleconsultationController;
 
 // Atalho da Agenda para a Teleconsulta
 $router->get('/teleconsulta/sessao-agenda/{appointmentId}', [TeleconsultationController::class, 'openFromAppointment'])->name('teleconsultation.open_agenda');
+$router->post('/teleconsulta/sessao-agenda/{appointmentId}', [TeleconsultationController::class, 'createFromAppointment'])->name('teleconsultation.create_agenda');
 
 // Jornada do Profissional
 $router->get('/teleconsulta/{id}/atendimento', [TeleconsultationController::class, 'professionalRoom'])->name('teleconsultation.room');
@@ -65,6 +66,12 @@ $router->post('/teleconsulta/{id}/admitir', [TeleconsultationController::class, 
 $router->post('/teleconsulta/{id}/rejeitar', [TeleconsultationController::class, 'reject'])->name('teleconsultation.reject');
 $router->post('/teleconsulta/{id}/evoluir', [TeleconsultationController::class, 'recordEvolution'])->name('teleconsultation.evolve');
 $router->post('/teleconsulta/{id}/encerrar', [TeleconsultationController::class, 'end'])->name('teleconsultation.end');
+$router->get('/teleconsulta/{id}/estado', [TeleconsultationController::class, 'professionalState'])->name('teleconsultation.state');
+$router->post('/teleconsulta/{id}/midia', [TeleconsultationController::class, 'professionalMedia'])->name('teleconsultation.media');
+$router->post('/teleconsulta/{id}/convite', [TeleconsultationController::class, 'issueInvite'])->name('teleconsultation.invite');
+$router->post('/teleconsulta/{id}/convite-email', [TeleconsultationController::class, 'emailInvite'])->name('teleconsultation.invite_email');
+$router->get('/teleconsulta/{id}/rascunho', [TeleconsultationController::class, 'draftGet'])->name('teleconsultation.draft');
+$router->post('/teleconsulta/{id}/rascunho', [TeleconsultationController::class, 'draftSave'])->name('teleconsultation.draft_save');
 
 // Jornada do Paciente (Convite Seguro & Sala de Espera)
 $router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
@@ -73,6 +80,9 @@ $router->post('/teleconsulta/sala-espera/{token}/consentir', [TeleconsultationCo
 $router->post('/teleconsulta/sala-espera/{token}/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
 $router->get('/teleconsulta/sala-espera/{token}/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
 $router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
+$router->post('/teleconsulta/sala/{token}/midia', [TeleconsultationController::class, 'patientMedia'])->name('teleconsultation.patient_media');
+$router->post('/teleconsulta/sinal/{room}', [TeleconsultationController::class, 'signalSend'])->name('teleconsultation.signal_send');
+$router->get('/teleconsulta/sinal/{room}', [TeleconsultationController::class, 'signalPoll'])->name('teleconsultation.signal_poll');
 
 // 4. Central de Ajuda & Service Desk (NI2-195)
 use ClyoNutri\Application\Controllers\HelpdeskController;

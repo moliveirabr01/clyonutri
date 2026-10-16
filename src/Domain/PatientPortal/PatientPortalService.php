@@ -388,17 +388,32 @@ class PatientPortalService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         $stmt = $this->db->prepare("
-            SELECT a.*, u.name AS professional_name, t.meeting_url
+            SELECT a.*, u.name AS professional_name
             FROM appointments a
             LEFT JOIN professionals p ON p.id = a.professional_id
             LEFT JOIN users u ON u.id = p.user_id
-            LEFT JOIN telehealth_sessions t ON t.appointment_id = a.id
             WHERE a.patient_id = :patient_id AND a.clinic_id = :clinic_id AND a.status IN ('scheduled', 'confirmed')
             ORDER BY a.scheduled_at ASC LIMIT 1
         ");
         $stmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: null;
+        if (!$row) {
+            return null;
+        }
+        // NI2-221: a URL vem do Consultório Online (bilhete assinado e curto para a sala de espera),
+        // nunca da tabela legada telehealth_sessions (URLs fictícias/públicas).
+        $row['meeting_url'] = null;
+        try {
+            $ticket = (new \ClyoNutri\Domain\Telehealth\TeleconsultationService($this->db))
+                ->issuePortalTicket($patientId, (int)$row['id'], $clinicId);
+            if ($ticket !== null) {
+                $base = rtrim((string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), '/');
+                $row['meeting_url'] = ($base !== '' ? $base : '') . '/teleconsulta/sala-espera/' . $ticket;
+            }
+        } catch (\Throwable $e) {
+            $row['meeting_url'] = null; // sem teleconsulta disponível; nunca um link inventado
+        }
+        return $row;
     }
 
     public function confirmAppointment(int $patientId, int $appointmentId): bool

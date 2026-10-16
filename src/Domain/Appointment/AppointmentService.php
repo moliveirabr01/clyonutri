@@ -178,7 +178,12 @@ class AppointmentService
         ?int $userId = null
     ): array {
         $clinicId = TenantContext::getClinicId();
-        $current = TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        // O guard devolve só id/tenant/status; a edição precisa da linha completa
+        // (antes, editar sem scheduled_at gravava NULL no horário).
+        $currentStmt = $this->db->prepare('SELECT * FROM appointments WHERE id = :id AND clinic_id = :clinic_id');
+        $currentStmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId]);
+        $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
 
         $patientId = isset($data['patient_id']) ? (int)$data['patient_id'] : (int)$current['patient_id'];
         $professionalId = isset($data['professional_id']) ? (int)$data['professional_id'] : (int)$current['professional_id'];
@@ -245,6 +250,13 @@ class AppointmentService
                 "Consulta editada / reagendada para {$scheduledAt}"
             );
 
+            // Teleconsulta (NI2-236/250): reagendar revoga o convite; trocar o profissional encerra a sessão.
+            if ($professionalId !== (int)$current['professional_id']) {
+                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'professional_reassigned');
+            } elseif ($scheduledAt !== $current['scheduled_at'] || $duration !== (int)$current['duration_minutes']) {
+                $this->teleconsultation()->onAppointmentRescheduled($appointmentId, $clinicId);
+            }
+
             if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->commit();
             }
@@ -300,6 +312,11 @@ class AppointmentService
             'id' => $appointmentId,
             'clinic_id' => $clinicId,
         ]);
+
+        if ($success && in_array($newStatus, [self::STATUS_CANCELLED, self::STATUS_NO_SHOW], true)) {
+            // Teleconsulta (NI2-236): cancelamento e falta revogam acesso e liberam a sala.
+            $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, $newStatus);
+        }
 
         if ($success) {
             $this->recordStatusHistory(
@@ -368,6 +385,11 @@ class AppointmentService
             'record_hash' => $record['record_hash'],
             'version' => $record['version'],
         ];
+    }
+
+    private function teleconsultation(): \ClyoNutri\Domain\Telehealth\TeleconsultationService
+    {
+        return new \ClyoNutri\Domain\Telehealth\TeleconsultationService($this->db);
     }
 
     /**

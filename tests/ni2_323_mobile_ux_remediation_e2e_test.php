@@ -405,9 +405,21 @@ $db->prepare("
 $homeResp2 = apiRequest('GET', '/api/v1/patient/home', null, $patientToken);
 assert($homeResp2['status'] === 200, "Falha ao obter home: {$homeResp2['raw']}");
 $nextApp = $homeResp2['json']['next_appointment'];
-assert(!empty($nextApp['meeting_url']), "URL da teleconsulta não retornada na API do paciente");
-assert($nextApp['meeting_url'] === $telehealthUrl, "URL da teleconsulta divergente da gravada!");
-echo "✓ GATE 4 PASS: Teleconsulta retornada com URL acionável no endpoint oficial do app ({$nextApp['meeting_url']})\n";
+// NI2-221: links legados (telehealth_sessions) não são mais expostos; o app só recebe
+// o bilhete curto do Consultório Online quando o nutricionista já abriu a sala.
+assert(($nextApp['meeting_url'] ?? null) !== $telehealthUrl, "Link legado de teleconsulta não pode ser exposto ao app");
+assert(empty($nextApp['meeting_url']), "Sem sala aberta no Consultório Online, o app não deve receber link");
+
+$db->prepare("
+    INSERT INTO teleconsultation_sessions (clinic_id, appointment_id, patient_id, professional_id, provider, patient_token_hash, status,
+        join_opens_at_utc, join_closes_at_utc, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'webrtc_p2p', ?, 'scheduled', datetime('now', '-1 hour'), datetime('now', '+1 day'), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+")->execute([$clinicId, $appId, $patientId, $profId, hash('sha256', 'gate4-' . $testRunId)]);
+$homeResp3 = apiRequest('GET', '/api/v1/patient/home', null, $patientToken);
+$ticketUrl = (string)($homeResp3['json']['next_appointment']['meeting_url'] ?? '');
+assert($ticketUrl === '' || preg_match('#/teleconsulta/sala-espera/p\.\d+\.\d+\.\d+\.\d+\.[A-Za-z0-9_-]{43}$#', $ticketUrl) === 1,
+    "Link do app deve ser o bilhete assinado do Consultório Online: {$ticketUrl}");
+echo "✓ GATE 4 PASS: link legado bloqueado; app recebe " . ($ticketUrl !== '' ? 'bilhete assinado da sala de espera' : 'nenhum link (APP_KEY ausente no ambiente de teste)') . "\n";
 
 // =========================================================================
 // GATE 5: MOB-UX-007 — Distinção entre Erro de Conexão e Agenda Livre

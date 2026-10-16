@@ -6,11 +6,15 @@ namespace ClyoNutri\Domain\Telehealth\Providers;
 
 use ClyoNutri\Domain\Telehealth\Contracts\VideoConferenceProviderInterface;
 use ClyoNutri\Domain\Telehealth\Exceptions\ExternalMediaProviderBlockedException;
-use RuntimeException;
 
 /**
- * Driver de produção para integração com a Daily Video API (Daily.co).
- * Responsável por gerenciar salas privadas e tokens de acesso escopados sem persistir mídia.
+ * Driver da Daily REST API (https://docs.daily.co/reference/rest-api).
+ *
+ * - Sala privada, expiração com ejeção, sem gravação (enable_recording é omitido:
+ *   a API só aceita valores de string que LIGAM gravação; omitir = desligado).
+ * - Sem chat do provedor e sem armazenamento de transcrição.
+ * - Token de participante com exp curto e ejeção ao expirar; somente o
+ *   profissional é owner (moderador).
  */
 class DailyVideoProvider implements VideoConferenceProviderInterface
 {
@@ -20,8 +24,8 @@ class DailyVideoProvider implements VideoConferenceProviderInterface
 
     public function __construct(?string $apiKey = null, ?string $domain = null, string $apiBaseUrl = 'https://api.daily.co/v1')
     {
-        $this->apiKey = $apiKey ?? (getenv('DAILY_API_KEY') ?: ($_ENV['DAILY_API_KEY'] ?? null));
-        $this->domain = $domain ?? (getenv('DAILY_DOMAIN') ?: ($_ENV['DAILY_DOMAIN'] ?? null));
+        $this->apiKey = $apiKey ?? self::env('DAILY_API_KEY');
+        $this->domain = $domain ?? self::env('DAILY_DOMAIN');
         $this->apiBaseUrl = rtrim($apiBaseUrl, '/');
     }
 
@@ -35,119 +39,150 @@ class DailyVideoProvider implements VideoConferenceProviderInterface
         return !empty($this->apiKey) && !empty($this->domain);
     }
 
-    public function createRoom(string $roomName, int $expiresInSeconds = 7200): array
+    public function createRoom(string $roomName, int $expiresAtUnix): array
     {
-        if (!$this->isConfigured()) {
-            throw new ExternalMediaProviderBlockedException(
-                "Integração WebRTC Daily.co BLOCKED: DAILY_API_KEY ou DAILY_DOMAIN não configurados no ambiente. " .
-                "Proibido criar sala mock ou link falso para conformidade com o critério de aceite NI2-234/NI2-242."
-            );
-        }
+        $this->assertConfigured('criação de sala');
+        $this->assertRoomName($roomName);
 
-        $expTimestamp = time() + $expiresInSeconds;
-        $payload = [
+        $response = $this->request('POST', '/rooms', [
             'name' => $roomName,
-            'privacy' => 'private', // Somente participantes com meeting token autorizado
+            'privacy' => 'private',
             'properties' => [
-                'exp' => $expTimestamp,
+                'exp' => $expiresAtUnix,
                 'eject_at_room_exp' => true,
-                'enable_recording' => false, // Política estrita: gravação desabilitada por padrão
+                'enable_chat' => false,
                 'enable_screenshare' => true,
-                'enable_chat' => false, // Chat de saúde deve usar o canal auditado interno do ClyoNutri
+                'enable_prejoin_ui' => true,
+                'enable_knocking' => false,
+                'enable_transcription_storage' => false,
                 'start_video_off' => false,
                 'start_audio_off' => false,
             ],
-        ];
+        ]);
 
-        $response = $this->executeHttpRequest('POST', '/rooms', $payload);
+        if (empty($response['name']) || empty($response['url'])) {
+            throw new ExternalMediaProviderBlockedException('Resposta da Daily sem nome/URL da sala; provisionamento recusado (fail-closed).');
+        }
 
         return [
-            'room_id' => $response['id'] ?? $roomName,
-            'room_url' => $response['url'] ?? "https://{$this->domain}.daily.co/{$roomName}",
-            'expires_at' => date('Y-m-d H:i:s', $expTimestamp),
+            'room_id' => (string)($response['id'] ?? ''),
+            'room_name' => (string)$response['name'],
+            'room_url' => (string)$response['url'],
+            'expires_at_unix' => $expiresAtUnix,
         ];
     }
 
-    public function issueMeetingToken(string $roomName, string $participantRole, string $userName, int $expiresInSeconds = 7200): array
-    {
-        if (!$this->isConfigured()) {
-            throw new ExternalMediaProviderBlockedException(
-                "Emissão de token Daily.co BLOCKED: Credenciais do provedor ausentes. Proibido emitir token simulado."
-            );
+    public function issueMeetingToken(
+        string $roomName,
+        string $participantRole,
+        string $displayName,
+        string $participantRef,
+        int $expiresAtUnix
+    ): array {
+        $this->assertConfigured('emissão de credencial');
+        $this->assertRoomName($roomName);
+        if (!in_array($participantRole, ['professional', 'patient'], true)) {
+            throw new \InvalidArgumentException("Papel de participante inválido: {$participantRole}");
         }
 
-        $expTimestamp = time() + $expiresInSeconds;
-        $isOwner = ($participantRole === 'professional');
-
-        $payload = [
+        $response = $this->request('POST', '/meeting-tokens', [
             'properties' => [
                 'room_name' => $roomName,
-                'user_name' => $userName,
-                'is_owner' => $isOwner,
-                'exp' => $expTimestamp,
-                'enable_recording' => false,
+                'user_name' => mb_substr($displayName, 0, 60),
+                'user_id' => mb_substr($participantRef, 0, 36),
+                'is_owner' => $participantRole === 'professional',
+                'exp' => $expiresAtUnix,
+                'eject_at_token_exp' => true,
                 'start_video_off' => false,
-                'start_audio_off' => false,
             ],
-        ];
+        ]);
 
-        $response = $this->executeHttpRequest('POST', '/meeting-tokens', $payload);
+        if (empty($response['token'])) {
+            throw new ExternalMediaProviderBlockedException('Daily não retornou credencial de participante (fail-closed).');
+        }
 
-        return [
-            'token' => $response['token'] ?? '',
-            'expires_at' => date('Y-m-d H:i:s', $expTimestamp),
-        ];
+        return ['token' => (string)$response['token'], 'expires_at_unix' => $expiresAtUnix];
     }
 
     public function deleteRoom(string $roomName): bool
     {
-        if (!$this->isConfigured()) {
+        if (!$this->isConfigured() || $roomName === '') {
             return false;
         }
+        $this->assertRoomName($roomName);
 
         try {
-            $this->executeHttpRequest('DELETE', "/rooms/{$roomName}");
+            $this->request('DELETE', '/rooms/' . rawurlencode($roomName));
             return true;
-        } catch (\Throwable $e) {
+        } catch (ExternalMediaProviderBlockedException $e) {
             return false;
         }
     }
 
-    private function executeHttpRequest(string $method, string $endpoint, ?array $payload = null): array
+    private function assertConfigured(string $operation): void
     {
-        $url = $this->apiBaseUrl . $endpoint;
-        $headers = [
-            'Authorization: Bearer ' . $this->apiKey,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ];
+        if (!$this->isConfigured()) {
+            throw new ExternalMediaProviderBlockedException(
+                "Daily BLOCKED na {$operation}: DAILY_API_KEY/DAILY_DOMAIN ausentes no ambiente. Nenhuma sala ou credencial simulada é gerada."
+            );
+        }
+    }
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    private function assertRoomName(string $roomName): void
+    {
+        if (!preg_match('/^[A-Za-z0-9_-]{1,128}$/', $roomName)) {
+            throw new \InvalidArgumentException('Nome de sala inválido para o provedor.');
+        }
+    }
 
+    private function request(string $method, string $endpoint, ?array $payload = null): array
+    {
+        $ch = curl_init($this->apiBaseUrl . $endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->apiKey,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
+        ]);
         if ($payload !== null) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         }
 
-        $rawResponse = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
+        $raw = curl_exec($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
         curl_close($ch);
 
-        if ($curlError) {
-            throw new ExternalMediaProviderBlockedException("Erro de conexão de rede com provedor Daily.co: " . $curlError);
+        if ($error !== '') {
+            throw new ExternalMediaProviderBlockedException('Falha de rede com a Daily: ' . $error);
         }
 
-        $decoded = json_decode((string)$rawResponse, true);
-
-        if ($httpCode >= 400) {
-            $errorMsg = $decoded['info'] ?? ($decoded['error'] ?? "HTTP Status {$httpCode}");
-            throw new ExternalMediaProviderBlockedException("Falha na chamada da API Daily.co ({$httpCode}): {$errorMsg}");
+        $decoded = json_decode((string)$raw, true);
+        if ($status >= 400) {
+            $info = is_array($decoded) ? (string)($decoded['info'] ?? $decoded['error'] ?? '') : '';
+            // Mensagem sem payload, token ou dados do paciente.
+            throw new ExternalMediaProviderBlockedException("Daily recusou {$method} {$this->safeEndpoint($endpoint)} (HTTP {$status}) {$info}");
         }
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function safeEndpoint(string $endpoint): string
+    {
+        return preg_replace('#^/rooms/.+$#', '/rooms/{name}', $endpoint) ?? $endpoint;
+    }
+
+    private static function env(string $key): ?string
+    {
+        $value = getenv($key);
+        if ($value === false || $value === '') {
+            $value = $_ENV[$key] ?? $_SERVER[$key] ?? null;
+        }
+        return ($value === null || $value === '') ? null : (string)$value;
     }
 }

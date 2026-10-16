@@ -109,6 +109,21 @@ final class AdminController
         exit;
     }
 
+    /** GET JSON — métricas operacionais da teleconsulta, sem dados clínicos (NI2-432). */
+    public function teleconsultationMetrics(): void
+    {
+        $this->getAuthorizedUser('dashboard.read');
+        $days = max(1, min(90, (int)($_GET['dias'] ?? 7)));
+        $clinicId = isset($_GET['clinica']) && $_GET['clinica'] !== '' ? (int)$_GET['clinica'] : null;
+        $to = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode(
+            (new \ClyoNutri\Domain\Telehealth\TeleconsultationMetricsService($this->db))->summary($to->modify("-{$days} days"), $to, $clinicId),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+    }
+
     public function dashboard(): void
     {
         $user = $this->getAuthorizedUser('dashboard.read');
