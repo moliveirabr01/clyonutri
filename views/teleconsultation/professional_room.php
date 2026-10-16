@@ -13,8 +13,8 @@ $statusLabel = \ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($status);
   <title>Consultório Online — <?= $e($session['patient_name']) ?></title>
   <link rel="stylesheet" href="/assets/css/teleconsulta.css">
 </head>
-<body data-tc-session="<?= $sid ?>
-<a class="tc-skip" href="#tc-conteudo">Pular para o conteúdo</a>" data-tc-csrf="<?= $e($csrf) ?>">
+<body data-tc-session="<?= $sid ?>" data-tc-csrf="<?= $e($csrf) ?>">
+<a class="tc-skip" href="#tc-conteudo">Pular para o conteúdo</a>
 <header class="tc-header">
   <div>
     <h1 class="tc-brand">Consultório Online</h1>
