@@ -55,6 +55,8 @@ final class SecurityHeaders
     private static ?string $nonce = null;
     /** @var string[] */
     private static array $extraScript = [];
+    /** @var string[] origem do provedor de vídeo, só nas telas de sala (NI2-221 F06) */
+    private static array $extraFrame = [];
     private static bool $browserSent = false;
     private static bool $isApi = false;
 
@@ -83,8 +85,8 @@ final class SecurityHeaders
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: blob:",
             "media-src 'self' blob:",
-            "connect-src 'self'",
-            "frame-src 'self'",
+            'connect-src ' . implode(' ', array_unique(array_merge(["'self'"], self::$extraFrame))),
+            'frame-src ' . implode(' ', array_unique(array_merge(["'self'"], self::$extraFrame))),
             "worker-src 'self' blob:",
             "manifest-src 'self'",
             "object-src 'none'",
@@ -167,6 +169,27 @@ final class SecurityHeaders
         if (self::$browserSent) {
             self::emitCsp();
         }
+    }
+
+    /**
+     * NI2-221 F06 (preparado, desligado por padrão): libera a origem do provedor de vídeo
+     * (TELEHEALTH_PROVIDER_ORIGIN, ex.: https://clinica.daily.co) em frame-src/connect-src e
+     * na Permissions-Policy de câmera/microfone/tela SÓ na resposta da sala que chamar este método.
+     * Vazio ou inválido = nada muda. Retorna a origem liberada ou null.
+     */
+    public static function allowTelehealthProviderOrigin(): ?string
+    {
+        $origin = strtolower(trim((string)(Env::get('TELEHEALTH_PROVIDER_ORIGIN', '') ?? '')));
+        if ($origin === '' || !preg_match('#^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$#', $origin)) {
+            return null;
+        }
+        self::$extraFrame[] = $origin;
+        if (self::$browserSent && !headers_sent()) {
+            $o = '"' . $origin . '"';
+            header("Permissions-Policy: camera=(self {$o}), microphone=(self {$o}), display-capture=(self {$o}), fullscreen=(self {$o}), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()", true);
+            self::emitCsp();
+        }
+        return $origin;
     }
 
     public static function injectActions(string $buffer, int $phase = 0): string

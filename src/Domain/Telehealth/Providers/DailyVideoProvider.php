@@ -63,6 +63,7 @@ class DailyVideoProvider implements VideoConferenceProviderInterface
 
         return [
             'room_id' => $response['id'] ?? $roomName,
+            'room_name' => $response['name'] ?? $roomName, // F11: deleteRoom usa o nome
             'room_url' => $response['url'] ?? "https://{$this->domain}.daily.co/{$roomName}",
             'expires_at' => date('Y-m-d H:i:s', $expTimestamp),
         ];
@@ -106,7 +107,7 @@ class DailyVideoProvider implements VideoConferenceProviderInterface
         }
 
         try {
-            $this->executeHttpRequest('DELETE', "/rooms/{$roomName}");
+            $this->executeHttpRequest('DELETE', '/rooms/' . rawurlencode($roomName));
             return true;
         } catch (\Throwable $e) {
             return false;
