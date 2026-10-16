@@ -27,6 +27,10 @@ final class ApiErrorBoundary
         };
         ob_start(static function (string $body) use ($requestId, &$failed): string {
             $status = http_response_code();
+            // v13: respostas sem corpo (preflight OPTIONS 204, 304) não são JSON inválido.
+            if (!$failed && ($status === 204 || $status === 304)) {
+                return '';
+            }
             $isJson = false;
             foreach (headers_list() as $header) {
                 if (stripos($header, 'Content-Type: application/json') === 0) $isJson = true;
