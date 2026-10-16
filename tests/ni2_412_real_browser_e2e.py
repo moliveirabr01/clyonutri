@@ -160,8 +160,9 @@ with sync_playwright() as p:
     page.locator("button", has_text="+ Alimento").first.click(); page.wait_for_timeout(300)
     page.keyboard.insert_text("arroz"); page.wait_for_timeout(1500)
     txt = page.inner_text("#modal-add-item .food-search-results")
-    ck("Catálogo TACO" in txt and "Código 301" in txt and "Código 9901" in txt, "NI2-415", "resultados mostram fonte e código")
-    ck("Nome repetido no catálogo" in txt, "NI2-415", "nomes repetidos sinalizados (sem mesclar)")
+    # v14 UX-08: equivalentes agrupados (apresentação), com referência TACO x cadastro interno
+    ck("Catálogo TACO" in txt and "TACO 4ª ed. nº 1" in txt and "Cadastro interno nº 301" in txt and "Cadastro interno nº 9901" in txt, "NI2-415", "resultados mostram fonte e referência (nº TACO x cadastro interno)")
+    ck("cadastros equivalentes" in txt, "NI2-415/UX-08", "equivalentes agrupados sem mesclar no banco")
     ck(re.search(r"P [\d,]+ g · C [\d,]+ g · G [\d,]+ g", txt) is not None, "NI2-415", "composição por 100 g visível sem abrir outra tela")
     shot("ux03-busca-arroz-depois")
     page.keyboard.press("ArrowDown"); page.keyboard.press("Enter"); page.wait_for_timeout(200)

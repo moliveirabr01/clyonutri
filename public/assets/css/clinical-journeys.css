@@ -49,6 +49,10 @@ html.cn-dialog-open { overflow: hidden; }
 .food-result__badge--custom { background: #FFF4ED; color: #9A3412; }
 .food-result__meta { font-size: 0.75rem; color: #475569; }
 .food-result__dup { font-size: 0.72rem; color: #92400E; }
+/* UX-08 (v14): grupo de cadastros equivalentes */
+.food-result-group { display: flex; flex-direction: column; gap: 4px; }
+.food-result__equivalents { align-self: flex-start; background: none; border: none; padding: 2px 4px; font-size: 0.75rem; color: var(--brand-copper-600, #9A5B2E); text-decoration: underline; cursor: pointer; text-align: left; }
+.food-result--equivalent { margin-left: 16px; border-style: dashed; }
 
 /* NI2-418 (UX-06): próximo passo e navegação por seções do perfil */
 .cn-next-step { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-left: 4px solid var(--brand-copper-500, #C2703D); margin-bottom: var(--space-4); }

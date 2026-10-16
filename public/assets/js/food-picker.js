@@ -14,32 +14,62 @@
     // NI2-415 (UX-03): fonte, tipo (catálogo x personalizado da clínica), categoria, composição por 100 g e código
     const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
     const fmt = v => Number(v || 0).toLocaleString('pt-BR', {maximumFractionDigits: 1});
+    // UX-08 (v14): itens equivalentes (mesmo nome normalizado + mesma composição; chave vinda do servidor)
+    // aparecem como um só resultado, com os demais cadastros em "ver equivalentes". Só apresentação:
+    // cada botão continua selecionando o id original (planos existentes não mudam).
+    const refOf = food => food.reference || ((food.is_custom ? 'Cadastro da clínica nº ' : 'Código ') + food.id);
+    const originOf = food => (food.is_custom ? 'Personalizado da sua clínica' : ('Catálogo ' + (food.source || ''))).trim();
+    const expanded = new Set();
+    function foodButton(food, extra) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'food-result' + (extra ? ' food-result--equivalent' : '');
+      button.setAttribute('aria-pressed', String(select.value === String(food.id)));
+      button.dataset.foodId = String(food.id);
+      const name = document.createElement('strong'), meta = document.createElement('span'), energy = document.createElement('span');
+      name.textContent = food.name;
+      const badge = document.createElement('span'); badge.className = 'food-result__badge' + (food.is_custom ? ' food-result__badge--custom' : ''); badge.textContent = originOf(food);
+      meta.className = 'food-result__meta'; meta.dataset.reference = refOf(food);
+      meta.textContent = [food.category, refOf(food)].filter(Boolean).join(' · ');
+      energy.textContent = fmt(food.energy_kcal) + ' kcal · P ' + fmt(food.protein_g) + ' g · C ' + fmt(food.carbohydrate_g) + ' g · G ' + fmt(food.lipid_g) + ' g por 100 g';
+      button.append(name, badge, meta, energy);
+      button.setAttribute('aria-label', food.name + ', ' + originOf(food) + ', ' + meta.textContent + ', ' + energy.textContent);
+      button.addEventListener('click', () => {
+        select.value = String(food.id); validate(); render();
+        chosen.textContent = 'Selecionado: ' + food.name + ' (' + refOf(food) + ')'; chosen.hidden = false;
+      });
+      return button;
+    }
     function render() {
       results.replaceChildren();
-      const counts = {};
-      foods.forEach(food => { const k = norm(food.name); counts[k] = (counts[k] || 0) + 1; });
+      const groups = new Map(), nameKeys = {};
       foods.forEach(food => {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'food-result';
-        button.setAttribute('aria-pressed', String(select.value === String(food.id)));
-        const name = document.createElement('strong'), meta = document.createElement('span'), energy = document.createElement('span');
-        name.textContent = food.name;
-        const origin = food.is_custom ? 'Personalizado da sua clínica' : ('Catálogo ' + (food.source || ''));
-        const badge = document.createElement('span'); badge.className = 'food-result__badge' + (food.is_custom ? ' food-result__badge--custom' : ''); badge.textContent = origin.trim();
-        meta.className = 'food-result__meta';
-        meta.textContent = [food.category, 'Código ' + food.id].filter(Boolean).join(' · ');
-        energy.textContent = fmt(food.energy_kcal) + ' kcal · P ' + fmt(food.protein_g) + ' g · C ' + fmt(food.carbohydrate_g) + ' g · G ' + fmt(food.lipid_g) + ' g por 100 g';
-        button.append(name, badge, meta, energy);
-        if (counts[norm(food.name)] > 1) {
+        const key = food.equivalence_key || ('id:' + food.id);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(food);
+      });
+      groups.forEach((items, key) => { const n = norm(String(items[0].name).replace(/\btaco\b/gi, '')); (nameKeys[n] = nameKeys[n] || new Set()).add(key); });
+      groups.forEach((items, key) => {
+        // Principal: o que tem nº TACO; senão o de menor id. Se o selecionado for um equivalente, ele vira o principal.
+        items.sort((a, b) => (b.taco_code != null) - (a.taco_code != null) || a.id - b.id);
+        const selIdx = items.findIndex(f => String(f.id) === select.value);
+        if (selIdx > 0) items.unshift(items.splice(selIdx, 1)[0]);
+        const wrap = document.createElement('div'); wrap.className = 'food-result-group';
+        const main = foodButton(items[0], false); wrap.append(main);
+        const n = norm(String(items[0].name).replace(/\btaco\b/gi, ''));
+        if (nameKeys[n] && nameKeys[n].size > 1) {
           const dup = document.createElement('span'); dup.className = 'food-result__dup';
-          dup.textContent = 'Nome repetido no catálogo: compare código e composição antes de escolher.';
-          button.append(dup);
+          dup.textContent = 'Mesmo nome com composição diferente: compare a origem e os valores antes de escolher.';
+          main.append(dup); main.setAttribute('aria-label', main.getAttribute('aria-label') + ', mesmo nome com composição diferente');
         }
-        button.setAttribute('aria-label', food.name + ', ' + origin + ', ' + meta.textContent + ', ' + energy.textContent + (counts[norm(food.name)] > 1 ? ', nome repetido no catálogo' : ''));
-        button.addEventListener('click', () => {
-          select.value = String(food.id); validate(); render();
-          chosen.textContent = 'Selecionado: ' + food.name + ' (' + origin.trim() + ', código ' + food.id + ')'; chosen.hidden = false;
-        });
-        results.append(button);
+        if (items.length > 1) {
+          const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'food-result__equivalents';
+          const open = expanded.has(key);
+          toggle.setAttribute('aria-expanded', String(open));
+          toggle.textContent = (open ? 'Ocultar' : 'Ver') + ' ' + (items.length - 1) + (items.length === 2 ? ' cadastro equivalente' : ' cadastros equivalentes') + ' (mesmo nome e composição: ' + items.slice(1).map(refOf).join('; ') + ')';
+          toggle.addEventListener('click', () => { open ? expanded.delete(key) : expanded.add(key); render(); });
+          wrap.append(toggle);
+          if (open) items.slice(1).forEach(f => wrap.append(foodButton(f, true)));
+        }
+        results.append(wrap);
       });
     }
     box.closest?.('form')?.addEventListener('clyo:discard', () => {
