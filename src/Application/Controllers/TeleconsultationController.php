@@ -272,13 +272,13 @@ class TeleconsultationController
         $this->securityHeaders();
         try {
             $this->patientRateLimit($token);
-            $session = $this->service->getSessionByPatientToken($token);
+            [$session, $cookieValue] = $this->service->redeemPatientLink($token);
         } catch (\Throwable $e) {
             $this->clearPatientCookie();
             $this->patientErrorPage($e);
             return;
         }
-        $this->setPatientCookie($token);
+        $this->setPatientCookie($cookieValue);
         $target = in_array($session['status'], ['admitted', 'in_progress'], true) ? '/teleconsulta/sala' : '/teleconsulta/sala-espera';
         header('Location: ' . $target, true, 303);
         exit;
@@ -525,7 +525,7 @@ class TeleconsultationController
     {
         http_response_code($this->statusFor($e));
         $this->securityHeaders();
-        $message = $e instanceof TeleconsultationRateLimitException
+        $message = ($e instanceof TeleconsultationRateLimitException || $e instanceof \ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationTicketUsedException)
             ? $e->getMessage()
             : 'Este link de teleconsulta não está disponível. Ele pode ter expirado, sido substituído ou a consulta pode ter sido encerrada. Fale com seu nutricionista para receber um novo convite.';
         echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'

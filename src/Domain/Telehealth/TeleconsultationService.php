@@ -12,6 +12,7 @@ use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Telehealth\Contracts\VideoConferenceProviderInterface;
 use ClyoNutri\Domain\Telehealth\Exceptions\ExternalMediaProviderBlockedException;
 use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationStateException;
+use ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationTicketUsedException;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -130,6 +131,10 @@ class TeleconsultationService
         }
 
         [$opensAt, $closesAt] = $this->joinWindow($appointment);
+        // v13: consulta já passada (fim + tolerância) não ganha sala nova.
+        if ($closesAt < $this->now()) {
+            throw new TeleconsultationStateException("Consulta #{$appointmentId} já passou; não é possível abrir a teleconsulta. Reagende a consulta para criar uma nova sala.");
+        }
         $rawToken = bin2hex(random_bytes(32));
         $now = $this->nowSql();
 
@@ -273,7 +278,13 @@ class TeleconsultationService
      * rotacionar o convite do nutricionista. Só existe se a sessão já foi aberta
      * pelo nutricionista e não está encerrada. O bilhete é revalidado a cada uso.
      */
-    public function issuePortalTicket(int $patientId, int $appointmentId, int $clinicId, int $maxTtlSeconds = 7200): ?string
+    /**
+     * Bilhete assinado para o paciente entrar na sala de espera.
+     * v13: por padrão o bilhete é de uso único ("q.": leva um nonce e é consumido na primeira troca por cookie);
+     * o app/portal pede um novo a cada leitura de meeting_url. O link do e-mail ($singleUse = false) segue
+     * reutilizável dentro da janela ("p."), pois o paciente pode abri-lo mais de uma vez.
+     */
+    public function issuePortalTicket(int $patientId, int $appointmentId, int $clinicId, int $maxTtlSeconds = 7200, bool $singleUse = true): ?string
     {
         $session = $this->findSessionRowByAppointment($appointmentId, $clinicId);
         if ($session === null || (int)$session['patient_id'] !== $patientId) {
@@ -292,13 +303,120 @@ class TeleconsultationService
             $this->now()->getTimestamp() + max(60, $maxTtlSeconds)
         );
         // Geração do convite no bilhete: emitir novo convite invalida bilhetes (app e e-mail) antigos.
-        $body = 'p.' . (int)$session['id'] . '.' . $patientId . '.' . (int)$session['invite_generation'] . '.' . $exp;
-        return $body . '.' . rtrim(strtr(base64_encode(hash_hmac('sha256', $body, $key, true)), '+/', '-_'), '=');
+        $base = (int)$session['id'] . '.' . $patientId . '.' . (int)$session['invite_generation'] . '.' . $exp;
+        $body = $singleUse ? 'q.' . $base . '.' . self::b64url(random_bytes(16)) : 'p.' . $base;
+        return $body . '.' . self::b64url(hash_hmac('sha256', $body, $key, true));
+    }
+
+    public const SINGLE_USE_TICKET_PATTERN = '/^(q\.(\d{1,10})\.(\d{1,10})\.(\d{1,6})\.(\d{1,12})\.[A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/D';
+
+    public static function isSingleUseTicket(string $token): bool
+    {
+        return preg_match(self::SINGLE_USE_TICKET_PATTERN, $token) === 1;
+    }
+
+    /**
+     * v13: troca o link pelo acesso deste navegador. Bilhete de uso único é consumido aqui (atomicamente);
+     * devolve [sessão, valor do cookie]. Para convite de 64 hex e bilhete "p." o cookie é o próprio código.
+     * @return array{0: array, 1: string}
+     */
+    public function redeemPatientLink(string $rawToken): array
+    {
+        if (!self::isSingleUseTicket($rawToken)) {
+            return [$this->getSessionByPatientToken($rawToken), $rawToken];
+        }
+        $session = $this->verifySingleUseTicket($rawToken);
+        $browserKey = self::b64url(random_bytes(32));
+        $this->purgeExpiredRedemptions();
+        try {
+            $this->db->prepare('INSERT INTO teleconsultation_ticket_redemptions
+                    (ticket_hash, session_id, clinic_id, browser_key_hash, redeemed_at_utc, expires_at_utc)
+                VALUES (:t, :s, :c, :b, :now, :exp)')
+                ->execute([
+                    't' => hash('sha256', $rawToken), 's' => (int)$session['id'], 'c' => (int)$session['clinic_id'],
+                    'b' => hash('sha256', $browserKey), 'now' => $this->nowSql(),
+                    'exp' => gmdate('Y-m-d H:i:s', self::ticketExpiry($rawToken)),
+                ]);
+        } catch (\PDOException $e) {
+            if ((string)$e->getCode() !== '23000') {
+                throw $e;
+            }
+            throw new TeleconsultationTicketUsedException();
+        }
+        $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'portal_ticket_redeemed', 'patient', (int)$session['patient_id']);
+        return [$session, $rawToken . '~' . $browserKey];
+    }
+
+    private function verifySingleUseTicket(string $ticket): array
+    {
+        if (preg_match(self::SINGLE_USE_TICKET_PATTERN, $ticket, $m) !== 1) {
+            throw new TenantSecurityException('Convite de teleconsulta inválido.');
+        }
+        $key = self::ticketKey();
+        if ($key === null || !hash_equals(self::b64url(hash_hmac('sha256', $m[1], $key, true)), $m[6])
+            || (int)$m[5] < $this->now()->getTimestamp()) {
+            throw new TenantSecurityException('Este acesso à teleconsulta expirou. Abra novamente pelo aplicativo ou peça um novo convite.');
+        }
+        $stmt = $this->db->prepare(self::SESSION_SELECT . ' WHERE s.id = :id AND s.patient_id = :pid');
+        $stmt->execute(['id' => (int)$m[2], 'pid' => (int)$m[3]]);
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$session || (int)$session['invite_generation'] !== (int)$m[4]) {
+            throw new TenantSecurityException('Convite de teleconsulta inválido ou substituído.');
+        }
+        return $this->assertPatientSessionUsable($session);
+    }
+
+    private static function ticketExpiry(string $ticket): int
+    {
+        return preg_match(self::SINGLE_USE_TICKET_PATTERN, $ticket, $m) === 1 ? (int)$m[5] : 0;
+    }
+
+    private function purgeExpiredRedemptions(): void
+    {
+        try {
+            $this->db->prepare('DELETE FROM teleconsultation_ticket_redemptions WHERE expires_at_utc < :cut')
+                ->execute(['cut' => $this->now()->modify('-1 day')->format('Y-m-d H:i:s')]);
+        } catch (\PDOException $e) {
+            // limpeza oportunista; não bloqueia a entrada
+        }
+    }
+
+    private function assertPatientSessionUsable(array $session): array
+    {
+        $session = $this->applyExpiry($session);
+        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+            throw new TeleconsultationStateException('Esta teleconsulta não está mais disponível. Fale com seu nutricionista.');
+        }
+        return $session;
+    }
+
+    private static function b64url(string $bin): string
+    {
+        return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
     }
 
     /** Valida o convite (hash de 64 hex) ou o bilhete do app; estado não terminal e janela. */
     public function getSessionByPatientToken(string $rawToken): array
     {
+        // v13: cookie de bilhete de uso único = "<bilhete>~<chave do navegador>" (vínculo ao navegador que trocou o link).
+        if (str_contains($rawToken, '~')) {
+            [$ticket, $browserKey] = explode('~', $rawToken, 2);
+            $session = $this->verifySingleUseTicket($ticket);
+            if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $browserKey) !== 1) {
+                throw new TenantSecurityException('Convite de teleconsulta inválido.');
+            }
+            $stmt = $this->db->prepare('SELECT browser_key_hash FROM teleconsultation_ticket_redemptions WHERE ticket_hash = :t AND session_id = :s');
+            $stmt->execute(['t' => hash('sha256', $ticket), 's' => (int)$session['id']]);
+            $stored = $stmt->fetchColumn();
+            if (!is_string($stored) || !hash_equals($stored, hash('sha256', $browserKey))) {
+                throw new TeleconsultationTicketUsedException();
+            }
+            return $session;
+        }
+        if (self::isSingleUseTicket($rawToken)) {
+            // o código de uso único só vale na troca pelo link (redeemPatientLink), nunca como credencial direta
+            throw new TenantSecurityException('Abra a teleconsulta pelo link do aplicativo.');
+        }
         if (preg_match('/^p\.(\d{1,10})\.(\d{1,10})\.(\d{1,6})\.(\d{1,12})\.([A-Za-z0-9_-]{43})$/', $rawToken, $m)) {
             $key = self::ticketKey();
             $body = "p.{$m[1]}.{$m[2]}.{$m[3]}.{$m[4]}";

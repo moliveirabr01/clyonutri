@@ -15,9 +15,13 @@ class PatientPortalService
 {
     private PDO $db;
 
-    public function __construct(?PDO $db = null)
+    /** Relógio fixo opcional (testes); padrão: agora. */
+    private ?\DateTimeImmutable $fixedNow;
+
+    public function __construct(?PDO $db = null, ?\DateTimeImmutable $now = null)
     {
         $this->db = $db ?? Connection::getInstance();
+        $this->fixedNow = $now;
     }
 
     // =========================================================================
@@ -393,10 +397,29 @@ class PatientPortalService
             LEFT JOIN professionals p ON p.id = a.professional_id
             LEFT JOIN users u ON u.id = p.user_id
             WHERE a.patient_id = :patient_id AND a.clinic_id = :clinic_id AND a.status IN ('scheduled', 'confirmed')
-            ORDER BY a.scheduled_at ASC LIMIT 1
+              AND a.scheduled_at >= :floor
+            ORDER BY a.scheduled_at ASC LIMIT 50
         ");
-        $stmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        // v13: consultas passadas não são "próxima consulta". scheduled_at está no fuso da aplicação;
+        // a consulta continua válida até início + duração + tolerância (TELECONSULT_JOIN_GRACE_MINUTES).
+        $appTz = new \DateTimeZone(date_default_timezone_get());
+        $now = ($this->fixedNow ?? new \DateTimeImmutable('now'))->setTimezone($appTz);
+        $stmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId, 'floor' => $now->modify('-1 day')->format('Y-m-d H:i:s')]);
+        $graceRaw = getenv('TELECONSULT_JOIN_GRACE_MINUTES');
+        $grace = is_numeric($graceRaw) ? max(0, min(240, (int)$graceRaw)) : 30;
+        $row = false;
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
+            try {
+                $start = new \DateTimeImmutable((string)$candidate['scheduled_at'], $appTz);
+            } catch (\Exception $e) {
+                continue;
+            }
+            $end = $start->modify('+' . (max(15, (int)($candidate['duration_minutes'] ?? 60)) + $grace) . ' minutes');
+            if ($end >= $now) {
+                $row = $candidate;
+                break;
+            }
+        }
         if (!$row) {
             return null;
         }

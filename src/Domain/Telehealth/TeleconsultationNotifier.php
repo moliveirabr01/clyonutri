@@ -107,7 +107,7 @@ class TeleconsultationNotifier
             return ['status' => 'skipped', 'reason' => 'Paciente sem e-mail cadastrado.'];
         }
 
-        $ticket = $this->service->issuePortalTicket((int)$session['patient_id'], (int)$session['appointment_id'], $clinicId, 30 * 24 * 3600);
+        $ticket = $this->service->issuePortalTicket((int)$session['patient_id'], (int)$session['appointment_id'], $clinicId, 30 * 24 * 3600, false);
         if ($ticket === null) {
             $this->service->recordSystemEvent($sessionId, $clinicId, $event . 'failed', $actorType, $actorId, ['generation' => $generation, 'reason' => 'link_unavailable']);
             throw new TeleconsultationStateException('Não foi possível gerar o link do paciente (verifique APP_KEY e o estado da sessão).');
