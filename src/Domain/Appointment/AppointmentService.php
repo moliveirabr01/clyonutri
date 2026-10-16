@@ -179,6 +179,12 @@ class AppointmentService
     ): array {
         $clinicId = TenantContext::getClinicId();
         $current = TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        // v11: TenantGuard só devolve id/clinic/patient/professional/status; sem o resto, editar zerava type/notes
+        // (ex.: teleconsulta virava 'first_visit'). Completa com a linha atual.
+        $beforeSt = $this->db->prepare("SELECT scheduled_at, professional_id, patient_id, type, duration_minutes, notes FROM appointments WHERE id = :id AND clinic_id = :c");
+        $beforeSt->execute(['id' => $appointmentId, 'c' => $clinicId]);
+        $before = $beforeSt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $current = array_merge($before ?? [], $current);
 
         $patientId = isset($data['patient_id']) ? (int)$data['patient_id'] : (int)$current['patient_id'];
         $professionalId = isset($data['professional_id']) ? (int)$data['professional_id'] : (int)$current['professional_id'];
@@ -245,6 +251,18 @@ class AppointmentService
                 "Consulta editada / reagendada para {$scheduledAt}"
             );
 
+            // NI2-221 F04: reagendar, trocar paciente/profissional ou mudar a modalidade invalida o convite da teleconsulta.
+            if ($before !== null && (
+                (string)$before['scheduled_at'] !== (string)$scheduledAt
+                || (int)$before['professional_id'] !== $professionalId
+                || (int)$before['patient_id'] !== $patientId
+                || (string)$before['type'] !== (string)$type
+                || (int)$before['duration_minutes'] !== $duration
+            )) {
+                (new \ClyoNutri\Domain\Telehealth\TeleconsultationService($this->db))
+                    ->revokeForAppointment($appointmentId, $clinicId, 'appointment_rescheduled');
+            }
+
             if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->commit();
             }
@@ -300,6 +318,12 @@ class AppointmentService
             'id' => $appointmentId,
             'clinic_id' => $clinicId,
         ]);
+
+        if ($success && in_array($newStatus, [self::STATUS_CANCELLED, self::STATUS_NO_SHOW, self::STATUS_COMPLETED], true)) {
+            // NI2-221 F04: cancelar / falta / concluir revoga o convite da teleconsulta (cancelar também cancela a sessão).
+            $reason = ['cancelled' => 'appointment_cancelled', 'no_show' => 'appointment_no_show', 'completed' => 'appointment_completed'][$newStatus];
+            (new \ClyoNutri\Domain\Telehealth\TeleconsultationService($this->db))->revokeForAppointment($appointmentId, $clinicId, $reason);
+        }
 
         if ($success) {
             $this->recordStatusHistory(
