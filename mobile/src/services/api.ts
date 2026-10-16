@@ -184,7 +184,8 @@ export interface Appointment {
   professional_name?: string;
   meeting_url?: string | null;
   is_online?: boolean;
-  video_status?: 'indisponivel_no_app' | 'presencial';
+  /** Valores emitidos pelo servidor (PatientPortalService::getNextAppointment). */
+  video_status?: 'presencial' | 'aguardando_sala' | 'sala_disponivel';
 }
 
 export interface PatientRecipePrescription {
