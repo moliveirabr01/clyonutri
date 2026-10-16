@@ -1,0 +1,35 @@
+/* Teleconsulta (NI2-221 v11) — CSS local; substitui o Tailwind via CDN (F13). */
+*,*::before,*::after{box-sizing:border-box}
+.tc-body{margin:0;min-height:100vh;background:#0f172a;color:#e2e8f0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+.tc-center{align-items:center;justify-content:center;padding:16px}
+.tc-header{background:#1e293b;border-bottom:1px solid #334155;padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.tc-brand{color:#34d399;font-weight:700}
+.tc-main{flex:1;display:grid;grid-template-columns:1fr;gap:16px;padding:16px}
+@media(min-width:1024px){.tc-main{grid-template-columns:7fr 5fr}}
+.tc-card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px}
+.tc-card h1{font-size:1.25rem;margin:0 0 6px}.tc-card h2{font-size:1rem;margin:0 0 8px}.tc-card h3{font-size:.9rem;margin:0 0 6px}
+.tc-narrow{max-width:620px;width:100%}
+.tc-stack>*+*{margin-top:12px}
+.tc-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tc-muted{color:#94a3b8;font-size:.85rem}
+.tc-small{font-size:.8rem}
+.tc-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;background:#334155;color:#e2e8f0}
+.tc-badge-wait{background:#f59e0b;color:#111}.tc-badge-ok{background:#059669;color:#fff}
+.tc-alert{padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220}
+.tc-alert-warn{border-color:#b45309;background:#2a1a05;color:#fde68a}
+.tc-alert-ok{border-color:#047857;background:#052e22;color:#a7f3d0}
+.tc-alert-err{border-color:#b91c1c;background:#2b0a0a;color:#fecaca}
+.tc-btn{display:inline-block;border:0;border-radius:6px;padding:8px 14px;font-weight:600;font-size:.85rem;cursor:pointer;text-decoration:none;color:#fff;background:#475569}
+.tc-btn:focus-visible,.tc-input:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}
+.tc-btn[disabled]{opacity:.5;cursor:not-allowed}
+.tc-btn-ok{background:#059669}.tc-btn-danger{background:#dc2626}.tc-btn-block{display:block;width:100%}
+.tc-input{width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:8px 10px;font:inherit}
+textarea.tc-input{min-height:160px}
+.tc-label{display:block;font-size:.8rem;font-weight:600;color:#cbd5e1;margin-bottom:4px}
+.tc-video{position:relative;background:#000;border:1px solid #334155;border-radius:10px;min-height:340px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.tc-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.tc-video video{width:100%;max-height:320px;object-fit:cover}
+.tc-term{max-height:140px;overflow-y:auto;background:#0b1220;border:1px solid #334155;border-radius:6px;padding:10px;font-size:.85rem}
+.tc-link{word-break:break-all;font-family:ui-monospace,monospace;font-size:.8rem;background:#0b1220;padding:8px;border-radius:6px;border:1px dashed #64748b}
+.tc-list{list-style:none;margin:0;padding:0}.tc-list li{padding:6px 0;border-bottom:1px solid #334155;font-size:.85rem}
+.tc-hidden{display:none !important}

@@ -33,8 +33,9 @@ class Router
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
 
-        // Validação CSRF em requisições de mutação Web (rotas /api/ e /teleconsulta/sala-espera/ autenticadas por token de URL)
-        if ($method === 'POST' && !str_starts_with($path, '/api/') && !str_starts_with($path, '/teleconsulta/sala-espera/')) {
+        // Validação CSRF em requisições de mutação Web (exceto /api/, que tem guard próprio).
+        // v11: a teleconsulta do paciente usa cookie de sessão e envia X-CSRF-Token; não há mais exceção.
+        if ($method === 'POST' && !str_starts_with($path, '/api/')) {
             $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);

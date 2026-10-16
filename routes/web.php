@@ -65,14 +65,17 @@ $router->post('/teleconsulta/{id}/admitir', [TeleconsultationController::class, 
 $router->post('/teleconsulta/{id}/rejeitar', [TeleconsultationController::class, 'reject'])->name('teleconsultation.reject');
 $router->post('/teleconsulta/{id}/evoluir', [TeleconsultationController::class, 'recordEvolution'])->name('teleconsultation.evolve');
 $router->post('/teleconsulta/{id}/encerrar', [TeleconsultationController::class, 'end'])->name('teleconsultation.end');
+$router->post('/teleconsulta/{id}/convite', [TeleconsultationController::class, 'issueLink'])->name('teleconsultation.issue_link');
+$router->post('/teleconsulta/sessao-agenda/{appointmentId}', [TeleconsultationController::class, 'createFromAppointment'])->name('teleconsultation.create');
 
 // Jornada do Paciente (Convite Seguro & Sala de Espera)
-$router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
-$router->post('/teleconsulta/sala-espera/{token}/dispositivo', [TeleconsultationController::class, 'patientSubmitDeviceCheck'])->name('teleconsultation.device');
-$router->post('/teleconsulta/sala-espera/{token}/consentir', [TeleconsultationController::class, 'patientAcceptConsent'])->name('teleconsultation.consent');
-$router->post('/teleconsulta/sala-espera/{token}/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
-$router->get('/teleconsulta/sala-espera/{token}/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
-$router->get('/teleconsulta/sala/{token}', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
+$router->get('/teleconsulta/sala-espera', [TeleconsultationController::class, 'patientWaitingRoom'])->name('teleconsultation.waiting');
+$router->get('/teleconsulta/sala-espera/status', [TeleconsultationController::class, 'patientStatus'])->name('teleconsultation.status');
+$router->post('/teleconsulta/sala-espera/dispositivo', [TeleconsultationController::class, 'patientSubmitDeviceCheck'])->name('teleconsultation.device');
+$router->post('/teleconsulta/sala-espera/consentir', [TeleconsultationController::class, 'patientAcceptConsent'])->name('teleconsultation.consent');
+$router->post('/teleconsulta/sala-espera/entrar', [TeleconsultationController::class, 'patientEnterWaiting'])->name('teleconsultation.enter');
+$router->get('/teleconsulta/sala', [TeleconsultationController::class, 'patientConsultationRoom'])->name('teleconsultation.patient_room');
+$router->get('/teleconsulta/sala-espera/{token}', [TeleconsultationController::class, 'patientLinkExchange'])->name('teleconsultation.link');
 
 // 4. Central de Ajuda & Service Desk (NI2-195)
 use ClyoNutri\Application\Controllers\HelpdeskController;

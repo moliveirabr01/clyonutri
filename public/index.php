@@ -337,18 +337,26 @@ $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
 
 // 3.1 Consultório Online & Teleconsulta (NI2-221 / NI2-411)
+// v11 (NI2-221): criação só por POST; o link do paciente vira cookie e redireciona para URL limpa.
 $router->get('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'openFromAppointment'])));
+$router->post('/teleconsulta/sessao-agenda/{appointmentId}', $requireAuth($requireTelehealth([$teleCtrl, 'createFromAppointment'])));
 $router->get('/teleconsulta/{id}/atendimento', $requireAuth($requireTelehealth([$teleCtrl, 'professionalRoom'])));
 $router->post('/teleconsulta/{id}/admitir', $requireAuth($requireTelehealth([$teleCtrl, 'admit'])));
 $router->post('/teleconsulta/{id}/rejeitar', $requireAuth($requireTelehealth([$teleCtrl, 'reject'])));
 $router->post('/teleconsulta/{id}/evoluir', $requireAuth($requireTelehealth([$teleCtrl, 'recordEvolution'])));
 $router->post('/teleconsulta/{id}/encerrar', $requireAuth($requireTelehealth([$teleCtrl, 'end'])));
-$router->get('/teleconsulta/sala-espera/{token}', $requireTelehealth([$teleCtrl, 'patientWaitingRoom']));
-$router->post('/teleconsulta/sala-espera/{token}/dispositivo', $requireTelehealth([$teleCtrl, 'patientSubmitDeviceCheck']));
-$router->post('/teleconsulta/sala-espera/{token}/consentir', $requireTelehealth([$teleCtrl, 'patientAcceptConsent']));
-$router->post('/teleconsulta/sala-espera/{token}/entrar', $requireTelehealth([$teleCtrl, 'patientEnterWaiting']));
-$router->get('/teleconsulta/sala-espera/{token}/status', $requireTelehealth([$teleCtrl, 'patientStatus']));
-$router->get('/teleconsulta/sala/{token}', $requireTelehealth([$teleCtrl, 'patientConsultationRoom']));
+$router->post('/teleconsulta/{id}/convite', $requireAuth($requireTelehealth([$teleCtrl, 'issueLink'])));
+// Paciente (sessão por cookie, rotas específicas antes das com {token})
+$router->get('/teleconsulta/sala-espera', $requireTelehealth([$teleCtrl, 'patientWaitingRoom']));
+$router->get('/teleconsulta/sala-espera/status', $requireTelehealth([$teleCtrl, 'patientStatus']));
+$router->post('/teleconsulta/sala-espera/dispositivo', $requireTelehealth([$teleCtrl, 'patientSubmitDeviceCheck']));
+$router->post('/teleconsulta/sala-espera/consentir', $requireTelehealth([$teleCtrl, 'patientAcceptConsent']));
+$router->post('/teleconsulta/sala-espera/entrar', $requireTelehealth([$teleCtrl, 'patientEnterWaiting']));
+$router->get('/teleconsulta/sala', $requireTelehealth([$teleCtrl, 'patientConsultationRoom']));
+$router->get('/teleconsulta/sala-espera/{token}', $requireTelehealth([$teleCtrl, 'patientLinkExchange']));
+$router->get('/teleconsulta/sala/{token}', $requireTelehealth([$teleCtrl, 'patientLinkExchange']));
+$router->get('/teleconsulta/sala-espera/{token}/status', $requireTelehealth([$teleCtrl, 'patientLegacyTokenApi']));
+$router->post('/teleconsulta/sala-espera/{token}/{acao}', $requireTelehealth([$teleCtrl, 'patientLegacyTokenApi']));
 $router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
 $router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
 $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));

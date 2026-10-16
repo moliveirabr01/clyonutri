@@ -6,669 +6,668 @@ namespace ClyoNutri\Application\Controllers;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Http\SecurityHeaders;
 use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Core\Security\TelehealthRateLimiter;
 use ClyoNutri\Core\Security\TenantSecurityException;
+use ClyoNutri\Domain\Telehealth\TeleconsultationException;
 use ClyoNutri\Domain\Telehealth\TeleconsultationService;
 use PDO;
 
 /**
- * Controller oficial para o Consultório Online / Teleconsulta no ClyoNutri II.
- * Atende às jornadas do Nutricionista e do Paciente.
+ * Consultório Online / Teleconsulta (NI2-221) — v11.
+ *
+ * Profissional: só o responsável pelo agendamento abre a sala e age (F01/F07). Criar a sessão é POST com CSRF (F07).
+ * Paciente: o link /teleconsulta/sala-espera/{token} é trocado por um cookie de sessão e redireciona para a URL
+ * limpa /teleconsulta/sala-espera (F14). Endpoints do paciente com rate limit e CSRF. Status sem URL de sala (F05).
+ * Sem provedor de vídeo configurado, as telas dizem isso (F02): nada de "vídeo conectado" nem selos de conformidade.
  */
 class TeleconsultationController
 {
-    private PDO $db;
-    private TeleconsultationService $teleconsultationService;
+    private const PATIENT_KEY = '_tele_patient';
+    private const LINK_FLASH_KEY = '_tele_link_once';
 
-    public function __construct(?PDO $db = null, ?TeleconsultationService $service = null)
+    private PDO $db;
+    private TeleconsultationService $service;
+    private TelehealthRateLimiter $limiter;
+
+    public function __construct(?PDO $db = null, ?TeleconsultationService $service = null, ?TelehealthRateLimiter $limiter = null)
     {
         $this->db = $db ?? Connection::getInstance();
-        $this->teleconsultationService = $service ?? new TeleconsultationService($this->db);
+        $this->service = $service ?? new TeleconsultationService($this->db);
+        $this->limiter = $limiter ?? new TelehealthRateLimiter($this->db);
     }
 
-    /**
-     * Inicia ou abre o Consultório Online a partir de um agendamento da clínica.
-     */
+    // ================================================================ utilidades
+
+    private static function startSession(): void
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+    }
+
+    /** @return array{0:int,1:int}|null [userId, clinicId] */
+    private function staff(): ?array
+    {
+        self::startSession();
+        $u = (int)($_SESSION['user_id'] ?? 0);
+        $c = (int)($_SESSION['clinic_id'] ?? 0);
+        if ($u <= 0 || $c <= 0) {
+            header('Location: /login');
+            return null;
+        }
+        TenantContext::setClinicId($c);
+        return [$u, $c];
+    }
+
+    private static function noStore(): void
+    {
+        header('Cache-Control: no-store, private', true);
+        header('Pragma: no-cache', true);
+    }
+
+    /** Converte erro em status + mensagem pública. Nada interno vai para a resposta (F15/F20). */
+    private static function mapError(\Throwable $e): array
+    {
+        if ($e instanceof TeleconsultationException) {
+            return [$e->httpStatus, $e->getMessage()];
+        }
+        if ($e instanceof TenantSecurityException) {
+            return [404, 'Teleconsulta não encontrada.'];
+        }
+        error_log('[teleconsulta] erro interno: ' . get_class($e) . ' em ' . basename($e->getFile()) . ':' . $e->getLine());
+        return [500, 'Não foi possível concluir a ação agora. Tente novamente em instantes.'];
+    }
+
+    private static function h(?string $v): string
+    {
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+
+    private static function head(string $title): void
+    {
+        ?><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title><?= self::h($title) ?></title>
+<link rel="stylesheet" href="/assets/css/teleconsulta.css">
+</head>
+<?php
+    }
+
+    private static function messagePage(int $status, string $title, string $message, ?string $backHref = null, string $extraHtml = ''): void
+    {
+        http_response_code($status);
+        self::noStore();
+        header('Content-Type: text/html; charset=utf-8');
+        self::head($title . ' — ClyoNutri');
+        ?>
+<body class="tc-body tc-center">
+  <main class="tc-card tc-narrow tc-stack" role="main">
+    <h1><?= self::h($title) ?></h1>
+    <p><?= self::h($message) ?></p>
+    <?= $extraHtml ?>
+    <?php if ($backHref): ?><p><a class="tc-btn" href="<?= self::h($backHref) ?>">Voltar</a></p><?php endif; ?>
+  </main>
+</body>
+</html>
+<?php
+    }
+
+    private static function json(int $status, array $data): void
+    {
+        http_response_code($status);
+        self::noStore();
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function postCsrfOk(): bool
+    {
+        $t = $_POST['_csrf'] ?? $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        return is_string($t) && Csrf::validate($t);
+    }
+
+    // ================================================================ profissional
+
+    /** GET /teleconsulta/sessao-agenda/{appointmentId}: só lê. Sessão existente → sala; senão botão (POST). */
     public function openFromAppointment(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        TenantContext::setClinicId((int)$clinicId);
+        if (!($who = $this->staff())) { return; }
+        [$userId, $clinicId] = $who;
         $appointmentId = (int)($params['appointmentId'] ?? 0);
-
-        // Verificar se já existe sessão criada para o agendamento
-        $stmt = $this->db->prepare("
-            SELECT id FROM teleconsultation_sessions
-            WHERE appointment_id = :app_id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute(['app_id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $existing = $stmt->fetch();
-
-        if ($existing) {
-            header("Location: /teleconsulta/{$existing['id']}/atendimento");
-            exit;
-        }
-
-        // Se não existir, agendar nova sessão
         try {
-            $created = $this->teleconsultationService->scheduleSession($appointmentId, (int)$clinicId);
-            header("Location: /teleconsulta/{$created['session_id']}/atendimento");
-            exit;
+            $p = $this->service->previewForAppointment($appointmentId, $userId, $clinicId);
         } catch (\Throwable $e) {
-            http_response_code(400);
-            echo "<h1>Erro ao iniciar teleconsulta</h1><p>" . htmlspecialchars($e->getMessage()) . "</p>";
-            echo "<a href='/agenda'>← Voltar para a Agenda</a>";
-            exit;
+            [$st, $msg] = self::mapError($e);
+            self::messagePage($st, 'Teleconsulta indisponível', $msg, '/agenda');
+            return;
         }
+        if ($p['session_id'] !== null) {
+            header('Location: /teleconsulta/' . $p['session_id'] . '/atendimento', true, 303);
+            return;
+        }
+        $csrf = self::h(Csrf::generate());
+        $when = self::h(date('d/m/Y H:i', strtotime($p['appointment']['scheduled_at'])));
+        self::messagePage(200, 'Abrir sala de teleconsulta', "Consulta online de {$when}. Ainda não existe sala para este agendamento.", '/agenda',
+            '<form method="POST" action="/teleconsulta/sessao-agenda/' . $appointmentId . '"><input type="hidden" name="_csrf" value="' . $csrf . '">'
+            . '<button class="tc-btn tc-btn-ok" type="submit">Criar sala de teleconsulta</button></form>');
     }
 
-    /**
-     * Interface do Nutricionista: Consultório Virtual & Prontuário Integrado.
-     */
+    /** POST /teleconsulta/sessao-agenda/{appointmentId}: cria (idempotente) e vai para a sala. */
+    public function createFromAppointment(array $params = []): void
+    {
+        if (!($who = $this->staff())) { return; }
+        [$userId, $clinicId] = $who;
+        if (!self::postCsrfOk()) {
+            self::messagePage(403, 'Ação bloqueada', 'Sessão expirada. Recarregue a página e tente de novo.', '/agenda');
+            return;
+        }
+        try {
+            $r = $this->service->createSessionForAppointment((int)($params['appointmentId'] ?? 0), $userId, $clinicId);
+        } catch (\Throwable $e) {
+            [$st, $msg] = self::mapError($e);
+            self::messagePage($st, 'Teleconsulta indisponível', $msg, '/agenda');
+            return;
+        }
+        header('Location: /teleconsulta/' . $r['session_id'] . '/atendimento', true, 303);
+    }
+
+    /** GET /teleconsulta/{id}/atendimento — só o responsável (F07). */
     public function professionalRoom(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        TenantContext::setClinicId((int)$clinicId);
+        if (!($who = $this->staff())) { return; }
+        [$userId, $clinicId] = $who;
         $sessionId = (int)($params['id'] ?? 0);
-
         try {
-            $session = $this->teleconsultationService->getSessionById($sessionId, (int)$clinicId);
+            $s = $this->service->getSessionForProfessional($sessionId, $userId, $clinicId);
         } catch (\Throwable $e) {
-            http_response_code(404);
-            echo "<h1>Sessão de teleconsulta não encontrada ou acesso não autorizado</h1>";
-            exit;
+            [$st, $msg] = self::mapError($e);
+            self::messagePage($st, 'Teleconsulta indisponível', $msg, '/agenda');
+            return;
         }
 
-        // Buscar dados do prontuário recente do paciente
-        $stmtRecords = $this->db->prepare("
-            SELECT id, version, title, record_hash, created_at 
-            FROM clinical_records 
-            WHERE patient_id = :p_id AND clinic_id = :c_id 
-            ORDER BY version DESC LIMIT 5
-        ");
-        $stmtRecords->execute(['p_id' => $session['patient_id'], 'c_id' => $clinicId]);
-        $recentRecords = $stmtRecords->fetchAll();
+        $st = $this->db->prepare("SELECT id, version, title, created_at FROM clinical_records WHERE patient_id = :p AND clinic_id = :c ORDER BY version DESC LIMIT 5");
+        $st->execute(['p' => $s['patient_id'], 'c' => $clinicId]);
+        $recent = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        $csrfToken = Csrf::generate();
+        $linkOnce = null;
+        if (isset($_SESSION[self::LINK_FLASH_KEY]) && (int)($_SESSION[self::LINK_FLASH_KEY]['sid'] ?? 0) === $sessionId) {
+            $linkOnce = $_SESSION[self::LINK_FLASH_KEY];
+        }
+        unset($_SESSION[self::LINK_FLASH_KEY]); // mostrado uma vez
 
+        $csrf = self::h(Csrf::generate());
+        $status = (string)$s['status'];
+        $label = \ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($status);
+        $terminal = in_array($status, TeleconsultationService::TERMINAL, true);
+        $videoOk = $this->service->isVideoConfigured() && !empty($s['external_room_url']);
+        if ($videoOk) {
+            $videoOk = SecurityHeaders::allowTelehealthProviderOrigin() !== null;
+        }
+        $flash = isset($_GET['salvo']) ? 'Evolução gravada no prontuário.' : null;
+
+        self::noStore();
+        header('Content-Type: text/html; charset=utf-8');
+        self::head('Teleconsulta — ' . $s['patient_name']);
         ?>
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Consultório Virtual ClyoNutri — Dr(a). <?= htmlspecialchars($session['professional_name']) ?></title>
-            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
-            <!-- Header do Consultório -->
-            <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <span class="text-emerald-400 font-bold text-lg">ClyoNutri II Teleconsulta</span>
-                    <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-mono">CFN / LGPD Seguro</span>
-                </div>
-                <div class="flex items-center space-x-6 text-sm">
-                    <div>
-                        <span class="text-slate-400">Paciente:</span> 
-                        <strong class="text-white"><?= htmlspecialchars($session['patient_name']) ?></strong>
-                    </div>
-                    <div>
-                        <span class="text-slate-400">Status:</span> 
-                        <span id="session-status-badge" class="px-2 py-0.5 rounded text-xs font-semibold <?= $session['status'] === 'waiting_room' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white' ?>">
-                            <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($session['status'])) ?>
-                        </span>
-                    </div>
-                    <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/encerrar" data-confirm="Deseja realmente encerrar a teleconsulta?">
-                        <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium text-xs">
-                            Encerrar Atendimento
-                        </button>
-                    </form>
-                </div>
-            </header>
+<body class="tc-body">
+<header class="tc-header">
+  <div class="tc-row"><span class="tc-brand">ClyoNutri · Teleconsulta</span></div>
+  <div class="tc-row tc-small">
+    <span>Paciente: <strong><?= self::h($s['patient_name']) ?></strong></span>
+    <span>Estado: <span id="session-status-badge" class="tc-badge <?= $status === 'waiting_room' ? 'tc-badge-wait' : '' ?>"><?= self::h($label) ?></span></span>
+    <?php if (in_array($status, ['admitted', 'in_progress'], true)): ?>
+    <form method="POST" action="/teleconsulta/<?= (int)$s['id'] ?>/encerrar" data-confirm="Encerrar a chamada? Isso não conclui a consulta na agenda.">
+      <input type="hidden" name="_csrf" value="<?= $csrf ?>">
+      <button type="submit" class="tc-btn tc-btn-danger">Encerrar chamada</button>
+    </form>
+    <?php endif; ?>
+  </div>
+</header>
+<main class="tc-main" role="main">
+  <section class="tc-stack" aria-label="Sala e admissão">
+    <?php if ($flash): ?><div class="tc-alert tc-alert-ok" role="status"><?= self::h($flash) ?></div><?php endif; ?>
+    <div class="tc-card tc-stack">
+      <h2>Admissão do paciente</h2>
+      <p class="tc-muted"><?= $status === 'waiting_room' ? 'O paciente está na sala de espera.' : 'Estado atual: ' . self::h($label) . '.' ?></p>
+      <?php if (!$terminal): ?>
+      <div class="tc-row">
+        <?php if ($status === 'waiting_room'): ?>
+        <form method="POST" action="/teleconsulta/<?= (int)$s['id'] ?>/admitir"><input type="hidden" name="_csrf" value="<?= $csrf ?>"><button type="submit" class="tc-btn tc-btn-ok">Admitir paciente</button></form>
+        <?php endif; ?>
+        <?php if (in_array($status, ['scheduled', 'device_checked', 'waiting_room'], true)): ?>
+        <form method="POST" action="/teleconsulta/<?= (int)$s['id'] ?>/rejeitar"><input type="hidden" name="_csrf" value="<?= $csrf ?>"><input type="hidden" name="reason" value="Recusado pelo profissional"><button type="submit" class="tc-btn">Recusar</button></form>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </div>
 
-            <!-- Layout Principal: Vídeo (Esquerda) + Prontuário Eletrônico (Direita) -->
-            <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
-                <!-- Coluna de Vídeo e Sala de Espera (7 Colunas) -->
-                <section class="lg:col-span-7 flex flex-col space-y-4">
-                    <!-- Painel de Notificação da Sala de Espera -->
-                    <div id="waiting-room-alert" class="p-4 rounded-lg border <?= $session['status'] === 'waiting_room' ? 'bg-amber-950 border-amber-600 text-amber-200' : 'bg-slate-800 border-slate-700 text-slate-300' ?>">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="font-bold text-sm">Controle de Admissão de Participantes</h3>
-                                <p class="text-xs mt-1" id="waiting-room-message">
-                                    <?= $session['status'] === 'waiting_room' ? 'Paciente está aguardando na sala de espera!' : 'Status atual da sessão: ' . htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::teleconsultationStatus($session['status'])) ?>
-                                </p>
-                            </div>
-                            <?php if ($session['status'] === 'waiting_room' || $session['status'] === 'device_checked' || $session['status'] === 'scheduled'): ?>
-                            <div class="flex space-x-2">
-                                <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/admitir">
-                                    <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
-                                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-xs font-semibold">
-                                        Admitir Paciente
-                                    </button>
-                                </form>
-                                <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/rejeitar">
-                                    <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
-                                    <input type="hidden" name="reason" value="Paciente ausente ou não autorizado">
-                                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded text-xs font-semibold">
-                                        Recusar
-                                    </button>
-                                </form>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+    <div class="tc-card tc-stack">
+      <h2>Link do paciente</h2>
+      <?php if ($linkOnce): ?>
+        <div class="tc-alert tc-alert-warn" role="status">
+          <p><strong>Copie agora: este link aparece só uma vez.</strong> Envie ao paciente por um canal seu (o sistema ainda não envia convites). Gerar outro link invalida este.</p>
+          <p class="tc-link" id="patient-link"><?= self::h($linkOnce['url']) ?></p>
+          <p class="tc-small">Vale de <?= self::h(date('d/m/Y H:i', strtotime($linkOnce['window_start']))) ?> até <?= self::h(date('d/m/Y H:i', strtotime($linkOnce['expires_at']))) ?>.</p>
+        </div>
+      <?php endif; ?>
+      <?php if (!$terminal): ?>
+      <form method="POST" action="/teleconsulta/<?= (int)$s['id'] ?>/convite" data-confirm="Gerar um novo link? O link anterior deixa de funcionar.">
+        <input type="hidden" name="_csrf" value="<?= $csrf ?>">
+        <button type="submit" class="tc-btn"><?= empty($s['token_issued_at']) ? 'Gerar link do paciente' : 'Gerar novo link (invalida o anterior)' ?></button>
+      </form>
+      <?php else: ?>
+      <p class="tc-muted">Teleconsulta encerrada: não há link ativo.</p>
+      <?php endif; ?>
+    </div>
 
-                    <!-- Feed de Mídia WebRTC -->
-                    <div class="flex-1 bg-black rounded-lg border border-slate-700 flex flex-col items-center justify-center relative min-h-[360px] overflow-hidden">
-                        <?php if ($session['external_room_url']): ?>
-                            <iframe src="<?= htmlspecialchars($session['external_room_url']) ?>" 
-                                    class="w-full h-full border-0 absolute inset-0"
-                                    allow="camera; microphone; fullscreen; display-capture"></iframe>
-                        <?php else: ?>
-                            <div class="text-center p-6 space-y-3 z-10">
-                                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto text-emerald-400">
-                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                </div>
-                                <h4 class="font-semibold text-slate-200">Vídeo Real Conectado via Daily WebRTC</h4>
-                                <p class="text-xs text-slate-400 max-w-md">
-                                    Ambiente seguro de teleconsulta. O paciente só acessa o feed de vídeo após ser admitido pelo nutricionista.
-                                </p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </section>
+    <div class="tc-video" aria-label="Vídeo">
+      <?php if ($videoOk && in_array($status, ['admitted', 'in_progress'], true)): ?>
+        <iframe src="<?= self::h($s['external_room_url']) ?>" title="Sala de vídeo" allow="camera; microphone; fullscreen; display-capture"></iframe>
+      <?php else: ?>
+        <div class="tc-card tc-narrow tc-stack" role="status">
+          <h3>Vídeo não configurado</h3>
+          <p class="tc-muted">Esta instalação ainda não tem um provedor de vídeo ativo. A sala de espera, a admissão e a evolução funcionam, mas a chamada de vídeo não acontece por aqui.</p>
+        </div>
+      <?php endif; ?>
+    </div>
+  </section>
 
-                <!-- Coluna do Prontuário Integrado (5 Colunas) -->
-                <section class="lg:col-span-5 bg-slate-800 border border-slate-700 rounded-lg p-5 flex flex-col space-y-4">
-                    <div class="border-b border-slate-700 pb-3">
-                        <h2 class="font-bold text-white text-base">Evolução Clínica & Prontuário em Tempo Real</h2>
-                        <p class="text-xs text-slate-400 mt-1">
-                            As notas ficam salvas no prontuário com histórico preservado. O paciente não vê as notas privadas.
-                        </p>
-                    </div>
-
-                    <!-- Formulário de Registro Clínico Imediato -->
-                    <form method="POST" action="/teleconsulta/<?= $session['id'] ?>/evoluir" class="space-y-4 flex-1 flex flex-col">
-                        <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
-
-                        <div>
-                            <label for="tc1-title" class="block text-xs font-semibold text-slate-300 mb-1">Título da Evolução / Queixa Principal</label>
-                            <input id="tc1-title" type="text" name="title" required
-                                   value="Evolução Teleconsulta - <?= date('d/m/Y H:i') ?>"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
-                        </div>
-
-                        <div class="flex-1 flex flex-col">
-                            <label for="tc2-clinical_notes" class="block text-xs font-semibold text-slate-300 mb-1">Conduta Nutricional & Anotações de Teleconsulta</label>
-                            <textarea id="tc2-clinical_notes" name="clinical_notes" required rows="8"
-                                      placeholder="Registre as queixas, recordatório alimentar, metas discutidas, orientações e alterações de plano..."
-                                      class="w-full flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-sm text-white focus:outline-none focus:border-emerald-500"></textarea>
-                        </div>
-
-                        <div>
-                            <label for="tc3-goals" class="block text-xs font-semibold text-slate-300 mb-1">Metas para a Próxima Sessão</label>
-                            <input id="tc3-goals" type="text" name="goals" placeholder="Ex: Aumentar ingestão hídrica para 2.5L/dia; meta proteica atingida"
-                                   class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
-                        </div>
-
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded text-sm transition">
-                            Gravar Evolução no Prontuário (SHA-256)
-                        </button>
-                    </form>
-
-                    <!-- Histórico Recente do Prontuário -->
-                    <div class="border-t border-slate-700 pt-3">
-                        <h3 class="text-xs font-semibold text-slate-400 mb-2">Últimos Registros Clínicos do Paciente</h3>
-                        <div class="space-y-2 max-h-36 overflow-y-auto pr-1 text-xs">
-                            <?php foreach ($recentRecords as $rec): ?>
-                                <div class="bg-slate-900 p-2 rounded border border-slate-800 flex justify-between items-center">
-                                    <div>
-                                        <div class="font-medium text-slate-200"><?= htmlspecialchars($rec['title']) ?></div>
-                                        <div class="text-[10px] text-slate-500 font-mono">v<?= $rec['version'] ?> • <?= substr($rec['record_hash'], 0, 12) ?>...</div>
-                                    </div>
-                                    <div class="text-[10px] text-slate-400"><?= date('d/m/y', strtotime($rec['created_at'])) ?></div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </body>
-        </html>
-        <?php
+  <section class="tc-card tc-stack" aria-label="Evolução clínica">
+    <h2>Evolução clínica</h2>
+    <p class="tc-muted">As anotações ficam no prontuário com histórico preservado e não são enviadas ao paciente nem ao provedor de vídeo.<?= $status === 'completed' ? ' Chamada encerrada: o que for gravado agora entra como adendo.' : '' ?></p>
+    <?php if (in_array($status, ['admitted', 'in_progress', 'completed'], true)): ?>
+    <form method="POST" action="/teleconsulta/<?= (int)$s['id'] ?>/evoluir" class="tc-stack">
+      <input type="hidden" name="_csrf" value="<?= $csrf ?>">
+      <div><label class="tc-label" for="tc-title">Título</label><input id="tc-title" class="tc-input" type="text" name="title" required value="Evolução teleconsulta - <?= self::h(date('d/m/Y H:i')) ?>"></div>
+      <div><label class="tc-label" for="tc-notes">Conduta e anotações</label><textarea id="tc-notes" class="tc-input" name="clinical_notes" required></textarea></div>
+      <div><label class="tc-label" for="tc-goals">Metas para a próxima sessão</label><input id="tc-goals" class="tc-input" type="text" name="goals"></div>
+      <button type="submit" class="tc-btn tc-btn-ok tc-btn-block">Gravar evolução no prontuário</button>
+    </form>
+    <?php else: ?>
+      <p class="tc-muted">A evolução fica disponível depois de admitir o paciente.</p>
+    <?php endif; ?>
+    <h3>Últimos registros do paciente</h3>
+    <ul class="tc-list">
+      <?php foreach ($recent as $r): ?>
+        <li><?= self::h($r['title']) ?> <span class="tc-muted">· v<?= (int)$r['version'] ?> · <?= self::h(date('d/m/y', strtotime((string)$r['created_at']))) ?></span></li>
+      <?php endforeach; ?>
+      <?php if (!$recent): ?><li class="tc-muted">Nenhum registro.</li><?php endif; ?>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
+<?php
     }
 
-    /**
-     * POST: Nutricionista admite paciente.
-     */
+    /** Executa uma ação POST do profissional com CSRF, mapeamento de erro e redirect. */
+    private function staffAction(array $params, callable $fn, ?callable $onErrorHtml = null): void
+    {
+        if (!($who = $this->staff())) { return; }
+        [$userId, $clinicId] = $who;
+        $sessionId = (int)($params['id'] ?? 0);
+        if (!self::postCsrfOk()) {
+            self::messagePage(403, 'Ação bloqueada', 'Sessão expirada. Recarregue a página e tente de novo.', '/agenda');
+            return;
+        }
+        try {
+            $redirect = $fn($sessionId, $userId, $clinicId);
+        } catch (\Throwable $e) {
+            [$st, $msg] = self::mapError($e);
+            $back = $st === 404 || $st === 403 ? '/agenda' : "/teleconsulta/{$sessionId}/atendimento";
+            self::messagePage($st, 'Não foi possível concluir', $msg, $back, $onErrorHtml ? $onErrorHtml() : '');
+            return;
+        }
+        header('Location: ' . $redirect, true, 303);
+    }
+
     public function admit(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        Csrf::validate($_POST['_csrf'] ?? null);
-        TenantContext::setClinicId((int)$clinicId);
-
-        $sessionId = (int)($params['id'] ?? 0);
-        $this->teleconsultationService->admitPatient($sessionId, (int)$userId);
-
-        header("Location: /teleconsulta/{$sessionId}/atendimento");
-        exit;
+        $this->staffAction($params, function (int $sid, int $uid, int $cid) {
+            $this->service->admitPatient($sid, $uid, $cid);
+            return "/teleconsulta/{$sid}/atendimento";
+        });
     }
 
-    /**
-     * POST: Nutricionista rejeita admissão.
-     */
     public function reject(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        Csrf::validate($_POST['_csrf'] ?? null);
-        TenantContext::setClinicId((int)$clinicId);
-
-        $sessionId = (int)($params['id'] ?? 0);
-        $reason = trim((string)($_POST['reason'] ?? 'Recusado pelo profissional'));
-        $this->teleconsultationService->rejectPatient($sessionId, (int)$userId, $reason);
-
-        header("Location: /teleconsulta/{$sessionId}/atendimento");
-        exit;
+        $this->staffAction($params, function (int $sid, int $uid, int $cid) {
+            $this->service->rejectPatient($sid, $uid, trim((string)($_POST['reason'] ?? 'Recusado pelo profissional')), $cid);
+            return "/teleconsulta/{$sid}/atendimento";
+        });
     }
 
-    /**
-     * POST: Gravar evolução clínica durante a teleconsulta.
-     */
     public function recordEvolution(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        Csrf::validate($_POST['_csrf'] ?? null);
-        TenantContext::setClinicId((int)$clinicId);
-
-        $sessionId = (int)($params['id'] ?? 0);
-        $title = trim((string)($_POST['title'] ?? 'Evolução Teleconsulta'));
+        $title = trim((string)($_POST['title'] ?? 'Evolução teleconsulta'));
         $notes = trim((string)($_POST['clinical_notes'] ?? ''));
         $goals = trim((string)($_POST['goals'] ?? ''));
-
-        $this->teleconsultationService->recordClinicalEvolution($sessionId, (int)$userId, $title, [
-            'notes' => $notes,
-            'goals' => $goals,
-            'source' => 'teleconsultation_room',
-        ]);
-
-        header("Location: /teleconsulta/{$sessionId}/atendimento?salvo=1");
-        exit;
+        $this->staffAction($params, function (int $sid, int $uid, int $cid) use ($title, $notes, $goals) {
+            if ($notes === '') {
+                throw TeleconsultationException::conflict('Escreva a evolução antes de gravar.');
+            }
+            $this->service->recordClinicalEvolution($sid, $uid, $title, ['notes' => $notes, 'goals' => $goals, 'source' => 'teleconsultation_room'], $cid);
+            return "/teleconsulta/{$sid}/atendimento?salvo=1";
+        }, function () use ($notes) {
+            // F09 (parcial): o texto não se perde — devolvido para copiar.
+            return $notes === '' ? '' : '<label class="tc-label" for="tc-keep">Seu texto (copie antes de sair)</label><textarea id="tc-keep" class="tc-input" readonly>' . self::h($notes) . '</textarea>';
+        });
     }
 
-    /**
-     * POST: Encerrar teleconsulta.
-     */
     public function end(array $params = []): void
     {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $userId = $_SESSION['user_id'] ?? null;
-        $clinicId = $_SESSION['clinic_id'] ?? null;
-        if (!$userId || !$clinicId) {
-            header('Location: /login');
-            exit;
-        }
-
-        Csrf::validate($_POST['_csrf'] ?? null);
-        TenantContext::setClinicId((int)$clinicId);
-
-        $sessionId = (int)($params['id'] ?? 0);
-        $this->teleconsultationService->endTeleconsultation($sessionId, (int)$userId);
-
-        header("Location: /agenda?concluida={$sessionId}");
-        exit;
+        $this->staffAction($params, function (int $sid, int $uid, int $cid) {
+            $this->service->endTeleconsultation($sid, $uid, $cid);
+            return "/teleconsulta/{$sid}/atendimento";
+        });
     }
 
-    /**
-     * Interface do Paciente: Pré-Consulta, Teste de Dispositivos e Sala de Espera.
-     */
-    public function patientWaitingRoom(array $params = []): void
+    /** POST /teleconsulta/{id}/convite: gera/regera o link do paciente, mostrado uma única vez. */
+    public function issueLink(array $params = []): void
     {
-        $token = (string)($params['token'] ?? '');
-
-        try {
-            $session = $this->teleconsultationService->getSessionByPatientToken($token);
-        } catch (\Throwable $e) {
-            http_response_code(403);
-            echo "<h1>Convite de Teleconsulta Inválido ou Sessão Expirada</h1>";
-            echo "<p>" . htmlspecialchars($e->getMessage()) . "</p>";
-            exit;
-        }
-
-        ?>
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Sala de Espera Virtual — ClyoNutri II</title>
-            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
-            <div class="max-w-xl w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-6 space-y-6">
-                <!-- Cabeçalho -->
-                <div class="text-center space-y-1">
-                    <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full font-mono">
-                        Teleconsulta Nutricional Conforme CFN / LGPD
-                    </span>
-                    <h1 class="text-xl font-bold text-white mt-2">Consultório de <?= htmlspecialchars($session['professional_name']) ?></h1>
-                    <p class="text-sm text-slate-400">Paciente: <strong class="text-slate-200"><?= htmlspecialchars($session['patient_name']) ?></strong></p>
-                    <p class="text-xs text-slate-500">Agendamento: <?= date('d/m/Y H:i', strtotime($session['scheduled_at'])) ?></p>
-                </div>
-
-                <!-- Etapa 1: Teste Real de Câmera e Microfone WebRTC -->
-                <div id="step-device" class="bg-slate-900 border border-slate-700 rounded-lg p-4 space-y-3">
-                    <h2 class="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-                        <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">1</span>
-                        <span>Verificação de Dispositivos (Câmera e Áudio)</span>
-                    </h2>
-                    <p class="text-xs text-slate-400">
-                        O navegador solicitará permissão para uso da câmera e microfone para a consulta. Nenhuma gravação é realizada ou salva.
-                    </p>
-
-                    <div class="relative bg-black rounded overflow-hidden aspect-video flex items-center justify-center">
-                        <video id="video-preview" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
-                        <div id="video-placeholder" class="text-center text-xs text-slate-500 p-4">
-                            Clique abaixo para testar sua câmera e microfone
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between pt-2">
-                        <button type="button" id="btn-test-media" data-call="testMedia" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold py-2 px-4 rounded">
-                            Iniciar Teste de Dispositivos
-                        </button>
-                        <span id="media-status" class="text-xs text-slate-400">Aguardando teste</span>
-                    </div>
-                </div>
-
-                <!-- Etapa 2: Consentimento Informado (LGPD / CFN) -->
-                <div id="step-consent" class="bg-slate-900 border border-slate-700 rounded-lg p-4 space-y-3">
-                    <h2 class="text-sm font-semibold text-slate-200 flex items-center space-x-2">
-                        <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">2</span>
-                        <span>Termo de Consentimento para Teleconsulta</span>
-                    </h2>
-                    <div class="text-xs text-slate-400 bg-slate-950 p-3 rounded border border-slate-800 max-h-24 overflow-y-auto leading-relaxed">
-                        Declaro estar ciente de que esta teleconsulta é realizada em ambiente criptografado, respeitando as normas do CFN e a LGPD. Não haverá gravação de áudio ou vídeo da sessão sem consentimento prévio e expresso de ambas as partes. Compreendo as limitações inerentes ao atendimento remoto e comprometo-me a fornecer informações verídicas.
-                    </div>
-                    <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
-                        <input type="checkbox" id="consent-check" class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500">
-                        <span>Li e concordo com os termos de teleconsulta (Versão 2026.1)</span>
-                    </label>
-                </div>
-
-                <!-- Etapa 3: Acesso à Sala de Espera -->
-                <div id="step-waiting" class="space-y-3">
-                    <button type="button" id="btn-enter-waiting" data-call="enterWaitingRoom" disabled
-                            class="w-full bg-emerald-600 disabled:opacity-50 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-lg text-sm transition">
-                        Entrar na Sala de Espera
-                    </button>
-                    <div id="waiting-status" class="hidden text-center p-4 bg-amber-950 border border-amber-800 text-amber-300 rounded-lg text-xs space-y-2">
-                        <div class="animate-pulse font-semibold">Você está na sala de espera virtual.</div>
-                        <p class="text-amber-400/80">O(A) nutricionista foi notificado(a) da sua presença e irá admiti-lo(a) em instantes. Por favor, aguarde nesta página.</p>
-                    </div>
-                </div>
-            </div>
-
-            <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
-                const token = <?= json_encode($token) ?>;
-                let deviceCheckPassed = false;
-
-                async function testMedia() {
-                    const statusEl = document.getElementById('media-status');
-                    const videoEl = document.getElementById('video-preview');
-                    const placeholderEl = document.getElementById('video-placeholder');
-                    
-                    statusEl.textContent = 'Solicitando acesso à câmera e microfone...';
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                        videoEl.srcObject = stream;
-                        videoEl.classList.remove('hidden');
-                        placeholderEl.classList.add('hidden');
-                        statusEl.className = 'text-xs text-emerald-400 font-semibold';
-                        statusEl.textContent = '✓ Câmera e microfone operacionais!';
-                        deviceCheckPassed = true;
-
-                        // Notificar backend
-                        await fetch(`/teleconsulta/sala-espera/${token}/dispositivo`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ camera_ok: true, microphone_ok: true, browser: navigator.userAgent })
-                        });
-
-                        checkCanEnter();
-                    } catch (err) {
-                        statusEl.className = 'text-xs text-red-400 font-semibold';
-                        statusEl.textContent = 'Erro de permissão: ' + err.message;
-                    }
-                }
-
-                document.getElementById('consent-check').addEventListener('change', async function() {
-                    if (this.checked) {
-                        await fetch(`/teleconsulta/sala-espera/${token}/consentir`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ term_version: '2026.1' })
-                        });
-                    }
-                    checkCanEnter();
-                });
-
-                function checkCanEnter() {
-                    const consentOk = document.getElementById('consent-check').checked;
-                    document.getElementById('btn-enter-waiting').disabled = !(deviceCheckPassed && consentOk);
-                }
-
-                async function enterWaitingRoom() {
-                    const res = await fetch(`/teleconsulta/sala-espera/${token}/entrar`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    const data = await res.json();
-                    if (data.status === 'waiting_room') {
-                        document.getElementById('btn-enter-waiting').classList.add('hidden');
-                        document.getElementById('waiting-status').classList.remove('hidden');
-                        startStatusPolling();
-                    }
-                }
-
-                function startStatusPolling() {
-                    setInterval(async () => {
-                        try {
-                            const res = await fetch(`/teleconsulta/sala-espera/${token}/status`);
-                            const data = await res.json();
-                            if (data.is_admitted) {
-                                window.location.href = `/teleconsulta/sala/${token}`;
-                            } else if (data.status === 'rejected') {
-                                alert('A admissão para a teleconsulta não pôde ser concluída pelo profissional.');
-                                window.location.reload();
-                            }
-                        } catch (e) {}
-                    }, 3000);
-                }
-            </script>
-        </body>
-        </html>
-        <?php
+        $this->staffAction($params, function (int $sid, int $uid, int $cid) {
+            $r = $this->service->issuePatientLink($sid, $uid, $cid);
+            $base = rtrim((string)(\ClyoNutri\Core\Security\Env::get('APP_URL', '') ?? ''), '/');
+            $_SESSION[self::LINK_FLASH_KEY] = [
+                'sid' => $sid,
+                'url' => $base . '/teleconsulta/sala-espera/' . $r['token'],
+                'expires_at' => $r['expires_at'],
+                'window_start' => $r['window_start'],
+            ];
+            return "/teleconsulta/{$sid}/atendimento";
+        });
     }
 
+    // ================================================================ paciente
+
     /**
-     * API POST: Paciente envia teste de dispositivo.
+     * GET /teleconsulta/sala-espera/{token} e /teleconsulta/sala/{token}: troca o link por cookie e
+     * redireciona para a URL limpa (o token sai da barra de endereço e do histórico). Rate limit por IP.
      */
+    public function patientLinkExchange(array $params = []): void
+    {
+        self::startSession();
+        $ip = TelehealthRateLimiter::clientIp();
+        header('Referrer-Policy: no-referrer', true);
+        if ($this->limiter->isLocked('tele_bad', $ip) || !$this->limiter->hit('tele_link', $ip)) {
+            header('Retry-After: 900');
+            self::messagePage(429, 'Muitas tentativas', 'Aguarde alguns minutos e abra o link de novo.');
+            return;
+        }
+        try {
+            $s = $this->service->getSessionByPatientToken((string)($params['token'] ?? ''));
+        } catch (\Throwable $e) {
+            $this->limiter->hit('tele_bad', $ip);
+            [$st, $msg] = self::mapError($e);
+            self::messagePage($st === 500 ? 500 : 404, 'Link indisponível', $st === 500 ? $msg : 'Este link de teleconsulta é inválido ou expirou. Peça um novo link à clínica.');
+            return;
+        }
+        session_regenerate_id(true);
+        $_SESSION[self::PATIENT_KEY] = ['sid' => (int)$s['id'], 'gen' => (int)$s['token_generation'], 'h' => (string)$s['patient_token_hash']];
+        header('Location: /teleconsulta/sala-espera', true, 303);
+    }
+
+    /** Sessão do paciente a partir do cookie; inválida/revogada/expirada → null (e o cookie é limpo). */
+    private function patientSession(): ?array
+    {
+        self::startSession();
+        $p = $_SESSION[self::PATIENT_KEY] ?? null;
+        if (!is_array($p)) {
+            return null;
+        }
+        try {
+            return $this->service->getSessionForPatientCookie((int)$p['sid'], (int)$p['gen'], (string)$p['h']);
+        } catch (TeleconsultationException $e) {
+            unset($_SESSION[self::PATIENT_KEY]);
+            return null;
+        }
+    }
+
+    private function patientApi(string $scope, callable $fn, bool $mutating = true): void
+    {
+        $ip = TelehealthRateLimiter::clientIp();
+        $s = $this->patientSession();
+        if ($s === null) {
+            if (!$this->limiter->hit('tele_bad', $ip)) {
+                header('Retry-After: 900');
+                self::json(429, ['error' => 'Muitas tentativas. Aguarde alguns minutos.']);
+                return;
+            }
+            self::json(404, ['error' => 'Teleconsulta indisponível. O link pode ter expirado ou a consulta foi encerrada.']);
+            return;
+        }
+        if (!$this->limiter->hit($scope, $s['id'] . '|' . $ip)) {
+            header('Retry-After: 60');
+            self::json(429, ['error' => 'Muitas tentativas. Aguarde um pouco.']);
+            return;
+        }
+        if ($mutating && !self::postCsrfOk()) {
+            self::json(403, ['error' => 'Sessão expirada. Recarregue a página.']);
+            return;
+        }
+        try {
+            self::json(200, $fn($s));
+        } catch (\Throwable $e) {
+            [$st, $msg] = self::mapError($e);
+            self::json($st, ['error' => $msg]);
+        }
+    }
+
+    /** POST legados com token na URL: não existem mais (contam como tentativa inválida). */
+    public function patientLegacyTokenApi(array $params = []): void
+    {
+        if (!$this->limiter->hit('tele_bad', TelehealthRateLimiter::clientIp())) {
+            header('Retry-After: 900');
+            self::json(429, ['error' => 'Muitas tentativas. Aguarde alguns minutos.']);
+            return;
+        }
+        self::json(404, ['error' => 'Teleconsulta indisponível.']);
+    }
+
     public function patientSubmitDeviceCheck(array $params = []): void
     {
-        header('Content-Type: application/json');
-        $token = (string)($params['token'] ?? '');
-        $input = json_decode((string)file_get_contents('php://input'), true) ?? [];
-
-        try {
-            $res = $this->teleconsultationService->submitDeviceCheck($token, $input);
-            echo json_encode($res);
-        } catch (\Throwable $e) {
-            http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+        $in = json_decode((string)file_get_contents('php://input'), true) ?: [];
+        $this->patientApi('tele_post', fn(array $s) => $this->service->submitDeviceCheck($s, $in));
     }
 
-    /**
-     * API POST: Paciente aceita consentimento.
-     */
     public function patientAcceptConsent(array $params = []): void
     {
-        header('Content-Type: application/json');
-        $token = (string)($params['token'] ?? '');
-        $input = json_decode((string)file_get_contents('php://input'), true) ?? [];
-
-        try {
-            $res = $this->teleconsultationService->acceptConsent(
-                $token,
-                $input['term_version'] ?? '2026.1',
-                $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
-                $_SERVER['HTTP_USER_AGENT'] ?? 'Web'
-            );
-            echo json_encode($res);
-        } catch (\Throwable $e) {
-            http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+        $in = json_decode((string)file_get_contents('php://input'), true) ?: [];
+        $this->patientApi('tele_consent', fn(array $s) => $this->service->recordConsent(
+            $s,
+            (int)($in['term_id'] ?? 0),
+            ($in['decision'] ?? '') === 'accept',
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ));
     }
 
-    /**
-     * API POST: Paciente ingressa na fila de espera.
-     */
     public function patientEnterWaiting(array $params = []): void
     {
-        header('Content-Type: application/json');
-        $token = (string)($params['token'] ?? '');
-
-        try {
-            $res = $this->teleconsultationService->enterWaitingRoom($token);
-            echo json_encode($res);
-        } catch (\Throwable $e) {
-            http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+        $this->patientApi('tele_post', fn(array $s) => $this->service->enterWaitingRoom($s));
     }
 
-    /**
-     * API GET: Polling de status do paciente na sala de espera.
-     */
     public function patientStatus(array $params = []): void
     {
-        header('Content-Type: application/json');
-        $token = (string)($params['token'] ?? '');
-
-        try {
-            $res = $this->teleconsultationService->checkWaitingRoomStatus($token);
-            echo json_encode($res);
-        } catch (\Throwable $e) {
-            http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
+        $this->patientApi('tele_poll', fn(array $s) => $this->service->patientStatus($s), false);
     }
 
-    /**
-     * Interface do Paciente Admitido: Sala de Vídeo Ativa.
-     */
+    private static function patientGone(): void
+    {
+        self::messagePage(404, 'Teleconsulta indisponível', 'O link expirou, foi substituído ou a consulta foi encerrada ou cancelada. Se precisar, peça um novo link à clínica.');
+    }
+
+    /** GET /teleconsulta/sala-espera — pré-consulta + espera (URL limpa, sessão pelo cookie). */
+    public function patientWaitingRoom(array $params = []): void
+    {
+        $s = $this->patientSession();
+        if ($s === null) {
+            $this->limiter->hit('tele_bad', TelehealthRateLimiter::clientIp());
+            self::patientGone();
+            return;
+        }
+        if (!empty($s['too_early'])) {
+            self::messagePage(200, 'A sala ainda não abriu', 'A sala de espera abre em ' . date('d/m/Y \à\s H:i', strtotime($s['window_start'])) . '. Volte neste horário pelo mesmo link.');
+            return;
+        }
+        if (in_array($s['status'], ['admitted', 'in_progress'], true)) {
+            header('Location: /teleconsulta/sala', true, 303);
+            return;
+        }
+        $term = $this->service->getActiveConsentTerm();
+        $csrf = Csrf::generate();
+        self::noStore();
+        header('Content-Type: text/html; charset=utf-8');
+        self::head('Sala de espera — ClyoNutri');
+        $inWaiting = $s['status'] === 'waiting_room';
+        ?>
+<body class="tc-body tc-center">
+<main class="tc-card tc-narrow tc-stack" role="main">
+  <div>
+    <h1>Teleconsulta com <?= self::h($s['professional_name']) ?></h1>
+    <p class="tc-muted"><?= self::h($s['clinic_name']) ?> · <?= self::h(date('d/m/Y H:i', strtotime($s['scheduled_at']))) ?></p>
+  </div>
+
+  <section class="tc-card tc-stack" aria-labelledby="st1">
+    <h2 id="st1">1. Teste de câmera e microfone</h2>
+    <p class="tc-muted">O navegador vai pedir permissão. Nada é gravado.</p>
+    <div class="tc-video" style="min-height:200px"><video id="video-preview" autoplay playsinline muted class="tc-hidden"></video><span id="video-placeholder" class="tc-muted">Prévia da câmera</span></div>
+    <div class="tc-row"><button type="button" id="btn-test-media" class="tc-btn">Testar câmera e microfone</button><span id="media-status" class="tc-muted" role="status" aria-live="polite"><?= (int)$s['device_check_passed'] === 1 ? 'Teste já feito.' : 'Aguardando teste' ?></span></div>
+  </section>
+
+  <section class="tc-card tc-stack" aria-labelledby="st2">
+    <h2 id="st2">2. Termo de consentimento</h2>
+    <?php if ($term): ?>
+      <p class="tc-small"><strong><?= self::h($term['title']) ?></strong> · versão <?= self::h($term['version']) ?></p>
+      <div class="tc-term" tabindex="0"><?= nl2br(self::h($term['term_text'])) ?></div>
+      <div class="tc-row">
+        <button type="button" id="btn-consent-accept" class="tc-btn tc-btn-ok">Li e aceito</button>
+        <button type="button" id="btn-consent-decline" class="tc-btn">Não aceito</button>
+        <span id="consent-status" class="tc-muted" role="status" aria-live="polite"><?= !empty($s['consent_accepted_at']) ? 'Termo aceito.' : '' ?></span>
+      </div>
+    <?php else: ?>
+      <div class="tc-alert tc-alert-err" role="alert">O termo de consentimento não está configurado. Avise a clínica.</div>
+    <?php endif; ?>
+  </section>
+
+  <section class="tc-stack" aria-labelledby="st3">
+    <h2 id="st3" class="tc-small">3. Sala de espera</h2>
+    <button type="button" id="btn-enter-waiting" class="tc-btn tc-btn-ok tc-btn-block<?= $inWaiting ? ' tc-hidden' : '' ?>" disabled>Entrar na sala de espera</button>
+    <div id="waiting-status" class="tc-alert tc-alert-warn<?= $inWaiting ? '' : ' tc-hidden' ?>" role="status" aria-live="polite">Você está na sala de espera. Aguarde nesta página: o(a) profissional vai admitir você.</div>
+    <div id="error-box" class="tc-alert tc-alert-err tc-hidden" role="alert"></div>
+  </section>
+</main>
+<script nonce="<?= SecurityHeaders::nonce() ?>">
+(function () {
+  const csrf = <?= json_encode($csrf) ?>;
+  const termId = <?= json_encode($term ? (int)$term['id'] : 0) ?>;
+  let deviceOk = <?= (int)$s['device_check_passed'] === 1 ? 'true' : 'false' ?>;
+  let consentOk = <?= !empty($s['consent_accepted_at']) ? 'true' : 'false' ?>;
+  const $ = (id) => document.getElementById(id);
+  function showError(msg) { const b = $('error-box'); b.textContent = msg; b.classList.remove('tc-hidden'); }
+  async function post(path, body) {
+    const r = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(body || {}) });
+    let data = {}; try { data = await r.json(); } catch (e) {}
+    if (!r.ok) { throw new Error(data.error || 'Não foi possível concluir. Tente de novo.'); }
+    return data;
+  }
+  function refresh() { $('btn-enter-waiting').disabled = !(deviceOk && consentOk); }
+  $('btn-test-media').addEventListener('click', async function () {
+    const st = $('media-status');
+    st.textContent = 'Pedindo acesso à câmera e ao microfone...';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      $('video-preview').srcObject = stream; $('video-preview').classList.remove('tc-hidden'); $('video-placeholder').classList.add('tc-hidden');
+      await post('/teleconsulta/sala-espera/dispositivo', { camera_ok: true, microphone_ok: true });
+      st.textContent = 'Câmera e microfone funcionando.'; deviceOk = true; refresh();
+    } catch (e) {
+      st.textContent = 'Não foi possível usar a câmera ou o microfone. Verifique a permissão do navegador e tente de novo.';
+    }
+  });
+  async function consent(decision) {
+    try {
+      await post('/teleconsulta/sala-espera/consentir', { term_id: termId, decision: decision });
+      consentOk = decision === 'accept';
+      $('consent-status').textContent = consentOk ? 'Termo aceito.' : 'Você não aceitou o termo. Sem o aceite, a teleconsulta não acontece; fale com a clínica.';
+      refresh();
+    } catch (e) { showError(e.message); }
+  }
+  if ($('btn-consent-accept')) {
+    $('btn-consent-accept').addEventListener('click', () => consent('accept'));
+    $('btn-consent-decline').addEventListener('click', () => consent('decline'));
+  }
+  $('btn-enter-waiting').addEventListener('click', async function () {
+    try {
+      const d = await post('/teleconsulta/sala-espera/entrar', {});
+      if (d.status === 'waiting_room') { $('btn-enter-waiting').classList.add('tc-hidden'); $('waiting-status').classList.remove('tc-hidden'); poll(5000); }
+    } catch (e) { showError(e.message); }
+  });
+  function poll(delay) {
+    setTimeout(async function () {
+      let next = 5000;
+      try {
+        const r = await fetch('/teleconsulta/sala-espera/status', { credentials: 'same-origin' });
+        if (r.status === 404) { window.location.reload(); return; }
+        if (r.status === 429) { next = 30000; }
+        else {
+          const d = await r.json();
+          if (d.is_admitted) { window.location.href = '/teleconsulta/sala'; return; }
+          if (d.status === 'rejected') { showError('A admissão não foi aceita pelo profissional.'); return; }
+        }
+      } catch (e) { next = Math.min(30000, delay * 2); $('waiting-status').textContent = 'Conexão instável. Tentando de novo...'; }
+      poll(next);
+    }, delay);
+  }
+  refresh();
+  if (<?= $inWaiting ? 'true' : 'false' ?>) { poll(5000); }
+})();
+</script>
+</body>
+</html>
+<?php
+    }
+
+    /** GET /teleconsulta/sala — paciente admitido. Sem provedor: estado honesto (F02). */
     public function patientConsultationRoom(array $params = []): void
     {
-        $token = (string)($params['token'] ?? '');
-
-        try {
-            $session = $this->teleconsultationService->getSessionByPatientToken($token);
-        } catch (\Throwable $e) {
-            http_response_code(403);
-            echo "<h1>Acesso negado à sala de teleconsulta</h1>";
-            exit;
+        $s = $this->patientSession();
+        if ($s === null) {
+            $this->limiter->hit('tele_bad', TelehealthRateLimiter::clientIp());
+            self::patientGone();
+            return;
         }
-
-        if (!in_array($session['status'], ['admitted', 'in_progress'], true)) {
-            header("Location: /teleconsulta/sala-espera/{$token}");
-            exit;
+        if (!in_array($s['status'], ['admitted', 'in_progress'], true)) {
+            header('Location: /teleconsulta/sala-espera', true, 303);
+            return;
         }
-
+        $videoOk = $this->service->isVideoConfigured() && !empty($s['external_room_url'])
+            && SecurityHeaders::allowTelehealthProviderOrigin() !== null;
+        self::noStore();
+        header('Content-Type: text/html; charset=utf-8');
+        self::head('Teleconsulta — ClyoNutri');
         ?>
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Consulta Online com Dr(a). <?= htmlspecialchars($session['professional_name']) ?> — ClyoNutri</title>
-            <?php \ClyoNutri\Core\Http\SecurityHeaders::allowScriptSource('https://cdn.tailwindcss.com'); ?><script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
-            <header class="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <span class="text-emerald-400 font-bold">ClyoNutri II</span>
-                    <span class="text-xs text-slate-400">Em consulta com: <strong class="text-white"><?= htmlspecialchars($session['professional_name']) ?></strong></span>
-                </div>
-                <div class="text-xs text-emerald-400 font-semibold flex items-center space-x-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span>Conexão Segura Ativa</span>
-                </div>
-            </header>
-
-            <main class="flex-1 bg-black relative flex items-center justify-center">
-                <?php if (!empty($session['external_room_url'])): ?>
-                    <iframe src="<?= htmlspecialchars($session['external_room_url']) ?>" 
-                            class="w-full h-full border-0 absolute inset-0"
-                            allow="camera; microphone; fullscreen; display-capture"></iframe>
-                <?php else: ?>
-                    <div class="text-center p-6 space-y-3">
-                        <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto text-emerald-400">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                        </div>
-                        <h2 class="text-lg font-semibold text-white">Consulta Online em Andamento</h2>
-                        <p class="text-xs text-slate-400 max-w-sm mx-auto">
-                            Você foi admitido(a) com sucesso. A comunicação com o nutricionista está ativa.
-                        </p>
-                    </div>
-                <?php endif; ?>
-            </main>
-        </body>
-        </html>
-        <?php
+<body class="tc-body">
+<header class="tc-header"><span class="tc-brand">ClyoNutri</span><span class="tc-small">Consulta com <strong><?= self::h($s['professional_name']) ?></strong></span></header>
+<main class="tc-main" role="main" style="grid-template-columns:1fr">
+  <div class="tc-video">
+    <?php if ($videoOk): ?>
+      <iframe src="<?= self::h($s['external_room_url']) ?>" title="Sala de vídeo" allow="camera; microphone; fullscreen; display-capture"></iframe>
+    <?php else: ?>
+      <div class="tc-card tc-narrow tc-stack" role="status">
+        <h1>Você foi admitido(a)</h1>
+        <p>O vídeo não está configurado nesta instalação, então a chamada não acontece por esta página. Aguarde o contato do(a) profissional pelo canal combinado com a clínica.</p>
+      </div>
+    <?php endif; ?>
+  </div>
+</main>
+</body>
+</html>
+<?php
     }
 }
