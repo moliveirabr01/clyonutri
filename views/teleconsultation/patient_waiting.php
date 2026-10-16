@@ -1,5 +1,5 @@
 <?php
-/** @var array $session @var string $csrf @var string $termVersion */
+/** @var array $session @var string $csrf @var array $term */
 $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 ?><!DOCTYPE html>
 <html lang="pt-BR">
@@ -10,7 +10,7 @@ $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
   <title>Sala de espera — Teleconsulta</title>
   <link rel="stylesheet" href="/assets/css/teleconsulta.css">
 </head>
-<body data-tc-csrf="<?= $e($csrf) ?>">
+<body data-tc-csrf="<?= $e($csrf) ?>" data-tc-term-id="<?= (int)$term['id'] ?>">
 <a class="tc-skip" href="#tc-conteudo">Pular para o conteúdo</a>
 <header class="tc-header">
   <h1 class="tc-brand">Teleconsulta · <?= $e($session['clinic_name']) ?></h1>
@@ -35,9 +35,11 @@ $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     <li class="tc-card">
       <h2>2. Termo da teleconsulta</h2>
       <div id="tc-term" class="tc-small tc-term" tabindex="0" role="region" aria-label="Texto do termo da teleconsulta">
-        <p>Concordo em ser atendido(a) por teleconsulta, ciente de que o atendimento remoto tem limitações em relação ao presencial (por exemplo, não permite exame físico) e de que o(a) nutricionista pode indicar consulta presencial quando necessário.</p>
-        <p>A chamada não é gravada. Meus dados de saúde são tratados para a prestação do atendimento nutricional, conforme a LGPD, e as anotações ficam no meu prontuário. Posso interromper a teleconsulta a qualquer momento.</p>
-        <p class="tc-small">Versão <?= $e($termVersion) ?> — texto sujeito a revisão jurídica e regulatória (NI2-253).</p>
+        <p><strong><?= $e($term['title']) ?></strong></p>
+<?php foreach (preg_split('/\R{2,}/', trim((string)$term['term_text'])) as $paragraph): ?>
+        <p><?= $e($paragraph) ?></p>
+<?php endforeach; ?>
+        <p class="tc-small">Versão <?= $e($term['version']) ?> — texto sujeito a revisão jurídica e regulatória (NI2-253).</p>
       </div>
       <label class="tc-check-label">
         <input type="checkbox" id="tc-consent" class="tc-check" aria-describedby="tc-term">

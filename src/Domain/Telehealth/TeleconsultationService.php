@@ -354,37 +354,66 @@ class TeleconsultationService
         return ['device_check_passed' => true, 'status' => $target];
     }
 
-    public function acceptConsent(string $rawToken, string $termVersion, ?string $ipAddress = null, ?string $userAgent = null): array
+    /** Versão oficial do termo de teleconsulta (inserida pela migração 35, consent_terms). */
+    public const CONSENT_TERM_VERSION = '2026.10-r1';
+
+    /**
+     * Termo de teleconsulta em vigor (consent_terms, purpose_code='telehealth', ativo, versão oficial).
+     * Sem o termo no banco a teleconsulta não avança (fail-closed).
+     */
+    public function getActiveConsentTerm(): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT id, version, title, term_text FROM consent_terms
+            WHERE purpose_code = 'telehealth' AND version = :v AND is_active = 1
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute(['v' => self::CONSENT_TERM_VERSION]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Aceite do termo pelo paciente (F18 do v11): referencia o termo por consent_term_id.
+     * Grava sessão (consent_term_id + versão) e patient_consents (consent_type='telehealth', term_id)
+     * na mesma transação, com auditoria. Termo divergente do vigente = página desatualizada (409).
+     */
+    public function acceptConsent(string $rawToken, int $termId, ?string $ipAddress = null, ?string $userAgent = null): array
     {
         $session = $this->getSessionByPatientToken($rawToken);
-        $termVersion = trim($termVersion);
-        if (!preg_match('/^[0-9A-Za-z.\-]{1,20}$/', $termVersion)) {
-            throw new InvalidArgumentException('Versão do termo de consentimento inválida.');
+        $term = $this->getActiveConsentTerm();
+        if ($term === null) {
+            throw new TeleconsultationStateException('O termo de consentimento da teleconsulta não está configurado. Avise a clínica.');
+        }
+        if ((int)$term['id'] !== $termId) {
+            throw new TeleconsultationStateException('O termo foi atualizado. Recarregue a página e leia a versão atual.');
         }
         $now = $this->nowSql();
 
-        $this->transaction(function () use ($session, $termVersion, $ipAddress, $userAgent, $now): void {
+        $this->transaction(function () use ($session, $term, $ipAddress, $userAgent, $now): void {
             $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
-                'consent_term_version' => $termVersion,
+                'consent_term_id' => (int)$term['id'],
+                'consent_term_version' => (string)$term['version'],
                 'consent_accepted_at' => $now,
             ]);
-            // Evidência no registro LGPD do paciente, com tenant (antes falhava em silêncio).
+            // Evidência no registro LGPD do paciente, com tenant e o termo exato aceito.
             $this->db->prepare("
-                INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, source_channel, user_agent)
-                VALUES (:clinic_id, :patient_id, :type, 1, :ip, :at, 'teleconsultation', :ua)
+                INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, term_id, source_channel, user_agent)
+                VALUES (:clinic_id, :patient_id, 'telehealth', 1, :ip, :at, :term_id, 'teleconsultation', :ua)
             ")->execute([
                 'clinic_id' => (int)$session['clinic_id'],
                 'patient_id' => (int)$session['patient_id'],
-                'type' => 'telehealth:' . $termVersion,
                 'ip' => $ipAddress,
                 'at' => $now,
+                'term_id' => (int)$term['id'],
                 'ua' => $userAgent !== null ? mb_substr($userAgent, 0, 255) : null,
             ]);
             $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'consent_signed', 'patient', (int)$session['patient_id'], [
-                'term_version' => $termVersion,
+                'term_id' => (int)$term['id'],
+                'term_version' => (string)$term['version'],
             ]);
         });
-        return ['term_version' => $termVersion];
+        return ['term_id' => (int)$term['id'], 'term_version' => (string)$term['version']];
     }
 
     public function enterWaitingRoom(string $rawToken): array

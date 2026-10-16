@@ -97,7 +97,7 @@ const waitHtml = (await pat.request('GET', '/teleconsulta/sala-espera')).text;
 const patCsrf = waitHtml.match(/data-tc-csrf="([^"]+)"/)[1];
 const pj = { 'content-type': 'application/json', 'x-csrf-token': patCsrf };
 await pat.request('POST', '/teleconsulta/sala-espera/dispositivo', pj, JSON.stringify({ camera_ok: true, microphone_ok: true }));
-await pat.request('POST', '/teleconsulta/sala-espera/consentir', pj, '{}');
+await pat.request('POST', '/teleconsulta/sala-espera/consentir', pj, JSON.stringify({ term_id: Number(waitHtml.match(/data-tc-term-id="(\d+)"/)[1]) }));
 await pat.request('POST', '/teleconsulta/sala-espera/entrar', pj, '{}');
 await pro.form('POST', `/teleconsulta/${sid}/admitir`, { _csrf: proCsrf });
 

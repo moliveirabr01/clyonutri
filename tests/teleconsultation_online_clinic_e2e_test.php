@@ -155,11 +155,16 @@ step('NI2-237/244: antes da admissão não há sala nem credencial para o pacien
     expectThrows(TenantSecurityException::class, fn() => $svc->getSessionByPatientToken(str_repeat('a', 64)), 'convite inexistente');
     expectThrows(TenantSecurityException::class, fn() => $svc->getSessionByPatientToken('../../etc'), 'convite malformado');
     $svc->submitDeviceCheck($ctx['token'], ['camera_ok' => true, 'microphone_ok' => true, 'browser' => 'Mozilla/5.0 Chrome/130']);
-    $svc->acceptConsent($ctx['token'], '2026.1', '203.0.113.7', 'Mozilla/5.0');
+    $term = $svc->getActiveConsentTerm();
+    check($term !== null && $term['version'] === '2026.10-r1', 'termo oficial 2026.10-r1 vigente');
+    expectThrows(TeleconsultationStateException::class, fn() => $svc->acceptConsent($ctx['token'], (int)$term['id'] + 999), 'termo divergente recusado');
+    $svc->acceptConsent($ctx['token'], (int)$term['id'], '203.0.113.7', 'Mozilla/5.0');
     $early = new TeleconsultationService($db, $p2p, null, $before);
     expectThrows(TeleconsultationStateException::class, fn() => $early->enterWaitingRoom($ctx['token']), 'sala de espera antes da janela');
-    $consent = $db->query("SELECT clinic_id, consent_type, source_channel FROM patient_consents WHERE source_channel = 'teleconsultation' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    check($consent !== false && $consent['consent_type'] === 'telehealth:2026.1', 'consentimento gravado no registro LGPD');
+    $consent = $db->query("SELECT clinic_id, consent_type, term_id, source_channel FROM patient_consents WHERE source_channel = 'teleconsultation' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    check($consent !== false && $consent['consent_type'] === 'telehealth' && (int)$consent['term_id'] === (int)$term['id'], 'consentimento gravado no registro LGPD com term_id');
+    $sessTerm = $db->query('SELECT consent_term_id, consent_term_version FROM teleconsultation_sessions WHERE id = ' . (int)$ctx['session'])->fetch(PDO::FETCH_ASSOC);
+    check((int)$sessTerm['consent_term_id'] === (int)$term['id'] && $sessTerm['consent_term_version'] === '2026.10-r1', 'sessão referencia o termo por consent_term_id');
     pass('NI2-237/238/244 pré-consulta', 'lobby sem vazamento; janela respeitada; consentimento persistido com tenant');
 });
 
@@ -244,7 +249,7 @@ step('NI2-237: recusa é terminal e só volta com novo convite', function () use
     $appt = $mkAppt($clinicA, $patientA, $nutriA['pro'], '2026-10-20 14:00:00');
     $created = $svc->scheduleSession($appt, $nutriA['pro'], $clinicA);
     $svc->submitDeviceCheck($created['raw_patient_token'], ['camera_ok' => true, 'microphone_ok' => true]);
-    $svc->acceptConsent($created['raw_patient_token'], '2026.1');
+    $svc->acceptConsent($created['raw_patient_token'], (int)$svc->getActiveConsentTerm()['id']);
     $svc->enterWaitingRoom($created['raw_patient_token']);
     $svc->rejectPatient((int)$created['session_id'], $nutriA['pro'], 'Pessoa não identificada');
     expectThrows(TenantSecurityException::class, fn() => $svc->getSessionByPatientToken($created['raw_patient_token']), 'convite revogado após recusa');
@@ -377,7 +382,7 @@ step('F15/F12: motivo de recusa por código e módulo desligado por padrão', fu
     $appt = $mkAppt($clinicA, $patientA, $nutriA['pro'], '2026-10-20 14:00:00');
     $c = $svc->scheduleSession($appt, $nutriA['pro'], $clinicA);
     $svc->submitDeviceCheck($c['raw_patient_token'], ['camera_ok' => true, 'microphone_ok' => true]);
-    $svc->acceptConsent($c['raw_patient_token'], '2026.1');
+    $svc->acceptConsent($c['raw_patient_token'], (int)$svc->getActiveConsentTerm()['id']);
     $svc->enterWaitingRoom($c['raw_patient_token']);
     $svc->rejectPatient((int)$c['session_id'], $nutriA['pro'], 'Maria, CPF 123 não confirmou');
     $events = $svc->getSessionEvents((int)$c['session_id']);

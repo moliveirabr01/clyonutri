@@ -36,7 +36,6 @@ use PDO;
  */
 class TeleconsultationController
 {
-    private const TERM_VERSION = '2026.2';
 
     private PDO $db;
     private TeleconsultationService $service;
@@ -296,8 +295,12 @@ class TeleconsultationController
             $this->patientErrorPage($e);
             return;
         }
+        $term = $this->service->getActiveConsentTerm(); // consent_terms 2026.10-r1 (migração 35)
+        if ($term === null) {
+            $this->patientErrorPage(new TeleconsultationStateException('Termo da teleconsulta não configurado.'));
+            return;
+        }
         $csrf = Csrf::generate();
-        $termVersion = self::TERM_VERSION;
         $this->securityHeaders();
         require __DIR__ . '/../../../views/teleconsultation/patient_waiting.php';
     }
@@ -311,7 +314,7 @@ class TeleconsultationController
     {
         $this->patientJson($params, fn(string $t, array $in) => $this->service->acceptConsent(
             $t,
-            self::TERM_VERSION,
+            (int)($in['term_id'] ?? 0),
             $this->clientIp(),
             (string)($_SERVER['HTTP_USER_AGENT'] ?? '')
         ));

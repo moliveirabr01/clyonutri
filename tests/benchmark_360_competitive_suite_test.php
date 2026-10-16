@@ -264,7 +264,7 @@ try {
     assertBenchmark(strlen((string)$teleSession['raw_patient_token']) === 64, "Convite do paciente gerado (banco guarda só o hash)");
     $checked = $teleService->submitDeviceCheck($teleSession['raw_patient_token'], ['camera_ok' => true, 'microphone_ok' => true]);
     assertBenchmark(!empty($checked), "Check de dispositivo do paciente deve ser validado");
-    $consented = $teleService->acceptConsent($teleSession['raw_patient_token'], '2026.2', '127.0.0.1', 'benchmark');
+    $consented = $teleService->acceptConsent($teleSession['raw_patient_token'], (int)$teleService->getActiveConsentTerm()['id'], '127.0.0.1', 'benchmark');
     assertBenchmark(!empty($consented), "Consentimento da teleconsulta registrado");
     logBenchmarkPass('TELECONSULTATION', 'Sessão de teleconsulta ligada à agenda com sala de espera e tokens seguros');
 
@@ -367,6 +367,7 @@ try {
     
     if ($teleSessionId > 0) {
         $db->exec("DELETE FROM teleconsultation_events WHERE session_id = {$teleSessionId}");
+        $db->exec("DELETE FROM patient_consents WHERE patient_id = {$patientId} AND consent_type = 'telehealth'");
         $db->exec("DELETE FROM patient_consents WHERE patient_id = {$patientId}");
         $db->exec("DELETE FROM teleconsultation_sessions WHERE id = {$teleSessionId}");
     }

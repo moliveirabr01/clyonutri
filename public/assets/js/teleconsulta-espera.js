@@ -32,7 +32,7 @@
   document.getElementById('tc-consent').addEventListener('change', function () {
     var box = this;
     if (!box.checked) { consentOk = false; update(); return; }
-    post('/consentir', {}).then(function () { consentOk = true; update(); })
+    post('/consentir', { term_id: Number(document.body.getAttribute('data-tc-term-id')) }).then(function () { consentOk = true; update(); })
       .catch(function (err) { box.checked = false; say('tc-wait-status', err.message, 'error'); });
   });
 
