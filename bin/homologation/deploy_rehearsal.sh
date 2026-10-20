@@ -43,10 +43,11 @@ check() { # check <id> <ok|fail> <detalhe>
 }
 stop_server() { if [ -n "$SERVER_PID" ]; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; SERVER_PID=""; fi; }
 start_server() { # start_server [senha_db]
+  # FORCE_HTTPS=false: ensaio em HTTP local; com HTTPS obrigatório (NI2-427) tudo responderia 403.
   stop_server
   local pass="${1:-$PASS}"
   ( cd "$BASE/current" && DB_CONNECTION=mysql DB_HOST="$HOST" DB_PORT="$DBPORT" DB_USERNAME="$USER" DB_PASSWORD="$pass" DB_DATABASE="$DB" \
-    APP_ENV=production APP_TIMEZONE=America/Sao_Paulo PHP_CLI_SERVER_WORKERS=2 \
+    APP_ENV=production FORCE_HTTPS=false APP_TIMEZONE=America/Sao_Paulo PHP_CLI_SERVER_WORKERS=2 \
     exec "$PHP_BIN" -S "127.0.0.1:${PORT}" -t public public/index.php ) > "$WORK/rehearsal_server.log" 2>&1 &
   SERVER_PID=$!
   for _ in $(seq 1 50); do curl -s -o /dev/null "$URL/up" && return 0; sleep 0.2; done

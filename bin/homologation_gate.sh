@@ -128,8 +128,11 @@ if [ -z "${NO_DB:-}" ]; then
     --key "$WORK/smtp/key.pem" --user noreply@gate.test --password gate-smtp-senha > "$EVID/logs/smtp.log" 2>&1 &
   PIDS+=($!)
 
+  # FORCE_HTTPS=false: o servidor do gate é HTTP local (127.0.0.1), sem TLS. Com APP_ENV=production e o
+  # HTTPS obrigatório da NI2-427, toda página respondia 403 e nenhuma jornada rodava. A regra de HTTPS
+  # em si é coberta pelos testes do Transport, não por este servidor.
   ( DB_CONNECTION=mysql DB_HOST="$GATE_DB_HOST" DB_PORT="${GATE_DB_PORT:-3306}" DB_USERNAME="$GATE_DB_USER" DB_PASSWORD="${GATE_DB_PASS:-}" \
-    DB_DATABASE="$APP_DB" APP_ENV=production APP_URL="$BASE_URL" APP_SUPPORT_EMAIL=suporte@gate.test MOBILE_WEB_ORIGINS="$MOBILE_URL" \
+    DB_DATABASE="$APP_DB" APP_ENV=production FORCE_HTTPS=false APP_URL="$BASE_URL" APP_SUPPORT_EMAIL=suporte@gate.test MOBILE_WEB_ORIGINS="$MOBILE_URL" \
     MAIL_DRIVER=smtp MAIL_HOST=localhost MAIL_PORT="$SMTP_PORT" MAIL_ENCRYPTION=ssl MAIL_USERNAME=noreply@gate.test \
     MAIL_PASSWORD=gate-smtp-senha MAIL_FROM_ADDRESS=noreply@gate.test MAIL_FROM_NAME=ClyoNutri PHP_CLI_SERVER_WORKERS=4 \
     exec "$PHP_BIN" -d openssl.cafile="$WORK/smtp/cert.pem" -S "127.0.0.1:${PORT}" -t public tests/homologation/support/router.php ) > "$EVID/logs/app_server.log" 2>&1 &
