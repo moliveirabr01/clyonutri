@@ -64,7 +64,7 @@ $template = $templateService->createTemplate(
                 'name' => 'Lanche Energético',
                 'time_of_day' => '16:00',
                 'items' => [
-                    ['food_id' => $banana['id'], 'amount' => 100, 'measure_unit' => 'unidade'],
+                    ['food_id' => $banana['id'], 'amount' => 1, 'measure_unit' => 'unidade'], // 1 banana (100 unidades = 10 kg excede o limite de 5 kg)
                     ['food_id' => $aveia['id'], 'amount' => 30, 'measure_unit' => 'g'],
                 ],
             ],

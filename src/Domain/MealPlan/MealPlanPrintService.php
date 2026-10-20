@@ -77,13 +77,23 @@ class MealPlanPrintService
                 foreach ($item['substitutions'] ?? [] as $sub) {
                     $subs[] = [
                         'food' => (string)$sub['food_name'],
-                        'quantity' => $this->quantity($sub['amount'] ?? null, $sub['measure_unit'] ?? null),
+                        'quantity' => $this->quantity(
+                            $sub['amount'] ?? null,
+                            $sub['measure_unit'] ?? null,
+                            isset($sub['weight_grams']) && $sub['weight_grams'] !== null ? (float)$sub['weight_grams'] : null,
+                            !empty($sub['weight_is_estimated'])
+                        ),
                         'notes' => trim((string)($sub['notes'] ?? '')),
                     ];
                 }
                 $items[] = [
                     'food' => (string)$item['food_name'],
-                    'quantity' => $this->quantity($item['amount'] ?? null, $item['measure_unit'] ?? null),
+                    'quantity' => $this->quantity(
+                        $item['amount'] ?? null,
+                        $item['measure_unit'] ?? null,
+                        isset($item['weight_grams']) && $item['weight_grams'] !== null ? (float)$item['weight_grams'] : null,
+                        !empty($item['weight_is_estimated'])
+                    ),
                     'notes' => trim((string)($item['notes'] ?? '')),
                     'energy_kcal' => (float)($item['energy_kcal'] ?? 0),
                     'substitutions' => $subs,
@@ -133,14 +143,29 @@ class MealPlanPrintService
         ];
     }
 
-    private function quantity(mixed $amount, ?string $unit): string
+    /**
+     * Quantidade como prescrita + peso em gramas gravado no cálculo (o mesmo usado nas calorias).
+     * Medida caseira genérica (não cadastrada para o alimento) aparece como "peso estimado".
+     */
+    private function quantity(mixed $amount, ?string $unit, ?float $weightGrams = null, bool $estimated = false): string
     {
         if ($amount === null || $amount === '' || (float)$amount <= 0) {
             return trim((string)$unit);
         }
         $n = (float)$amount;
         $formatted = fmod($n, 1.0) === 0.0 ? number_format($n, 0, ',', '.') : rtrim(rtrim(number_format($n, 2, ',', '.'), '0'), ',');
-        return trim($formatted . ' ' . (string)$unit);
+        $unitStr = trim((string)$unit);
+        $out = trim($formatted . ' ' . $unitStr);
+        if ((bool)preg_match('/^(g|gramas?)$/i', $unitStr)) {
+            return $out;
+        }
+        if ($weightGrams !== null && $weightGrams > 0) {
+            $out .= ' (~' . number_format(round($weightGrams), 0, ',', '.') . 'g' . ($estimated ? ', peso estimado' : '') . ')';
+        } elseif (preg_match('/\((\d+(?:[.,]\d+)?)\s*g\)/i', $unitStr, $m) && $n != 1.0) {
+            // Planos publicados antes do peso persistido: usa o peso unitário escrito na própria medida.
+            $out .= ' (~' . number_format(round($n * (float)str_replace(',', '.', $m[1])), 0, ',', '.') . 'g)';
+        }
+        return $out;
     }
 
     private function time(?string $value): ?string

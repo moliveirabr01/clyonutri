@@ -250,8 +250,17 @@ try {
 }
 assertTest($caughtAllergenError, "Publicação com conflito alergênico bloqueada preventivamente");
 
-// 4.3 Publicação com autorização/override do nutricionista
-$publishRes = $service->publishPlan($planId, true, true);
+// 4.3 Override sem justificativa é recusado (code review NI2-9, A2)
+$caughtNoReason = false;
+try {
+    $service->publishPlan($planId, true, true);
+} catch (InvalidArgumentException $e) {
+    $caughtNoReason = str_contains($e->getMessage(), 'justificativa');
+}
+assertTest($caughtNoReason, "Override de alérgeno sem justificativa clínica é recusado");
+
+// 4.3 Publicação com autorização/override do nutricionista, com justificativa
+$publishRes = $service->publishPlan($planId, true, true, 'Tilápia mantida apenas como substituição; paciente orientado a não consumir.');
 assertTest($publishRes['status'] === 'published', "Plano publicado com sucesso após validação clínica");
 assertTest($publishRes['version'] === 1, "Primeira versão publicada registrada como v1");
 
@@ -338,7 +347,7 @@ assertTest(
 );
 
 // 5.4 Publicar a nova versão duplicada e conferir superseding
-$pubV2 = $service->publishPlan($newDraftId, true, true);
+$pubV2 = $service->publishPlan($newDraftId, true, true, 'Revisado com a paciente: alérgenos sinalizados conferidos.');
 assertTest($pubV2['version'] === 2, "Nova versão duplicada publicada como v2");
 
 // Checar status do plano anterior: tornou-se superseded

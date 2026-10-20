@@ -334,7 +334,7 @@ class LabelMap
             'nuts','tree nuts','castanhas' => 'Castanhas', 'brazil nuts','castanha-do-pará' => 'Castanha-do-Pará',
             'egg','eggs','ovo','ovos' => 'Ovos', 'soy','soja' => 'Soja',
             'peanut','peanuts','amendoim' => 'Amendoim', 'fish','peixe','peixes' => 'Peixes',
-            'shellfish','crustaceans','crustáceos' => 'Crustáceos', 'sesame','gergelim' => 'Gergelim',
+            'shellfish','crustaceans','crustáceos','crustaceos' => 'Crustáceos', 'molluscs','moluscos' => 'Moluscos', 'sesame','gergelim' => 'Gergelim',
             'wheat','trigo' => 'Trigo', 'sulfites','sulfitos' => 'Sulfitos',
             '' => 'Não informado', default => $value,
         };

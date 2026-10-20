@@ -60,7 +60,7 @@ class MealPlanDraftAssistant
                 'name' => 'Café da Manhã',
                 'time_of_day' => '07:30',
                 'items' => [
-                    ['food_id' => $banana['id'], 'amount' => 100, 'measure_unit' => 'unidade'],
+                    ['food_id' => $banana['id'], 'amount' => 1, 'measure_unit' => 'unidade'], // 1 banana (antes: 100 unidades = 10 kg)
                     ['food_id' => $aveia['id'], 'amount' => 30, 'measure_unit' => 'g'],
                 ],
             ],

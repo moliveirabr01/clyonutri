@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ClyoNutri\Domain\MealPlan;
 
+use ClyoNutri\Core\Audit\AuditLogger;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\TenantGuard;
@@ -109,28 +110,17 @@ class MealPlanService
                             $food = $fStmt->fetch();
                             if (!$food) throw new InvalidArgumentException('Alimento não disponível neste catálogo.');
 
-                            $kcal = 0.0;
-                            $prot = 0.0;
-                            $carb = 0.0;
-                            $lip = 0.0;
-                            $fib = 0.0;
-
-                            if ($food) {
-                                $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId);
-                                $kcal = $calc['energy_kcal'];
-                                $prot = $calc['protein_g'];
-                                $carb = $calc['carbohydrate_g'];
-                                $lip = $calc['lipid_g'];
-                                $fib = $calc['fiber_g'];
-                            }
+                            $calc = $this->portionNutrition($food, $amount, $unit, $foodId);
 
                             $iStmt = $this->db->prepare("
                                 INSERT INTO meal_plan_items (
                                     meal_id, food_id, amount, measure_unit, notes, ordering,
-                                    energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g
+                                    energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g,
+                                    weight_grams, weight_is_estimated
                                 ) VALUES (
                                     :meal_id, :food_id, :amount, :measure_unit, :notes, :ordering,
-                                    :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g
+                                    :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g,
+                                    :weight_grams, :weight_is_estimated
                                 )
                             ");
                             $iStmt->execute([
@@ -140,12 +130,7 @@ class MealPlanService
                                 'measure_unit' => $unit,
                                 'notes' => $itemNotes,
                                 'ordering' => $itemOrder++,
-                                'energy_kcal' => $kcal,
-                                'protein_g' => $prot,
-                                'carbohydrate_g' => $carb,
-                                'lipid_g' => $lip,
-                                'fiber_g' => $fib,
-                            ]);
+                            ] + self::nutritionColumns($calc));
                             $itemId = (int)$this->db->lastInsertId();
 
                             if (!empty($item['substitutions'])) {
@@ -160,28 +145,17 @@ class MealPlanService
                                     $subFood = $sfStmt->fetch();
                                     if (!$subFood) throw new InvalidArgumentException('Substituição não disponível neste catálogo.');
 
-                                    $sKcal = 0.0;
-                                    $sProt = 0.0;
-                                    $sCarb = 0.0;
-                                    $sLip = 0.0;
-                                    $sFib = 0.0;
-
-                                    if ($subFood) {
-                                        $sCalc = $this->calculator->calculateForPortion($subFood, $subAmount, $subUnit, $subFoodId);
-                                        $sKcal = $sCalc['energy_kcal'];
-                                        $sProt = $sCalc['protein_g'];
-                                        $sCarb = $sCalc['carbohydrate_g'];
-                                        $sLip = $sCalc['lipid_g'];
-                                        $sFib = $sCalc['fiber_g'];
-                                    }
+                                    $sCalc = $this->portionNutrition($subFood, $subAmount, $subUnit, $subFoodId);
 
                                     $sStmt = $this->db->prepare("
                                         INSERT INTO meal_plan_substitutions (
                                             item_id, food_id, amount, measure_unit, notes,
-                                            energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g
+                                            energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g,
+                                            weight_grams, weight_is_estimated
                                         ) VALUES (
                                             :item_id, :food_id, :amount, :measure_unit, :notes,
-                                            :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g
+                                            :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g,
+                                            :weight_grams, :weight_is_estimated
                                         )
                                     ");
                                     $sStmt->execute([
@@ -190,12 +164,7 @@ class MealPlanService
                                         'amount' => $subAmount,
                                         'measure_unit' => $subUnit,
                                         'notes' => $subNotes,
-                                        'energy_kcal' => $sKcal,
-                                        'protein_g' => $sProt,
-                                        'carbohydrate_g' => $sCarb,
-                                        'lipid_g' => $sLip,
-                                        'fiber_g' => $sFib,
-                                    ]);
+                                    ] + self::nutritionColumns($sCalc));
                                 }
                             }
                         }
@@ -236,39 +205,32 @@ class MealPlanService
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertMealPlanBelongsToClinic($planId, $clinicId, $this->db);
-        $this->assertPlanIsEditable($planId);
 
         $cleanName = trim($name);
         if ($cleanName === '') {
             throw new InvalidArgumentException("O nome da refeição é obrigatório.");
         }
+        $timeOfDay = self::normalizeTimeOfDay($timeOfDay);
 
-        if ($timeOfDay !== null && trim($timeOfDay) !== '') {
-            $timeOfDay = trim($timeOfDay);
-            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $timeOfDay)) {
-                throw new InvalidArgumentException("Horário inválido. Utilize o formato HH:MM (ex: 08:00, 12:30).");
-            }
-        } else {
-            $timeOfDay = null;
-        }
+        return $this->inDraftTransaction($planId, function () use ($planId, $cleanName, $timeOfDay, $notes): int {
+            $oStmt = $this->db->prepare("SELECT COALESCE(MAX(ordering), 0) + 1 FROM meal_plan_meals WHERE meal_plan_id = :plan_id");
+            $oStmt->execute(['plan_id' => $planId]);
+            $nextOrder = (int)$oStmt->fetchColumn();
 
-        $oStmt = $this->db->prepare("SELECT COALESCE(MAX(ordering), 0) + 1 FROM meal_plan_meals WHERE meal_plan_id = :plan_id");
-        $oStmt->execute(['plan_id' => $planId]);
-        $nextOrder = (int)$oStmt->fetchColumn();
+            $stmt = $this->db->prepare("
+                INSERT INTO meal_plan_meals (meal_plan_id, name, time_of_day, notes, ordering)
+                VALUES (:plan_id, :name, :time_of_day, :notes, :ordering)
+            ");
+            $stmt->execute([
+                'plan_id' => $planId,
+                'name' => $cleanName,
+                'time_of_day' => $timeOfDay,
+                'notes' => $notes !== null ? trim($notes) : null,
+                'ordering' => $nextOrder,
+            ]);
 
-        $stmt = $this->db->prepare("
-            INSERT INTO meal_plan_meals (meal_plan_id, name, time_of_day, notes, ordering)
-            VALUES (:plan_id, :name, :time_of_day, :notes, :ordering)
-        ");
-        $stmt->execute([
-            'plan_id' => $planId,
-            'name' => $cleanName,
-            'time_of_day' => $timeOfDay,
-            'notes' => $notes !== null ? trim($notes) : null,
-            'ordering' => $nextOrder,
-        ]);
-
-        return (int)$this->db->lastInsertId();
+            return (int)$this->db->lastInsertId();
+        });
     }
 
     /**
@@ -277,33 +239,28 @@ class MealPlanService
     public function updateMeal(int $mealId, string $name, ?string $timeOfDay = null, ?string $notes = null): bool
     {
         $meal = $this->findMealWithTenantCheck($mealId);
-        $this->assertPlanIsEditable((int)$meal['meal_plan_id']);
+        $planId = (int)$meal['meal_plan_id'];
 
         $cleanName = trim($name);
         if ($cleanName === '') {
             throw new InvalidArgumentException("O nome da refeição é obrigatório.");
         }
+        $timeOfDay = self::normalizeTimeOfDay($timeOfDay);
 
-        if ($timeOfDay !== null && trim($timeOfDay) !== '') {
-            $timeOfDay = trim($timeOfDay);
-            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $timeOfDay)) {
-                throw new InvalidArgumentException("Horário inválido. Utilize o formato HH:MM (ex: 08:00, 12:30).");
-            }
-        } else {
-            $timeOfDay = null;
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE meal_plan_meals
-            SET name = :name, time_of_day = :time_of_day, notes = :notes
-            WHERE id = :id
-        ");
-        return $stmt->execute([
-            'name' => $cleanName,
-            'time_of_day' => $timeOfDay,
-            'notes' => $notes !== null ? trim($notes) : null,
-            'id' => $mealId,
-        ]);
+        return $this->inDraftTransaction($planId, function () use ($mealId, $planId, $cleanName, $timeOfDay, $notes): bool {
+            $stmt = $this->db->prepare("
+                UPDATE meal_plan_meals
+                SET name = :name, time_of_day = :time_of_day, notes = :notes
+                WHERE id = :id AND meal_plan_id = :plan_id
+            ");
+            return $stmt->execute([
+                'name' => $cleanName,
+                'time_of_day' => $timeOfDay,
+                'notes' => $notes !== null ? trim($notes) : null,
+                'id' => $mealId,
+                'plan_id' => $planId,
+            ]);
+        });
     }
 
     /**
@@ -313,13 +270,13 @@ class MealPlanService
     {
         $meal = $this->findMealWithTenantCheck($mealId);
         $planId = (int)$meal['meal_plan_id'];
-        $this->assertPlanIsEditable($planId);
 
-        $stmt = $this->db->prepare("DELETE FROM meal_plan_meals WHERE id = :id");
-        $res = $stmt->execute(['id' => $mealId]);
-
-        $this->calculateAndPersistPlanTotals($planId);
-        return $res;
+        return $this->inDraftTransaction($planId, function () use ($mealId, $planId): bool {
+            $stmt = $this->db->prepare("DELETE FROM meal_plan_meals WHERE id = :id AND meal_plan_id = :plan_id");
+            $res = $stmt->execute(['id' => $mealId, 'plan_id' => $planId]);
+            $this->calculateAndPersistPlanTotals($planId);
+            return $res;
+        });
     }
 
     /**
@@ -329,18 +286,19 @@ class MealPlanService
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertMealPlanBelongsToClinic($planId, $clinicId, $this->db);
-        $this->assertPlanIsEditable($planId);
 
-        $order = 1;
-        $stmt = $this->db->prepare("UPDATE meal_plan_meals SET ordering = :order WHERE id = :id AND meal_plan_id = :plan_id");
-        foreach ($mealIdsInOrder as $mealId) {
-            $stmt->execute([
-                'order' => $order++,
-                'id' => (int)$mealId,
-                'plan_id' => $planId,
-            ]);
-        }
-        return true;
+        return $this->inDraftTransaction($planId, function () use ($planId, $mealIdsInOrder): bool {
+            $order = 1;
+            $stmt = $this->db->prepare("UPDATE meal_plan_meals SET ordering = :order WHERE id = :id AND meal_plan_id = :plan_id");
+            foreach ($mealIdsInOrder as $mealId) {
+                $stmt->execute([
+                    'order' => $order++,
+                    'id' => (int)$mealId,
+                    'plan_id' => $planId,
+                ]);
+            }
+            return true;
+        });
     }
 
     /**
@@ -353,58 +311,52 @@ class MealPlanService
         string $measureUnit = 'g',
         ?string $notes = null
     ): int {
-        if ($amount <= 0) {
+        if (!is_finite($amount) || $amount <= 0) {
             throw new InvalidArgumentException("A quantidade prescrita deve ser estritamente maior que zero.");
         }
 
         $meal = $this->findMealWithTenantCheck($mealId);
         $planId = (int)$meal['meal_plan_id'];
-        $this->assertPlanIsEditable($planId);
 
-        // Obter alimento da tabela foods
-        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
-        $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
-        $food = $fStmt->fetch();
-        if (!$food) {
-            throw new InvalidArgumentException("Alimento com ID {$foodId} não encontrado no catálogo.");
-        }
+        return $this->inDraftTransaction($planId, function () use ($mealId, $planId, $foodId, $amount, $measureUnit, $notes): int {
+            $food = $this->findCatalogFood($foodId);
+            if (!$food) {
+                throw new InvalidArgumentException("Alimento com ID {$foodId} não encontrado no catálogo.");
+            }
 
-        // Calcular macronutrientes proporcionais (100g ou medida caseira)
-        $nutrition = $this->calculator->calculateForPortion($food, $amount, $measureUnit, $foodId);
+            // Macronutrientes proporcionais (100g ou medida caseira) e peso em gramas persistido
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId);
 
-        // Próxima ordenação do item na refeição
-        $oStmt = $this->db->prepare("SELECT COALESCE(MAX(ordering), 0) + 1 FROM meal_plan_items WHERE meal_id = :meal_id");
-        $oStmt->execute(['meal_id' => $mealId]);
-        $nextOrder = (int)$oStmt->fetchColumn();
+            $oStmt = $this->db->prepare("SELECT COALESCE(MAX(ordering), 0) + 1 FROM meal_plan_items WHERE meal_id = :meal_id");
+            $oStmt->execute(['meal_id' => $mealId]);
+            $nextOrder = (int)$oStmt->fetchColumn();
 
-        $stmt = $this->db->prepare("
-            INSERT INTO meal_plan_items (
-                meal_id, food_id, amount, measure_unit, notes, ordering,
-                energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g
-            ) VALUES (
-                :meal_id, :food_id, :amount, :measure_unit, :notes, :ordering,
-                :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g
-            )
-        ");
-        $stmt->execute([
-            'meal_id' => $mealId,
-            'food_id' => $foodId,
-            'amount' => $amount,
-            'measure_unit' => trim($measureUnit),
-            'notes' => $notes !== null ? trim($notes) : null,
-            'ordering' => $nextOrder,
-            'energy_kcal' => $nutrition['energy_kcal'],
-            'protein_g' => $nutrition['protein_g'],
-            'carbohydrate_g' => $nutrition['carbohydrate_g'],
-            'lipid_g' => $nutrition['lipid_g'],
-            'fiber_g' => $nutrition['fiber_g'],
-        ]);
-        $itemId = (int)$this->db->lastInsertId();
+            $stmt = $this->db->prepare("
+                INSERT INTO meal_plan_items (
+                    meal_id, food_id, amount, measure_unit, notes, ordering,
+                    energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g,
+                    weight_grams, weight_is_estimated
+                ) VALUES (
+                    :meal_id, :food_id, :amount, :measure_unit, :notes, :ordering,
+                    :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g,
+                    :weight_grams, :weight_is_estimated
+                )
+            ");
+            $stmt->execute([
+                'meal_id' => $mealId,
+                'food_id' => $foodId,
+                'amount' => $amount,
+                'measure_unit' => trim($measureUnit),
+                'notes' => $notes !== null ? trim($notes) : null,
+                'ordering' => $nextOrder,
+            ] + self::nutritionColumns($nutrition));
+            $itemId = (int)$this->db->lastInsertId();
 
-        // Recalcular totais consolidados do plano em cascata
-        $this->calculateAndPersistPlanTotals($planId);
+            // Recalcular totais consolidados do plano em cascata
+            $this->calculateAndPersistPlanTotals($planId);
 
-        return $itemId;
+            return $itemId;
+        });
     }
 
     /**
@@ -435,20 +387,19 @@ class MealPlanService
                 throw new \DomainException('Este item foi alterado em outra aba. Confira os dados atuais antes de salvar novamente.');
             }
 
-            $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
-            $fStmt->execute(['id' => (int)$item['food_id'], 'food_clinic' => TenantContext::getClinicId()]);
-            $food = $fStmt->fetch();
+            $food = $this->findCatalogFood((int)$item['food_id']);
             if (!$food) {
                 throw new InvalidArgumentException("Alimento associado não encontrado.");
             }
 
-            $nutrition = $this->calculator->calculateForPortion($food, $amount, $measureUnit, (int)$item['food_id']);
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, (int)$item['food_id']);
 
             $stmt = $this->db->prepare("
                 UPDATE meal_plan_items
                 SET amount = :amount, measure_unit = :measure_unit, notes = :notes,
                     energy_kcal = :energy_kcal, protein_g = :protein_g, carbohydrate_g = :carbohydrate_g,
-                    lipid_g = :lipid_g, fiber_g = :fiber_g
+                    lipid_g = :lipid_g, fiber_g = :fiber_g,
+                    weight_grams = :weight_grams, weight_is_estimated = :weight_is_estimated
                 WHERE id = :id AND amount = :old_amount AND measure_unit = :old_unit
                     AND (notes = :old_notes OR (notes IS NULL AND :old_notes IS NULL))
                     AND EXISTS (SELECT 1 FROM meal_plan_meals m JOIN meal_plans p ON p.id = m.meal_plan_id
@@ -458,15 +409,10 @@ class MealPlanService
                 'amount' => $amount,
                 'measure_unit' => trim($measureUnit),
                 'notes' => $notes !== null ? trim($notes) : null,
-                'energy_kcal' => $nutrition['energy_kcal'],
-                'protein_g' => $nutrition['protein_g'],
-                'carbohydrate_g' => $nutrition['carbohydrate_g'],
-                'lipid_g' => $nutrition['lipid_g'],
-                'fiber_g' => $nutrition['fiber_g'],
                 'id' => $itemId,
                 'old_amount' => $item['amount'], 'old_unit' => $item['measure_unit'], 'old_notes' => $item['notes'],
                 'plan_id' => $planId, 'clinic_id' => TenantContext::getClinicId(),
-            ]);
+            ] + self::nutritionColumns($nutrition));
 
             if ($stmt->rowCount() !== 1) throw new \DomainException('O plano ou item mudou. Recarregue antes de salvar.');
             $this->calculateAndPersistPlanTotals($planId);
@@ -492,13 +438,14 @@ class MealPlanService
         $item = $this->findItemWithTenantCheck($itemId);
         $meal = $this->findMealWithTenantCheck((int)$item['meal_id']);
         $planId = (int)$meal['meal_plan_id'];
-        $this->assertPlanIsEditable($planId);
 
-        $stmt = $this->db->prepare("DELETE FROM meal_plan_items WHERE id = :id");
-        $res = $stmt->execute(['id' => $itemId]);
-
-        $this->calculateAndPersistPlanTotals($planId);
-        return $res;
+        return $this->inDraftTransaction($planId, function () use ($itemId, $planId): bool {
+            $stmt = $this->db->prepare("DELETE FROM meal_plan_items WHERE id = :id
+                AND meal_id IN (SELECT id FROM meal_plan_meals WHERE meal_plan_id = :plan_id)");
+            $res = $stmt->execute(['id' => $itemId, 'plan_id' => $planId]);
+            $this->calculateAndPersistPlanTotals($planId);
+            return $res;
+        });
     }
 
     /**
@@ -511,48 +458,44 @@ class MealPlanService
         string $measureUnit = 'g',
         ?string $notes = null
     ): int {
-        if ($amount <= 0) {
+        if (!is_finite($amount) || $amount <= 0) {
             throw new InvalidArgumentException("A quantidade da substituição deve ser estritamente maior que zero.");
         }
 
         $item = $this->findItemWithTenantCheck($itemId);
         $meal = $this->findMealWithTenantCheck((int)$item['meal_id']);
         $planId = (int)$meal['meal_plan_id'];
-        $this->assertPlanIsEditable($planId);
 
-        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
-        $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
-        $food = $fStmt->fetch();
-        if (!$food) {
-            throw new InvalidArgumentException("Alimento de substituição com ID {$foodId} não encontrado.");
-        }
+        return $this->inDraftTransaction($planId, function () use ($itemId, $foodId, $amount, $measureUnit, $notes): int {
+            $food = $this->findCatalogFood($foodId);
+            if (!$food) {
+                throw new InvalidArgumentException("Alimento de substituição com ID {$foodId} não encontrado.");
+            }
 
-        // Calcular macros da substituição para consulta e comparação de equivalência
-        $nutrition = $this->calculator->calculateForPortion($food, $amount, $measureUnit, $foodId);
+            // Macros da substituição para consulta e comparação de equivalência
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId);
 
-        $stmt = $this->db->prepare("
-            INSERT INTO meal_plan_substitutions (
-                item_id, food_id, amount, measure_unit, notes,
-                energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g
-            ) VALUES (
-                :item_id, :food_id, :amount, :measure_unit, :notes,
-                :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g
-            )
-        ");
-        $stmt->execute([
-            'item_id' => $itemId,
-            'food_id' => $foodId,
-            'amount' => $amount,
-            'measure_unit' => trim($measureUnit),
-            'notes' => $notes !== null ? trim($notes) : null,
-            'energy_kcal' => $nutrition['energy_kcal'],
-            'protein_g' => $nutrition['protein_g'],
-            'carbohydrate_g' => $nutrition['carbohydrate_g'],
-            'lipid_g' => $nutrition['lipid_g'],
-            'fiber_g' => $nutrition['fiber_g'],
-        ]);
+            $stmt = $this->db->prepare("
+                INSERT INTO meal_plan_substitutions (
+                    item_id, food_id, amount, measure_unit, notes,
+                    energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g,
+                    weight_grams, weight_is_estimated
+                ) VALUES (
+                    :item_id, :food_id, :amount, :measure_unit, :notes,
+                    :energy_kcal, :protein_g, :carbohydrate_g, :lipid_g, :fiber_g,
+                    :weight_grams, :weight_is_estimated
+                )
+            ");
+            $stmt->execute([
+                'item_id' => $itemId,
+                'food_id' => $foodId,
+                'amount' => $amount,
+                'measure_unit' => trim($measureUnit),
+                'notes' => $notes !== null ? trim($notes) : null,
+            ] + self::nutritionColumns($nutrition));
 
-        return (int)$this->db->lastInsertId();
+            return (int)$this->db->lastInsertId();
+        });
     }
 
     /**
@@ -580,8 +523,10 @@ class MealPlanService
             throw new RuntimeException("Planos alimentares publicados ou arquivados são imutáveis.");
         }
 
-        $del = $this->db->prepare("DELETE FROM meal_plan_substitutions WHERE id = :id");
-        return $del->execute(['id' => $subId]);
+        return $this->inDraftTransaction((int)$sub['meal_plan_id'], function () use ($subId): bool {
+            $del = $this->db->prepare("DELETE FROM meal_plan_substitutions WHERE id = :id");
+            return $del->execute(['id' => $subId]);
+        });
     }
 
     /**
@@ -677,11 +622,15 @@ class MealPlanService
 
         $plan['clinical_safety_summary'] = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService($this->db))->getClinicalSummaryForPrescription((int)$plan['patient_id']);
 
-        // Validação clínica de alergênicos contra a anamnese do paciente
+        // Validação clínica de alergênicos contra a anamnese do paciente (fail-closed)
         $foodIds = [];
+        $estimated = [];
         foreach ($plan['meals'] as $m) {
             foreach ($m['items'] as $it) {
                 $foodIds[] = (int)$it['food_id'];
+                if (!empty($it['weight_is_estimated'])) {
+                    $estimated[] = ['food_name' => $it['food_name'], 'amount' => (float)$it['amount'], 'measure_unit' => $it['measure_unit'], 'weight_grams' => $it['weight_grams'] !== null ? (float)$it['weight_grams'] : null];
+                }
                 foreach ($it['substitutions'] as $sub) {
                     $foodIds[] = (int)$sub['food_id'];
                 }
@@ -695,6 +644,7 @@ class MealPlanService
             'plan' => $plan,
             'is_ready_to_publish' => count($plan['meals']) > 0 && (float)$plan['daily_energy_kcal'] > 0,
             'allergen_safety' => $allergenSafety,
+            'estimated_weights' => $estimated,
             'summary' => [
                 'meals_count' => count($plan['meals']),
                 'daily_energy_kcal' => (float)$plan['daily_energy_kcal'],
@@ -708,52 +658,85 @@ class MealPlanService
 
     /**
      * Publica o plano alimentar com snapshot imutável, versionamento e auditoria (NI2-79)
+     *
+     * Só rascunhos são publicados. A troca draft -> published é a primeira escrita da transação
+     * (UPDATE condicional), então duas publicações simultâneas ou uma edição concorrente não passam.
+     * Conflito de alérgeno, alimento sem informação de alérgeno ou alergia não reconhecida exigem
+     * $allowAllergenOverride = true E uma justificativa ($overrideReason, mín. 10 caracteres),
+     * gravadas na versão e na trilha de auditoria com o autor.
      */
-    public function publishPlan(int $planId, bool $allowAllergenOverride = false, bool $returnDetails = false): bool|array
+    public function publishPlan(int $planId, bool $allowAllergenOverride = false, bool $returnDetails = false, ?string $overrideReason = null): bool|array
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertMealPlanBelongsToClinic($planId, $clinicId, $this->db);
 
-        $preview = $this->getPlanPreview($planId);
-        $plan = $preview['plan'];
-
-        if ($plan['status'] === 'published') {
-            throw new RuntimeException("Este plano alimentar já está publicado.");
+        $head = $this->db->prepare("SELECT patient_id, status FROM meal_plans WHERE id = :id AND clinic_id = :c");
+        $head->execute(['id' => $planId, 'c' => $clinicId]);
+        $planHead = $head->fetch(PDO::FETCH_ASSOC);
+        if (!$planHead) {
+            throw new InvalidArgumentException("Plano alimentar não encontrado.");
         }
-
-        if (empty($plan['meals'])) {
-            throw new InvalidArgumentException("Não é possível publicar um plano alimentar sem nenhuma refeição cadastrada.");
-        }
-
-        $hasItems = false;
-        foreach ($plan['meals'] as $m) {
-            if (!empty($m['items'])) {
-                $hasItems = true;
-                break;
-            }
-        }
-        if (!$hasItems) {
-            throw new InvalidArgumentException("Não é possível publicar um plano alimentar sem nenhum alimento prescrito.");
-        }
-
-        // Bloqueio por conflito de alergênicos
-        if ($preview['allergen_safety']['has_conflict'] && !$allowAllergenOverride) {
-            $conflictNames = array_map(
-                fn($c) => $c['food_name'] . " (" . $c['allergen_group'] . ")",
-                $preview['allergen_safety']['conflicts']
-            );
-            throw new InvalidArgumentException(
-                "Publicação bloqueada por segurança clínica: conflito de alergênicos detectado [" .
-                implode(', ', $conflictNames) . "]. Marque autorização expressa do nutricionista se desejar prosseguir."
-            );
-        }
-
-        $patientId = (int)$plan['patient_id'];
-        $professionalId = (int)$plan['professional_id'];
+        self::assertPublishableStatus((string)$planHead['status']);
+        $patientId = (int)$planHead['patient_id'];
+        $actorUserId = TenantContext::getUserId();
+        $publishedAt = date('Y-m-d H:i:s');
 
         $this->db->beginTransaction();
         try {
-            // Obter próximo número sequencial de versão do plano para o paciente
+            // Serializa publicações do mesmo paciente (MySQL); no SQLite a escrita abaixo já trava o banco.
+            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $lock = $this->db->prepare("SELECT id FROM patients WHERE id = :id AND clinic_id = :c FOR UPDATE");
+                $lock->execute(['id' => $patientId, 'c' => $clinicId]);
+            }
+
+            // Primeira escrita: draft -> published. Se outra requisição já publicou ou mudou o status, para aqui.
+            $claim = $this->db->prepare("
+                UPDATE meal_plans
+                SET status = 'published', published_at = :published_at, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND clinic_id = :clinic_id AND status = 'draft'
+            ");
+            $claim->execute(['published_at' => $publishedAt, 'id' => $planId, 'clinic_id' => $clinicId]);
+            if ($claim->rowCount() !== 1) {
+                $st = $this->db->prepare("SELECT status FROM meal_plans WHERE id = :id AND clinic_id = :c");
+                $st->execute(['id' => $planId, 'c' => $clinicId]);
+                self::assertPublishableStatus((string)$st->fetchColumn());
+                throw new RuntimeException("O plano mudou durante a publicação. Recarregue e tente novamente.");
+            }
+
+            // Conferência feita sobre o estado já travado: é exatamente isso que vira o snapshot.
+            $preview = $this->getPlanPreview($planId);
+            $plan = $preview['plan'];
+
+            if (empty($plan['meals'])) {
+                throw new InvalidArgumentException("Não é possível publicar um plano alimentar sem nenhuma refeição cadastrada.");
+            }
+            $hasItems = false;
+            foreach ($plan['meals'] as $m) {
+                if (!empty($m['items'])) {
+                    $hasItems = true;
+                    break;
+                }
+            }
+            if (!$hasItems) {
+                throw new InvalidArgumentException("Não é possível publicar um plano alimentar sem nenhum alimento prescrito.");
+            }
+
+            $safety = $preview['allergen_safety'];
+            $reason = $overrideReason !== null ? trim($overrideReason) : '';
+            $overrideUsed = false;
+            if (!empty($safety['requires_confirmation'])) {
+                if (!$allowAllergenOverride) {
+                    throw new InvalidArgumentException(self::allergenBlockMessage($safety));
+                }
+                if (mb_strlen($reason) < 10) {
+                    throw new InvalidArgumentException("Para publicar com alerta de alérgeno, descreva a justificativa clínica (mínimo de 10 caracteres).");
+                }
+                $overrideUsed = true;
+            }
+
+            $professionalId = (int)$plan['professional_id'];
+
+            // Próximo número sequencial de versão do paciente (único por clinic_id + patient_id)
             $vStmt = $this->db->prepare("
                 SELECT COALESCE(MAX(version_number), 0) + 1
                 FROM meal_plan_versions
@@ -762,7 +745,6 @@ class MealPlanService
             $vStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
             $nextVersionNumber = (int)$vStmt->fetchColumn();
 
-            // Desativar versão publicada anterior em meal_plan_versions
             $supVer = $this->db->prepare("
                 UPDATE meal_plan_versions
                 SET status = 'superseded'
@@ -770,31 +752,26 @@ class MealPlanService
             ");
             $supVer->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
 
-            // Desativar outros planos publicados do paciente em meal_plans
             $supPlan = $this->db->prepare("
                 UPDATE meal_plans
                 SET status = 'superseded'
                 WHERE clinic_id = :clinic_id AND patient_id = :patient_id AND status = 'published' AND id != :plan_id
             ");
-            $supPlan->execute([
-                'clinic_id' => $clinicId,
-                'patient_id' => $patientId,
-                'plan_id' => $planId,
-            ]);
+            $supPlan->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId, 'plan_id' => $planId]);
 
-            $publishedAt = date('Y-m-d H:i:s');
+            $plan['version'] = $nextVersionNumber;
+            $plan['published_at'] = $publishedAt;
             $snapshotPayload = json_encode($plan, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-            // Gravar snapshot imutável em meal_plan_versions
             $insVer = $this->db->prepare("
                 INSERT INTO meal_plan_versions (
                     clinic_id, meal_plan_id, patient_id, professional_id,
                     version_number, title, daily_energy_kcal, payload_json,
-                    status, published_at, created_at
+                    status, published_at, created_at, published_by_user_id, allergen_override_reason
                 ) VALUES (
                     :clinic_id, :meal_plan_id, :patient_id, :professional_id,
                     :version_number, :title, :daily_energy_kcal, :payload_json,
-                    'published', :published_at, :created_at
+                    'published', :published_at, :created_at, :published_by, :override_reason
                 )
             ");
             $insVer->execute([
@@ -808,35 +785,25 @@ class MealPlanService
                 'payload_json' => $snapshotPayload,
                 'published_at' => $publishedAt,
                 'created_at' => $publishedAt,
+                'published_by' => $actorUserId,
+                'override_reason' => $overrideUsed ? $reason : null,
             ]);
 
-            // Atualizar o plano para status 'published'
-            $upPlan = $this->db->prepare("
-                UPDATE meal_plans
-                SET status = 'published', published_at = :published_at, version = :version, updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id AND clinic_id = :clinic_id
-            ");
-            $upPlan->execute([
-                'published_at' => $publishedAt,
-                'version' => $nextVersionNumber,
-                'id' => $planId,
-                'clinic_id' => $clinicId,
-            ]);
+            $upPlan = $this->db->prepare("UPDATE meal_plans SET version = :version WHERE id = :id AND clinic_id = :clinic_id");
+            $upPlan->execute(['version' => $nextVersionNumber, 'id' => $planId, 'clinic_id' => $clinicId]);
 
-            // Registrar trilha de auditoria clínica
-            $auditStmt = $this->db->prepare("
-                INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
-                VALUES (:clinic_id, 'MEAL_PLAN_PUBLISHED', 'meal_plans', :res_id, :details)
-            ");
-            $auditStmt->execute([
-                'clinic_id' => $clinicId,
-                'res_id' => (string)$planId,
-                'details' => json_encode([
-                    'patient_id' => $patientId,
-                    'version_number' => $nextVersionNumber,
-                    'daily_energy_kcal' => $plan['daily_energy_kcal'],
-                    'allergen_override' => $allowAllergenOverride,
-                ], JSON_UNESCAPED_UNICODE),
+            // Trilha de auditoria clínica com autor e IP (AuditLogger)
+            (new AuditLogger($this->db))->log('MEAL_PLAN_PUBLISHED', 'meal_plans', (string)$planId, [
+                'patient_id' => $patientId,
+                'professional_id' => $professionalId,
+                'published_by_user_id' => $actorUserId,
+                'version_number' => $nextVersionNumber,
+                'daily_energy_kcal' => $plan['daily_energy_kcal'],
+                'allergen_override' => $overrideUsed,
+                'allergen_override_reason' => $overrideUsed ? $reason : null,
+                'allergen_conflicts' => array_map(fn($c) => ['food_id' => $c['food_id'], 'group' => $c['allergen_group']], $safety['conflicts'] ?? []),
+                'unverified_food_ids' => array_map(fn($f) => $f['food_id'], $safety['unverified_foods'] ?? []),
+                'unmapped_allergy_text' => (bool)($safety['unmapped_allergy_text'] ?? false),
             ]);
 
             $this->db->commit();
@@ -857,6 +824,35 @@ class MealPlanService
             }
             throw $e;
         }
+    }
+
+    private static function assertPublishableStatus(string $status): void
+    {
+        if ($status === 'published') {
+            throw new RuntimeException("Este plano alimentar já está publicado.");
+        }
+        if ($status !== 'draft') {
+            throw new RuntimeException("Somente rascunhos podem ser publicados. Para voltar a uma versão anterior, duplique-a e publique a cópia.");
+        }
+    }
+
+    private static function allergenBlockMessage(array $safety): string
+    {
+        $parts = [];
+        if (!empty($safety['conflicts'])) {
+            $parts[] = 'conflito de alergênicos detectado [' . implode(', ', array_map(
+                fn($c) => $c['food_name'] . " (" . $c['allergen_group'] . ")",
+                $safety['conflicts']
+            )) . ']';
+        }
+        if (!empty($safety['unverified_foods'])) {
+            $parts[] = 'alimentos sem informação de alérgenos [' . implode(', ', array_map(fn($f) => $f['food_name'], $safety['unverified_foods'])) . ']';
+        }
+        if (!empty($safety['unmapped_allergy_text'])) {
+            $parts[] = 'a alergia registrada na anamnese não foi reconhecida automaticamente';
+        }
+        return "Publicação bloqueada por segurança clínica: " . implode('; ', $parts)
+            . ". Revise e marque a autorização expressa do nutricionista, com justificativa, se desejar prosseguir.";
     }
 
     /**
@@ -1007,7 +1003,7 @@ class MealPlanService
                 lipid_g = :lip,
                 fiber_g = :fib,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id
+            WHERE id = :id AND status = 'draft'
         ");
         $up->execute([
             'kcal' => $kcal,
@@ -1025,6 +1021,100 @@ class MealPlanService
             'lipid_g' => $lip,
             'fiber_g' => $fib,
         ];
+    }
+
+    /** Peso máximo de um item ou substituição (gramas). Evita erro de digitação virar prescrição. */
+    public const MAX_PORTION_GRAMS = 5000.0;
+
+    /**
+     * Calcula energia/macros e o peso em gramas de uma porção, com validação de faixa.
+     */
+    private function portionNutrition(array $food, float $amount, string $unit, int $foodId): array
+    {
+        $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId);
+        if (!is_finite((float)$calc['weight_grams']) || (float)$calc['weight_grams'] > self::MAX_PORTION_GRAMS) {
+            throw new InvalidArgumentException('Quantidade acima do limite de 5 kg por alimento. Confira o valor digitado.');
+        }
+        return $calc;
+    }
+
+    /** Colunas nutricionais + peso persistidos em meal_plan_items / meal_plan_substitutions. */
+    private static function nutritionColumns(array $calc): array
+    {
+        return [
+            'energy_kcal' => $calc['energy_kcal'],
+            'protein_g' => $calc['protein_g'],
+            'carbohydrate_g' => $calc['carbohydrate_g'],
+            'lipid_g' => $calc['lipid_g'],
+            'fiber_g' => $calc['fiber_g'],
+            'weight_grams' => $calc['weight_grams'],
+            'weight_is_estimated' => !empty($calc['weight_is_estimated']) ? 1 : 0,
+        ];
+    }
+
+    private function findCatalogFood(int $foodId): array|false
+    {
+        $fStmt = $this->db->prepare("SELECT * FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :food_clinic)");
+        $fStmt->execute(['id' => $foodId, 'food_clinic' => TenantContext::getClinicId()]);
+        return $fStmt->fetch();
+    }
+
+    private static function normalizeTimeOfDay(?string $timeOfDay): ?string
+    {
+        if ($timeOfDay === null || trim($timeOfDay) === '') {
+            return null;
+        }
+        $timeOfDay = trim($timeOfDay);
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $timeOfDay)) {
+            throw new InvalidArgumentException("Horário inválido. Utilize o formato HH:MM (ex: 08:00, 12:30).");
+        }
+        return $timeOfDay;
+    }
+
+    /**
+     * Executa uma alteração de rascunho numa transação cuja PRIMEIRA escrita confirma, no próprio SQL,
+     * que o plano continua em 'draft' nesta clínica (trava a linha no MySQL; trava o banco no SQLite).
+     * Uma publicação concorrente fica serializada: ou a alteração entra antes do snapshot, ou falha.
+     *
+     * @template T
+     * @param callable(): T $work
+     * @return T
+     */
+    private function inDraftTransaction(int $planId, callable $work): mixed
+    {
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+        try {
+            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                // MySQL: trava a linha do plano até o commit. (rowCount de UPDATE no MySQL conta só linhas
+                // efetivamente alteradas; updated_at no mesmo segundo daria 0, então não serve de guarda.)
+                $guard = $this->db->prepare("SELECT status FROM meal_plans WHERE id = :id AND clinic_id = :clinic_id FOR UPDATE");
+                $guard->execute(['id' => $planId, 'clinic_id' => TenantContext::getClinicId()]);
+                $isDraft = $guard->fetchColumn() === 'draft';
+            } else {
+                // SQLite: a primeira escrita obtém o lock de escrita do banco; changes() conta as linhas casadas.
+                $guard = $this->db->prepare("UPDATE meal_plans SET updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id AND clinic_id = :clinic_id AND status = 'draft'");
+                $guard->execute(['id' => $planId, 'clinic_id' => TenantContext::getClinicId()]);
+                $isDraft = $guard->rowCount() === 1;
+            }
+            if (!$isDraft) {
+                $this->assertPlanIsEditable($planId); // lança a mensagem adequada (não encontrado / imutável)
+                throw new RuntimeException("O plano mudou durante a edição. Recarregue e tente novamente.");
+            }
+            $result = $work();
+            if ($ownTx) {
+                $this->db->commit();
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     private function assertPlanIsEditable(int $planId): void

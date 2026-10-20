@@ -253,7 +253,7 @@ assert($allergenBlocked === true, "Publicação de prescrição com alergênico 
 echo "  ✓ Alerta e bloqueio de segurança clínica ativados: tentativa de prescrever Leite desnatado para paciente com alergia a lactose foi barrada.\n";
 
 // Publicação supervisionada expressa (quando o profissional insere substituto ou confirmação clínica formal)
-$publishedWithOverride = $mealPlanService->publishPlan($planInseguro['plan_id'], true);
+$publishedWithOverride = $mealPlanService->publishPlan($planInseguro['plan_id'], true, false, 'Leite sem lactose orientado; conferido com a paciente.');
 assert($publishedWithOverride === true, "Com autorização explícita de override, publicação supervisionada é permitida");
 echo "  ✓ Supervisão profissional com confirmação explícita registrada com sucesso.\n\n";
 

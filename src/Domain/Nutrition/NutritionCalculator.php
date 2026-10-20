@@ -29,12 +29,13 @@ class NutritionCalculator
      */
     public function calculateForPortion(array $foodBase, float $amount, string $unit = 'g', ?int $foodId = null): array
     {
-        if ($amount <= 0) {
+        if (!is_finite($amount) || $amount <= 0) {
             throw new InvalidArgumentException("A quantidade consumida/prescrita deve ser estritamente positiva.");
         }
 
-        // Converter para gramas
-        $grams = $this->converter->convertToGrams($amount, $unit, $foodId);
+        // Converter para gramas (com a origem do peso: medida do alimento, exata ou genérica/estimada)
+        $conversion = $this->converter->convertDetailed($amount, $unit, $foodId);
+        $grams = $conversion['grams'];
 
         // Fator em relação à base de 100g
         $factor = $grams / 100.0;
@@ -49,6 +50,7 @@ class NutritionCalculator
             'amount_input' => $amount,
             'unit_input' => $unit,
             'weight_grams' => round($grams, 2),
+            'weight_is_estimated' => $conversion['estimated'],
             'energy_kcal' => round($kcal100g * $factor, 2),
             'protein_g' => round($prot100g * $factor, 2),
             'carbohydrate_g' => round($carb100g * $factor, 2),

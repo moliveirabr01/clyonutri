@@ -62,15 +62,42 @@ class HouseholdMeasureConverter
      * @return float Quantidade convertida em gramas
      * @throws InvalidArgumentException Se quantidade <= 0 ou unidade desconhecida
      */
+    /**
+     * Unidades exatas (massa e volume). As demais medidas da tabela padrão são genéricas:
+     * o peso real depende do alimento, então o resultado é marcado como estimado.
+     */
+    private const EXACT_UNITS = ['g', 'grama', 'gramas', 'mg', 'kg', 'ml', 'mililitro', 'mililitros', 'l', 'litro', 'litros'];
+
+    /**
+     * Converte uma quantidade e unidade de medida em gramas.
+     *
+     * @param float $amount Quantidade (ex: 2.0)
+     * @param string $unit Unidade (ex: 'colher de sopa', 'g')
+     * @param int|null $foodId ID do alimento para buscar medida caseira específica
+     * @return float Quantidade convertida em gramas
+     * @throws InvalidArgumentException Se quantidade <= 0 ou unidade desconhecida
+     */
     public function convertToGrams(float $amount, string $unit, ?int $foodId = null): float
     {
-        if ($amount <= 0) {
+        return $this->convertDetailed($amount, $unit, $foodId)['grams'];
+    }
+
+    /**
+     * Igual a convertToGrams, mas informa a origem do peso.
+     *
+     * @return array{grams: float, estimated: bool, source: string}
+     *   source: 'food_measure' (medida cadastrada para o alimento), 'exact' (g/ml/kg...) ou
+     *   'generic' (medida caseira padrão, igual para qualquer alimento: estimated = true).
+     */
+    public function convertDetailed(float $amount, string $unit, ?int $foodId = null): array
+    {
+        if (!is_finite($amount) || $amount <= 0) {
             throw new InvalidArgumentException("A quantidade prescrita deve ser maior que zero (recebido: {$amount}).");
         }
 
         $normalizedUnit = mb_strtolower(trim($unit), 'UTF-8');
 
-        // 1. Tentar medida caseira específica do alimento cadastrada no banco
+        // 1. Medida caseira específica do alimento cadastrada no banco
         if ($foodId !== null && $this->db !== null) {
             $stmt = $this->db->prepare("
                 SELECT grams_equivalent 
@@ -85,14 +112,18 @@ class HouseholdMeasureConverter
             $gramsPerMeasure = $stmt->fetchColumn();
 
             if ($gramsPerMeasure !== false) {
-                return round($amount * (float)$gramsPerMeasure, 4);
+                return ['grams' => round($amount * (float)$gramsPerMeasure, 4), 'estimated' => false, 'source' => 'food_measure'];
             }
         }
 
-        // 2. Tentar tabela de medidas padrão
+        // 2. Tabela de medidas padrão
         if (array_key_exists($normalizedUnit, self::STANDARD_MEASURES)) {
-            $factor = self::STANDARD_MEASURES[$normalizedUnit];
-            return round($amount * $factor, 4);
+            $exact = in_array($normalizedUnit, self::EXACT_UNITS, true);
+            return [
+                'grams' => round($amount * self::STANDARD_MEASURES[$normalizedUnit], 4),
+                'estimated' => !$exact,
+                'source' => $exact ? 'exact' : 'generic',
+            ];
         }
 
         throw new InvalidArgumentException("Unidade de medida não reconhecida ou inválida: '{$unit}'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.");

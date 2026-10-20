@@ -3291,13 +3291,17 @@ class DashboardController
     public function createMealPlan(): void
     {
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        // O autor (e a assinatura/CRN da impressão) é sempre o profissional logado; sem fallback (code review NI2-9, A1).
+        $professionalId = $this->prescriberProfessionalId($db);
+        if ($professionalId === null) {
+            $this->denyPrescription();
+            return;
+        }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         $patientId = (int)($_POST['patient_id'] ?? 0);
         $title = trim($_POST['title'] ?? '');
         $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
-
-        $professionalId = $this->getActiveProfessionalId();
 
         try {
             $created = $service->createPlan($patientId, $professionalId, $title, $notes);
@@ -3448,6 +3452,28 @@ class DashboardController
                 <li>Alimento <strong><?= htmlspecialchars($conf['food_name']) ?></strong> possui grupo alergênico registrado: <em><?= htmlspecialchars(LabelMap::allergen($conf['allergen_group'])) ?></em>.</li>
               <?php endforeach; ?>
             </ul>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($preview['allergen_safety']['unverified_foods']) || !empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
+          <div role="status" data-testid="allergen-unverified" style="background: #fff7ed; color: #7c2d12; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fed7aa;">
+            <strong style="display: block; margin-bottom: 6px;">Alergia registrada: confira os alimentos abaixo</strong>
+            <?php if (!empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
+              <p style="margin: 0 0 6px; font-size: 0.9rem;">A alergia descrita na anamnese não corresponde a um grupo alergênico conhecido, então nenhum alimento pôde ser conferido automaticamente.</p>
+            <?php endif; ?>
+            <?php if (!empty($preview['allergen_safety']['unverified_foods'])): ?>
+              <p style="margin: 0 0 6px; font-size: 0.9rem;">Estes alimentos não têm informação de alérgenos no catálogo. A falta de informação não confirma que são seguros:</p>
+              <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+                <?php foreach ($preview['allergen_safety']['unverified_foods'] as $uf): ?>
+                  <li><?= htmlspecialchars($uf['food_name']) ?></li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+            <p style="margin: 6px 0 0; font-size: 0.85rem;">Para publicar, será preciso confirmar e justificar a prescrição.</p>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($preview['estimated_weights'])): ?>
+          <div role="note" data-testid="estimated-weights" style="background: #f8fafc; color: #334155; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; font-size: 0.85rem;">
+            <strong>Peso estimado em <?= count($preview['estimated_weights']) ?> item(ns):</strong> a medida caseira usada não está cadastrada para o alimento, então o cálculo usa um peso padrão (ex.: 1 unidade = 100 g). Prefira gramas ou uma medida cadastrada para o alimento.
           </div>
         <?php endif; ?>
 
@@ -3767,9 +3793,9 @@ class DashboardController
               Ao publicar, este plano passa a ser a <strong>prescrição ativa</strong> que o paciente vê no aplicativo. Ele vira uma nova versão numerada e não poderá mais ser editado; para mudar depois, crie uma cópia. As versões anteriores continuam no histórico.
             </p>
 
-            <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
+            <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
               <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85rem; border: 1px solid #ffeeba;">
-                <strong>⚠️ Conflito de Alérgeno:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa abaixo.
+                <strong>⚠️ <?= !empty($preview['allergen_safety']['has_conflict']) ? 'Conflito de Alérgeno' : 'Alérgenos não verificados' ?>:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa e justificar abaixo. A justificativa fica registrada na versão e na trilha de auditoria.
               </div>
             <?php endif; ?>
 
@@ -3783,12 +3809,14 @@ class DashboardController
             </div>
             <form method="POST" action="/planos/<?= $planId ?>/publicar">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
+              <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
                 <div style="margin-bottom: 16px;">
                   <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; cursor: pointer;">
                     <input type="checkbox" name="allow_allergen_override" value="1" required style="margin-top: 3px;">
                     <span>Confirmo e autorizo clinicamente a prescrição dos alimentos assinalados mesmo com os alertas detectados.</span>
                   </label>
+                  <label for="allergen-override-reason" style="display: block; font-weight: 600; margin: 10px 0 6px; font-size: 0.85rem;">Justificativa clínica *</label>
+                  <textarea id="allergen-override-reason" name="allergen_override_reason" rows="3" required minlength="10" maxlength="1000" placeholder="Ex.: rótulos conferidos com a paciente; produto sem glúten da marca X" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
                 </div>
               <?php endif; ?>
 
@@ -3820,6 +3848,10 @@ class DashboardController
 
     public function addMealToPlan(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
@@ -3841,6 +3873,10 @@ class DashboardController
 
     public function deleteMealFromPlan(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $mealId = (int)($params['mealId'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
@@ -3859,6 +3895,10 @@ class DashboardController
 
     public function addItemToPlanMeal(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $mealId = (int)($_POST['meal_id'] ?? 0);
         $foodId = (int)($_POST['food_id'] ?? 0);
@@ -3882,13 +3922,32 @@ class DashboardController
 
     private function canEditPlanItems(\PDO $db): bool
     {
-        $access = $db->prepare("SELECT 1 FROM clinic_members cm JOIN users u ON u.id = cm.user_id
+        return $this->prescriberProfessionalId($db) !== null;
+    }
+
+    /**
+     * Profissional prescritor do usuário logado nesta clínica: nutricionista ativo, membro ativo
+     * da clínica e com registro em professionals (CRN). Null = não pode prescrever.
+     * Única regra de autorização para todas as ações que alteram planos (code review NI2-9, A1).
+     */
+    private function prescriberProfessionalId(\PDO $db): ?int
+    {
+        $access = $db->prepare("SELECT pr.id FROM clinic_members cm JOIN users u ON u.id = cm.user_id
             JOIN professionals pr ON pr.user_id = u.id
             WHERE cm.clinic_id = ? AND cm.user_id = ? AND cm.status = 'active'
             AND cm.role IN ('owner', 'admin', 'nutritionist')
-            AND u.status = 'active' AND u.role = 'nutritionist'");
+            AND u.status = 'active' AND u.role = 'nutritionist'
+            AND pr.crn IS NOT NULL AND TRIM(pr.crn) <> ''
+            ORDER BY pr.id LIMIT 1");
         $access->execute([TenantContext::getClinicId(), TenantContext::getUserId()]);
-        return (bool)$access->fetchColumn();
+        $id = $access->fetchColumn();
+        return $id === false ? null : (int)$id;
+    }
+
+    private function denyPrescription(): void
+    {
+        http_response_code(403);
+        echo 'Você não tem permissão para editar prescrições. Apenas nutricionistas com CRN cadastrado na clínica podem prescrever.';
     }
 
     public function updatePlanItem(array $params): void
@@ -3920,6 +3979,10 @@ class DashboardController
 
     public function deleteItemFromPlanMeal(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $itemId = (int)($params['itemId'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
@@ -3938,6 +4001,10 @@ class DashboardController
 
     public function addSubstitutionToPlanItem(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $itemId = (int)($_POST['item_id'] ?? 0);
         $foodId = (int)($_POST['food_id'] ?? 0);
@@ -3961,6 +4028,10 @@ class DashboardController
 
     public function deleteSubstitutionFromPlan(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $subId = (int)($params['subId'] ?? 0);
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
@@ -3979,14 +4050,19 @@ class DashboardController
 
     public function publishMealPlan(array $params): void
     {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
         $planId = (int)($params['id'] ?? 0);
         $allowAllergenOverride = !empty($_POST['allow_allergen_override']);
+        $overrideReason = is_string($_POST['allergen_override_reason'] ?? null) ? trim($_POST['allergen_override_reason']) : null;
 
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $res = $service->publishPlan($planId, $allowAllergenOverride, true);
+            $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason);
             $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro na publicação: " . $e->getMessage();

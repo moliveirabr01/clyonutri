@@ -191,7 +191,7 @@ $planDetails = $mealPlanService->getPlanWithDetails($planId);
 assertJourney(abs((float)$planDetails['daily_energy_kcal'] - 553.8) < 0.2, "Totais calculados com precisão proporcional: {$planDetails['daily_energy_kcal']} kcal");
 
 // Publicar o Plano com Snapshot Imutável
-$publishResult = $mealPlanService->publishPlan($planId, true, true);
+$publishResult = $mealPlanService->publishPlan($planId, true, true, 'Alérgenos conferidos na consulta; substituições orientadas.');
 assertJourney($publishResult['status'] === 'published', "Plano alimentar publicado com sucesso");
 assertJourney($publishResult['version'] === 1, "Publicado como Versão 1 imutável");
 

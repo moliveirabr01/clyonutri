@@ -21,13 +21,67 @@ class PatientApiController
     }
 
     /**
-     * Retorna o plano alimentar ativo para o portal/app do paciente
+     * Retorna o plano alimentar ativo para o portal/app do paciente.
+     *
+     * Fonte: o snapshot imutável da versão publicada vigente (meal_plan_versions), ou seja, exatamente
+     * o que o nutricionista revisou e publicou (NI2-79). Renomear um alimento do catálogo depois da
+     * publicação não muda o que o paciente vê. Valores nutricionais são os da porção prescrita.
+     * Planos publicados sem versão gravada (dados legados/fixtures) caem na leitura das tabelas.
      */
     public function getDailyMealPlan(int $patientId): ?array
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId,$clinicId,$this->db);
 
+        $version = (new \ClyoNutri\Domain\MealPlan\MealPlanService($this->db))->getPatientPublishedPlan($patientId);
+        if ($version !== null && is_array($version['payload'] ?? null)) {
+            return $this->planFromSnapshot($version);
+        }
+
+        return $this->planFromLiveTables($patientId, $clinicId);
+    }
+
+    private function planFromSnapshot(array $version): array
+    {
+        $payload = $version['payload'];
+        $plan = array_intersect_key($payload, array_flip([
+            'id', 'clinic_id', 'patient_id', 'professional_id', 'title', 'notes', 'daily_energy_kcal',
+            'protein_g', 'carbohydrate_g', 'lipid_g', 'fiber_g', 'parent_plan_id', 'professional_name',
+        ]));
+        $plan['id'] = (int)$version['meal_plan_id'];
+        $plan['status'] = 'published';
+        $plan['version'] = (int)$version['version_number'];
+        $plan['version_number'] = (int)$version['version_number'];
+        $plan['published_at'] = $this->atom((string)$version['published_at']);
+
+        $meals = [];
+        foreach ($payload['meals'] ?? [] as $m) {
+            $items = [];
+            foreach ($m['items'] ?? [] as $it) {
+                $subs = [];
+                foreach ($it['substitutions'] ?? [] as $s) {
+                    $subs[] = self::pick($s, ['id', 'item_id', 'food_id', 'food_name', 'amount', 'measure_unit', 'notes',
+                        'energy_kcal', 'protein_g', 'carbohydrate_g', 'lipid_g', 'fiber_g', 'weight_grams', 'weight_is_estimated']);
+                }
+                $item = self::pick($it, ['id', 'meal_id', 'food_id', 'food_name', 'amount', 'measure_unit', 'notes', 'ordering',
+                    'energy_kcal', 'protein_g', 'carbohydrate_g', 'lipid_g', 'fiber_g', 'weight_grams', 'weight_is_estimated']);
+                $item['quantity'] = $it['amount'] ?? 0;
+                $item['unit'] = $it['measure_unit'] ?? 'g';
+                $item['substitutions'] = $subs;
+                $items[] = $item;
+            }
+            $meal = self::pick($m, ['id', 'meal_plan_id', 'name', 'time_of_day', 'ordering', 'notes']);
+            $meal['time'] = $m['time_of_day'] ?? '';
+            $meal['items'] = $items;
+            $meals[] = $meal;
+        }
+        $plan['meals'] = $meals;
+        return $plan;
+    }
+
+    /** Leitura legada (plano publicado sem versão gravada). Valores da porção, não por 100 g. */
+    private function planFromLiveTables(int $patientId, int $clinicId): ?array
+    {
         $stmt = $this->db->prepare("
             SELECT * FROM meal_plans
             WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND status = 'published'
@@ -40,7 +94,6 @@ class PatientApiController
             return null;
         }
 
-        // Refeições e Itens
         $mStmt = $this->db->prepare("
             SELECT * FROM meal_plan_meals WHERE meal_plan_id = :plan_id ORDER BY ordering ASC
         ");
@@ -50,7 +103,7 @@ class PatientApiController
         foreach ($meals as &$m) {
             $m['time'] = $m['time_of_day'] ?? ($m['time'] ?? '');
             $iStmt = $this->db->prepare("
-                SELECT i.*, f.name AS food_name, f.energy_kcal, f.protein_g, f.carbohydrate_g, f.lipid_g
+                SELECT i.*, f.name AS food_name
                 FROM meal_plan_items i
                 JOIN foods f ON f.id = i.food_id
                 WHERE i.meal_id = :meal_id
@@ -71,14 +124,35 @@ class PatientApiController
                 $subStmt->execute(['item_id' => $it['id']]);
                 $it['substitutions'] = $subStmt->fetchAll();
             }
+            unset($it);
             $m['items'] = $items;
         }
+        unset($m);
 
         if (!empty($plan['published_at'])) {
-            $plan['published_at'] = (new \DateTimeImmutable($plan['published_at'], new \DateTimeZone(date_default_timezone_get())))->format(DATE_ATOM);
+            $plan['published_at'] = $this->atom((string)$plan['published_at']);
         }
         $plan['meals'] = $meals;
         return $plan;
+    }
+
+    private function atom(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+        return (new \DateTimeImmutable($value, new \DateTimeZone(date_default_timezone_get())))->format(DATE_ATOM);
+    }
+
+    private static function pick(array $row, array $keys): array
+    {
+        $out = [];
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $row)) {
+                $out[$k] = $row[$k];
+            }
+        }
+        return $out;
     }
 
     public function logHydration(int $patientId, int $amountMl): array
