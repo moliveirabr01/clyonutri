@@ -97,6 +97,17 @@ $db->prepare("
     ON CONFLICT(clinic_id, user_id) DO UPDATE SET practice_preferences = excluded.practice_preferences
 ")->execute(['prefs' => $prefs]);
 
+// Autoagendamento é opt-in (NI2-433): sem configuração, a clínica 1 não aparece.
+$db->exec("DELETE FROM booking_settings WHERE clinic_id IN (1, 2)");
+$optInProbe = new BookingService($db, new DateTimeImmutable('2026-10-20 07:00:00', new DateTimeZone('America/Sao_Paulo')));
+assertCheck($optInProbe->getSettings(1)['is_enabled'] === false, "Sem configuração da clínica, autoagendamento fica desligado (opt-in)");
+assertCheck(empty($optInProbe->getAvailableSlots(1, 1, '2026-10-20', 60, 'presential')), "Desligado: nenhum horário é oferecido");
+assertCheck($optInProbe->publicProfessional(1) === null, "Desligado: profissional não aparece na página pública");
+$optInProbe->updateSettings(1, ['is_enabled' => true]);
+assertCheck($optInProbe->publicProfessional(1) !== null && $optInProbe->publicProfessional(2) === null, "Ligado só na clínica 1: profissional da clínica 2 continua fora");
+$consentTermId = (int)$db->query("SELECT id FROM consent_terms WHERE purpose_code = 'clinical_care' AND is_active = 1 ORDER BY id DESC LIMIT 1")->fetchColumn();
+assertCheck($consentTermId > 0, "Termo vigente de assistência clínica disponível para o aceite");
+
 // Limpar tabelas para testes limpos
 $db->exec("DELETE FROM booking_holds WHERE clinic_id IN (1, 2)");
 $db->exec("DELETE FROM appointments WHERE clinic_id IN (1, 2)");
@@ -263,6 +274,7 @@ try {
     $expiredBookingService->confirmBooking($holdExp['hold_token'], [
         'name' => 'Carlos Alberto',
         'email' => 'carlos@email.com',
+        'terms_accepted' => true, 'consent_term_id' => $consentTermId,
         'phone' => '(11) 97777-6666',
     ]);
 } catch (HoldExpiredException $e) {
@@ -289,6 +301,7 @@ $holdValid = $bookingService->createHold(
 $confirmed = $bookingService->confirmBooking($holdValid['hold_token'], [
     'name' => 'Beatriz Oliveira',
     'email' => 'beatriz@email.com',
+    'terms_accepted' => true, 'consent_term_id' => $consentTermId,
     'phone' => '(11) 98888-5555',
     'cpf' => '123.456.789-00',
     'notes' => 'Acompanhamento nutricional pós-bariátrica',
@@ -338,6 +351,7 @@ $holdTele = $bookingService->createHold(
 $confirmedTele = $bookingService->confirmBooking($holdTele['hold_token'], [
     'name' => 'Felipe Martins',
     'email' => 'felipe@email.com',
+    'terms_accepted' => true, 'consent_term_id' => $consentTermId,
     'phone' => '(21) 99999-1111',
 ]);
 

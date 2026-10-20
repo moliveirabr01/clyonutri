@@ -1,0 +1,74 @@
+banco: SQLite · datas: qua 2026-10-28, qui 2026-10-29, sáb 2026-10-24
+PASS Clínica sem configuração: /agendar/1 responde 404 (opt-in)
+PASS Clínica que nunca ligou: /agendar/4 responde 404
+PASS /agendar sem profissional não lista ninguém (404)
+PASS API de horários de clínica desligada: 404 BOOKING_NOT_AVAILABLE
+PASS Página da clínica B mostra só a profissional dela, sem e-mails
+PASS Nutricionista sem gestão não liga o autoagendamento (409)
+PASS Login real da dona da clínica A
+PASS Configurações mostram o agendamento online e o link /agendar/1
+PASS Sem CSRF válido a configuração é recusada (403)
+PASS Valor fora da política é recusado no servidor (422)
+PASS Dona liga o autoagendamento: persistido em booking_settings
+PASS Página pública da clínica A: só a Dra. Ana, sem outra clínica
+PASS Horários = jornada configurada (08–18, sem a pausa 12–13, de 60 em 60 min)
+PASS Duração vem do cadastro do profissional (60 min)
+PASS Sábado (dia sem atendimento) não tem horários
+PASS Recepção marca 10:00 pela agenda interna (AppointmentService)
+PASS Horário ocupado pela agenda interna some da página pública
+PASS Profissional da clínica B pedido como da clínica A: 404
+PASS Hold em horário já marcado: 409 SLOT_UNAVAILABLE
+PASS Hold na pausa: 409
+PASS Hold fora da jornada: 409
+PASS Hold fora da grade de horários: 409
+PASS Data em formato inválido: 422
+PASS Modalidade inexistente: 422
+PASS Tipo de atendimento inexistente: 422
+PASS Hold cruzando clínicas (prof. da B com clinic_id da A): 404
+PASS Hold em clínica desligada: 404
+PASS 8 pedidos simultâneos do mesmo horário: 1 reserva e 7 recusas 409
+PASS Horário em reserva some da lista para os outros
+PASS Repetição com a mesma chave devolve a mesma reserva (200, idempotente)
+PASS Página pública carrega o termo vigente de assistência clínica
+PASS Sem aceite do termo: 422 e nada é gravado
+PASS Termo de versão diferente da vigente: 422
+PASS Sem e-mail nem celular: 422
+PASS E-mail inválido: 422
+PASS Token inexistente: 422 sem detalhes
+PASS 6 confirmações simultâneas do mesmo token: exatamente 1 consulta
+PASS Respostas 200 apontam para a mesma consulta
+PASS Consulta canônica em appointments (status scheduled, 60 min, clínica e profissional certos)
+PASS Histórico auditável da consulta (null → scheduled)
+PASS Paciente nova criada na clínica A
+PASS Consentimento registrado com a versão do termo e canal self_service_booking
+PASS Hold convertido e sem dados pessoais (nome, e-mail, telefone, CPF ficam fora do hold)
+PASS Auditoria do fluxo sem dados pessoais
+PASS Horário confirmado não pode ser reservado de novo (409)
+PASS E-mail de paciente existente com outro nome NÃO anexa à ficha dela
+PASS Mesmo e-mail e mesmo nome: vincula à paciente existente
+PASS Hold vencido: 410 HOLD_EXPIRED
+PASS Horário do hold vencido volta a ficar livre
+PASS Liberar a reserva devolve o horário na hora
+PASS Recepção ocupou o horário durante o hold: confirmação recusada (409) e só 1 consulta às 10:00
+PASS Corrida recepção x paciente às 11:00: no máximo 1 consulta no horário
+PASS Corrida recepção x paciente às 13:00: no máximo 1 consulta no horário
+PASS Corrida recepção x paciente às 14:00: no máximo 1 consulta no horário
+PASS Cancelar sem sessão de paciente: 401
+PASS Paciente não cancela consulta de outra pessoa (403)
+PASS Remarcar para a pausa: recusado (409)
+PASS Remarcar para horário ocupado: recusado (409)
+PASS Remarcar para horário livre: 200 e consulta movida
+PASS Horário antigo (14:00) liberado e novo (17:00) ocupado
+PASS Paciente cancela a própria consulta (200)
+PASS Cancelar de novo: recusado (409), estado inválido
+PASS Teleconsulta desligada pela clínica: hold de teleconsulta recusado (422)
+PASS Limite de 10 reservas por IP em 10 min: a 11ª recebe 429
+PASS Navegador: lista de horários vem do servidor (sem 10:00, 11:00, 13:00, 14:00 ocupados)
+PASS Navegador: funil completo cria a consulta (qui 15:00, retorno)
+PASS Navegador: sem rolagem horizontal em 390 px
+PASS Navegador: nenhum erro de script nem bloqueio de CSP
+PASS axe WCAG 2 A/AA na página pública
+
+EVIDÊNCIAS [{"cenario":"holds simultâneos","status":[409,409,409,409,409,201,409,409]},{"cenario":"confirmações simultâneas do mesmo token","status":[200,200,200,200,200,200],"consultas_criadas":1},{"cenario":"corrida recepção x paciente 11:00","recepcao_ok":false,"paciente_status":200,"consultas":1},{"cenario":"corrida recepção x paciente 13:00","recepcao_ok":false,"paciente_status":200,"consultas":1},{"cenario":"corrida recepção x paciente 14:00","recepcao_ok":false,"paciente_status":200,"consultas":1},{"cenario":"limite de abuso","status":[201,409,409,409,409,409,409,409,409,409,429]},{"cenario":"axe /agendar/1","violacoes":[]}]
+
+NI2-433 (SQLite): 69 verificações PASS
