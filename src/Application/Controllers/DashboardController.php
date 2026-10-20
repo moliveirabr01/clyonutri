@@ -3808,13 +3808,36 @@ class DashboardController
 
         <!-- Modal Adicionar Refeição -->
         <div id="modal-add-meal" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Adicionar Refeição</h2>
             <form method="POST" action="/planos/<?= $planId ?>/refeicoes">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+
+              <?php
+                // NI2-444: uma lista só alimenta os chips e as sugestões do campo (datalist).
+                $quickMeals = [
+                    ['Café da Manhã', '07:30', '☕'], ['Colação', '10:00', '🍎'], ['Almoço', '12:30', '🍽️'],
+                    ['Lanche da Tarde', '16:00', '🥪'], ['Pré-Treino', '17:30', '⚡'], ['Pós-Treino', '19:00', '💪'],
+                    ['Jantar', '20:00', '🍲'], ['Ceia', '22:00', '🌙'],
+                ];
+              ?>
+              <!-- Sugestões rápidas pré-selecionáveis (NI2-444) -->
+              <div style="margin-bottom: 16px;">
+                <p id="quick-meal-label" style="font-weight: 600; margin: 0 0 6px; font-size: 0.875rem; color: var(--neutral-gray-700);">Sugestões rápidas (clique para preencher):</p>
+                <div role="group" aria-labelledby="quick-meal-label" style="display: flex; flex-wrap: wrap; gap: 6px;" id="quick-meal-suggestions">
+                  <?php foreach ($quickMeals as [$qmName, $qmTime, $qmIcon]): ?>
+                  <button type="button" class="btn btn-sm btn-outline quick-meal-btn" data-meal="<?= htmlspecialchars($qmName, ENT_QUOTES) ?>" data-time="<?= $qmTime ?>" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 16px;"><span aria-hidden="true"><?= $qmIcon ?></span> <?= htmlspecialchars($qmName) ?></button>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+
               <div style="margin-bottom: 16px;">
                 <label for="dc19-name" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
-                <input id="dc19-name" type="text" name="name" required placeholder="Ex: Café da Manhã, Almoço, Ceia" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <input id="dc19-name" type="text" name="name" required list="common-meals-list" placeholder="Ex: Café da Manhã, Almoço, Ceia ou digite uma personalizada" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <datalist id="common-meals-list">
+                  <?php foreach ($quickMeals as [$qmName]): ?><option value="<?= htmlspecialchars($qmName, ENT_QUOTES) ?>"><?php endforeach; ?>
+                </datalist>
+                <small style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block; margin-top: 4px;">Você pode escolher uma sugestão acima ou digitar qualquer nome personalizado livremente.</small>
               </div>
               <div style="margin-bottom: 16px;">
                 <label for="dc20-time_of_day" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Horário Sugerido (HH:MM)</label>
@@ -3995,6 +4018,33 @@ class DashboardController
           document.getElementById('add-sub-item-name').innerText = 'Substituição para o item: ' + foodName;
           window.openFoodDialog('modal-add-sub');
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+          var quickBtns = document.querySelectorAll('.quick-meal-btn');
+          var nameInput = document.getElementById('dc19-name');
+          var timeInput = document.getElementById('dc20-time_of_day');
+
+          if (timeInput) {
+            timeInput.addEventListener('input', function() { timeInput.dataset.autoFilled = '0'; });
+          }
+
+          quickBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              var mealName = this.getAttribute('data-meal');
+              var mealTime = this.getAttribute('data-time');
+              if (nameInput) {
+                nameInput.value = mealName;
+                nameInput.focus();
+              }
+              // Troca o horário se o campo está vazio ou se ele veio de outro chip;
+              // um horário digitado pelo nutricionista é preservado.
+              if (timeInput && mealTime && (!timeInput.value || timeInput.dataset.autoFilled === '1')) {
+                timeInput.value = mealTime;
+                timeInput.dataset.autoFilled = '1';
+              }
+            });
+          });
+        });
         </script>
         <?php
         $content = ob_get_clean();
