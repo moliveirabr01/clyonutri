@@ -89,15 +89,17 @@ stateDiagram-v2
 
 ## 4. Tratamento de Erros e Códigos HTTP Padronizados
 
-| Cenário | Código HTTP | Código de Erro da API | Mensagem Amigável |
-| :--- | :---: | :--- | :--- |
-| Slot indisponível ou em disputa | `409 Conflict` | `SLOT_UNAVAILABLE` | "Este horário não está mais disponível. Escolha outro horário." |
-| Hold temporário expirado | `410 Gone` | `HOLD_EXPIRED` | "Sua reserva temporária expirou. Por favor, selecione o horário novamente." |
-| Violou antecedência mínima | `422 Unprocessable Entity` | `MIN_ADVANCE_VIOLATION` | "Agendamentos devem ser realizados com pelo menos X horas de antecedência." |
-| Fora do horário de trabalho | `422 Unprocessable Entity` | `OUTSIDE_WORKING_HOURS` | "Horário fora da jornada de trabalho ou pausa do nutricionista." |
-| Tentativa de acesso cross-tenant | `403 Forbidden` | `FORBIDDEN_TENANT_ACCESS` | "Ação não autorizada para esta clínica ou paciente." |
-| Consulta não encontrada | `404 Not Found` | `APPOINTMENT_NOT_FOUND` | "Agendamento não encontrado." |
-| Limite de cancelamento violado | `422 Unprocessable Entity` | `CANCEL_POLICY_VIOLATION` | "Cancelamentos devem ser feitos com no mínimo X horas de antecedência." |
+| Cenário | HTTP | Código da API |
+| :--- | :---: | :--- |
+| Profissional inexistente, inativo, de outra clínica ou com autoagendamento desligado (opt-in) | `404` | `BOOKING_NOT_AVAILABLE` (não diz qual) |
+| Horário fora da jornada, na pausa, antes da antecedência mínima, além do limite futuro, fora da grade, ocupado ou em hold | `409` | `SLOT_UNAVAILABLE` (hold) / `SLOT_CONFLICT` (confirmação e remarcação) |
+| Hold vencido, liberado ou já fechado sem consulta | `410` | `HOLD_EXPIRED` |
+| Dados inválidos (formato de data, modalidade, tipo, e-mail, telefone, nome, termo não aceito ou de versão antiga) | `422` | `UNPROCESSABLE_ENTITY` / `INVALID_ARGUMENT` |
+| Política da clínica (cancelar/remarcar com pouca antecedência, modalidade desligada) | `422` | `POLICY_VIOLATION` / `UNPROCESSABLE_ENTITY` |
+| Consulta já cancelada/realizada, ou alterada durante a operação | `409` | `INVALID_STATE` |
+| Paciente sem sessão do app | `401` | `UNAUTHENTICATED` |
+| Paciente mexendo em consulta de outra pessoa ou clínica | `403` | `FORBIDDEN` |
+| Muitas tentativas do mesmo IP | `429` | `RATE_LIMITED` |
 
 ---
 
@@ -109,3 +111,20 @@ Todas as transições registram metadados estruturados em `appointment_status_hi
 - Estado anterior e estado posterior (`from_status` -> `to_status`).
 - Motivo legível (ex: `"Autoagendamento self-service pelo paciente (portal/web)"`, `"Reagendado pelo paciente de DD/MM/AAAA para DD/MM/AAAA. Motivo: ..."`).
 - Nenhuma informação clínica protegida (PHI/CID) é exposta em logs de agendamento.
+
+
+---
+
+## 6. Revisão de 20/10/2026 (implementação verificável)
+
+- **Opt-in:** sem linha em `booking_settings`, o autoagendamento fica desligado. A clínica liga em Configurações → Agendamento online, e só owner/admin altera.
+- **Entrada contextual:** `/agendar/{professionalId}` mostra só aquele profissional. `/agendar` sem id e profissional não apto respondem 404. Não há listagem entre clínicas.
+- **Disponibilidade real:** só a jornada configurada em Configurações. Sem configuração, não há horários (antes era inventado seg–sex 8–18). Consultas `cancelled`/`no_show` liberam o horário, como na agenda interna.
+- **O servidor decide:** a clínica vem do profissional, a duração vem do cadastro dele e o horário precisa ser um dos slots oferecidos.
+- **Concorrência:** hold, confirmação e remarcação travam o profissional (`SELECT … FOR UPDATE` no MySQL, a mesma trava da agenda interna). A confirmação toma posse do hold por `UPDATE … WHERE status='held'`.
+- **Identidade:** o paciente existente só é vinculado com e-mail **e** nome iguais; caso contrário, é criado um cadastro novo. O hold não guarda nome, e-mail, telefone nem CPF. O CPF não é coletado.
+- **Consentimento:** a confirmação exige o aceite do termo `clinical_care` vigente e grava `patient_consents` com `term_id` e `source_channel = self_service_booking`.
+- **Abuso:** limite por IP (hash), com slots 120, holds 10 e confirmações 20 a cada 10 minutos.
+- **Auditoria:** `audit_logs` com `BOOKING_HOLD_CREATED`, `BOOKING_CONFIRMED`, `BOOKING_HOLD_EXPIRED`, `BOOKING_RESCHEDULED_BY_PATIENT`, `BOOKING_CANCELLED_BY_PATIENT` e `BOOKING_SETTINGS_UPDATED`, sem dados pessoais.
+
+Evidências: `docs/evidencias/ni2-433/RELATORIO.md`.

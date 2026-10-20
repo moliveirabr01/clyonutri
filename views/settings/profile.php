@@ -65,6 +65,26 @@
 <p>Depois de salvar, novos agendamentos e alterações de horário devem respeitar esta disponibilidade. Consultas já agendadas são mantidas.</p>
 <button type="submit" class="btn btn-primary">Salvar disponibilidade</button>
 </form>
+<form class="card" method="POST" action="/configuracoes" id="booking-settings" data-testid="booking-settings">
+<h2>Agendamento online</h2>
+<p>Pacientes marcam consultas pelo seu link, só nos horários livres da disponibilidade acima. Cada horário fica reservado por alguns minutos enquanto o paciente preenche os dados; a consulta entra na sua agenda ao confirmar.</p>
+<input type="hidden" name="section" value="booking">
+<input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+<?php $bs=$bookingSettings; $dis=$canManageBooking?'':'disabled'; ?>
+<?php if(!$canManageBooking): ?><p role="note"><strong>Somente a gestão do consultório altera estas regras.</strong></p><?php endif; ?>
+<label style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600;"><input type="checkbox" name="booking_enabled" value="1" <?= !empty($bs['is_enabled'])?'checked':'' ?> <?= $dis ?>> Aceitar agendamento online</label>
+<?php if(!empty($bs['is_enabled'])&&!$bookingHasAvailability): ?><p role="alert" class="card" style="border-left: 4px solid #B45309;">Ligado, mas sem dias de atendimento configurados: o link não mostra horários. Preencha a disponibilidade semanal acima.</p><?php endif; ?>
+<fieldset style="border: 0; padding: 0; margin: 0 0 12px;"><legend class="form-label">Modalidades oferecidas</legend>
+<label style="display: inline-flex; gap: 6px; margin-right: 16px;"><input type="checkbox" name="booking_allow_presential" value="1" <?= !empty($bs['allow_presential'])?'checked':'' ?> <?= $dis ?>> Presencial</label>
+<label style="display: inline-flex; gap: 6px;"><input type="checkbox" name="booking_allow_telehealth" value="1" <?= !empty($bs['allow_telehealth'])?'checked':'' ?> <?= $dis ?>> Teleconsulta</label></fieldset>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+<?php foreach(['min_advance_hours'=>['Antecedência mínima para marcar (horas)',0,168],'max_future_days'=>['Agenda aberta até (dias à frente)',1,365],'hold_ttl_minutes'=>['Tempo de reserva do horário (minutos)',5,60],'cancel_min_advance_hours'=>['Cancelar pelo app até (horas antes)',0,168],'reschedule_min_advance_hours'=>['Remarcar pelo app até (horas antes)',0,168]] as $f=>[$lbl,$mn,$mx]): ?>
+<div class="form-group"><label class="form-label" for="booking-<?= $f ?>"><?= $lbl ?></label><input class="form-control" type="number" id="booking-<?= $f ?>" name="booking_<?= $f ?>" min="<?= $mn ?>" max="<?= $mx ?>" required value="<?= (int)$bs[$f] ?>" <?= $dis ?>></div>
+<?php endforeach; ?>
+</div>
+<?php if($bookingLink): ?><div class="form-group"><label class="form-label" for="booking-link">Seu link de agendamento</label><input class="form-control" id="booking-link" type="text" readonly value="<?= htmlspecialchars($bookingLink,ENT_QUOTES) ?>"><small><?= !empty($bs['is_enabled'])?'Envie este link aos pacientes.':'O link só funciona depois de ligar o agendamento online.' ?></small></div><?php endif; ?>
+<?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar agendamento online</button><?php endif; ?>
+</form>
 <form class="card" method="POST" action="/configuracoes">
 <h2>Alterar senha</h2>
 <input type="hidden" name="section" value="password">

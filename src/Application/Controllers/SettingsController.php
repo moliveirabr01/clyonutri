@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Domain\Booking\BookingService;
 use ClyoNutri\Domain\Settings\ProfessionalProfile;
 final class SettingsController
 {
@@ -16,6 +18,23 @@ final class SettingsController
                     $service->changePassword($_POST);$_SESSION=[];session_regenerate_id(true);$_SESSION['flash_success']='Senha alterada com sucesso. Entre com a nova senha.';header('Location: /login');return;
                 }elseif($section==='availability')$service->saveAvailability($_POST);
                 elseif($section==='profile')$service->save($_POST);
+                elseif($section==='booking'){
+                    // Política de autoagendamento é da clínica: só a gestão altera (NI2-433).
+                    if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o agendamento online.');
+                    $bookingSvc=new BookingService(Connection::getInstance());
+                    $before=$bookingSvc->getSettings(TenantContext::getClinicId());
+                    $after=$bookingSvc->updateSettings(TenantContext::getClinicId(),[
+                        'is_enabled'=>!empty($_POST['booking_enabled']),
+                        'allow_presential'=>!empty($_POST['booking_allow_presential']),
+                        'allow_telehealth'=>!empty($_POST['booking_allow_telehealth']),
+                        'min_advance_hours'=>$_POST['booking_min_advance_hours']??'',
+                        'max_future_days'=>$_POST['booking_max_future_days']??'',
+                        'hold_ttl_minutes'=>$_POST['booking_hold_ttl_minutes']??'',
+                        'cancel_min_advance_hours'=>$_POST['booking_cancel_min_advance_hours']??'',
+                        'reschedule_min_advance_hours'=>$_POST['booking_reschedule_min_advance_hours']??'',
+                    ]);
+                    (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('BOOKING_SETTINGS_UPDATED','booking_settings',(string)TenantContext::getClinicId(),['before'=>$before,'after'=>$after]);
+                }
                 else throw new \InvalidArgumentException('Selecione uma seção válida.');
                 $profile=$service->read();$success=true;
             }
@@ -47,8 +66,15 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $lastSec=$_POST['section']??'';
-            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':'Configurações atualizadas com sucesso.');
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':'Configurações atualizadas com sucesso.'));
         }
+        $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
+        $pidStmt=Connection::getInstance()->prepare('SELECT id FROM professionals WHERE user_id=?');$pidStmt->execute([TenantContext::getUserId()]);
+        $bookingProfessionalId=(int)$pidStmt->fetchColumn();
+        $bookingBase=rtrim((string)(getenv('APP_URL')?:($_ENV['APP_URL']??'')),'/');
+        $bookingLink=$bookingProfessionalId>0?$bookingBase.'/agendar/'.$bookingProfessionalId:null;
+        $bookingHasAvailability=!empty($weekly)&&count(array_filter($weekly,static fn($r)=>is_array($r)&&!empty($r['enabled'])))>0;
+        $canManageBooking=in_array($profile['member_role'],['owner','admin'],true);
         $revision=ProfessionalProfile::revision($profile);$title='Configurações';$activeNav='configuracoes';$clinicName=$_SESSION['clinic_name']??'';$userName=$_SESSION['user_name']??'';
         ob_start();require __DIR__.'/../../../views/settings/profile.php';$content=ob_get_clean();require __DIR__.'/../../../views/layouts/professional-shell.php';
     }

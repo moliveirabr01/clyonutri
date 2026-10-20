@@ -16,6 +16,12 @@ use RuntimeException;
 
 class BookingService
 {
+    /** Tipos de atendimento aceitos no autoagendamento (mesmos códigos da agenda interna). */
+    public const SERVICE_TYPES = ['first_visit', 'follow_up'];
+    public const MODALITIES = ['presential', 'telehealth'];
+    /** Status de consulta que NÃO ocupam o horário (mesma regra de AppointmentService::findConflict). */
+    private const FREEING_STATUSES = ['cancelled', 'no_show'];
+
     private PDO $db;
     private ?DateTimeImmutable $fixedNow;
     private DateTimeZone $timezone;
@@ -57,10 +63,11 @@ class BookingService
             ];
         }
 
-        // Configuração padrão
+        // Configuração padrão. O autoagendamento é OPT-IN: sem configuração explícita da clínica,
+        // nenhum profissional fica exposto na página pública (NI2-433).
         return [
             'clinic_id' => $clinicId,
-            'is_enabled' => true,
+            'is_enabled' => false,
             'min_advance_hours' => 2,
             'max_future_days' => 60,
             'hold_ttl_minutes' => 15,
@@ -79,6 +86,21 @@ class BookingService
     {
         $current = $this->getSettings($clinicId);
         $merged = array_merge($current, $data);
+        // Limites da política (validados no servidor, não só no formulário).
+        foreach ([
+            'min_advance_hours' => [0, 168], 'max_future_days' => [1, 365], 'hold_ttl_minutes' => [5, 60],
+            'cancel_min_advance_hours' => [0, 168], 'reschedule_min_advance_hours' => [0, 168],
+        ] as $field => [$min, $max]) {
+            if (!is_numeric($merged[$field]) || (int)$merged[$field] < $min || (int)$merged[$field] > $max) {
+                throw new InvalidArgumentException("Valor inválido em {$field}: use de {$min} a {$max}.");
+            }
+        }
+        foreach (['is_enabled', 'require_cpf', 'allow_telehealth', 'allow_presential'] as $flag) {
+            $merged[$flag] = filter_var($merged[$flag], FILTER_VALIDATE_BOOL);
+        }
+        if ($merged['is_enabled'] && !$merged['allow_telehealth'] && !$merged['allow_presential']) {
+            throw new InvalidArgumentException('Escolha ao menos uma modalidade (presencial ou teleconsulta).');
+        }
 
         $stmt = $this->db->prepare("
             INSERT INTO booking_settings (
@@ -154,10 +176,14 @@ class BookingService
         int $professionalId,
         string $date,
         int $durationMinutes = 60,
-        string $modality = 'presential'
+        string $modality = 'presential',
+        ?int $excludeAppointmentId = null
     ): array {
         $settings = $this->getSettings($clinicId);
         if (!$settings['is_enabled']) {
+            return [];
+        }
+        if (!$this->professionalInClinic($professionalId, $clinicId)) {
             return [];
         }
 
@@ -189,20 +215,13 @@ class BookingService
             return [];
         }
 
-        // Buscar disponibilidade semanal do profissional
+        // Disponibilidade semanal configurada pelo profissional em Configurações. Sem configuração,
+        // não há horário a oferecer: a página pública não inventa jornada (NI2-433, "horários
+        // realmente disponíveis").
         $prefs = $this->getProfessionalPreferences($clinicId, $professionalId);
         $weeklyAvail = $prefs['weekly_availability'] ?? null;
         if (empty($weeklyAvail) || !is_array($weeklyAvail)) {
-            // Se não houver configuração explícita, usa padrão seg-sex das 08:00 às 18:00 com almoço 12-13
-            $weeklyAvail = [
-                'seg' => ['enabled' => 1, 'start' => '08:00', 'end' => '18:00', 'break_start' => '12:00', 'break_end' => '13:00'],
-                'ter' => ['enabled' => 1, 'start' => '08:00', 'end' => '18:00', 'break_start' => '12:00', 'break_end' => '13:00'],
-                'qua' => ['enabled' => 1, 'start' => '08:00', 'end' => '18:00', 'break_start' => '12:00', 'break_end' => '13:00'],
-                'qui' => ['enabled' => 1, 'start' => '08:00', 'end' => '18:00', 'break_start' => '12:00', 'break_end' => '13:00'],
-                'sex' => ['enabled' => 1, 'start' => '08:00', 'end' => '18:00', 'break_start' => '12:00', 'break_end' => '13:00'],
-                'sab' => ['enabled' => 0, 'start' => '08:00', 'end' => '12:00'],
-                'dom' => ['enabled' => 0, 'start' => '08:00', 'end' => '12:00'],
-            ];
+            return [];
         }
 
         $dayIndex = (int)$requestedDate->format('N') - 1; // 0=seg, 6=dom
@@ -226,18 +245,26 @@ class BookingService
         $breakEnd = $breakEndStr ? new DateTimeImmutable($date . ' ' . $breakEndStr . ':00', $this->timezone) : null;
 
         // Buscar consultas existentes no dia
-        $apptsStmt = $this->db->prepare("
+        // Inclui consultas que começam no dia anterior (podem atravessar a meia-noite) e ignora
+        // só os status que liberam o horário, como a agenda interna.
+        $apptsSql = "
             SELECT scheduled_at, duration_minutes FROM appointments
             WHERE clinic_id = :clinic_id AND professional_id = :prof_id
-              AND scheduled_at >= :start_of_day AND scheduled_at < :end_of_day
-              AND status <> 'cancelled'
-        ");
-        $apptsStmt->execute([
+              AND scheduled_at >= :start_window AND scheduled_at < :end_of_day
+              AND status NOT IN ('cancelled', 'no_show')
+        ";
+        $apptsParams = [
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
-            'start_of_day' => $date . ' 00:00:00',
-            'end_of_day' => $date . ' 23:59:59',
-        ]);
+            'start_window' => $requestedDate->modify('-1 day')->format('Y-m-d H:i:s'),
+            'end_of_day' => $requestedDate->modify('+1 day')->format('Y-m-d H:i:s'),
+        ];
+        if ($excludeAppointmentId !== null) {
+            $apptsSql .= ' AND id <> :exclude_id';
+            $apptsParams['exclude_id'] = $excludeAppointmentId;
+        }
+        $apptsStmt = $this->db->prepare($apptsSql);
+        $apptsStmt->execute($apptsParams);
         $existingAppts = $apptsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Buscar reservas temporárias ativas no dia
@@ -245,14 +272,14 @@ class BookingService
         $holdsStmt = $this->db->prepare("
             SELECT scheduled_at, duration_minutes FROM booking_holds
             WHERE clinic_id = :clinic_id AND professional_id = :prof_id
-              AND scheduled_at >= :start_of_day AND scheduled_at < :end_of_day
+              AND scheduled_at >= :start_window AND scheduled_at < :end_of_day
               AND status = 'held' AND expires_at_utc > :now_utc
         ");
         $holdsStmt->execute([
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
-            'start_of_day' => $date . ' 00:00:00',
-            'end_of_day' => $date . ' 23:59:59',
+            'start_window' => $requestedDate->modify('-1 day')->format('Y-m-d H:i:s'),
+            'end_of_day' => $requestedDate->modify('+1 day')->format('Y-m-d H:i:s'),
             'now_utc' => $nowUtcStr,
         ]);
         $existingHolds = $holdsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -330,8 +357,64 @@ class BookingService
     }
 
     /**
-     * Cria reserva temporária com TTL (Hold).
-     * Proteção ACID com validação de concorrência anti-overbooking.
+     * Profissional apto a receber autoagendamento: usuário, vínculo e clínica ativos e
+     * autoagendamento ligado na clínica. Retorna só dados públicos (nunca e-mail).
+     */
+    public function publicProfessional(int $professionalId): ?array
+    {
+        if ($professionalId <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare("
+            SELECT p.id, cm.clinic_id, u.name, c.name AS clinic_name, c.logo_path
+            FROM professionals p
+            JOIN users u ON u.id = p.user_id
+            JOIN clinic_members cm ON cm.user_id = p.user_id
+            JOIN clinics c ON c.id = cm.clinic_id
+            WHERE p.id = :id AND u.status = 'active' AND c.status = 'active' AND cm.status = 'active'
+            LIMIT 1
+        ");
+        $stmt->execute(['id' => $professionalId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || !$this->getSettings((int)$row['clinic_id'])['is_enabled']) {
+            return null;
+        }
+        return [
+            'id' => (int)$row['id'],
+            'clinic_id' => (int)$row['clinic_id'],
+            'name' => (string)$row['name'],
+            'clinic_name' => (string)$row['clinic_name'],
+            'logo_path' => $row['logo_path'] ?? null,
+            'duration_minutes' => $this->bookingDuration((int)$row['clinic_id'], (int)$row['id']),
+        ];
+    }
+
+    /** Duração definida pelo profissional em Configurações (o paciente não escolhe). */
+    public function bookingDuration(int $clinicId, int $professionalId): int
+    {
+        $prefs = $this->getProfessionalPreferences($clinicId, $professionalId);
+        $d = (int)($prefs['default_duration_minutes'] ?? 60);
+        return max(15, min(240, $d > 0 ? $d : 60));
+    }
+
+    public static function normalizeServiceType(string $type): ?string
+    {
+        $t = strtolower(trim($type));
+        if ($t === 'followup' || $t === 'return') {
+            $t = 'follow_up';
+        }
+        return in_array($t, self::SERVICE_TYPES, true) ? $t : null;
+    }
+
+    /**
+     * Cria reserva temporária com TTL (hold).
+     *
+     * Regras (NI2-433/434):
+     * - só para profissional apto (publicProfessional) e da clínica informada;
+     * - o horário precisa ser um dos slots que o motor de disponibilidade oferece agora
+     *   (jornada, pausa, antecedência, limite futuro, consultas e holds);
+     * - dentro da transação, com o profissional travado (MySQL: FOR UPDATE, a mesma trava da
+     *   agenda interna), a colisão é verificada de novo contra consultas e holds ativos.
      */
     public function createHold(
         int $clinicId,
@@ -343,17 +426,34 @@ class BookingService
         ?string $idempotencyKey = null,
         array $patientData = []
     ): array {
+        $prof = $this->publicProfessional($professionalId);
+        if ($prof === null || $prof['clinic_id'] !== $clinicId) {
+            throw new BookingUnavailableException();
+        }
         $settings = $this->getSettings($clinicId);
-        if (!$settings['is_enabled']) {
-            throw new RuntimeException("O autoagendamento está temporariamente desabilitado para esta clínica.");
+
+        $normalizedType = self::normalizeServiceType($serviceType);
+        if ($normalizedType === null) {
+            throw new InvalidArgumentException('Tipo de atendimento inválido.');
+        }
+        if (!in_array($modality, self::MODALITIES, true)) {
+            throw new InvalidArgumentException('Modalidade inválida.');
+        }
+        if (($modality === 'telehealth' && !$settings['allow_telehealth']) || ($modality === 'presential' && !$settings['allow_presential'])) {
+            throw new InvalidArgumentException('Esta modalidade não está disponível para agendamento online.');
+        }
+        $idempotencyKey = $idempotencyKey !== null ? trim($idempotencyKey) : null;
+        if ($idempotencyKey !== null && ($idempotencyKey === '' || strlen($idempotencyKey) > 64 || !preg_match('/^[A-Za-z0-9_.:-]+$/', $idempotencyKey))) {
+            $idempotencyKey = null;
         }
 
-        $durationMinutes = max(15, min(240, $durationMinutes));
+        // A duração é a do profissional; o valor enviado pelo cliente é ignorado.
+        $durationMinutes = $prof['duration_minutes'];
         $now = $this->now();
         $nowUtcStr = gmdate('Y-m-d H:i:s', $now->getTimestamp());
 
-        // Idempotência: se já existe hold com esta chave e ainda está ativo, devolve
-        if ($idempotencyKey !== null && trim($idempotencyKey) !== '') {
+        // Idempotência: mesma chave + mesmo horário devolve o hold ativo, sem duplicar.
+        if ($idempotencyKey !== null) {
             $stmt = $this->db->prepare("
                 SELECT * FROM booking_holds
                 WHERE clinic_id = :clinic_id AND idempotency_key = :key
@@ -377,18 +477,20 @@ class BookingService
             }
         }
 
-        try {
-            $slotStart = new DateTimeImmutable($scheduledAt, $this->timezone);
-        } catch (\Exception $e) {
-            throw new InvalidArgumentException("Formato de data e hora inválido.");
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/', $scheduledAt)) {
+            throw new InvalidArgumentException('Formato de data e hora inválido. Use AAAA-MM-DD HH:MM.');
         }
-
+        try {
+            $slotStart = new DateTimeImmutable(str_replace('T', ' ', $scheduledAt), $this->timezone);
+        } catch (\Exception $e) {
+            throw new InvalidArgumentException('Formato de data e hora inválido.');
+        }
         $slotEnd = $slotStart->modify('+' . $durationMinutes . ' minutes');
 
-        // Validar antecedência mínima
-        $minAdvanceLimit = $now->modify('+' . $settings['min_advance_hours'] . ' hours');
-        if ($slotStart < $minAdvanceLimit) {
-            throw new InvalidArgumentException("Agendamentos devem ser solicitados com no mínimo {$settings['min_advance_hours']} horas de antecedência.");
+        // O horário precisa ser um dos oferecidos pelo motor de disponibilidade.
+        $offered = array_column($this->getAvailableSlots($clinicId, $professionalId, $slotStart->format('Y-m-d'), $durationMinutes, $modality), 'scheduled_at');
+        if (!in_array($slotStart->format('Y-m-d H:i:s'), $offered, true)) {
+            throw new BookingConflictException('O horário ' . $slotStart->format('d/m/Y H:i') . ' não está disponível. Escolha outro horário da lista.');
         }
 
         $ownsTransaction = false;
@@ -398,70 +500,46 @@ class BookingService
         }
 
         try {
-            // Lock de leitura no MySQL para evitar race conditions
-            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
-                $lock = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
-                $lock->execute(['id' => $professionalId]);
-            }
+            $this->lockProfessional($professionalId);
             TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
-            // 1. Checar colisão com appointments ativos
             $conflictAppt = $this->findAppointmentConflict($clinicId, $professionalId, $slotStart, $slotEnd);
             if ($conflictAppt !== null) {
-                throw new BookingConflictException(
-                    "O horário solicitado (" . $slotStart->format('d/m/Y H:i') . ") não está mais disponível.",
-                    $conflictAppt
-                );
+                throw new BookingConflictException('O horário solicitado (' . $slotStart->format('d/m/Y H:i') . ') não está mais disponível.');
             }
-
-            // 2. Checar colisão com outros holds ativos
             $conflictHold = $this->findActiveHoldConflict($clinicId, $professionalId, $slotStart, $slotEnd, $nowUtcStr);
             if ($conflictHold !== null) {
-                throw new BookingConflictException(
-                    "O horário solicitado (" . $slotStart->format('d/m/Y H:i') . ") está reservado temporariamente por outro paciente. Tente novamente em instantes.",
-                    $conflictHold
-                );
+                throw new BookingConflictException('O horário solicitado (' . $slotStart->format('d/m/Y H:i') . ') está reservado temporariamente por outra pessoa. Tente outro horário ou aguarde alguns minutos.');
             }
 
-            // Gerar token seguro de 64 caracteres hex
             $holdToken = bin2hex(random_bytes(32));
             $ttlMinutes = max(5, min(60, $settings['hold_ttl_minutes']));
-            $expiresAtTimestamp = $now->getTimestamp() + ($ttlMinutes * 60);
-            $expiresAtUtc = gmdate('Y-m-d H:i:s', $expiresAtTimestamp);
+            $expiresAtUtc = gmdate('Y-m-d H:i:s', $now->getTimestamp() + ($ttlMinutes * 60));
 
             $stmt = $this->db->prepare("
                 INSERT INTO booking_holds (
                     clinic_id, professional_id, patient_id, hold_token, idempotency_key,
                     scheduled_at, duration_minutes, service_type, modality, status,
-                    expires_at_utc, patient_name, patient_email, patient_phone, patient_cpf,
-                    patient_notes, payment_status, created_at, updated_at
+                    expires_at_utc, payment_status, created_at, updated_at
                 ) VALUES (
-                    :clinic_id, :prof_id, :patient_id, :hold_token, :idempotency_key,
+                    :clinic_id, :prof_id, NULL, :hold_token, :idempotency_key,
                     :scheduled_at, :duration, :service_type, :modality, 'held',
-                    :expires_at_utc, :name, :email, :phone, :cpf,
-                    :notes, 'not_required', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    :expires_at_utc, 'not_required', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 )
             ");
-
             $stmt->execute([
                 'clinic_id' => $clinicId,
                 'prof_id' => $professionalId,
-                'patient_id' => !empty($patientData['patient_id']) ? (int)$patientData['patient_id'] : null,
                 'hold_token' => $holdToken,
-                'idempotency_key' => $idempotencyKey ?: null,
+                'idempotency_key' => $idempotencyKey,
                 'scheduled_at' => $slotStart->format('Y-m-d H:i:s'),
                 'duration' => $durationMinutes,
-                'service_type' => $serviceType,
+                'service_type' => $normalizedType,
                 'modality' => $modality,
                 'expires_at_utc' => $expiresAtUtc,
-                'name' => $patientData['name'] ?? null,
-                'email' => $patientData['email'] ?? null,
-                'phone' => $patientData['phone'] ?? null,
-                'cpf' => $patientData['cpf'] ?? null,
-                'notes' => $patientData['notes'] ?? null,
             ]);
-
             $holdId = (int)$this->db->lastInsertId();
+            $this->audit($clinicId, 'BOOKING_HOLD_CREATED', (string)$holdId, ['modality' => $modality, 'service_type' => $normalizedType]);
 
             if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->commit();
@@ -486,12 +564,28 @@ class BookingService
     }
 
     /**
-     * Confirma a reserva temporária e converte atomicamente em agendamento canônico (appointments).
+     * Confirma a reserva e cria o agendamento canônico (appointments) na mesma transação.
+     *
+     * Contra concorrência: o profissional é travado (MySQL: FOR UPDATE) e o hold passa de
+     * 'held' para 'converted' por UPDATE condicional. Duas confirmações simultâneas do mesmo
+     * token criam uma única consulta; a segunda recebe a mesma consulta (idempotente).
      */
     public function confirmBooking(string $holdToken, array $confirmationData): array
     {
+        if (!preg_match('/^[a-f0-9]{64}$/', $holdToken)) {
+            throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
+        }
+        $patient = $this->validatedPatientData($confirmationData);
+        $termId = $this->acceptedClinicalCareTerm($confirmationData);
         $now = $this->now();
         $nowUtcStr = gmdate('Y-m-d H:i:s', $now->getTimestamp());
+
+        $peek = $this->db->prepare('SELECT professional_id FROM booking_holds WHERE hold_token = :token LIMIT 1');
+        $peek->execute(['token' => $holdToken]);
+        $professionalId = $peek->fetchColumn();
+        if ($professionalId === false) {
+            throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
+        }
 
         $ownsTransaction = false;
         if (!$this->db->inTransaction()) {
@@ -500,16 +594,24 @@ class BookingService
         }
 
         try {
-            $stmt = $this->db->prepare("SELECT * FROM booking_holds WHERE hold_token = :token LIMIT 1");
+            // Mesma ordem de travas da agenda interna e do createHold: profissional primeiro.
+            $this->lockProfessional((int)$professionalId);
+
+            $sel = 'SELECT * FROM booking_holds WHERE hold_token = :token LIMIT 1';
+            if ($this->isMysql()) {
+                $sel .= ' FOR UPDATE';
+            }
+            $stmt = $this->db->prepare($sel);
             $stmt->execute(['token' => $holdToken]);
             $hold = $stmt->fetch(PDO::FETCH_ASSOC);
-
             if (!$hold) {
-                throw new InvalidArgumentException("Reserva não encontrada ou token inválido.");
+                throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
             }
 
             if ($hold['status'] === 'converted') {
-                // Já confirmada: idempotência
+                if ($ownsTransaction && $this->db->inTransaction()) {
+                    $this->db->commit();
+                }
                 return [
                     'success' => true,
                     'already_confirmed' => true,
@@ -518,58 +620,51 @@ class BookingService
                     'status' => 'scheduled',
                 ];
             }
-
             if ($hold['status'] !== 'held') {
-                throw new RuntimeException("Esta reserva não pode ser confirmada porque seu status é '{$hold['status']}'.");
+                throw new HoldExpiredException('Esta reserva não está mais ativa. Selecione o horário novamente.');
             }
-
-            // Verificar se o TTL expirou
-            if ($hold['expires_at_utc'] <= $nowUtcStr) {
-                $up = $this->db->prepare("UPDATE booking_holds SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = :id");
-                $up->execute(['id' => $hold['id']]);
+            if ((string)$hold['expires_at_utc'] <= $nowUtcStr) {
+                $this->db->prepare("UPDATE booking_holds SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND status = 'held'")
+                    ->execute(['id' => $hold['id']]);
+                $this->audit((int)$hold['clinic_id'], 'BOOKING_HOLD_EXPIRED', (string)$hold['id'], null);
                 if ($ownsTransaction && $this->db->inTransaction()) {
                     $this->db->commit();
                 }
                 throw new HoldExpiredException();
             }
 
+            // Toma posse do hold. rowCount 0 = outra requisição chegou antes.
+            $claim = $this->db->prepare("UPDATE booking_holds SET status = 'converted', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND status = 'held'");
+            $claim->execute(['id' => $hold['id']]);
+            if ($claim->rowCount() !== 1) {
+                throw new BookingConflictException('Esta reserva já está sendo confirmada. Atualize a página.');
+            }
+
             $clinicId = (int)$hold['clinic_id'];
-            $professionalId = (int)$hold['professional_id'];
             $scheduledAt = (string)$hold['scheduled_at'];
             $durationMinutes = (int)$hold['duration_minutes'];
             $modality = (string)$hold['modality'];
             $serviceType = (string)$hold['service_type'];
-
             $slotStart = new DateTimeImmutable($scheduledAt, $this->timezone);
             $slotEnd = $slotStart->modify('+' . $durationMinutes . ' minutes');
 
-            // Re-checar colisão contra appointments
-            $conflictAppt = $this->findAppointmentConflict($clinicId, $professionalId, $slotStart, $slotEnd);
-            if ($conflictAppt !== null) {
-                throw new BookingConflictException("Conflito detectado no fechamento da vaga: o horário foi ocupado.", $conflictAppt);
+            // A agenda interna pode ter ocupado o horário durante o hold.
+            if ($this->findAppointmentConflict($clinicId, (int)$professionalId, $slotStart, $slotEnd) !== null) {
+                throw new BookingConflictException('O horário foi ocupado enquanto você preenchia os dados. Escolha outro horário.');
             }
 
-            // Identificar ou criar o paciente na clínica
-            $patientName = trim((string)($confirmationData['name'] ?? ($hold['patient_name'] ?? '')));
-            $patientEmail = trim((string)($confirmationData['email'] ?? ($hold['patient_email'] ?? '')));
-            $patientPhone = trim((string)($confirmationData['phone'] ?? ($hold['patient_phone'] ?? '')));
-            $patientCpf = trim((string)($confirmationData['cpf'] ?? ($hold['patient_cpf'] ?? '')));
-            $patientNotes = trim((string)($confirmationData['notes'] ?? ($hold['patient_notes'] ?? '')));
+            $patientId = $this->findOrCreatePatient($clinicId, $patient['name'], $patient['email'], $patient['phone']);
+            // Consentimento para assistência clínica, com a versão do termo que o paciente viu.
+            $this->db->prepare("
+                INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, term_id, source_channel, user_agent)
+                VALUES (:c, :p, 'clinical_care', 1, :ip, :at, :t, 'self_service_booking', :ua)
+            ")->execute([
+                'c' => $clinicId, 'p' => $patientId, 'ip' => ($_SERVER['REMOTE_ADDR'] ?? null), 'at' => $now->format('Y-m-d H:i:s'),
+                't' => $termId, 'ua' => mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null,
+            ]);
+            $apptType = $modality === 'telehealth' ? 'telehealth' : $serviceType;
 
-            if ($patientName === '') {
-                throw new InvalidArgumentException("O nome do paciente é obrigatório para confirmar o agendamento.");
-            }
-
-            $patientId = !empty($hold['patient_id']) ? (int)$hold['patient_id'] : null;
-
-            if ($patientId === null) {
-                $patientId = $this->findOrCreatePatient($clinicId, $patientName, $patientEmail, $patientPhone, $patientCpf);
-            }
-
-            $apptType = ($modality === 'telehealth' || TeleconsultationService::isOnlineType($serviceType)) ? 'telehealth' : $serviceType;
-
-            // Inserir agendamento canônico na tabela appointments
-            $apptStmt = $this->db->prepare("
+            $this->db->prepare("
                 INSERT INTO appointments (
                     clinic_id, patient_id, professional_id, scheduled_at,
                     duration_minutes, status, type, notes, created_at, updated_at
@@ -577,69 +672,41 @@ class BookingService
                     :clinic_id, :patient_id, :prof_id, :scheduled_at,
                     :duration, 'scheduled', :type, :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 )
-            ");
-            $apptStmt->execute([
+            ")->execute([
                 'clinic_id' => $clinicId,
                 'patient_id' => $patientId,
-                'prof_id' => $professionalId,
+                'prof_id' => (int)$professionalId,
                 'scheduled_at' => $scheduledAt,
                 'duration' => $durationMinutes,
                 'type' => $apptType,
-                'notes' => $patientNotes !== '' ? $patientNotes : 'Autoagendamento via portal web ClyoNutri',
+                'notes' => $patient['notes'] !== '' ? $patient['notes'] : 'Autoagendamento online pelo paciente',
             ]);
             $appointmentId = (int)$this->db->lastInsertId();
 
-            // Gravar histórico de auditoria
-            $histStmt = $this->db->prepare("
-                INSERT INTO appointment_status_history (
-                    clinic_id, appointment_id, from_status, to_status, notes, created_at
-                ) VALUES (
-                    :clinic_id, :appt_id, NULL, 'scheduled', 'Autoagendamento self-service pelo paciente (portal/web)', CURRENT_TIMESTAMP
-                )
-            ");
-            $histStmt->execute([
-                'clinic_id' => $clinicId,
-                'appt_id' => $appointmentId,
-            ]);
+            $this->db->prepare("
+                INSERT INTO appointment_status_history (clinic_id, appointment_id, from_status, to_status, notes, created_at)
+                VALUES (:clinic_id, :appt_id, NULL, 'scheduled', 'Autoagendamento self-service pelo paciente (portal/web)', CURRENT_TIMESTAMP)
+            ")->execute(['clinic_id' => $clinicId, 'appt_id' => $appointmentId]);
 
-            // Se for teleconsulta, inicializar a sessão canônica
             $teleSessionId = null;
-            if ($modality === 'telehealth' || TeleconsultationService::isOnlineType($apptType)) {
+            if ($modality === 'telehealth') {
                 try {
-                    $teleService = new TeleconsultationService($this->db, null, null, $now);
-                    $session = $teleService->scheduleSession($appointmentId, $professionalId, $clinicId);
-                    $teleSessionId = (int)($session['session_id'] ?? 0);
+                    $session = (new TeleconsultationService($this->db, null, null, $now))->scheduleSession($appointmentId, (int)$professionalId, $clinicId);
+                    $teleSessionId = (int)($session['session_id'] ?? 0) ?: null;
                 } catch (\Throwable $e) {
-                    // Log interno; o agendamento não falha se a teleconsulta for preparada em seguida
+                    // A sala pode ser preparada depois pela agenda; a consulta continua confirmada.
+                    error_log('[ClyoNutri][booking] teleconsulta não preparada para a consulta #' . $appointmentId . ': ' . get_class($e));
                 }
             }
 
-            // Atualizar hold para 'converted'
-            $upHold = $this->db->prepare("
-                UPDATE booking_holds
-                SET status = 'converted',
-                    appointment_id = :appt_id,
-                    patient_id = :patient_id,
-                    patient_name = :name,
-                    patient_email = :email,
-                    patient_phone = :phone,
-                    patient_cpf = :cpf,
-                    patient_notes = :notes,
-                    teleconsultation_session_id = :tele_id,
-                    updated_at = CURRENT_TIMESTAMP
+            // Dados pessoais vão para o cadastro do paciente; o hold guarda só o vínculo.
+            $this->db->prepare("
+                UPDATE booking_holds SET appointment_id = :appt_id, patient_id = :patient_id,
+                    teleconsultation_session_id = :tele_id, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
-            ");
-            $upHold->execute([
-                'appt_id' => $appointmentId,
-                'patient_id' => $patientId,
-                'name' => $patientName,
-                'email' => $patientEmail,
-                'phone' => $patientPhone,
-                'cpf' => $patientCpf,
-                'notes' => $patientNotes,
-                'tele_id' => $teleSessionId,
-                'id' => $hold['id'],
-            ]);
+            ")->execute(['appt_id' => $appointmentId, 'patient_id' => $patientId, 'tele_id' => $teleSessionId, 'id' => $hold['id']]);
+
+            $this->audit($clinicId, 'BOOKING_CONFIRMED', (string)$appointmentId, ['hold_id' => (int)$hold['id'], 'modality' => $modality, 'service_type' => $serviceType]);
 
             if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->commit();
@@ -661,6 +728,56 @@ class BookingService
             }
             throw $e;
         }
+    }
+
+    /** Termo vigente de assistência clínica (o mesmo do cadastro feito pelo consultório). */
+    public function activeClinicalCareTerm(): ?array
+    {
+        $row = $this->db->query("SELECT id, version, title FROM consent_terms WHERE purpose_code = 'clinical_care' AND is_active = 1 ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /** Exige aceite explícito do termo vigente; versão diferente (página antiga) é recusada. */
+    private function acceptedClinicalCareTerm(array $in): int
+    {
+        $accepted = filter_var($in['terms_accepted'] ?? false, FILTER_VALIDATE_BOOL);
+        $term = $this->activeClinicalCareTerm();
+        if ($term === null) {
+            throw new RuntimeException('Termo de consentimento indisponível. Agendamento online temporariamente suspenso.');
+        }
+        if (!$accepted) {
+            throw new InvalidArgumentException('Para agendar, é preciso aceitar o termo de uso dos dados para a assistência nutricional.');
+        }
+        if ((int)($in['consent_term_id'] ?? 0) !== (int)$term['id']) {
+            throw new InvalidArgumentException('O termo de consentimento foi atualizado. Recarregue a página e leia a versão vigente.');
+        }
+        return (int)$term['id'];
+    }
+
+    /** Nome obrigatório e ao menos um contato válido; tamanhos limitados (dados mínimos). */
+    private function validatedPatientData(array $in): array
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', (string)($in['name'] ?? '')) ?? '');
+        $email = strtolower(trim((string)($in['email'] ?? '')));
+        $phone = trim((string)($in['phone'] ?? ''));
+        $notes = trim((string)($in['notes'] ?? ''));
+        if (mb_strlen($name) < 3 || mb_strlen($name) > 150) {
+            throw new InvalidArgumentException('Informe o nome completo (3 a 150 caracteres).');
+        }
+        if ($email !== '' && (strlen($email) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL))) {
+            throw new InvalidArgumentException('E-mail inválido.');
+        }
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+        if ($phone !== '' && (strlen($digits) < 10 || strlen($digits) > 15)) {
+            throw new InvalidArgumentException('Telefone inválido. Informe DDD e número.');
+        }
+        if ($email === '' && $phone === '') {
+            throw new InvalidArgumentException('Informe e-mail ou celular para receber a confirmação.');
+        }
+        if (mb_strlen($notes) > 500) {
+            throw new InvalidArgumentException('A observação pode ter até 500 caracteres.');
+        }
+        return ['name' => $name, 'email' => $email, 'phone' => $phone, 'notes' => $notes];
     }
 
     /**
@@ -710,9 +827,13 @@ class BookingService
         $stmt = $this->db->prepare("
             UPDATE appointments
             SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
+            WHERE id = :id AND clinic_id = :clinic_id AND status = :status
         ");
-        $stmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId]);
+        $stmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId, 'status' => $appt['status']]);
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException('A consulta mudou enquanto o cancelamento era feito. Atualize e tente de novo.');
+        }
+        $this->audit($clinicId, 'BOOKING_CANCELLED_BY_PATIENT', (string)$appointmentId, null);
 
         // Registrar no histórico de status
         $hist = $this->db->prepare("
@@ -770,40 +891,77 @@ class BookingService
             throw new InvalidArgumentException("Reagendamentos self-service devem ser solicitados com no mínimo {$minAdvanceHours} horas de antecedência.");
         }
 
-        $newStart = new DateTimeImmutable($newScheduledAt, $this->timezone);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/', $newScheduledAt)) {
+            throw new InvalidArgumentException('Formato de data e hora inválido. Use AAAA-MM-DD HH:MM.');
+        }
+        $newStart = new DateTimeImmutable(str_replace('T', ' ', $newScheduledAt), $this->timezone);
         $duration = (int)($appt['duration_minutes'] ?? 60);
         $newEnd = $newStart->modify('+' . $duration . ' minutes');
+        $professionalId = (int)$appt['professional_id'];
+        if ($newStart->format('Y-m-d H:i:s') === (new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone))->format('Y-m-d H:i:s')) {
+            throw new InvalidArgumentException('O novo horário é igual ao atual.');
+        }
+        $apptModality = TeleconsultationService::isOnlineType((string)($appt['type'] ?? '')) ? 'telehealth' : 'presential';
 
-        // Checar conflitos no novo horário excluindo a consulta atual
-        $conflict = $this->findAppointmentConflict($clinicId, (int)$appt['professional_id'], $newStart, $newEnd, $appointmentId);
-        if ($conflict !== null) {
-            throw new BookingConflictException("O novo horário solicitado (" . $newStart->format('d/m/Y H:i') . ") já está ocupado.", $conflict);
+        // O novo horário precisa estar na disponibilidade real (jornada, pausa, antecedência),
+        // desconsiderando a própria consulta.
+        $offered = array_column($this->getAvailableSlots($clinicId, $professionalId, $newStart->format('Y-m-d'), $duration, $apptModality, $appointmentId), 'scheduled_at');
+        if (!in_array($newStart->format('Y-m-d H:i:s'), $offered, true)) {
+            throw new BookingConflictException('O novo horário (' . $newStart->format('d/m/Y H:i') . ') não está disponível.');
         }
 
-        $stmt = $this->db->prepare("
-            UPDATE appointments
-            SET scheduled_at = :new_time, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
-        ");
-        $stmt->execute([
-            'new_time' => $newStart->format('Y-m-d H:i:s'),
-            'id' => $appointmentId,
-            'clinic_id' => $clinicId,
-        ]);
+        $ownsTransaction = false;
+        if (!$this->db->inTransaction()) {
+            $this->db->beginTransaction();
+            $ownsTransaction = true;
+        }
+        try {
+            $this->lockProfessional($professionalId);
+            $nowUtcStr = gmdate('Y-m-d H:i:s', $this->now()->getTimestamp());
+            if ($this->findAppointmentConflict($clinicId, $professionalId, $newStart, $newEnd, $appointmentId) !== null
+                || $this->findActiveHoldConflict($clinicId, $professionalId, $newStart, $newEnd, $nowUtcStr) !== null) {
+                throw new BookingConflictException('O novo horário solicitado (' . $newStart->format('d/m/Y H:i') . ') já está ocupado.');
+            }
 
-        $hist = $this->db->prepare("
-            INSERT INTO appointment_status_history (
-                clinic_id, appointment_id, from_status, to_status, notes, created_at
-            ) VALUES (
-                :clinic_id, :appt_id, :from_status, :from_status, :notes, CURRENT_TIMESTAMP
-            )
-        ");
-        $hist->execute([
-            'clinic_id' => $clinicId,
-            'appt_id' => $appointmentId,
-            'from_status' => $appt['status'],
-            'notes' => 'Reagendado pelo paciente de ' . date('d/m/Y H:i', strtotime((string)$appt['scheduled_at'])) . ' para ' . $newStart->format('d/m/Y H:i') . '. Motivo: ' . mb_substr(trim($reason), 0, 300),
-        ]);
+            $stmt = $this->db->prepare("
+                UPDATE appointments
+                SET scheduled_at = :new_time, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND clinic_id = :clinic_id AND status = :status
+            ");
+            $stmt->execute([
+                'new_time' => $newStart->format('Y-m-d H:i:s'),
+                'id' => $appointmentId,
+                'clinic_id' => $clinicId,
+                'status' => $appt['status'],
+            ]);
+            if ($stmt->rowCount() !== 1) {
+                throw new BookingConflictException('A consulta mudou enquanto o reagendamento era feito. Atualize e tente de novo.');
+            }
+
+            $hist = $this->db->prepare("
+                INSERT INTO appointment_status_history (
+                    clinic_id, appointment_id, from_status, to_status, notes, created_at
+                ) VALUES (
+                    :clinic_id, :appt_id, :from_status, :to_status, :notes, CURRENT_TIMESTAMP
+                )
+            ");
+            $hist->execute([
+                'clinic_id' => $clinicId,
+                'appt_id' => $appointmentId,
+                'from_status' => $appt['status'],
+                'to_status' => $appt['status'],
+                'notes' => 'Reagendado pelo paciente de ' . (new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone))->format('d/m/Y H:i') . ' para ' . $newStart->format('d/m/Y H:i') . '. Motivo: ' . mb_substr(trim($reason), 0, 300),
+            ]);
+            $this->audit($clinicId, 'BOOKING_RESCHEDULED_BY_PATIENT', (string)$appointmentId, null);
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
 
         return [
             'success' => true,
@@ -830,6 +988,51 @@ class BookingService
         return json_decode((string)($json ?: '{}'), true) ?: [];
     }
 
+    private function isMysql(): bool
+    {
+        return $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
+    }
+
+    /** Mesma trava da agenda interna (AppointmentService): serializa marcações do profissional. */
+    private function lockProfessional(int $professionalId): void
+    {
+        if ($this->isMysql()) {
+            $this->db->prepare('SELECT id FROM professionals WHERE id = :id FOR UPDATE')->execute(['id' => $professionalId]);
+        }
+    }
+
+    private function professionalInClinic(int $professionalId, int $clinicId): bool
+    {
+        $stmt = $this->db->prepare("
+            SELECT 1 FROM professionals p JOIN clinic_members cm ON cm.user_id = p.user_id
+            WHERE p.id = :p AND cm.clinic_id = :c AND cm.status = 'active' LIMIT 1
+        ");
+        $stmt->execute(['p' => $professionalId, 'c' => $clinicId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /** Auditoria sem dados pessoais (só ids e categorias). */
+    private function audit(int $clinicId, string $action, ?string $resourceId, ?array $details): void
+    {
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        $this->db->prepare("
+            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details)
+            VALUES (:clinic_id, NULL, :action, 'booking', :rid, :ip, :ua, :details)
+        ")->execute([
+            'clinic_id' => $clinicId,
+            'action' => $action,
+            'rid' => $resourceId,
+            'ip' => $ip !== '' ? $ip : null,
+            'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? 'CLI/Internal'), 0, 255),
+            'details' => $details ? json_encode($details, JSON_UNESCAPED_UNICODE) : null,
+        ]);
+    }
+
+    private function ts(string $localDateTime): int
+    {
+        return (new DateTimeImmutable($localDateTime, $this->timezone))->getTimestamp();
+    }
+
     private function findAppointmentConflict(
         int $clinicId,
         int $professionalId,
@@ -837,35 +1040,36 @@ class BookingService
         DateTimeImmutable $slotEnd,
         ?int $excludeAppointmentId = null
     ): ?array {
+        // Janela de um dia antes do início (consultas longas) até o fim do slot.
         $sql = "
-            SELECT a.id, a.scheduled_at, a.duration_minutes, p.name AS patient_name
+            SELECT a.id, a.scheduled_at, a.duration_minutes
             FROM appointments a
-            LEFT JOIN patients p ON p.id = a.patient_id
             WHERE a.clinic_id = :clinic_id AND a.professional_id = :prof_id
-              AND a.status <> 'cancelled'
+              AND a.scheduled_at >= :window_start AND a.scheduled_at < :slot_end
+              AND a.status NOT IN ('cancelled', 'no_show')
         ";
-        $params = ['clinic_id' => $clinicId, 'prof_id' => $professionalId];
-
+        $params = [
+            'clinic_id' => $clinicId,
+            'prof_id' => $professionalId,
+            'window_start' => $slotStart->modify('-1 day')->format('Y-m-d H:i:s'),
+            'slot_end' => $slotEnd->format('Y-m-d H:i:s'),
+        ];
         if ($excludeAppointmentId !== null) {
-            $sql .= " AND a.id <> :exclude_id";
+            $sql .= ' AND a.id <> :exclude_id';
             $params['exclude_id'] = $excludeAppointmentId;
         }
-
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
         $startTs = $slotStart->getTimestamp();
         $endTs = $slotEnd->getTimestamp();
-
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $apptStartTs = strtotime((string)$row['scheduled_at']);
-            $apptEndTs = $apptStartTs + ((int)($row['duration_minutes'] ?? 60) * 60);
-
+            $apptStartTs = $this->ts((string)$row['scheduled_at']);
+            $apptEndTs = $apptStartTs + (max(15, (int)($row['duration_minutes'] ?? 60)) * 60);
             if ($startTs < $apptEndTs && $endTs > $apptStartTs) {
                 return $row;
             }
         }
-
         return null;
     }
 
@@ -877,72 +1081,69 @@ class BookingService
         string $nowUtcStr
     ): ?array {
         $stmt = $this->db->prepare("
-            SELECT id, scheduled_at, duration_minutes, hold_token
+            SELECT id, scheduled_at, duration_minutes
             FROM booking_holds
             WHERE clinic_id = :clinic_id AND professional_id = :prof_id
               AND status = 'held' AND expires_at_utc > :now_utc
+              AND scheduled_at >= :window_start AND scheduled_at < :slot_end
         ");
         $stmt->execute([
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
             'now_utc' => $nowUtcStr,
+            'window_start' => $slotStart->modify('-1 day')->format('Y-m-d H:i:s'),
+            'slot_end' => $slotEnd->format('Y-m-d H:i:s'),
         ]);
-
         $startTs = $slotStart->getTimestamp();
         $endTs = $slotEnd->getTimestamp();
-
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $holdStartTs = strtotime((string)$row['scheduled_at']);
-            $holdEndTs = $holdStartTs + ((int)($row['duration_minutes'] ?? 60) * 60);
-
+            $holdStartTs = $this->ts((string)$row['scheduled_at']);
+            $holdEndTs = $holdStartTs + (max(15, (int)($row['duration_minutes'] ?? 60)) * 60);
             if ($startTs < $holdEndTs && $endTs > $holdStartTs) {
                 return $row;
             }
         }
-
         return null;
     }
 
-    private function findOrCreatePatient(
-        int $clinicId,
-        string $name,
-        string $email,
-        string $phone,
-        string $cpf
-    ): int {
-        // Tentar localizar paciente existente na mesma clínica por email ou telefone
+    /**
+     * Vincula ao paciente existente da clínica só quando e-mail E nome conferem (evita que um
+     * visitante anexe a consulta ao prontuário de outra pessoa digitando só o e-mail dela).
+     * Caso contrário, cria um cadastro novo, marcado como vindo do autoagendamento.
+     */
+    private function findOrCreatePatient(int $clinicId, string $name, string $email, string $phone): int
+    {
         if ($email !== '') {
-            $stmt = $this->db->prepare("SELECT id FROM patients WHERE clinic_id = :clinic_id AND LOWER(email) = LOWER(:email) LIMIT 1");
+            $stmt = $this->db->prepare('SELECT id, name FROM patients WHERE clinic_id = :clinic_id AND LOWER(email) = :email');
             $stmt->execute(['clinic_id' => $clinicId, 'email' => $email]);
-            $id = $stmt->fetchColumn();
-            if ($id) return (int)$id;
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (self::sameName((string)$row['name'], $name)) {
+                    return (int)$row['id'];
+                }
+            }
         }
 
-        if ($phone !== '') {
-            $stmt = $this->db->prepare("SELECT id FROM patients WHERE clinic_id = :clinic_id AND phone = :phone LIMIT 1");
-            $stmt->execute(['clinic_id' => $clinicId, 'phone' => $phone]);
-            $id = $stmt->fetchColumn();
-            if ($id) return (int)$id;
-        }
-
-        $cleanCpf = preg_replace('/\D/', '', $cpf);
-        $patientNotes = $cleanCpf !== '' ? 'CPF: ' . $cleanCpf : null;
-        $uuid = bin2hex(random_bytes(16));
-
-        // Criar novo paciente
-        $insert = $this->db->prepare("
+        $this->db->prepare("
             INSERT INTO patients (clinic_id, uuid, name, email, phone, status, notes, created_at, updated_at)
             VALUES (:clinic_id, :uuid, :name, :email, :phone, 'active', :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ");
-        $insert->execute([
+        ")->execute([
             'clinic_id' => $clinicId,
-            'uuid' => $uuid,
+            'uuid' => bin2hex(random_bytes(16)),
             'name' => $name,
             'email' => $email !== '' ? $email : null,
             'phone' => $phone !== '' ? $phone : null,
-            'notes' => $patientNotes,
+            'notes' => 'Cadastro criado pelo autoagendamento online. Confirme os dados na primeira consulta.',
         ]);
-
         return (int)$this->db->lastInsertId();
+    }
+
+    public static function sameName(string $a, string $b): bool
+    {
+        $norm = static function (string $s): string {
+            $s = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $s) ?? ''));
+            $t = class_exists(\Normalizer::class) ? \Normalizer::normalize($s, \Normalizer::FORM_D) : $s;
+            return preg_replace('/\p{Mn}+/u', '', (string)$t) ?? $s;
+        };
+        return $norm($a) !== '' && $norm($a) === $norm($b);
     }
 }

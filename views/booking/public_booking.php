@@ -12,7 +12,6 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agendar Consulta — ClyoNutri</title>
-  <link rel="stylesheet" href="/assets/css/design-system.css">
   <style>
     body {
       margin: 0;
@@ -68,12 +67,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       padding: 8px 4px;
       font-size: 0.85rem;
       font-weight: 600;
-      color: #94a3b8;
+      color: #475569;
       border-bottom: 3px solid #e2e8f0;
     }
     .step-pill.active {
-      color: #ea580c;
-      border-bottom-color: #ea580c;
+      color: #c2410c;
+      border-bottom-color: #c2410c;
     }
     .step-pill.completed {
       color: #16a34a;
@@ -99,7 +98,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     }
     .form-control:focus {
       outline: none;
-      border-color: #ea580c;
+      border-color: #c2410c;
       box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
     }
     .modality-picker {
@@ -120,7 +119,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       border-color: #fdba74;
     }
     .modality-card.selected {
-      border-color: #ea580c;
+      border-color: #c2410c;
       background: #fff7ed;
     }
     .slots-grid {
@@ -144,14 +143,14 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       transition: all 0.15s ease;
     }
     .slot-btn:hover {
-      background: #ea580c;
+      background: #c2410c;
       color: #fff;
-      border-color: #ea580c;
+      border-color: #c2410c;
     }
     .slot-btn.selected {
-      background: #ea580c;
+      background: #c2410c;
       color: #fff;
-      border-color: #ea580c;
+      border-color: #c2410c;
     }
     .hold-banner {
       background: #fef3c7;
@@ -174,7 +173,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     .btn-submit {
       width: 100%;
       padding: 14px;
-      background: #ea580c;
+      background: #c2410c;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -184,12 +183,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       transition: background 0.15s ease;
     }
     .btn-submit:hover {
-      background: #c2410c;
+      background: #9a3412;
     }
     .btn-cancel-hold {
       background: none;
       border: 1px solid #cbd5e1;
-      color: #64748b;
+      color: #475569;
       padding: 8px 12px;
       border-radius: 6px;
       cursor: pointer;
@@ -216,11 +215,11 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 <body>
   <header class="booking-header">
     <a href="/agendar" class="booking-header__brand">
-      <span style="color: #ea580c;">Clyo</span>Nutri
+      <span style="color: #c2410c;">Clyo</span>Nutri
       <span style="font-size: 0.8rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 9999px; font-weight: 500;">Autoagendamento</span>
     </a>
     <div>
-      <a href="/app" style="color: #64748b; text-decoration: none; font-size: 0.9rem; font-weight: 500;">
+      <a href="/app" style="color: #475569; text-decoration: none; font-size: 0.9rem; font-weight: 500;">
         Já sou paciente
       </a>
     </div>
@@ -245,35 +244,36 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </h2>
 
         <div class="form-group">
-          <label class="form-label" for="select-prof">Nutricionista</label>
-          <select id="select-prof" class="form-control">
-            <?php foreach ($professionals as $p): ?>
-              <option value="<?= (int)$p['id'] ?>" data-clinic="<?= (int)$p['clinic_id'] ?>" <?= ($selectedProf && (int)$selectedProf['id'] === (int)$p['id']) ? 'selected' : '' ?>>
-                <?= htmlspecialchars($p['name']) ?> — <?= htmlspecialchars($p['clinic_name']) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
+          <p class="form-label" style="margin-bottom: 4px;">Nutricionista</p>
+          <p style="margin: 0; font-weight: 700; color: #0f172a;" data-testid="booking-professional"><?= htmlspecialchars($selectedProf['name']) ?> <span style="font-weight: 400; color: #475569;">— <?= htmlspecialchars($selectedProf['clinic_name']) ?></span></p>
+          <p style="margin: 4px 0 0; font-size: 0.85rem; color: #475569;">Consulta de <?= (int)$selectedProf['duration_minutes'] ?> minutos.</p>
+          <select id="select-prof" hidden aria-hidden="true" tabindex="-1"><option value="<?= (int)$selectedProf['id'] ?>" data-clinic="<?= (int)$selectedProf['clinic_id'] ?>" selected></option></select>
         </div>
 
         <div class="form-label">Modalidade de Atendimento</div>
+        <?php $allowPres = !empty($settings['allow_presential']); $allowTele = !empty($settings['allow_telehealth']); ?>
         <div class="modality-picker">
+          <?php if ($allowPres): ?>
           <div class="modality-card selected" id="modality-presential" data-value="presential">
             <div style="font-size: 1.5rem; margin-bottom: 6px;">🏢</div>
             <strong style="color: #0f172a; display: block;">Presencial</strong>
-            <span style="font-size: 0.8rem; color: #64748b;">No consultório</span>
+            <span style="font-size: 0.8rem; color: #475569;">No consultório</span>
           </div>
-          <div class="modality-card" id="modality-telehealth" data-value="telehealth">
+          <?php endif; ?>
+          <?php if ($allowTele): ?>
+          <div class="modality-card<?= $allowPres ? '' : ' selected' ?>" id="modality-telehealth" data-value="telehealth">
             <div style="font-size: 1.5rem; margin-bottom: 6px;">📹</div>
             <strong style="color: #0f172a; display: block;">Teleconsulta</strong>
-            <span style="font-size: 0.8rem; color: #64748b;">Vídeo sem app</span>
+            <span style="font-size: 0.8rem; color: #475569;">Vídeo sem app</span>
           </div>
+          <?php endif; ?>
         </div>
 
         <div class="form-group">
           <label class="form-label" for="select-service">Tipo de Consulta</label>
           <select id="select-service" class="form-control">
-            <option value="first_visit" selected>Primeira Consulta (Avaliação + Plano Inicial) — 60 min</option>
-            <option value="followup">Consulta de Retorno / Acompanhamento — 45 min</option>
+            <option value="first_visit" selected>Primeira consulta</option>
+            <option value="follow_up">Retorno / acompanhamento</option>
           </select>
         </div>
 
@@ -296,14 +296,14 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <input type="date" id="input-date" class="form-control" min="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d', strtotime('+1 day')) ?>">
         </div>
 
-        <div id="slots-loading" style="display: none; text-align: center; padding: 24px; color: #64748b;">
+        <div id="slots-loading" style="display: none; text-align: center; padding: 24px; color: #475569;">
           Buscando horários disponíveis em tempo real...
         </div>
 
         <div id="slots-container" style="margin-top: 16px;">
           <div class="form-label">Horários Livres</div>
           <div id="slots-grid" class="slots-grid"></div>
-          <div id="no-slots-msg" style="display: none; padding: 20px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+          <div id="no-slots-msg" style="display: none; padding: 20px; text-align: center; color: #475569; font-size: 0.9rem;">
             Nenhum horário livre nesta data. Por favor, escolha outro dia.
           </div>
         </div>
@@ -346,11 +346,6 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="patient-cpf">CPF (opcional)</label>
-            <input type="text" id="patient-cpf" class="form-control" placeholder="000.000.000-00">
-          </div>
-
-          <div class="form-group">
             <label class="form-label" for="patient-notes">Objetivo ou Observações</label>
             <textarea id="patient-notes" class="form-control" rows="2" placeholder="Conte brevemente o motivo da consulta (ex: ganho de massa, reeducação alimentar...)"></textarea>
           </div>
@@ -358,7 +353,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <div class="form-group" style="margin-bottom: 24px;">
             <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; color: #475569; cursor: pointer;">
               <input type="checkbox" id="terms-accept" required style="margin-top: 2px;">
-              <span>Concordo com os <a href="/termos" target="_blank" style="color: #ea580c;">Termos de Uso</a> e autorizo o tratamento de dados para assistência nutricional (<a href="/privacidade" target="_blank" style="color: #ea580c;">LGPD</a>).</span>
+              <span>Li e aceito o termo &ldquo;<?= htmlspecialchars((string)($consentTerm['title'] ?? 'Assistência clínica')) ?>&rdquo; (versão <?= htmlspecialchars((string)($consentTerm['version'] ?? '')) ?>) e autorizo o uso dos meus dados para o atendimento nutricional. <a href="/privacidade" target="_blank" rel="noopener" style="color: #c2410c;">Política de privacidade</a>.</span>
             </label>
           </div>
 
@@ -379,13 +374,13 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </p>
 
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px;">
-          <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Código da Consulta</div>
+          <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Código da Consulta</div>
           <div id="receipt-id" style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px;"></div>
 
-          <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Data e Horário</div>
+          <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Data e Horário</div>
           <div id="receipt-datetime" style="font-size: 1.05rem; font-weight: 600; color: #0f172a; margin-bottom: 12px;"></div>
 
-          <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Modalidade</div>
+          <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Modalidade</div>
           <div id="receipt-modality" style="font-size: 1rem; color: #0f172a;"></div>
         </div>
 
@@ -399,7 +394,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     </div>
   </main>
 
-  <footer style="text-align: center; padding: 20px 16px; color: #94a3b8; font-size: 0.8rem; border-top: 1px solid #e2e8f0; background: #fff;">
+  <footer style="text-align: center; padding: 20px 16px; color: #475569; font-size: 0.8rem; border-top: 1px solid #e2e8f0; background: #fff;">
     &copy; <?= date('Y') ?> ClyoNutri • Sistema Operacional do Nutricionista
   </footer>
 
@@ -408,9 +403,11 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       var state = {
         profId: <?= (int)$profId ?>,
         clinicId: <?= (int)$clinicId ?>,
-        modality: 'presential',
+        modality: <?= !empty($settings['allow_presential']) ? "'presential'" : "'telehealth'" ?>,
         serviceType: 'first_visit',
-        durationMinutes: 60,
+        durationMinutes: <?= (int)$selectedProf['duration_minutes'] ?>,
+        consentTermId: <?= (int)($consentTerm['id'] ?? 0) ?>,
+        visitId: Math.random().toString(36).slice(2, 12),
         selectedDate: document.getElementById('input-date').value,
         selectedSlotTime: null,
         holdToken: null,
@@ -450,7 +447,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         showError(null);
         var sSelect = document.getElementById('select-service');
         state.serviceType = sSelect.value;
-        state.durationMinutes = state.serviceType === 'followup' ? 45 : 60;
+        // A duração é definida pelo profissional; o servidor ignora outro valor.
 
         document.getElementById('section-step-1').style.display = 'none';
         document.getElementById('section-step-2').style.display = 'block';
@@ -473,7 +470,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         loadSlots();
       });
 
+      var slotsRequestSeq = 0;
       function loadSlots() {
+        // Só a resposta do pedido mais recente é usada: trocar a data rápido não pode misturar
+        // horários de dias diferentes nem duplicar botões.
+        var requestId = ++slotsRequestSeq;
+        var requestedDate = state.selectedDate;
         showError(null);
         var grid = document.getElementById('slots-grid');
         var loading = document.getElementById('slots-loading');
@@ -490,9 +492,16 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
                   '&modality=' + state.modality;
 
         fetch(url)
-          .then(function(res) { return res.json(); })
+          .then(function(res) {
+            return res.json().then(function(data) {
+              if (!res.ok) { throw new Error(data.error || 'Erro ao carregar horários disponíveis. Tente novamente.'); }
+              return data;
+            });
+          })
           .then(function(data) {
+            if (requestId !== slotsRequestSeq) return;
             loading.style.display = 'none';
+            grid.innerHTML = '';
             if (!data.available_slots || data.available_slots.length === 0) {
               empty.style.display = 'block';
               return;
@@ -503,14 +512,16 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
               btn.className = 'slot-btn';
               btn.textContent = slot.time;
               btn.addEventListener('click', function() {
+                state.selectedDate = requestedDate;
                 createHold(slot.scheduled_at, slot.time);
               });
               grid.appendChild(btn);
             });
           })
           .catch(function(err) {
+            if (requestId !== slotsRequestSeq) return;
             loading.style.display = 'none';
-            showError('Erro ao carregar horários disponíveis. Tente novamente.');
+            showError(err && err.message ? err.message : 'Erro ao carregar horários disponíveis. Tente novamente.');
           });
       }
 
@@ -523,7 +534,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           duration_minutes: state.durationMinutes,
           service_type: state.serviceType,
           modality: state.modality,
-          idempotency_key: 'hold_' + state.clinicId + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)
+          // Mesma chave para o mesmo horário nesta visita: clique duplo ou nova tentativa
+          // devolvem a mesma reserva em vez de criar outra.
+          idempotency_key: 'h_' + state.visitId + '_' + scheduledAt.replace(/[^0-9]/g, '')
         };
 
         fetch('/api/v1/booking/holds', {
@@ -536,7 +549,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             throw new Error('Este horário acabou de ser reservado por outro paciente. Por favor, escolha outro horário.');
           }
           if (!res.ok) {
-            throw new Error('Não foi possível reservar o horário. Tente novamente.');
+            return res.json().then(function(err) { throw new Error(err.error || 'Não foi possível reservar o horário. Tente novamente.'); });
           }
           return res.json();
         })
@@ -613,8 +626,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           name: document.getElementById('patient-name').value.trim(),
           email: document.getElementById('patient-email').value.trim(),
           phone: document.getElementById('patient-phone').value.trim(),
-          cpf: document.getElementById('patient-cpf').value.trim(),
-          notes: document.getElementById('patient-notes').value.trim()
+          notes: document.getElementById('patient-notes').value.trim(),
+          terms_accepted: document.getElementById('terms-accept').checked,
+          consent_term_id: state.consentTermId
         };
 
         fetch('/api/v1/booking/confirm', {
