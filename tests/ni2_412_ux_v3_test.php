@@ -116,7 +116,8 @@ $_SESSION['user_id'] = 0;
 $prof360 = $render(fn() => (new \ClyoNutri\Application\Controllers\DashboardController())->profile360(['id' => $pA]));
 check(str_contains($prof360, 'data-testid="care-continue"') && str_contains($prof360, 'href="/consulta/' . $todayId . '"'), 'Perfil: Continuar atendimento da mesma consulta');
 check(str_contains($prof360, 'href="#patient-appointments"') && !str_contains($prof360, 'Perfil Clínico 360'), 'Perfil: navegação por seções e sem jargão "Perfil Clínico 360"');
-$db->exec("UPDATE appointments SET status = 'confirmed' WHERE id = {$todayId}");
+// A renderização usa o relógio real: move a consulta para hoje (o restante do teste usa 15/10/2026 fixo).
+$db->prepare("UPDATE appointments SET status = 'confirmed', scheduled_at = :s WHERE id = :id")->execute(['s' => (new DateTimeImmutable('now', new DateTimeZone('America/Sao_Paulo')))->format('Y-m-d') . ' 00:01:00', 'id' => $todayId]);
 $prof360b = $render(fn() => (new \ClyoNutri\Application\Controllers\DashboardController())->profile360(['id' => $pA]));
 check(preg_match('#<form method="POST" action="/agenda/' . $todayId . '/status"[^>]*data-confirm="Iniciar agora#', $prof360b) === 1 && str_contains($prof360b, 'name="status" value="in_progress"'), 'Perfil: Iniciar atendimento é POST com confirmação (não GET)');
 $demoUser = $db->query("SELECT u.id, cm.clinic_id FROM users u JOIN clinic_members cm ON cm.user_id = u.id WHERE u.email = 'demo.local@clyonutri.local' LIMIT 1")->fetch(PDO::FETCH_ASSOC);

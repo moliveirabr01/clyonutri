@@ -1,0 +1,289 @@
+[
+ {
+  "story": "setup",
+  "name": "Login real da nutricionista fictícia",
+  "ok": true,
+  "detail": "http://127.0.0.1:37009/dashboard"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Semana de 14/10/2026 = 12/10 a 18/10/2026",
+  "ok": true,
+  "detail": "Semana de 12/10 a 18/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Semana 12–18/10 mostra a consulta de 14/10 (09:00) e não a de 21/10 (10:00)",
+  "ok": true,
+  "detail": "Semana de 12/10 a 18/10/2026\n1 consulta(s) nesta semana\nSEGUNDA\n12/10\nLivre\nTERÇA\n13/10\nLivre\nQUARTA\n14/10\n09:00\nAgendada\nPaciente Fictícia Agenda\nQUINTA\n15/10\nLivre\nSEXTA\n16/10\nLivre\nSÁBADO\n17/10\nLiv"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Link \"Próxima semana\" tem nome acessível com direção e período",
+  "ok": true,
+  "detail": "Próxima semana (19 de outubro de 2026 a 25 de outubro de 2026)"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Teclado: \"Próxima semana\" é alcançável com Tab",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-413",
+  "name": "Um Enter em \"Próxima semana\" muda início e fim em exatamente 7 dias (19/10 a 25/10/2026)",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Conteúdo da semana muda junto (aparece 21/10 10:00, some 14/10 09:00)",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026\n1 consulta(s) nesta semana\nSEGUNDA\n19/10\nLivre\nTERÇA\n20/10\nLivre\nQUARTA\n21/10\n10:00\nAgendada\nPaciente Fictícia Agenda\nQUINTA\n22/10\nLivre\nSEXTA\n23/10\nLivre\nSÁBADO\n24/10\nLiv"
+ },
+ {
+  "story": "NI2-413",
+  "name": "\"Semana anterior\" volta exatamente 7 dias",
+  "ok": true,
+  "detail": "Semana de 12/10 a 18/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "De qualquer dia da semana (2026-10-12) um clique leva a 19/10–25/10",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "De qualquer dia da semana (2026-10-15) um clique leva a 19/10–25/10",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "De qualquer dia da semana (2026-10-18) um clique leva a 19/10–25/10",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Virada de ano na semanal (28/12–03/01 → 04/01–10/01/2027)",
+  "ok": true,
+  "detail": "Semana de 04/01 a 10/01/2027"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Diária: link \"Próximo dia\" com nome acessível e data",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-413",
+  "name": "Diária anda 1 dia na virada de ano (31/12 → 01/01/2027)",
+  "ok": true,
+  "detail": "Consultas do Dia (01/01/2027)"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Diária volta 1 dia na virada de mês (01/03 → 28/02/2026)",
+  "ok": true,
+  "detail": "Consultas do Dia (28/02/2026)"
+ },
+ {
+  "story": "NI2-413",
+  "name": "Ano bissexto (01/03/2028 → 29/02/2028)",
+  "ok": true,
+  "detail": "Consultas do Dia (29/02/2028)"
+ },
+ {
+  "story": "NI2-413",
+  "name": "\"Hoje\" volta à semana vigente (19/10 a 25/10)",
+  "ok": true,
+  "detail": "Semana de 19/10 a 25/10/2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "\"Hoje\" marca o período vigente (aria-current)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-413",
+  "name": "Leitor de tela recebe o período exibido (role=status)",
+  "ok": true,
+  "detail": "Semana de 19 de outubro de 2026 a 25 de outubro de 2026"
+ },
+ {
+  "story": "NI2-413",
+  "name": "360 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal",
+  "ok": true,
+  "detail": {
+   "scroll": -15,
+   "visiveis": 3,
+   "alvos": [
+    38,
+    38,
+    38
+   ]
+  }
+ },
+ {
+  "story": "NI2-413",
+  "name": "390 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal",
+  "ok": true,
+  "detail": {
+   "scroll": -15,
+   "visiveis": 3,
+   "alvos": [
+    38,
+    38,
+    38
+   ]
+  }
+ },
+ {
+  "story": "NI2-413",
+  "name": "768 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal",
+  "ok": true,
+  "detail": {
+   "scroll": -15,
+   "visiveis": 3,
+   "alvos": [
+    38,
+    38,
+    38
+   ]
+  }
+ },
+ {
+  "story": "NI2-413",
+  "name": "1366 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal",
+  "ok": true,
+  "detail": {
+   "scroll": 0,
+   "visiveis": 3,
+   "alvos": [
+    38,
+    38,
+    38
+   ]
+  }
+ },
+ {
+  "story": "NI2-413",
+  "name": "1366 com zoom 200% px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal",
+  "ok": true,
+  "detail": {
+   "scroll": -15,
+   "visiveis": 3,
+   "alvos": [
+    38,
+    38,
+    38
+   ]
+  }
+ },
+ {
+  "story": "NI2-414",
+  "name": "Anamnese alterada: ao sair, o navegador avisa (beforeunload)",
+  "ok": true,
+  "detail": [
+   {
+    "type": "beforeunload",
+    "message": ""
+   }
+  ]
+ },
+ {
+  "story": "NI2-414",
+  "name": "Permanecer mantém a página e o texto digitado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-414",
+  "name": "Buscar alimento e Cancelar: fecha sem pedir confirmação",
+  "ok": true,
+  "detail": [
+   {
+    "type": "beforeunload",
+    "message": ""
+   }
+  ]
+ },
+ {
+  "story": "NI2-414",
+  "name": "Buscar e Cancelar: nenhum formulário fica pendente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-414",
+  "name": "Sair depois de buscar/cancelar não gera aviso",
+  "ok": true,
+  "detail": [
+   {
+    "type": "beforeunload",
+    "message": ""
+   }
+  ]
+ },
+ {
+  "story": "NI2-415",
+  "name": "Escolha de alimento por teclado (seta + Enter) preenche a seleção",
+  "ok": true,
+  "detail": {
+   "sel": "1",
+   "dirty": [
+    "/planos/1/refeicoes",
+    "/planos/1/itens"
+   ]
+  }
+ },
+ {
+  "story": "NI2-414",
+  "name": "Alimento escolhido + Cancelar: pede confirmação de descarte",
+  "ok": true,
+  "detail": [
+   {
+    "type": "beforeunload",
+    "message": ""
+   }
+  ]
+ },
+ {
+  "story": "NI2-414",
+  "name": "Descartar a inclusão de alimento não apaga o outro formulário pendente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "story": "NI2-414",
+  "name": "Enviar um formulário com outro ainda pendente: aviso de saída antes de perder o outro",
+  "ok": true,
+  "detail": [
+   {
+    "type": "beforeunload",
+    "message": ""
+   }
+  ]
+ },
+ {
+  "story": "NI2-414",
+  "name": "Confirmando, o alimento enviado é gravado (1 item no plano)",
+  "ok": true,
+  "detail": 1
+ },
+ {
+  "story": "NI2-414",
+  "name": "Nenhum erro de script nem bloqueio de CSP durante os fluxos",
+  "ok": true,
+  "detail": []
+ },
+ {
+  "story": "NI2-414",
+  "name": "Só o envio confirmado gravou item (cancelamentos não gravaram nada)",
+  "ok": true,
+  "detail": 1
+ }
+]

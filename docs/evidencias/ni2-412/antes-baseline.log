@@ -1,0 +1,29 @@
+PASS [setup] Login real da nutricionista fictícia
+PASS [NI2-413] Semana de 14/10/2026 = 12/10 a 18/10/2026
+PASS [NI2-413] Semana 12–18/10 mostra a consulta de 14/10 (09:00) e não a de 21/10 (10:00)
+FAIL [NI2-413] Link "Próxima semana" tem nome acessível com direção e período → null
+FAIL [NI2-413] Teclado: "Próxima semana" é alcançável com Tab
+FAIL [NI2-413] Um Enter em "Próxima semana" muda início e fim em exatamente 7 dias (19/10 a 25/10/2026) → "Semana de 12/10 a 18/10/2026"
+FAIL [NI2-413] Conteúdo da semana muda junto (aparece 21/10 10:00, some 14/10 09:00) → "Semana de 12/10 a 18/10/2026\n1 consulta(s) nesta semana\nSEGUNDA\n12/10\nLivre\nTERÇA\n13/10\nLivre\nQUARTA\n14/10\n09:00\nAgendada\nPaciente Fictícia Agenda\nQUINTA\n15/10\nLivre\nSEXTA\n16/10\nLivre\nSÁBADO\n17/10\nLiv"
+PASS [NI2-413] "Semana anterior" volta exatamente 7 dias
+FAIL [NI2-413] De qualquer dia da semana (2026-10-12) um clique leva a 19/10–25/10 → "Semana de 12/10 a 18/10/2026"
+FAIL [NI2-413] De qualquer dia da semana (2026-10-15) um clique leva a 19/10–25/10 → "Semana de 12/10 a 18/10/2026"
+PASS [NI2-413] De qualquer dia da semana (2026-10-18) um clique leva a 19/10–25/10
+FAIL [NI2-413] Virada de ano na semanal (28/12–03/01 → 04/01–10/01/2027) → "Semana de 28/12 a 03/01/2027"
+FAIL [NI2-413] Diária: link "Próximo dia" com nome acessível e data → null
+PASS [NI2-413] Diária anda 1 dia na virada de ano (31/12 → 01/01/2027)
+PASS [NI2-413] Diária volta 1 dia na virada de mês (01/03 → 28/02/2026)
+PASS [NI2-413] Ano bissexto (01/03/2028 → 29/02/2028)
+PASS [NI2-413] "Hoje" volta à semana vigente (19/10 a 25/10)
+FAIL [NI2-413] "Hoje" marca o período vigente (aria-current)
+FAIL [NI2-413] Leitor de tela recebe o período exibido (role=status) → ""
+FAIL [NI2-413] 360 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal → {"scroll":-15,"visiveis":0,"alvos":[]}
+FAIL [NI2-413] 390 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal → {"scroll":-15,"visiveis":0,"alvos":[]}
+FAIL [NI2-413] 768 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal → {"scroll":-15,"visiveis":0,"alvos":[]}
+FAIL [NI2-413] 1366 px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal → {"scroll":0,"visiveis":0,"alvos":[]}
+FAIL [NI2-413] 1366 com zoom 200% px: anterior/Hoje/próxima visíveis, alvo ≥ 24 px e sem rolagem horizontal → {"scroll":-15,"visiveis":0,"alvos":[]}
+PASS [NI2-414] Anamnese alterada: ao sair, o navegador avisa (beforeunload)
+PASS [NI2-414] Permanecer mantém a página e o texto digitado
+FAIL (interrompido) locator.click: Timeout 30000ms exceeded.
+
+NI2-412 UX-01/UX-02 (BASELINE): 11/27 PASS
