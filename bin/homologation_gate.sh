@@ -56,6 +56,13 @@ record() { # record <id> <P0|P1|INFO> <status> <duração_s> <detalhe> [log]
   printf '  %-8s %-4s %-28s %s\n' "[$3]" "$2" "$1" "$5"
 }
 now() { date +%s; }
+# Limite de tempo portável: GNU timeout (Linux), gtimeout (coreutils no macOS) ou perl (nativo no macOS).
+run_timeout() { # run_timeout <segundos> <comando...>
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$secs" "$@"
+  else perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$secs" "$@"; fi
+}
 cleanup() {
   for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null; done
   if [ "${GATE_KEEP_DBS:-}" != "1" ] && [ -n "${DB_READY:-}" ]; then
@@ -200,7 +207,7 @@ while read -r suite; do
   [[ -z "$suite" || "$suite" == \#* ]] && continue
   cp "$LEG_DB" "$WORK/legacy_run.sqlite"
   if ( unset DB_HOST DB_PORT DB_USERNAME DB_PASSWORD; DB_CONNECTION=sqlite DB_DATABASE="$WORK/legacy_run.sqlite" APP_ENV=local \
-       timeout 180 "$PHP_BIN" -d zend.assertions=1 -d assert.exception=1 "$suite" ) >> "$LEG_LOG" 2>&1; then
+       run_timeout 180 "$PHP_BIN" -d zend.assertions=1 -d assert.exception=1 "$suite" ) >> "$LEG_LOG" 2>&1; then
     LEG_OK=$((LEG_OK+1)); echo "[PASS] $suite" >> "$LEG_LOG"
   else
     LEG_FAIL=$((LEG_FAIL+1)); LEG_FAILED+=("$(basename "$suite" .php)"); echo "[FAIL] $suite" >> "$LEG_LOG"
