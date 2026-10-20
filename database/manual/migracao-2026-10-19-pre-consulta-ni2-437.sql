@@ -6,15 +6,23 @@
 -- ============================================================================
 SET NAMES utf8mb4;
 SET @db = DATABASE();
+-- Tipo real das chaves primárias deste banco. A produção da HostGator usa BIGINT; uma instalação
+-- pelas migrations usa INT. As FKs só são aceitas pelo MySQL quando os tipos são iguais.
+SET @t_clinics = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'clinics' AND COLUMN_NAME = 'id');
+SET @t_patients = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'patients' AND COLUMN_NAME = 'id');
+SET @t_professionals = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'professionals' AND COLUMN_NAME = 'id');
+SET @t_appointments = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'id');
+SET @t_anthro = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'anthropometric_assessments' AND COLUMN_NAME = 'id');
+
 SET @ok_base = ((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db
   AND TABLE_NAME IN ('clinics','patients','professionals','appointments','consent_terms','patient_consents','audit_logs') AND UPPER(ENGINE) = 'INNODB') = 7);
 
 SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `preconsultation_questionnaires` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clinic_id` INT NOT NULL,
-  `patient_id` INT NOT NULL,
-  `professional_id` INT NOT NULL,
-  `appointment_id` INT NULL,
+  `id` {T_CLINICS} AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `patient_id` {T_PATIENTS} NOT NULL,
+  `professional_id` {T_PROFESSIONALS} NOT NULL,
+  `appointment_id` {T_APPOINTMENTS} NULL,
   `status` VARCHAR(20) NOT NULL DEFAULT ''draft'',
   `objectives_json` TEXT NOT NULL,
   `suggestion_json` TEXT NOT NULL,
@@ -49,12 +57,13 @@ SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `preconsultation_questionn
   CONSTRAINT `fk_precons_professional` FOREIGN KEY (`professional_id`) REFERENCES `professionals`(`id`),
   CONSTRAINT `fk_precons_appointment` FOREIGN KEY (`appointment_id`) REFERENCES `appointments`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `preconsultation_answer_snapshots` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clinic_id` INT NOT NULL,
-  `questionnaire_id` INT NOT NULL,
+  `id` {T_CLINICS} AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `questionnaire_id` {T_CLINICS} NOT NULL,
   `kind` VARCHAR(20) NOT NULL,
   `answers_json` TEXT NOT NULL,
   `answers_sha256` VARCHAR(64) NOT NULL,
@@ -63,6 +72,7 @@ SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `preconsultation_answer_sn
   CONSTRAINT `fk_precons_snap_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_precons_snap_q` FOREIGN KEY (`questionnaire_id`) REFERENCES `preconsultation_questionnaires`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Termo de consentimento (mesmo texto da migração PHP)
@@ -70,12 +80,14 @@ SET @q = IF(@ok_base = 1, CONCAT('INSERT INTO `consent_terms` (`version`, `title
   'SELECT ''2026.10-precons-r1'', ''Uso das respostas da pré-consulta'', ''pre_consultation'', ',
   '''Autorizo a clínica e o(a) nutricionista indicado(a) a tratar as informações de saúde e de hábitos que informei neste questionário, exclusivamente para preparar e realizar o meu atendimento nutricional. As respostas ficam no meu prontuário na clínica e não são compartilhadas com terceiros. Elas não substituem a consulta e não geram diagnóstico automático. Posso pedir acesso, correção ou exclusão dos meus dados à clínica, nos termos da LGPD.'', 1 ',
   'FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `consent_terms` WHERE `purpose_code` = ''pre_consultation'' AND `version` = ''2026.10-precons-r1'')'), 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @ok = ((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME IN ('preconsultation_questionnaires','preconsultation_answer_snapshots')) = 2
   AND (SELECT COUNT(*) FROM `consent_terms` WHERE `purpose_code` = 'pre_consultation') > 0);
 SET @q = IF(@ok, CONCAT('INSERT INTO `migrations` (`migration`, `executed_at`) SELECT ''2026_10_19_000045_create_preconsultation_tables'', CURRENT_TIMESTAMP FROM DUAL ',
   'WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = ''2026_10_19_000045_create_preconsultation_tables'')'), 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SELECT IF(@ok, 'OK — migração 45 aplicada (pré-consulta)', 'FALHA — ver preflight') AS resultado;

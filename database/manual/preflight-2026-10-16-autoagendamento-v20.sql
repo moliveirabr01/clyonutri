@@ -32,7 +32,7 @@ SET @has_pk_appts = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE
 -- 5. Tabelas criadas pela versão antiga deste pacote (colunas erradas)?
 SET @old_settings = @has_settings = 1 AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'booking_settings' AND COLUMN_NAME IN ('max_future_days', 'require_cpf')) < 2;
 SET @old_holds = @has_holds = 1 AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'booking_holds' AND COLUMN_NAME IN ('payment_status', 'notification_status')) < 2;
-SET @int_signed = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME IN ('clinics', 'professionals', 'patients', 'appointments') AND COLUMN_NAME = 'id' AND COLUMN_TYPE = 'int');
+SET @tipos_id = (SELECT GROUP_CONCAT(DISTINCT COLUMN_TYPE) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME IN ('clinics', 'professionals', 'patients', 'appointments') AND COLUMN_NAME = 'id');
 
 -- 6. Relatório Preflight
 SELECT
@@ -51,4 +51,4 @@ SELECT
   @has_settings AS booking_settings_already_exists,
   @bad_engines AS bad_engines_count,
   (@old_settings OR @old_holds) AS estrutura_antiga,
-  @int_signed AS ids_int_compativeis_esperado_4;
+  @tipos_id AS tipo_das_chaves;

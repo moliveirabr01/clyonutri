@@ -16,6 +16,14 @@
 
 SET NAMES utf8mb4;
 SET @db = DATABASE();
+-- Tipo real das chaves primárias deste banco. A produção da HostGator usa BIGINT; uma instalação
+-- pelas migrations usa INT. As FKs só são aceitas pelo MySQL quando os tipos são iguais.
+SET @t_clinics = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'clinics' AND COLUMN_NAME = 'id');
+SET @t_patients = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'patients' AND COLUMN_NAME = 'id');
+SET @t_professionals = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'professionals' AND COLUMN_NAME = 'id');
+SET @t_appointments = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'id');
+SET @t_anthro = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'anthropometric_assessments' AND COLUMN_NAME = 'id');
+
 
 -- Estrutura antiga (arquivo v20 anterior)? Então não segue.
 SET @bs_exists  = (SELECT COUNT(*) FROM information_schema.TABLES  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'booking_settings');
@@ -26,10 +34,10 @@ SET @estrutura_antiga = (@bs_exists = 1 AND @bs_ok_cols < 2) OR (@bh_exists = 1 
 
 SET @q = IF(@estrutura_antiga, 'DO 0', '
 CREATE TABLE IF NOT EXISTS `booking_holds` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clinic_id` INT NOT NULL,
-  `professional_id` INT NOT NULL,
-  `patient_id` INT NULL,
+  `id` {T_CLINICS} AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `professional_id` {T_PROFESSIONALS} NOT NULL,
+  `patient_id` {T_PATIENTS} NULL,
   `hold_token` VARCHAR(64) NOT NULL UNIQUE,
   `idempotency_key` VARCHAR(64) NULL,
   `scheduled_at` DATETIME NOT NULL,
@@ -38,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `booking_holds` (
   `modality` VARCHAR(20) NOT NULL DEFAULT ''presential'',
   `status` VARCHAR(30) NOT NULL DEFAULT ''held'',
   `expires_at_utc` DATETIME NOT NULL,
-  `appointment_id` INT NULL,
+  `appointment_id` {T_APPOINTMENTS} NULL,
   `patient_name` VARCHAR(150) NULL,
   `patient_email` VARCHAR(150) NULL,
   `patient_phone` VARCHAR(50) NULL,
@@ -58,12 +66,13 @@ CREATE TABLE IF NOT EXISTS `booking_holds` (
   CONSTRAINT `fk_booking_holds_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_booking_holds_appt` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @q = IF(@estrutura_antiga, 'DO 0', '
 CREATE TABLE IF NOT EXISTS `booking_settings` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clinic_id` INT NOT NULL UNIQUE,
+  `id` {T_CLINICS} AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL UNIQUE,
   `is_enabled` TINYINT(1) NOT NULL DEFAULT 1,
   `min_advance_hours` INT NOT NULL DEFAULT 2,
   `max_future_days` INT NOT NULL DEFAULT 60,
@@ -77,6 +86,7 @@ CREATE TABLE IF NOT EXISTS `booking_settings` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_booking_settings_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Registra a migration 42 (assim o php bin/migrate.php não tenta criar de novo).
@@ -86,6 +96,7 @@ SET @ok = NOT @estrutura_antiga
 SET @q = IF(@ok, CONCAT('INSERT INTO `', @db, '`.`migrations` (`migration`, `executed_at`) ',
   'SELECT ''2026_10_16_000042_create_booking_holds_and_self_service_tables'', CURRENT_TIMESTAMP FROM DUAL ',
   'WHERE NOT EXISTS (SELECT 1 FROM `', @db, '`.`migrations` WHERE `migration` = ''2026_10_16_000042_create_booking_holds_and_self_service_tables'')'), 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SELECT

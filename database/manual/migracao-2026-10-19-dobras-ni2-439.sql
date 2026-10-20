@@ -7,17 +7,25 @@
 -- ============================================================================
 SET NAMES utf8mb4;
 SET @db = DATABASE();
+-- Tipo real das chaves primárias deste banco. A produção da HostGator usa BIGINT; uma instalação
+-- pelas migrations usa INT. As FKs só são aceitas pelo MySQL quando os tipos são iguais.
+SET @t_clinics = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'clinics' AND COLUMN_NAME = 'id');
+SET @t_patients = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'patients' AND COLUMN_NAME = 'id');
+SET @t_professionals = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'professionals' AND COLUMN_NAME = 'id');
+SET @t_appointments = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'id');
+SET @t_anthro = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'anthropometric_assessments' AND COLUMN_NAME = 'id');
+
 
 SET @ok_base = (
   (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME IN ('clinics','patients','professionals','anthropometric_assessments') AND UPPER(ENGINE) = 'INNODB') = 4
 );
 
 SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `skinfold_measurements` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `clinic_id` INT NOT NULL,
-  `patient_id` INT NOT NULL,
-  `professional_id` INT NOT NULL,
-  `assessment_id` INT NULL,
+  `id` {T_CLINICS} AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `patient_id` {T_PATIENTS} NOT NULL,
+  `professional_id` {T_PROFESSIONALS} NOT NULL,
+  `assessment_id` {T_ANTHRO} NULL,
   `record_group_id` INT NULL,
   `version` INT NOT NULL DEFAULT 1,
   `status` VARCHAR(20) NOT NULL DEFAULT ''active'',
@@ -47,12 +55,14 @@ SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `skinfold_measurements` (
   CONSTRAINT `fk_skinfold_professional` FOREIGN KEY (`professional_id`) REFERENCES `professionals`(`id`),
   CONSTRAINT `fk_skinfold_assessment` FOREIGN KEY (`assessment_id`) REFERENCES `anthropometric_assessments`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @ok = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'skinfold_measurements') = 1;
 SET @q = IF(@ok, CONCAT('INSERT INTO `', @db, '`.`migrations` (`migration`, `executed_at`) ',
   'SELECT ''2026_10_19_000044_create_skinfold_measurements'', CURRENT_TIMESTAMP FROM DUAL ',
   'WHERE NOT EXISTS (SELECT 1 FROM `', @db, '`.`migrations` WHERE `migration` = ''2026_10_19_000044_create_skinfold_measurements'')'), 'DO 0');
+SET @q = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT')), '{T_PROFESSIONALS}', IFNULL(@t_professionals, 'INT')), '{T_APPOINTMENTS}', IFNULL(@t_appointments, 'INT')), '{T_ANTHRO}', IFNULL(@t_anthro, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
 SELECT IF(@ok, 'OK — migração 44 aplicada (skinfold_measurements)', 'FALHA — ver preflight') AS resultado;
