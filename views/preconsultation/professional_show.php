@@ -26,9 +26,27 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 
 <?php if ($link): ?>
   <div class="card" style="margin-bottom: var(--space-4); border-left: 4px solid var(--brand-copper-600);" data-testid="pc-link">
-    <label class="form-label" for="pc-link-input">Link do paciente (mostrado só agora; um novo envio gera outro link e invalida este)</label>
-    <input class="form-control" id="pc-link-input" type="text" readonly value="<?= $e($link) ?>">
-    <small style="color: var(--neutral-gray-500);">Para abrir, o paciente confirma a data de nascimento cadastrada.</small>
+    <h2 style="font-size: 1.1rem; margin: 0 0 8px;">Envie o link ao paciente</h2>
+    <label class="form-label" for="pc-link-input">Link do paciente (mostrado só agora; gerar outro link invalida este)</label>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch;">
+      <input class="form-control" id="pc-link-input" type="text" readonly value="<?= $e($link) ?>" style="flex: 1 1 280px;">
+      <button type="button" class="btn btn-secondary" id="pc-copy-link" data-copy-target="pc-link-input" data-testid="pc-copy-link">Copiar link</button>
+      <?php if (!empty($whatsappUrl)): ?>
+        <a class="btn" href="<?= $e($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" data-testid="pc-whatsapp"
+           style="background: #1F7A4A; color: #fff; border: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-decoration: none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4a.5.5 0 0 0 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z"/></svg>
+          Enviar pelo WhatsApp
+        </a>
+      <?php endif; ?>
+    </div>
+    <p role="status" aria-live="polite" id="pc-copy-status" style="margin: 6px 0 0; font-size: 0.85rem; color: var(--semantic-success, #18794E);"></p>
+    <small style="display: block; color: var(--neutral-gray-500);">
+      Para abrir, o paciente confirma a data de nascimento cadastrada.
+      <?php if (!empty($whatsappUrl) && empty($whatsappHasPhone)): ?>
+        O paciente não tem celular válido no cadastro: o WhatsApp vai pedir para você escolher o contato.
+        <a href="/pacientes/<?= $pid ?>/editar">Cadastrar celular</a>.
+      <?php endif; ?>
+    </small>
   </div>
 <?php endif; ?>
 
@@ -75,7 +93,8 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
     </div>
     <fieldset class="form-group" style="border: 0; padding: 0; margin: 0;">
       <legend class="form-label">Canal</legend>
-      <label style="display: flex; gap: 6px;"><input type="radio" name="channel" value="email" checked> E-mail do cadastro + link para copiar</label>
+      <label style="display: flex; gap: 6px;"><input type="radio" name="channel" value="whatsapp" checked> WhatsApp (mensagem pronta para enviar)</label>
+      <label style="display: flex; gap: 6px;"><input type="radio" name="channel" value="email"> E-mail do cadastro + link para copiar</label>
       <label style="display: flex; gap: 6px;"><input type="radio" name="channel" value="link"> Só gerar o link</label>
     </fieldset>
     <button type="submit" class="btn btn-primary"><?= $q['status'] === 'draft' ? 'Enviar' : 'Gerar novo link' ?></button>
@@ -132,4 +151,8 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 <details class="card"><summary>Registro de salvamentos (auditoria)</summary>
   <ul style="font-size: 0.85rem;"><?php foreach ($snapshots as $s): ?><li><?= $e(date('d/m/Y H:i:s', strtotime((string)$s['saved_at']))) ?> · <?= $s['kind'] === 'submitted' ? 'envio final' : 'rascunho' ?> · SHA-256 <?= $e(substr((string)$s['answers_sha256'], 0, 16)) ?>…</li><?php endforeach; ?></ul>
 </details>
+<?php endif; ?>
+
+<?php if ($link): ?>
+<script src="/assets/js/pre-consulta-profissional.js" nonce="<?= $e(\ClyoNutri\Core\Http\SecurityHeaders::nonce()) ?>" defer></script>
 <?php endif; ?>

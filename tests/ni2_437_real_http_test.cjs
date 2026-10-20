@@ -51,6 +51,10 @@ function form(pairs) { const f = new URLSearchParams(); for (const [k, v] of pai
   r = await pro.post('/pacientes/1/pre-consulta/1/perguntas', editForm);
   page = await pro.req('/pacientes/1/pre-consulta/1');
   check('Edição: retira sugerida e inclui extra', !/name="questions\[\]" value="water" checked/.test(page.text) && /name="questions\[\]" value="salt_use" checked/.test(page.text));
+  check('Canal padrão do envio é o WhatsApp', /name="channel" value="whatsapp" checked/.test(page.text));
+  r = await pro.post('/pacientes/1/pre-consulta/1/enviar', { _csrf_token: token(page.text), ttl_days: '7', channel: 'whatsapp' });
+  page = await pro.req('/pacientes/1/pre-consulta/1');
+  check('Sem APP_URL, WhatsApp recusado: sem botão e com aviso (link sairia relativo)', !page.text.includes('data-testid="pc-whatsapp"') && page.text.includes('APP_URL não configurado'));
   r = await pro.post('/pacientes/1/pre-consulta/1/enviar', { _csrf_token: token(page.text), ttl_days: '7', channel: 'link' });
   page = await pro.req('/pacientes/1/pre-consulta/1');
   const link = (page.text.match(/readonly value="([^"]*\/pre-consulta\/[A-Za-z0-9_-]{43})"/) || [])[1];

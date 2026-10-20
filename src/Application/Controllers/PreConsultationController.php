@@ -92,9 +92,14 @@ class PreConsultationController
         }
         $link = $_SESSION['precons_link'][$q['id']] ?? null;
         unset($_SESSION['precons_link'][$q['id']]);
+        // Só oferece o WhatsApp com link absoluto: um link relativo chegaria quebrado ao paciente.
+        $whatsappUrl = $link !== null && self::isAbsoluteUrl((string)$link)
+            ? self::whatsappUrl($patient, (string)$link, (string)($q['token_expires_at'] ?? '')) : null;
         $this->renderShell('Pré-consulta — ' . $patient['name'], 'professional_show', [
             'patient' => $patient, 'q' => $q, 'link' => $link, 'canEdit' => $this->prescriberId() !== null,
             'snapshots' => $service->snapshots((int)$q['id']),
+            'whatsappUrl' => $whatsappUrl,
+            'whatsappHasPhone' => self::whatsappPhone((string)($patient['phone'] ?? '')) !== null,
         ]);
     }
 
@@ -115,7 +120,20 @@ class PreConsultationController
             $base = rtrim((string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), '/');
             $url = ($base !== '' ? $base : '') . '/pre-consulta/' . $res['token'];
             $_SESSION['precons_link'][$qid] = $url;
-            $mail = $this->sendMail($patientId, $res, $url, ($_POST['channel'] ?? 'email') === 'email');
+            $channel = in_array($_POST['channel'] ?? '', ['email', 'whatsapp', 'link'], true) ? $_POST['channel'] : 'email';
+            if ($channel === 'whatsapp') {
+                $logger = new AuditLogger($this->db);
+                if (!self::isAbsoluteUrl($url)) {
+                    // Sem APP_URL o link sairia relativo ("/pre-consulta/…") e o paciente não conseguiria abrir.
+                    $logger->log('PRECONSULTATION_WHATSAPP_SKIPPED', 'preconsultation_questionnaires', (string)$qid, ['reason' => 'app_url_missing']);
+                    $mail = 'APP_URL não configurado: a mensagem do WhatsApp não foi preparada porque o link sairia incompleto. Configure APP_URL no .env.';
+                } else {
+                    $logger->log('PRECONSULTATION_WHATSAPP_PREPARED', 'preconsultation_questionnaires', (string)$qid, ['channel' => 'whatsapp']);
+                    $mail = 'Clique em "Enviar pelo WhatsApp" para abrir a conversa com a mensagem pronta.';
+                }
+            } else {
+                $mail = $this->sendMail($patientId, $res, $url, $channel === 'email');
+            }
             return 'Link gerado. Válido até ' . date('d/m/Y H:i', strtotime($res['expires_at'])) . '. ' . $mail;
         });
     }
@@ -305,6 +323,59 @@ class PreConsultationController
             $logger->log('PRECONSULTATION_EMAIL_FAILED', 'preconsultation_questionnaires', (string)$res['id'], ['reason' => 'mail_error']);
             return 'O e-mail não pôde ser enviado: copie o link abaixo e envie por outro canal.';
         }
+    }
+
+    /**
+     * Telefone no formato do WhatsApp (só dígitos, com DDI). Retorna null se não der para usar.
+     * - Com DDI explícito ("+" ou "00" no início): usa o número como foi informado. Nunca acrescenta
+     *   o 55, para um número estrangeiro não virar o de um desconhecido no Brasil.
+     * - Sem DDI: só aceita número brasileiro com DDD (10 ou 11 dígitos, com ou sem o 0 de longa
+     *   distância) ou já começando com 55.
+     */
+    public static function whatsappPhone(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        $international = str_starts_with($raw, '+') || str_starts_with(preg_replace('/[\s().-]/', '', $raw) ?? '', '00');
+        $d = preg_replace('/\D/', '', $raw) ?? '';
+        if ($international) {
+            $d = ltrim($d, '0'); // "00" de discagem internacional
+            return strlen($d) >= 8 && strlen($d) <= 15 ? $d : null;
+        }
+        $d = ltrim($d, '0'); // "0" de longa distância (ex.: 011 9…)
+        if (strlen($d) === 10 || strlen($d) === 11) {
+            return '55' . $d;
+        }
+        if (str_starts_with($d, '55') && (strlen($d) === 12 || strlen($d) === 13)) {
+            return $d;
+        }
+        return null;
+    }
+
+    public static function isAbsoluteUrl(string $url): bool
+    {
+        return (bool)preg_match('#^https?://[^/\s]+/#i', $url);
+    }
+
+    /** Link wa.me com a mensagem pronta. Sem telefone válido, o WhatsApp pede para escolher o contato. */
+    public static function whatsappUrl(array $patient, string $link, string $expiresAt): string
+    {
+        $first = trim(explode(' ', trim((string)($patient['name'] ?? '')))[0] ?? '');
+        $who = trim((string)($_SESSION['user_name'] ?? ''));
+        $clinic = trim((string)($_SESSION['clinic_name'] ?? ''));
+        $from = $who !== '' ? $who . ($clinic !== '' ? " ({$clinic})" : '') : $clinic;
+        $until = $expiresAt !== '' && strtotime($expiresAt) ? date('d/m/Y \à\s H:i', strtotime($expiresAt)) : null;
+
+        $msg = 'Olá' . ($first !== '' ? ", {$first}" : '') . '!' . ($from !== '' ? " Aqui é {$from}." : '') . "\n\n"
+            . "Antes da nossa consulta, peço que responda o questionário de pré-consulta pelo link abaixo. "
+            . "Leva poucos minutos e você pode salvar e continuar depois.\n\n"
+            . $link . "\n\n"
+            . 'Para abrir, confirme a sua data de nascimento.' . ($until ? " O link vale até {$until}." : '');
+
+        $phone = self::whatsappPhone((string)($patient['phone'] ?? ''));
+        return 'https://wa.me/' . ($phone ?? '') . '?text=' . rawurlencode($msg);
     }
 
     private function patientOr404(int $patientId): ?array
