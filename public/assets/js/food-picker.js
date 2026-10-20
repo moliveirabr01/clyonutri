@@ -102,7 +102,22 @@
     });
     next.addEventListener('click', () => { page++; load(true); });
     retry.addEventListener('click', () => load(page > 1));
-    input.addEventListener('keydown', event => { if (event.key === 'ArrowDown' && results.firstElementChild) { event.preventDefault(); results.firstElementChild.focus(); } });
+    // Teclado: seta para baixo do campo vai ao primeiro resultado; setas percorrem os botões (resultados,
+    // equivalentes); seta para cima no primeiro volta ao campo. Os resultados ficam dentro de grupos
+    // (div), por isso o foco vai sempre para os botões, não para o primeiro filho.
+    const resultButtons = () => [...results.querySelectorAll('button')];
+    input.addEventListener('keydown', event => {
+      const first = resultButtons()[0];
+      if (event.key === 'ArrowDown' && first) { event.preventDefault(); first.focus(); }
+    });
+    results.addEventListener('keydown', event => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const list = resultButtons(), i = list.indexOf(document.activeElement);
+      if (i < 0) return;
+      event.preventDefault();
+      if (event.key === 'ArrowDown') (list[i + 1] || list[i]).focus();
+      else (i === 0 ? input : list[i - 1]).focus();
+    });
   });
   // NI2-417 (UX-05): os diálogos de alimento usam o componente compartilhado (clinical-journeys.js)
   window.openFoodDialog = id => {
