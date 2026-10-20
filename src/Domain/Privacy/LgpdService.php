@@ -53,7 +53,7 @@ class LgpdService
         // Authentication secrets never belong in a portability package.
         $patient = array_intersect_key($patient, array_flip(['id','clinic_id','uuid','name','email','phone','birth_date','gender','status','notes','created_at','updated_at']));
         $related = [];
-        foreach (['clinical_records','meal_plans','appointments','checkins','receivables','food_diary_entries','hydration_logs'] as $table) {
+        foreach (['clinical_records','meal_plans','appointments','checkins','receivables','food_diary_entries','hydration_logs','skinfold_measurements'] as $table) {
             $stmt = $this->db->prepare("SELECT * FROM $table WHERE clinic_id = ? AND patient_id = ? ORDER BY id");
             $stmt->execute([$clinicId, $patientId]); $related[$table] = $stmt->fetchAll();
         }

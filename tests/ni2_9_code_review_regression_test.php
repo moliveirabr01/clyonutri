@@ -18,6 +18,8 @@ use ClyoNutri\Domain\Clinical\AllergenSafetyValidator;
 use ClyoNutri\Domain\MealPlan\MealPlanService;
 
 $db = Connection::getInstance();
+// Banco de testes já existente não recebe migrações novas automaticamente: aplica as pendentes (idempotente).
+(new ClyoNutri\Core\Database\Migrator($db, __DIR__ . '/../database/migrations'))->run();
 $passed = 0;
 $failed = 0;
 $log = [];

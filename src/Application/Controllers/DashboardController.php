@@ -772,9 +772,12 @@ class DashboardController
             <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
             <p style="color: var(--neutral-gray-500);">Evolução dos indicadores, composição corporal e comparação entre avaliações.</p>
           </div>
-          <button type="button" class="btn btn-primary" data-call="openAnthroModal">
-            + Nova Avaliação
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a class="btn btn-outline" href="/pacientes/<?= (int)$patient['id'] ?>/antropometria/dobras" data-testid="link-skinfolds">Dobras cutâneas</a>
+            <button type="button" class="btn btn-primary" data-call="openAnthroModal">
+              + Nova Avaliação
+            </button>
+          </div>
         </div>
 
         <!-- KPIs Resumo Clínico -->

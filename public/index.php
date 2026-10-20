@@ -330,6 +330,11 @@ $router->get('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'patientA
 $router->post('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'saveAnthropometry']));
 $router->post('/pacientes/{id}/antropometria/{evalId}/compartilhar', $requireAuth([$dashCtrl, 'shareAnthropometry']));
 $router->get('/pacientes/{id}/antropometria/comparar', $requireAuth([$dashCtrl, 'compareAnthropometry']));
+// NI2-439: dobras cutâneas por protocolo validado
+$skinfoldCtrl = new \ClyoNutri\Application\Controllers\SkinfoldController();
+$router->get('/pacientes/{id}/antropometria/dobras', $requireAuth([$skinfoldCtrl, 'show']));
+$router->post('/pacientes/{id}/antropometria/dobras', $requireAuth([$skinfoldCtrl, 'store']));
+$router->post('/pacientes/{id}/antropometria/dobras/{mid}/corrigir', $requireAuth([$skinfoldCtrl, 'correct']));
 $router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'search']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));

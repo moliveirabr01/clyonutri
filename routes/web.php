@@ -38,6 +38,9 @@ $router->get('/pacientes/{id}/antropometria', [DashboardController::class, 'pati
 $router->post('/pacientes/{id}/antropometria', [DashboardController::class, 'saveAnthropometry'])->name('anthropometry.store');
 $router->post('/pacientes/{id}/antropometria/{evalId}/compartilhar', [DashboardController::class, 'shareAnthropometry'])->name('anthropometry.share');
 $router->get('/pacientes/{id}/antropometria/comparar', [DashboardController::class, 'compareAnthropometry'])->name('anthropometry.compare');
+$router->get('/pacientes/{id}/antropometria/dobras', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'show'])->name('anthropometry.skinfolds');
+$router->post('/pacientes/{id}/antropometria/dobras', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'store'])->name('anthropometry.skinfolds.store');
+$router->post('/pacientes/{id}/antropometria/dobras/{mid}/corrigir', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'correct'])->name('anthropometry.skinfolds.correct');
 
 // Agenda e Execução de Consulta (NI2-10)
 $router->get('/agenda', [DashboardController::class, 'agenda'])->name('agenda.index');
