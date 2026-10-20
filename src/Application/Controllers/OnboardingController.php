@@ -299,7 +299,7 @@ class OnboardingController
                   </div>
                   <div>
                     <label for="ob8-default_price" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Valor Médio da Consulta (R$)</label>
-                    <input id="ob8-default_price" type="number" step="10" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <input id="ob8-default_price" type="number" step="any" min="0" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 

@@ -28,7 +28,11 @@ $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
       <div class="tc-video" style="max-width:420px">
         <video id="tc-preview" autoplay playsinline muted aria-label="Prévia da sua câmera"></video>
       </div>
-      <div class="tc-controls"><button type="button" id="tc-test" class="tc-btn">Testar câmera e microfone</button></div>
+      <div class="tc-controls" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" id="tc-test" class="tc-btn">Testar câmera e microfone</button>
+        <button type="button" id="tc-audio-only" class="tc-btn tc-hidden" style="background:#475569">Entrar apenas com áudio</button>
+        <button type="button" id="tc-bypass" class="tc-btn tc-hidden" style="background:#64748b">Continuar sem câmera</button>
+      </div>
       <div id="tc-test-status" class="tc-status" role="status" aria-live="polite">O navegador vai pedir permissão. Nada é gravado.</div>
     </li>
 

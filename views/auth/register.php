@@ -137,6 +137,15 @@
           <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" minlength="8" autocomplete="new-password" data-password-toggle required>
         </div>
 
+        <div class="form-group" style="margin-top: var(--space-4);">
+          <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.875rem; color: var(--neutral-gray-700); cursor: pointer;">
+            <input type="checkbox" id="terms_accepted" name="terms_accepted" value="1" required style="margin-top: 3px;">
+            <span>
+              Li e concordo com os <a href="/termos" target="_blank" rel="noopener" style="color: var(--brand-copper-600); text-decoration: underline;">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener" style="color: var(--brand-copper-600); text-decoration: underline;">Política de Privacidade (LGPD)</a>.
+            </span>
+          </label>
+        </div>
+
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);">
           <span>Criar Consultório & Ativar Onboarding</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>

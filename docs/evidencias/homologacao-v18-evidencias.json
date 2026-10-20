@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-10-16T04:57:57.196Z",
+  "total_tests": 7,
+  "failures": 0,
+  "evidences": [
+    {
+      "test_id": "V17-02-01",
+      "scenario": "Digitação seguida de perda de conexão antes da confirmação com recuperação automática",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:44.808Z",
+      "detail": {
+        "backupKey": "cn_consult_draft:1:2:2",
+        "hasLocalBackupOnFailure": true,
+        "errorStatusShown": true,
+        "savedStatusAfterRecovery": true,
+        "serverVersion": 1,
+        "evolutionSummaryLength": 58
+      }
+    },
+    {
+      "test_id": "V17-02-02",
+      "scenario": "Duas abas editando simultaneamente geram 409 Conflict sem perda de dados",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:48.847Z",
+      "detail": {
+        "abaASaved": true,
+        "abaBConflict": true,
+        "abaBBackupPreserved": true,
+        "serverEvolution": "Aba A: Conduta nutricional atualizada pela aba 1.",
+        "serverVersion": 2
+      }
+    },
+    {
+      "test_id": "V17-02-03",
+      "scenario": "Erro HTTP 503 com correlation_id e 401 JSON de sessão expirada preservam backup local",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:52.853Z",
+      "detail": {
+        "shows503Correlation": true,
+        "showsAuthExpired": true,
+        "preservedOn401": true
+      }
+    },
+    {
+      "test_id": "V17-02-04",
+      "scenario": "Submit do formulário aguarda gravação em voo e não perde texto digitado",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:54.555Z",
+      "detail": {
+        "submitIntercepted": true,
+        "submitCalls": 1
+      }
+    },
+    {
+      "test_id": "V17-02-05",
+      "scenario": "Isolamento estrito de rascunhos no navegador e expurgo de chaves estrangeiras/expiradas",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:54.563Z",
+      "detail": {
+        "foreignClinicPurged": true,
+        "foreignUserPurged": true,
+        "stalePurged": true,
+        "legacyPurged": true
+      }
+    },
+    {
+      "test_id": "V17-02-06",
+      "scenario": "Limpeza de backup local após confirmação do servidor e cabeçalho Clear-Site-Data no logout",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:56.840Z",
+      "detail": {
+        "backupClearedOnServerSave": true,
+        "hasClearSiteData": true
+      }
+    },
+    {
+      "test_id": "V17-02-07",
+      "scenario": "Rascunho e campos clínicos preservados na tela em caso de falha no envio de conclusão",
+      "status": "PASS",
+      "timestamp": "2026-10-16T04:57:57.196Z",
+      "detail": {
+        "hasDraftForm": true,
+        "hasSubmitErrorNotice": true
+      }
+    }
+  ]
+}

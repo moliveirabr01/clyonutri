@@ -8,6 +8,7 @@ declare(strict_types=1);
  */
 
 use ClyoNutri\Application\Controllers\AuthController;
+use ClyoNutri\Application\Controllers\BookingController;
 use ClyoNutri\Application\Controllers\DashboardController;
 use ClyoNutri\Application\Controllers\LandingController;
 
@@ -15,6 +16,8 @@ use ClyoNutri\Application\Controllers\LandingController;
 $router->get('/', [LandingController::class, 'index'])->name('home');
 $router->get('/termos', [LandingController::class, 'terms'])->name('terms');
 $router->get('/privacidade', [LandingController::class, 'privacy'])->name('privacy');
+$router->get('/agendar', [BookingController::class, 'publicBookingPage'])->name('booking.public');
+$router->get('/agendar/{professionalId}', [BookingController::class, 'publicBookingPage'])->name('booking.professional');
 $router->get('/login', [AuthController::class, 'showLogin'])->name('login');
 $router->post('/login', [AuthController::class, 'login']);
 $router->get('/logout', [AuthController::class, 'logout'])->name('logout');

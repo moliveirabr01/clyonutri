@@ -72,7 +72,17 @@ class AppointmentService
     /**
      * Agenda uma nova consulta com validação de tenant e detecção de conflitos de horário.
      */
-    public function schedule(
+    public function schedule(int $patientId, int $professionalId, string $scheduledAt,
+        string $type = 'first_visit', int $duration = 60, ?string $notes = null,
+        bool $allowConflict = false, ?int $userId = null): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        return $this->atomic(fn() => $this->scheduleAtomically($patientId, $professionalId, $scheduledAt, $type, $duration, $notes, $allowConflict, $userId));
+    }
+
+    private function scheduleAtomically(
         int $patientId,
         int $professionalId,
         string $scheduledAt,
@@ -83,107 +93,92 @@ class AppointmentService
         ?int $userId = null
     ): array {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
 
         $parsedDate = $this->normalizeDateTime($scheduledAt);
         $duration = max(15, min(240, $duration));
         $this->assertAvailability($professionalId,$parsedDate,$duration);
 
-        $ownsTransaction = false;
-        if (!$this->db->inTransaction()) {
-            $this->db->beginTransaction();
-            $ownsTransaction = true;
+        if (!$allowConflict) {
+            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
+                $lockStmt->execute(['id' => $professionalId]);
+            }
+
+            $conflict = $this->findConflict($clinicId, $professionalId, $parsedDate, $duration);
+            if ($conflict !== null) {
+                throw new AppointmentConflictException(
+                    "Conflito de agenda: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . " com duração de {$conflict['duration_minutes']} min.",
+                    $conflict
+                );
+            }
         }
 
-        try {
-            if (!$allowConflict) {
-                if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
-                    $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
-                    $lockStmt->execute(['id' => $professionalId]);
-                }
+        $stmt = $this->db->prepare("
+            INSERT INTO appointments (
+                clinic_id, patient_id, professional_id, scheduled_at,
+                duration_minutes, status, type, notes, created_at, updated_at
+            ) VALUES (
+                :clinic_id, :patient_id, :professional_id, :scheduled_at,
+                :duration, :status, :type, :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+        ");
 
-                $conflict = $this->findConflict($clinicId, $professionalId, $parsedDate, $duration);
-                if ($conflict !== null) {
-                    throw new AppointmentConflictException(
-                        "Conflito de agenda: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . " com duração de {$conflict['duration_minutes']} min.",
-                        $conflict
-                    );
-                }
-            }
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
+            'professional_id' => $professionalId,
+            'scheduled_at' => $parsedDate,
+            'duration' => $duration,
+            'status' => self::STATUS_SCHEDULED,
+            'type' => $type,
+            'notes' => $notes,
+        ]);
 
-            $stmt = $this->db->prepare("
-                INSERT INTO appointments (
-                    clinic_id, patient_id, professional_id, scheduled_at,
-                    duration_minutes, status, type, notes, created_at, updated_at
-                ) VALUES (
-                    :clinic_id, :patient_id, :professional_id, :scheduled_at,
-                    :duration, :status, :type, :notes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                )
-            ");
+        $id = (int)$this->db->lastInsertId();
 
-            $stmt->execute([
-                'clinic_id' => $clinicId,
-                'patient_id' => $patientId,
-                'professional_id' => $professionalId,
-                'scheduled_at' => $parsedDate,
-                'duration' => $duration,
-                'status' => self::STATUS_SCHEDULED,
-                'type' => $type,
-                'notes' => $notes,
-            ]);
+        // Registrar trilha de auditoria inicial
+        $this->recordStatusHistory(
+            $clinicId,
+            $id,
+            null,
+            self::STATUS_SCHEDULED,
+            $userId ?? TenantContext::getUserId(),
+            'Agendamento inicial criado'
+        );
 
-            $id = (int)$this->db->lastInsertId();
-
-            // Registrar trilha de auditoria inicial
-            $this->recordStatusHistory(
-                $clinicId,
-                $id,
-                null,
-                self::STATUS_SCHEDULED,
-                $userId ?? TenantContext::getUserId(),
-                'Agendamento inicial criado'
-            );
-
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->commit();
-            }
-
-            return [
-                'id' => $id,
-                'clinic_id' => $clinicId,
-                'patient_id' => $patientId,
-                'professional_id' => $professionalId,
-                'scheduled_at' => $parsedDate,
-                'duration_minutes' => $duration,
-                'status' => self::STATUS_SCHEDULED,
-                'type' => $type,
-                'notes' => $notes,
-            ];
-        } catch (\Throwable $e) {
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
-        }
+        return [
+            'id' => $id,
+            'clinic_id' => $clinicId,
+            'patient_id' => $patientId,
+            'professional_id' => $professionalId,
+            'scheduled_at' => $parsedDate,
+            'duration_minutes' => $duration,
+            'status' => self::STATUS_SCHEDULED,
+            'type' => $type,
+            'notes' => $notes,
+        ];
     }
 
     /**
      * Edita dados de um agendamento existente (data, horário, duração, notas, tipo).
      */
-    public function edit(
+    public function edit(int $appointmentId, array $data, bool $allowConflict = false, ?int $userId = null): array
+    {
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, TenantContext::getClinicId(), $this->db);
+        return $this->atomic(fn() => $this->editAtomically($appointmentId, $data, $allowConflict, $userId));
+    }
+
+    private function editAtomically(
         int $appointmentId,
         array $data,
         bool $allowConflict = false,
         ?int $userId = null
     ): array {
         $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-        // O guard devolve só id/tenant/status; a edição precisa da linha completa
-        // (antes, editar sem scheduled_at gravava NULL no horário).
-        $currentStmt = $this->db->prepare('SELECT * FROM appointments WHERE id = :id AND clinic_id = :clinic_id');
-        $currentStmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
+        $current = $this->lockAppointment($appointmentId, $clinicId);
+        if (!in_array($current['status'], [self::STATUS_SCHEDULED, self::STATUS_CONFIRMED], true)) {
+            throw new InvalidArgumentException('Só é possível editar consultas agendadas ou confirmadas.');
+        }
 
         $patientId = isset($data['patient_id']) ? (int)$data['patient_id'] : (int)$current['patient_id'];
         $professionalId = isset($data['professional_id']) ? (int)$data['professional_id'] : (int)$current['professional_id'];
@@ -196,99 +191,88 @@ class AppointmentService
         $type = $data['type'] ?? ($current['type'] ?? 'first_visit');
         $notes = array_key_exists('notes', $data) ? $data['notes'] : ($current['notes'] ?? null);
 
-        $ownsTransaction = false;
-        if (!$this->db->inTransaction()) {
-            $this->db->beginTransaction();
-            $ownsTransaction = true;
+        if (!$allowConflict) {
+            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
+                $lockStmt->execute(['id' => $professionalId]);
+            }
+
+            $conflict = $this->findConflict($clinicId, $professionalId, $scheduledAt, $duration, $appointmentId);
+            if ($conflict !== null) {
+                throw new AppointmentConflictException(
+                    "Conflito de agenda no reagendamento: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . ".",
+                    $conflict
+                );
+            }
         }
 
-        try {
-            if (!$allowConflict) {
-                if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
-                    $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
-                    $lockStmt->execute(['id' => $professionalId]);
-                }
+        $stmt = $this->db->prepare("
+            UPDATE appointments
+            SET patient_id = :patient_id,
+                professional_id = :professional_id,
+                scheduled_at = :scheduled_at,
+                duration_minutes = :duration,
+                type = :type,
+                notes = :notes,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id AND clinic_id = :clinic_id AND status IN ('scheduled', 'confirmed')
+        ");
 
-                $conflict = $this->findConflict($clinicId, $professionalId, $scheduledAt, $duration, $appointmentId);
-                if ($conflict !== null) {
-                    throw new AppointmentConflictException(
-                        "Conflito de agenda no reagendamento: o profissional já possui a consulta #{$conflict['id']} com '{$conflict['patient_name']}' às " . date('H:i', strtotime($conflict['scheduled_at'])) . ".",
-                        $conflict
-                    );
-                }
-            }
+        $stmt->execute([
+            'patient_id' => $patientId,
+            'professional_id' => $professionalId,
+            'scheduled_at' => $scheduledAt,
+            'duration' => $duration,
+            'type' => $type,
+            'notes' => $notes,
+            'id' => $appointmentId,
+            'clinic_id' => $clinicId,
+        ]);
 
-            $stmt = $this->db->prepare("
-                UPDATE appointments
-                SET patient_id = :patient_id,
-                    professional_id = :professional_id,
-                    scheduled_at = :scheduled_at,
-                    duration_minutes = :duration,
-                    type = :type,
-                    notes = :notes,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id AND clinic_id = :clinic_id
-            ");
+        $this->recordStatusHistory(
+            $clinicId,
+            $appointmentId,
+            $current['status'],
+            $current['status'],
+            $userId ?? TenantContext::getUserId(),
+            // UX-04 (v14): trilha legível com horário anterior, novo horário e motivo (se informado).
+            ($scheduledAt !== $current['scheduled_at']
+                ? 'Consulta reagendada de ' . date('d/m/Y H:i', strtotime((string)$current['scheduled_at'])) . ' para ' . date('d/m/Y H:i', strtotime($scheduledAt))
+                : "Consulta editada (horário mantido: " . date('d/m/Y H:i', strtotime($scheduledAt)) . ')')
+            . (trim((string)($data['reschedule_reason'] ?? '')) !== '' ? '. Motivo: ' . mb_substr(trim((string)$data['reschedule_reason']), 0, 300) : '')
+        );
 
-            $stmt->execute([
-                'patient_id' => $patientId,
-                'professional_id' => $professionalId,
-                'scheduled_at' => $scheduledAt,
-                'duration' => $duration,
-                'type' => $type,
-                'notes' => $notes,
-                'id' => $appointmentId,
-                'clinic_id' => $clinicId,
-            ]);
-
-            $this->recordStatusHistory(
-                $clinicId,
-                $appointmentId,
-                $current['status'],
-                $current['status'],
-                $userId ?? TenantContext::getUserId(),
-                // UX-04 (v14): trilha legível com horário anterior, novo horário e motivo (se informado).
-                ($scheduledAt !== $current['scheduled_at']
-                    ? 'Consulta reagendada de ' . date('d/m/Y H:i', strtotime((string)$current['scheduled_at'])) . ' para ' . date('d/m/Y H:i', strtotime($scheduledAt))
-                    : "Consulta editada (horário mantido: " . date('d/m/Y H:i', strtotime($scheduledAt)) . ')')
-                . (trim((string)($data['reschedule_reason'] ?? '')) !== '' ? '. Motivo: ' . mb_substr(trim((string)$data['reschedule_reason']), 0, 300) : '')
-            );
-
-            // Teleconsulta (NI2-236/250 + v11 F04): trocar profissional/paciente ou deixar de ser online encerra a sessão;
-            // reagendar (horário/duração) revoga o convite e recalcula a janela.
-            if ($professionalId !== (int)$current['professional_id'] || $patientId !== (int)$current['patient_id']) {
-                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'participant_reassigned');
-            } elseif (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)($current['type'] ?? ''))
-                && !\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)$type)) {
-                $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'modality_changed');
-            } elseif ($scheduledAt !== $current['scheduled_at'] || $duration !== (int)$current['duration_minutes']) {
-                $this->teleconsultation()->onAppointmentRescheduled($appointmentId, $clinicId);
-            }
-
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->commit();
-            }
-
-            return $this->getAppointment($appointmentId);
-        } catch (\Throwable $e) {
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
+        // Teleconsulta (NI2-236/250 + v11 F04): trocar profissional/paciente ou deixar de ser online encerra a sessão;
+        // reagendar (horário/duração) revoga o convite e recalcula a janela.
+        if ($professionalId !== (int)$current['professional_id'] || $patientId !== (int)$current['patient_id']) {
+            $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'participant_reassigned');
+        } elseif (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)($current['type'] ?? ''))
+            && !\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType((string)$type)) {
+            $this->teleconsultation()->onAppointmentCancelled($appointmentId, $clinicId, 'modality_changed');
+        } elseif ($scheduledAt !== $current['scheduled_at'] || $duration !== (int)$current['duration_minutes']) {
+            $this->teleconsultation()->onAppointmentRescheduled($appointmentId, $clinicId);
         }
+
+        return $this->getAppointment($appointmentId);
     }
 
     /**
      * Atualiza o status da consulta segundo a máquina de estados estrita (NI2-82).
      */
-    public function updateStatus(
+    public function updateStatus(int $appointmentId, string $newStatus, ?string $notes = null, ?int $userId = null): bool
+    {
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, TenantContext::getClinicId(), $this->db);
+        return $this->atomic(fn() => $this->updateStatusAtomically($appointmentId, $newStatus, $notes, $userId));
+    }
+
+    private function updateStatusAtomically(
         int $appointmentId,
         string $newStatus,
         ?string $notes = null,
         ?int $userId = null
     ): bool {
         $clinicId = TenantContext::getClinicId();
-        $current = TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        $current = $this->lockAppointment($appointmentId, $clinicId);
 
         if (!in_array($newStatus, self::VALID_STATUSES, true)) {
             throw new InvalidArgumentException("Status de consulta inválido: '{$newStatus}'. Valores aceitos: " . implode(', ', self::VALID_STATUSES));
@@ -312,14 +296,19 @@ class AppointmentService
         $stmt = $this->db->prepare("
             UPDATE appointments
             SET status = :status, updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id
+            WHERE id = :id AND clinic_id = :clinic_id AND status = :previous_status
         ");
 
         $success = $stmt->execute([
             'status' => $newStatus,
+            'previous_status' => $currentStatus,
             'id' => $appointmentId,
             'clinic_id' => $clinicId,
         ]);
+
+        if ($stmt->rowCount() !== 1) {
+            throw new InvalidArgumentException('A consulta foi alterada por outro atendimento. Recarregue a página.');
+        }
 
         if ($success && in_array($newStatus, [self::STATUS_CANCELLED, self::STATUS_NO_SHOW, self::STATUS_COMPLETED], true)) {
             // Teleconsulta (NI2-236 + v11 F04): cancelar, falta ou concluir revoga o acesso e libera a sala.
@@ -360,39 +349,116 @@ class AppointmentService
             throw new InvalidArgumentException("O resumo da evolução clínica é obrigatório para concluir o atendimento.");
         }
 
-        // Se estiver em 'scheduled' ou 'confirmed', avança primeiro para in_progress se necessário
-        if ($appointment['status'] === self::STATUS_SCHEDULED || $appointment['status'] === self::STATUS_CONFIRMED) {
-            $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, 'Início do atendimento clínico', $userId);
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) {
+            $this->db->beginTransaction();
+        } else {
+            $this->db->exec('SAVEPOINT sp_complete_consult');
         }
 
-        // Atualiza status final para completed
-        $this->updateStatus($appointmentId, self::STATUS_COMPLETED, 'Atendimento clínico concluído com registro no prontuário', $userId);
+        try {
+            $appointment = $this->lockAppointment($appointmentId, $clinicId);
+            if (!$appointment || !in_array($appointment['status'], [self::STATUS_SCHEDULED, self::STATUS_CONFIRMED, self::STATUS_IN_PROGRESS], true)) {
+                throw new InvalidArgumentException('Esta consulta já foi encerrada. Use a retificação do prontuário para corrigir uma evolução.');
+            }
 
-        // Append no Prontuário com SHA-256 e trilha criptográfica
-        $clinicalService = new ClinicalRecordService($this->db);
-        $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . date('d/m/Y', strtotime($appointment['scheduled_at'])) . ")";
-        $recordContent = array_merge([
-            'appointment_id' => $appointmentId,
-            'scheduled_at' => $appointment['scheduled_at'],
-            'type' => $appointment['type'],
-            'evolution_summary' => $evolutionSummary,
-            'concluded_at' => date('Y-m-d H:i:s'),
-        ], $clinicalDetails ?? []);
+            // Se estiver em 'scheduled' ou 'confirmed', avança primeiro para in_progress se necessário
+            if ($appointment['status'] === self::STATUS_SCHEDULED || $appointment['status'] === self::STATUS_CONFIRMED) {
+                $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, 'Início do atendimento clínico', $userId);
+            }
 
-        $record = $clinicalService->appendRecord(
-            (int)$appointment['patient_id'],
-            (int)$appointment['professional_id'],
-            $recordTitle,
-            $recordContent
-        );
+            // Append no Prontuário com SHA-256 e trilha criptográfica
+            $clinicalService = new ClinicalRecordService($this->db);
+            $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . date('d/m/Y', strtotime($appointment['scheduled_at'])) . ")";
+            $recordContent = array_merge([
+                'appointment_id' => $appointmentId,
+                'scheduled_at' => $appointment['scheduled_at'],
+                'type' => $appointment['type'],
+                'evolution_summary' => $evolutionSummary,
+                'concluded_at' => date('Y-m-d H:i:s'),
+            ], $clinicalDetails ?? []);
 
-        return [
-            'appointment_id' => $appointmentId,
-            'status' => self::STATUS_COMPLETED,
-            'clinical_record_id' => $record['id'],
-            'record_hash' => $record['record_hash'],
-            'version' => $record['version'],
-        ];
+            $record = $clinicalService->appendRecord(
+                (int)$appointment['patient_id'],
+                (int)$appointment['professional_id'],
+                $recordTitle,
+                $recordContent
+            );
+
+            // Atualiza status final para completed somente após o registro clínico estar persistido
+            $this->updateStatus($appointmentId, self::STATUS_COMPLETED, 'Atendimento clínico concluído com registro no prontuário', $userId);
+
+            if ($ownsTx) {
+                $this->db->commit();
+            } else {
+                $this->db->exec('RELEASE SAVEPOINT sp_complete_consult');
+            }
+
+            return [
+                'appointment_id' => $appointmentId,
+                'status' => self::STATUS_COMPLETED,
+                'clinical_record_id' => $record['id'],
+                'record_hash' => $record['record_hash'],
+                'version' => $record['version'],
+            ];
+        } catch (\Throwable $e) {
+            if ($ownsTx) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+            } else {
+                try {
+                    $this->db->exec('ROLLBACK TO SAVEPOINT sp_complete_consult');
+                    $this->db->exec('RELEASE SAVEPOINT sp_complete_consult');
+                } catch (\Throwable) {
+                }
+            }
+            throw $e;
+        }
+    }
+
+    private function atomic(callable $operation): mixed
+    {
+        $ownsTransaction = !$this->db->inTransaction();
+        $savepoint = 'appointment_' . bin2hex(random_bytes(8));
+        if ($ownsTransaction) {
+            $this->db->beginTransaction();
+        } else {
+            $this->db->exec('SAVEPOINT ' . $savepoint);
+        }
+        try {
+            $result = $operation();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            } else {
+                $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            } elseif (!$ownsTransaction && $this->db->inTransaction()) {
+                $this->db->exec('ROLLBACK TO SAVEPOINT ' . $savepoint);
+                $this->db->exec('RELEASE SAVEPOINT ' . $savepoint);
+            }
+            throw $e;
+        }
+    }
+
+    private function lockAppointment(int $appointmentId, int $clinicId): ?array
+    {
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $stmt = $this->db->prepare('SELECT * FROM appointments WHERE id = ? AND clinic_id = ? FOR UPDATE');
+        } else {
+            // SQLite serializes writers; acquire the write lock before reading state.
+            $stmt = $this->db->prepare('UPDATE appointments SET id = id WHERE id = ? AND clinic_id = ?');
+        }
+        $stmt->execute([$appointmentId, $clinicId]);
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') {
+            $stmt = $this->db->prepare('SELECT * FROM appointments WHERE id = ? AND clinic_id = ?');
+            $stmt->execute([$appointmentId, $clinicId]);
+        }
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     private function teleconsultation(): \ClyoNutri\Domain\Telehealth\TeleconsultationService
@@ -764,8 +830,9 @@ class AppointmentService
         $newStart = strtotime($scheduledAt);
         $newEnd = $newStart + ($durationMinutes * 60);
 
-        // Buscar consultas do mesmo profissional no mesmo dia para verificação exata
-        $targetDate = date('Y-m-d', $newStart);
+        $endExpression = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
+            ? 'DATE_ADD(a.scheduled_at, INTERVAL a.duration_minutes MINUTE)'
+            : "datetime(a.scheduled_at, '+' || a.duration_minutes || ' minutes')";
 
         $sql = "
             SELECT a.id, a.scheduled_at, a.duration_minutes, a.status, p.name AS patient_name
@@ -773,18 +840,24 @@ class AppointmentService
             JOIN patients p ON p.id = a.patient_id
             WHERE a.clinic_id = :clinic_id
               AND a.professional_id = :prof_id
-              AND date(a.scheduled_at) = :target_date
+              AND a.scheduled_at < :new_end
+              AND {$endExpression} > :new_start
               AND a.status NOT IN ('cancelled', 'no_show')
         ";
         $params = [
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
-            'target_date' => $targetDate,
+            'new_start' => $scheduledAt,
+            'new_end' => date('Y-m-d H:i:s', $newEnd),
         ];
 
         if ($excludeAppointmentId !== null) {
             $sql .= " AND a.id != :exclude_id";
             $params['exclude_id'] = $excludeAppointmentId;
+        }
+
+        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $sql .= ' FOR UPDATE';
         }
 
         $stmt = $this->db->prepare($sql);
@@ -809,12 +882,15 @@ class AppointmentService
      */
     private function normalizeDateTime(string $dateTimeStr): string
     {
-        try {
-            $dt = new DateTimeImmutable($dateTimeStr);
-            return $dt->format('Y-m-d H:i:s');
-        } catch (\Throwable $e) {
-            throw new InvalidArgumentException("Data e horário de consulta inválidos: '{$dateTimeStr}'. Use o formato 'YYYY-MM-DD HH:MM'.");
+        foreach (['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d\TH:i:s', 'Y-m-d\TH:i'] as $format) {
+            $dt = DateTimeImmutable::createFromFormat('!' . $format, $dateTimeStr);
+            $errors = DateTimeImmutable::getLastErrors();
+            if ($dt !== false && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+                && $dt->format($format) === $dateTimeStr) {
+                return $dt->format('Y-m-d H:i:s');
+            }
         }
+        throw new InvalidArgumentException("Data e horário de consulta inválidos: '{$dateTimeStr}'. Use o formato 'YYYY-MM-DD HH:MM'.");
     }
 
     /**
@@ -828,28 +904,24 @@ class AppointmentService
         ?int $userId,
         ?string $notes
     ): void {
-        try {
-            $stmt = $this->db->prepare("
-                INSERT INTO appointment_status_history (
-                    clinic_id, appointment_id, from_status, to_status,
-                    changed_by_user_id, notes, created_at
-                ) VALUES (
-                    :clinic_id, :app_id, :from_status, :to_status,
-                    :user_id, :notes, :created_at
-                )
-            ");
-            $stmt->execute([
-                'clinic_id' => $clinicId,
-                'app_id' => $appointmentId,
-                'from_status' => $fromStatus,
-                'to_status' => $toStatus,
-                'user_id' => $userId,
-                'notes' => $notes,
-                // UX-07 (v14): horário no fuso da aplicação (o mesmo de scheduled_at), também no SQLite.
-                'created_at' => date('Y-m-d H:i:s'),
-            ]);
-        } catch (\Throwable $e) {
-            // Em caso de falha no registro de histórico, não interrompe se for tabela não criada em dev antigo
-        }
+        $stmt = $this->db->prepare("
+            INSERT INTO appointment_status_history (
+                clinic_id, appointment_id, from_status, to_status,
+                changed_by_user_id, notes, created_at
+            ) VALUES (
+                :clinic_id, :app_id, :from_status, :to_status,
+                :user_id, :notes, :created_at
+            )
+        ");
+        $stmt->execute([
+            'clinic_id' => $clinicId,
+            'app_id' => $appointmentId,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'user_id' => $userId,
+            'notes' => $notes,
+            // UX-07 (v14): horário no fuso da aplicação (o mesmo de scheduled_at), também no SQLite.
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 }

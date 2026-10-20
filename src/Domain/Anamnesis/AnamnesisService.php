@@ -92,51 +92,98 @@ class AnamnesisService
             $lock = $this->db->prepare('SELECT id FROM patients WHERE id = ? AND clinic_id = ? FOR UPDATE');
             $lock->execute([$patientId, $clinicId]);
         }
-        // 3. Obter versão mais recente para incrementar
-        $vStmt = $this->db->prepare("
-            SELECT COALESCE(MAX(version), 0) + 1 FROM anamneses
-            WHERE patient_id = :patient_id AND clinic_id = :clinic_id
+        // 3. Obter rascunho existente ou próxima versão
+        $checkDraft = $this->db->prepare("
+            SELECT id, version FROM anamneses
+            WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND is_draft = 1
+            ORDER BY id DESC LIMIT 1
         ");
-        $vStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
-        $nextVersion = (int)$vStmt->fetchColumn();
-
-        // 4. Inserção append-only
-        $stmt = $this->db->prepare("
-            INSERT INTO anamneses (
-                clinic_id, patient_id, professional_id, version,
-                objectives, routine, food_preferences, restrictions,
-                allergies, allergy_assessment, symptoms, habits, clinical_history,
-                water_intake_ml, is_draft, notes, created_at
-            ) VALUES (
-                :clinic_id, :patient_id, :professional_id, :version,
-                :objectives, :routine, :food_preferences, :restrictions,
-                :allergies, :allergy_assessment, :symptoms, :habits, :clinical_history,
-                :water_intake_ml, :is_draft, :notes, :created_at
-            )
-        ");
+        $checkDraft->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
+        $existingDraft = $checkDraft->fetch();
 
         $createdAt = date('Y-m-d H:i:s');
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'patient_id' => $patientId,
-            'professional_id' => $professionalId,
-            'version' => $nextVersion,
-            'objectives' => $cleanData['objectives'],
-            'routine' => $cleanData['routine'],
-            'food_preferences' => $cleanData['food_preferences'],
-            'restrictions' => $cleanData['restrictions'],
-            'allergies' => $cleanData['allergies'],
-            'allergy_assessment' => $assessment,
-            'symptoms' => $cleanData['symptoms'],
-            'habits' => $cleanData['habits'],
-            'clinical_history' => $cleanData['clinical_history'],
-            'water_intake_ml' => $cleanData['water_intake_ml'],
-            'is_draft' => $isDraft ? 1 : 0,
-            'notes' => $cleanData['notes'],
-            'created_at' => $createdAt,
-        ]);
 
-        $id = (int)$this->db->lastInsertId();
+        if ($existingDraft) {
+            $id = (int)$existingDraft['id'];
+            $nextVersion = (int)$existingDraft['version'];
+            $stmt = $this->db->prepare("
+                UPDATE anamneses SET
+                    professional_id = :professional_id,
+                    objectives = :objectives,
+                    routine = :routine,
+                    food_preferences = :food_preferences,
+                    restrictions = :restrictions,
+                    allergies = :allergies,
+                    allergy_assessment = :allergy_assessment,
+                    symptoms = :symptoms,
+                    habits = :habits,
+                    clinical_history = :clinical_history,
+                    water_intake_ml = :water_intake_ml,
+                    is_draft = :is_draft,
+                    notes = :notes,
+                    created_at = :created_at
+                WHERE id = :id AND clinic_id = :clinic_id
+            ");
+            $stmt->execute([
+                'professional_id' => $professionalId,
+                'objectives' => $cleanData['objectives'],
+                'routine' => $cleanData['routine'],
+                'food_preferences' => $cleanData['food_preferences'],
+                'restrictions' => $cleanData['restrictions'],
+                'allergies' => $cleanData['allergies'],
+                'allergy_assessment' => $assessment,
+                'symptoms' => $cleanData['symptoms'],
+                'habits' => $cleanData['habits'],
+                'clinical_history' => $cleanData['clinical_history'],
+                'water_intake_ml' => $cleanData['water_intake_ml'],
+                'is_draft' => $isDraft ? 1 : 0,
+                'notes' => $cleanData['notes'],
+                'created_at' => $createdAt,
+                'id' => $id,
+                'clinic_id' => $clinicId,
+            ]);
+        } else {
+            $vStmt = $this->db->prepare("
+                SELECT COALESCE(MAX(version), 0) + 1 FROM anamneses
+                WHERE patient_id = :patient_id AND clinic_id = :clinic_id
+            ");
+            $vStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
+            $nextVersion = (int)$vStmt->fetchColumn();
+
+            $stmt = $this->db->prepare("
+                INSERT INTO anamneses (
+                    clinic_id, patient_id, professional_id, version,
+                    objectives, routine, food_preferences, restrictions,
+                    allergies, allergy_assessment, symptoms, habits, clinical_history,
+                    water_intake_ml, is_draft, notes, created_at
+                ) VALUES (
+                    :clinic_id, :patient_id, :professional_id, :version,
+                    :objectives, :routine, :food_preferences, :restrictions,
+                    :allergies, :allergy_assessment, :symptoms, :habits, :clinical_history,
+                    :water_intake_ml, :is_draft, :notes, :created_at
+                )
+            ");
+            $stmt->execute([
+                'clinic_id' => $clinicId,
+                'patient_id' => $patientId,
+                'professional_id' => $professionalId,
+                'version' => $nextVersion,
+                'objectives' => $cleanData['objectives'],
+                'routine' => $cleanData['routine'],
+                'food_preferences' => $cleanData['food_preferences'],
+                'restrictions' => $cleanData['restrictions'],
+                'allergies' => $cleanData['allergies'],
+                'allergy_assessment' => $assessment,
+                'symptoms' => $cleanData['symptoms'],
+                'habits' => $cleanData['habits'],
+                'clinical_history' => $cleanData['clinical_history'],
+                'water_intake_ml' => $cleanData['water_intake_ml'],
+                'is_draft' => $isDraft ? 1 : 0,
+                'notes' => $cleanData['notes'],
+                'created_at' => $createdAt,
+            ]);
+            $id = (int)$this->db->lastInsertId();
+        }
 
         // 5. Auditoria sem PII
         $this->logAudit($clinicId, $patientId, $isDraft ? 'ANAMNESIS_DRAFT_SAVED' : 'ANAMNESIS_RECORD_CREATED', (string)$id, [

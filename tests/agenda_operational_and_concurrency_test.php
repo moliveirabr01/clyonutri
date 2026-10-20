@@ -188,7 +188,7 @@ assertCheck($conflictConcurrence, "Slot concorrente idêntico bloqueado atomicam
 // -----------------------------------------------------------------------------
 echo "\n[3/5] Testando Máquina de Estados e Histórico de Auditoria...\n";
 
-$lifeApp = $service->schedule($p1['id'], $profId, '2026-11-15 11:00:00', 'first_visit', 60, 'Ciclo de vida completo');
+$lifeApp = $service->schedule($p1['id'], $profId, '2026-11-16 11:00:00', 'first_visit', 60, 'Ciclo de vida completo');
 
 // scheduled -> confirmed
 $step1 = $service->updateStatus($lifeApp['id'], 'confirmed', 'Paciente confirmou presença');

@@ -50,3 +50,9 @@ tests/teleconsulta_navegador/node_modules/
 storage/sessions/
 tests/prontuario_impressao/node_modules
 tests/plano_impressao/node_modules
+
+# Configuração privada e pacotes locais que a contêm
+.env.hostgator
+/clyonutri-hostgator-*.zip
+/release/clyonutri-hostgator-*/
+/_to_delete/

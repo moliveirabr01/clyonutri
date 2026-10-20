@@ -138,6 +138,9 @@ class AuthController
         }
         session_destroy();
 
+        if (!headers_sent()) {
+            header('Clear-Site-Data: "storage"');
+        }
         header('Location: /login');
         exit;
     }
@@ -175,6 +178,13 @@ class AuthController
 
         if ($name === '' || $email === '' || $password === '' || $clinicName === '' || $crn === '') {
             $_SESSION['flash_error'] = 'Preencha todos os campos obrigatórios para ativar o consultório.';
+            $_SESSION['old_input'] = $_POST;
+            header('Location: /cadastro');
+            exit;
+        }
+
+        if (empty($_POST['terms_accepted'])) {
+            $_SESSION['flash_error'] = 'É obrigatório ler e concordar com os Termos de Uso e a Política de Privacidade (LGPD).';
             $_SESSION['old_input'] = $_POST;
             header('Location: /cadastro');
             exit;

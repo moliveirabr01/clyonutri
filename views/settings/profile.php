@@ -12,7 +12,7 @@
 </div>
 
 <?php if($error): ?><p role="alert" class="card"><?= htmlspecialchars($error) ?></p><?php endif; ?>
-<?php if($success): ?><p role="status" class="card">Configurações atualizadas com sucesso.</p><?php endif; ?>
+<?php if($success): ?><p role="status" class="card"><?= htmlspecialchars($successMessage ?? 'Configurações atualizadas com sucesso.') ?></p><?php endif; ?>
 <div style="max-width: 960px;">
 <form class="card" method="POST" action="/configuracoes" data-unsaved-form>
 <h2>Dados cadastrais</h2>
@@ -27,7 +27,15 @@
 <legend style="font-size: 1.2rem; font-weight: 700; margin-bottom: 16px;">Registro no Conselho (CRN) &amp; Identificação</legend>
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
 <div class="form-group"><label class="form-label" for="profile-crn">Número do CRN</label><input class="form-control" id="profile-crn" name="crn" maxlength="20" required value="<?= htmlspecialchars($values['crn']??'',ENT_QUOTES) ?>"></div>
-<div class="form-group"><label class="form-label" for="profile-crn_region">Região do CRN</label><input class="form-control" id="profile-crn_region" name="crn_region" maxlength="10" required placeholder="Ex.: CRN-4" value="<?= htmlspecialchars($values['crn_region']??'',ENT_QUOTES) ?>"></div>
+<div class="form-group"><label class="form-label" for="profile-crn_region">Região do CRN</label>
+<?php $crnOptions=['CRN-1'=>'CRN-1 (DF/GO/MT/TO)','CRN-2'=>'CRN-2 (RS)','CRN-3'=>'CRN-3 (SP/MS)','CRN-4'=>'CRN-4 (RJ/ES)','CRN-5'=>'CRN-5 (BA/SE)','CRN-6'=>'CRN-6 (PE/AL/PB/RN/CE/PI/MA)','CRN-7'=>'CRN-7 (PA/AM/AP/AC/RO/RR)','CRN-8'=>'CRN-8 (PR)','CRN-9'=>'CRN-9 (MG)','CRN-10'=>'CRN-10 (SC)','CRN-11'=>'CRN-11 (CE/PI/MA)']; $currentReg=strtoupper(trim($values['crn_region']??'')); ?>
+<select class="form-control" id="profile-crn_region" name="crn_region" required>
+  <option value="">Selecione a região...</option>
+  <?php foreach($crnOptions as $val=>$lbl): ?>
+    <option value="<?= $val ?>" <?= $currentReg===$val || str_starts_with($currentReg,$val)?'selected':'' ?>><?= $lbl ?></option>
+  <?php endforeach; ?>
+</select>
+</div>
 </div>
 <p style="font-size: .875rem;">Alterações de e-mail ou CRN ficam pendentes de nova verificação cadastral.</p>
 </fieldset>
@@ -40,7 +48,10 @@
 <input type="hidden" name="section" value="availability">
 <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
 <input type="hidden" name="revision" value="<?= $revision ?>">
-<div class="form-group"><label class="form-label" for="appointment-duration">Duração padrão da consulta (minutos)</label><input id="appointment-duration" class="form-control" name="default_duration_minutes" type="number" min="15" max="240" required value="<?= htmlspecialchars((string)$duration,ENT_QUOTES) ?>"></div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+  <div class="form-group"><label class="form-label" for="appointment-duration">Duração padrão da consulta (minutos)</label><input id="appointment-duration" class="form-control" name="default_duration_minutes" type="number" min="15" max="240" required value="<?= htmlspecialchars((string)$duration,ENT_QUOTES) ?>"></div>
+  <div class="form-group"><label class="form-label" for="appointment-price">Valor padrão de referência (R$)</label><input id="appointment-price" class="form-control" type="text" readonly value="R$ <?= number_format((float)$defaultPrice, 2, ',', '.') ?>" style="background: var(--neutral-gray-100);"></div>
+</div>
 <?php foreach(['seg'=>'Segunda-feira','ter'=>'Terça-feira','qua'=>'Quarta-feira','qui'=>'Quinta-feira','sex'=>'Sexta-feira','sab'=>'Sábado','dom'=>'Domingo'] as $day=>$label): $row=is_array($weekly[$day]??null)?$weekly[$day]:[]; ?>
 <fieldset style="border: 1px solid var(--neutral-gray-300); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
 <legend style="padding: 0 8px; font-weight: 600;"><?= $label ?></legend>

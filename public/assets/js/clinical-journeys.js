@@ -166,4 +166,21 @@
   toggle?.addEventListener('click', () => { const open = toggle.getAttribute('aria-expanded') !== 'true'; toggle.setAttribute('aria-expanded', String(open)); nav?.classList.toggle('is-open', open); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && toggle?.getAttribute('aria-expanded') === 'true') { toggle.click(); toggle.focus(); } });
   document.querySelectorAll('.app-nav__item.active').forEach(el => el.setAttribute('aria-current', 'page'));
+
+  /* V15-02: higienização de rascunhos locais no sessionStorage após confirmação de conclusão da consulta ou no logout */
+  const clearDraftStorage = () => {
+    try {
+      for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+        const k = window.sessionStorage.key(i);
+        if (k && k.startsWith('cn_consult_draft:')) window.sessionStorage.removeItem(k);
+      }
+    } catch (e) {}
+  };
+  if (window.location.search.includes('success=consulta_concluida')) {
+    clearDraftStorage();
+  }
+  document.querySelectorAll('form.logout-form, form[action="/logout"]').forEach(f => {
+    f.addEventListener('submit', clearDraftStorage);
+  });
 })();
+

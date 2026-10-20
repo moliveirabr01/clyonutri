@@ -68,8 +68,15 @@ class TeleconsultationDraftService
                     VALUES (:c, :s, :p, :t, :n, :g, 1, :at)
                 ")->execute(['c' => $clinicId, 's' => $sessionId, 'p' => $professionalId, 't' => $title, 'n' => $notes, 'g' => $goals, 'at' => $now]);
             } catch (\PDOException $e) {
-                // Outra aba criou o rascunho ao mesmo tempo.
-                return ['status' => 'conflict', 'version' => 0, 'server' => $this->row($sessionId, $professionalId, $clinicId)];
+                if (\ClyoNutri\Domain\Appointment\ConsultationDraftService::isUniqueConstraintViolation($e)) {
+                    $existing = $this->row($sessionId, $professionalId, $clinicId);
+                    return [
+                        'status' => 'conflict',
+                        'version' => (int)($existing['version'] ?? 0),
+                        'server' => $existing,
+                    ];
+                }
+                throw $e;
             }
             return ['status' => 'saved', 'version' => 1, 'updated_at_utc' => $now];
         }

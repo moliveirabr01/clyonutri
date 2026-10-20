@@ -452,24 +452,38 @@ class TeleconsultationService
     public function submitDeviceCheck(string $rawToken, array $metrics): array
     {
         $session = $this->getSessionByPatientToken($rawToken);
-        if (empty($metrics['camera_ok']) || empty($metrics['microphone_ok'])) {
-            throw new InvalidArgumentException('O teste precisa confirmar câmera e microfone funcionando.');
+        $mode = (string)($metrics['mode'] ?? 'full');
+        if ($mode === 'audio_only') {
+            if (empty($metrics['microphone_ok'])) {
+                throw new InvalidArgumentException('O modo de áudio exige confirmar o microfone.');
+            }
+            $passed = 2;
+        } elseif ($mode === 'bypass_warning') {
+            $passed = 3;
+        } else {
+            if (empty($metrics['camera_ok']) || empty($metrics['microphone_ok'])) {
+                throw new InvalidArgumentException('O teste precisa confirmar câmera e microfone funcionando.');
+            }
+            $passed = 1;
         }
+
         $target = $session['status'] === self::STATUS_SCHEDULED ? self::STATUS_DEVICE_CHECKED : $session['status'];
         if ($target !== $session['status']) {
             $this->assertTransition($session['status'], $target);
         }
 
-        $this->transaction(function () use ($session, $target, $metrics): void {
+        $this->transaction(function () use ($session, $target, $metrics, $passed, $mode): void {
             $this->guardedUpdate((int)$session['id'], (int)$session['clinic_id'], $session['status'], [
-                'device_check_passed' => 1,
+                'device_check_passed' => $passed,
+                'device_check_mode' => $mode,
                 'status' => $target,
             ]);
             $this->recordEvent((int)$session['id'], (int)$session['clinic_id'], 'device_checked', 'patient', (int)$session['patient_id'], [
+                'device_check_mode' => $mode,
                 'browser_family' => self::browserFamily((string)($metrics['browser'] ?? '')),
             ]);
         });
-        return ['device_check_passed' => true, 'status' => $target];
+        return ['device_check_passed' => true, 'device_check_mode' => $mode, 'status' => $target];
     }
 
     /** Versão oficial do termo de teleconsulta (inserida pela migração 35, consent_terms). */

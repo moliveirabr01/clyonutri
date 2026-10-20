@@ -109,6 +109,8 @@ $recipeCtrl = new \ClyoNutri\Application\Controllers\RecipeController($db);
 $onboardingCtrl = new \ClyoNutri\Application\Controllers\OnboardingController($db);
 $adminCtrl = new \ClyoNutri\Application\Controllers\AdminController($db);
 $subCtrl = new \ClyoNutri\Application\Controllers\SubscriptionController();
+$patientAppCtrl = new \ClyoNutri\Application\Controllers\PatientAppController();
+$bookingCtrl = new \ClyoNutri\Application\Controllers\BookingController($db);
 
 // 1. Rotas de Autenticação & Recuperação de Acesso (PX-29 / NI2-322)
 $router->get('/login', [$authCtrl, 'showLogin']);
@@ -184,6 +186,14 @@ $requireAuth = function (callable $action) use ($db) {
             session_start();
         }
 
+        $reqUriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        $wantsJsonAuthError = str_starts_with($reqUriPath, '/api/')
+            || str_ends_with($reqUriPath, '/rascunho')
+            || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')
+            || str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')
+            || isset($_SERVER['HTTP_X_CSRF_TOKEN'])
+            || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+
         // Validação de tempo de inatividade de sessão configurado na plataforma (NI2-407 / AUD-05)
         $timeoutMinutes = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes($db);
         if (!empty($_SESSION['last_activity']) && (time() - (int)$_SESSION['last_activity'] > ($timeoutMinutes * 60))) {
@@ -191,12 +201,10 @@ $requireAuth = function (callable $action) use ($db) {
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_destroy();
             }
-            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/') || 
-                str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
-                ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+            if ($wantsJsonAuthError) {
                 http_response_code(401);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => 'Sessão encerrada por inatividade.']);
+                echo json_encode(['status' => 'unauthenticated', 'error' => 'Sessão encerrada por inatividade.']);
                 exit;
             }
             \ClyoNutri\Core\Http\Response::redirect('/login?error=session_timeout');
@@ -204,12 +212,10 @@ $requireAuth = function (callable $action) use ($db) {
         $_SESSION['last_activity'] = time();
 
         if (empty($_SESSION['user_id']) || empty($_SESSION['clinic_id'])) {
-            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/') || 
-                str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
-                ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+            if ($wantsJsonAuthError) {
                 http_response_code(401);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => 'Sessão expirada ou não autenticada.']);
+                echo json_encode(['status' => 'unauthenticated', 'error' => 'Sessão expirada ou não autenticada.']);
                 exit;
             }
             \ClyoNutri\Core\Http\Response::redirect('/login');
@@ -217,12 +223,10 @@ $requireAuth = function (callable $action) use ($db) {
 
         $authUser = \ClyoNutri\Core\Auth\AuthContext::resolveFromSession($db);
         if (!$authUser) {
-            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/') || 
-                str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
-                ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+            if ($wantsJsonAuthError) {
                 http_response_code(403);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => 'Acesso revogado ou sessão suspensa.']);
+                echo json_encode(['status' => 'forbidden', 'error' => 'Acesso revogado ou sessão suspensa.']);
                 exit;
             }
             \ClyoNutri\Core\Http\Response::redirect('/login?error=session_revoked');
@@ -302,6 +306,21 @@ $requireChat = function (callable $action) use ($db) {
 $router->get('/', [$landingCtrl, 'index']);
 $router->get('/termos', [$landingCtrl, 'terms']);
 $router->get('/privacidade', [$landingCtrl, 'privacy']);
+
+// Portal & App do Paciente (P03 - Auditoria Navegação Assistida)
+$router->get('/app', [$patientAppCtrl, 'index']);
+$router->post('/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
+$router->post('/app/login', [$patientAppCtrl, 'login']);
+
+// Autoagendamento Self-Service (NI2-433 / NI2-434)
+$router->get('/agendar', [$bookingCtrl, 'publicBookingPage']);
+$router->get('/agendar/{professionalId}', [$bookingCtrl, 'publicBookingPage']);
+$router->get('/api/v1/booking/slots', [$bookingCtrl, 'getSlots']);
+$router->post('/api/v1/booking/holds', [$bookingCtrl, 'createHold']);
+$router->post('/api/v1/booking/confirm', [$bookingCtrl, 'confirmBooking']);
+$router->post('/api/v1/booking/release', [$bookingCtrl, 'releaseHold']);
+$router->post('/api/v1/patient/appointments/{id}/cancel', [$bookingCtrl, 'cancelByPatient']);
+$router->post('/api/v1/patient/appointments/{id}/reschedule', [$bookingCtrl, 'rescheduleByPatient']);
 
 // Onboarding Guiado e Ativação do Consultório (NI2-282)
 $router->get('/onboarding', $requireAuth([$onboardingCtrl, 'show']));

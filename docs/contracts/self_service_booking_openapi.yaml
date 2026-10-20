@@ -1,0 +1,418 @@
+openapi: 3.0.3
+info:
+  title: ClyoNutri II — API de Autoagendamento Self-Service (NI2-433 / NI2-434)
+  description: Contrato unificado de autoagendamento para portal web público, aplicativo do paciente e agenda operacional.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: API v1 de Autoagendamento ClyoNutri
+
+paths:
+  /booking/slots:
+    get:
+      summary: Consulta horários disponíveis de um profissional em uma data
+      operationId: getAvailableSlots
+      parameters:
+        - name: clinic_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: ID da clínica
+        - name: professional_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: ID do profissional nutricionista
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: "2026-10-20"
+          description: Data da consulta (AAAA-MM-DD)
+        - name: duration
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 60
+          description: Duração estimada em minutos
+        - name: modality
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [presential, telehealth]
+            default: presential
+          description: Modalidade presencial ou teleconsulta
+      responses:
+        '200':
+          description: Lista de slots disponíveis retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clinic_id:
+                    type: integer
+                  professional_id:
+                    type: integer
+                  date:
+                    type: string
+                  duration_minutes:
+                    type: integer
+                  available_slots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        time:
+                          type: string
+                          example: "09:00"
+                        scheduled_at:
+                          type: string
+                          format: date-time
+                          example: "2026-10-20 09:00:00"
+                        available:
+                          type: boolean
+                          example: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /booking/holds:
+    post:
+      summary: Cria reserva temporária de horário com TTL de 15 minutos (Hold)
+      operationId: createBookingHold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clinic_id
+                - professional_id
+                - scheduled_at
+              properties:
+                clinic_id:
+                  type: integer
+                professional_id:
+                  type: integer
+                scheduled_at:
+                  type: string
+                  format: date-time
+                  example: "2026-10-20 09:00:00"
+                duration_minutes:
+                  type: integer
+                  default: 60
+                service_type:
+                  type: string
+                  default: first_visit
+                modality:
+                  type: string
+                  enum: [presential, telehealth]
+                  default: presential
+                idempotency_key:
+                  type: string
+                  description: Chave única de idempotência do cliente
+                patient_name:
+                  type: string
+                patient_email:
+                  type: string
+                  format: email
+                patient_phone:
+                  type: string
+      responses:
+        '201':
+          description: Reserva temporária criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingHold'
+        '409':
+          description: Conflito — o horário já foi ocupado ou reservado por outro usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /booking/confirm:
+    post:
+      summary: Confirma a reserva temporária e converte no agendamento canônico (appointments)
+      operationId: confirmBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hold_token
+                - name
+                - email
+                - phone
+              properties:
+                hold_token:
+                  type: string
+                  example: "a1b2c3d4e5f6..."
+                name:
+                  type: string
+                  example: "Maria Santos"
+                email:
+                  type: string
+                  format: email
+                  example: "maria.santos@email.com"
+                phone:
+                  type: string
+                  example: "(11) 98765-4321"
+                cpf:
+                  type: string
+                  example: "123.456.789-00"
+                notes:
+                  type: string
+                  example: "Primeira consulta para reeducação alimentar."
+      responses:
+        '200':
+          description: Agendamento canônico confirmado e persistido com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  appointment_id:
+                    type: integer
+                    example: 1042
+                  status:
+                    type: string
+                    example: "scheduled"
+                  scheduled_at:
+                    type: string
+                    format: date-time
+                    example: "2026-10-20 09:00:00"
+                  duration_minutes:
+                    type: integer
+                    example: 60
+                  modality:
+                    type: string
+                    example: "presential"
+                  teleconsultation_ready:
+                    type: boolean
+                    example: false
+        '410':
+          description: Reserva temporária expirada pelo TTL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflito detectado no fechamento da reserva
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /booking/release:
+    post:
+      summary: Libera voluntariamente uma reserva temporária antes do TTL
+      operationId: releaseBookingHold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hold_token
+              properties:
+                hold_token:
+                  type: string
+      responses:
+        '200':
+          description: Reserva liberada; slot devolvido de imediato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  released:
+                    type: boolean
+                    example: true
+
+  /patient/appointments/{id}/cancel:
+    post:
+      summary: Cancelamento self-service de consulta pelo paciente autenticado
+      operationId: cancelPatientAppointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID da consulta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  example: "Imprevisto no trabalho no horário da consulta."
+      responses:
+        '200':
+          description: Consulta cancelada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  appointment_id:
+                    type: integer
+                  status:
+                    type: string
+                    example: "cancelled"
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /patient/appointments/{id}/reschedule:
+    post:
+      summary: Reagendamento self-service de consulta pelo paciente autenticado
+      operationId: reschedulePatientAppointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID da consulta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - new_scheduled_at
+              properties:
+                new_scheduled_at:
+                  type: string
+                  format: date-time
+                  example: "2026-10-22 14:00:00"
+                reason:
+                  type: string
+                  example: "Necessidade de reagendamento pelo paciente."
+      responses:
+        '200':
+          description: Consulta reagendada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  appointment_id:
+                    type: integer
+                  scheduled_at:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+                    example: "scheduled"
+        '409':
+          description: Conflito de agenda no novo horário solicitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+components:
+  schemas:
+    BookingHold:
+      type: object
+      properties:
+        hold_token:
+          type: string
+          example: "7f8a9b0c1d2e3f..."
+        status:
+          type: string
+          enum: [held, converted, expired, released]
+          example: "held"
+        scheduled_at:
+          type: string
+          format: date-time
+          example: "2026-10-20 09:00:00"
+        duration_minutes:
+          type: integer
+          example: 60
+        expires_at_utc:
+          type: string
+          format: date-time
+          example: "2026-10-16 11:15:00"
+        ttl_seconds_remaining:
+          type: integer
+          example: 900
+        payment_status:
+          type: string
+          enum: [not_required, pending, paid, waived]
+          example: "not_required"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Conflito de agenda ou reserva expirada."
+        code:
+          type: string
+          enum: [SLOT_UNAVAILABLE, HOLD_EXPIRED, MIN_ADVANCE_VIOLATION, OUTSIDE_WORKING_HOURS, FORBIDDEN_TENANT_ACCESS, APPOINTMENT_NOT_FOUND, UNPROCESSABLE_ENTITY]
+          example: "SLOT_UNAVAILABLE"
+        correlation_id:
+          type: string
+          example: "clyo-bk-67123abc"
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Acesso proibido por isolamento de tenant ou paciente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnprocessableEntity:
+      description: Regra de negócio ou política violada
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

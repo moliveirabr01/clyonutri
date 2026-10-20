@@ -26,8 +26,29 @@ final class SettingsController
         if($error)foreach(['name','clinic_name','specialty','bio','email','phone','crn','crn_region'] as $field)if(is_string($_POST[$field]??null))$values[$field]=$_POST[$field];
         $preferences=json_decode($profile['practice_preferences'],true)?:[];
         $weekly=$preferences['weekly_availability']??[];
+        if (empty($weekly) && !empty($preferences['working_days'])) {
+            $workingDays = is_array($preferences['working_days']) ? $preferences['working_days'] : [];
+            $weekly = [];
+            foreach (['seg','ter','qua','qui','sex','sab','dom'] as $d) {
+                $enabled = in_array($d, $workingDays, true);
+                $weekly[$d] = [
+                    'enabled' => $enabled,
+                    'start' => $enabled ? '08:00' : '',
+                    'end' => $enabled ? '18:00' : '',
+                    'break_start' => $enabled ? '12:00' : '',
+                    'break_end' => $enabled ? '13:00' : '',
+                ];
+            }
+        }
         $duration=$preferences['default_duration_minutes']??60;
+        $defaultPrice=$preferences['default_price']??250.0;
+        $modalities=$preferences['modalities']??['presencial', 'online'];
         if($error&&($_POST['section']??'')==='availability'){if(is_array($_POST['weekly']??null))$weekly=$_POST['weekly'];if(is_string($_POST['default_duration_minutes']??null))$duration=$_POST['default_duration_minutes'];}
+        $successMessage=null;
+        if($success){
+            $lastSec=$_POST['section']??'';
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':'Configurações atualizadas com sucesso.');
+        }
         $revision=ProfessionalProfile::revision($profile);$title='Configurações';$activeNav='configuracoes';$clinicName=$_SESSION['clinic_name']??'';$userName=$_SESSION['user_name']??'';
         ob_start();require __DIR__.'/../../../views/settings/profile.php';$content=ob_get_clean();require __DIR__.'/../../../views/layouts/professional-shell.php';
     }

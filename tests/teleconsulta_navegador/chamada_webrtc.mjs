@@ -1,10 +1,40 @@
 // Executa o public/assets/js/teleconsulta-webrtc.js REAL em dois pares (nutricionista e paciente),
 // com WebRTC do werift e todas as requisições indo ao public/index.php real (SAPI web do php-wasm).
+import dgram from 'node:dgram';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import * as werift from 'werift';
 import { PHP, PHPRequestHandler, setPhpIniEntries } from '@php-wasm/universal';
 import { loadNodeRuntime, createNodeFsMountHandler } from '@php-wasm/node';
+
+// Em sandboxes CI/macOS onde sendto(127.0.0.1) retorna EPERM mas bind(127.0.0.1) é permitido,
+// entrega os datagramas UDP STUN/DTLS/SRTP entre os sockets locais vinculados no mesmo processo.
+const localUdpSockets = new Map();
+const origBind = dgram.Socket.prototype.bind;
+const origClose = dgram.Socket.prototype.close;
+const origSend = dgram.Socket.prototype.send;
+dgram.Socket.prototype.bind = function (...args) {
+  this.once('listening', () => { try { localUdpSockets.set(this.address().port, this); } catch {} });
+  return origBind.apply(this, args);
+};
+dgram.Socket.prototype.close = function (...args) {
+  try { localUdpSockets.delete(this.address().port); } catch {}
+  return origClose.apply(this, args);
+};
+dgram.Socket.prototype.send = function (buf, port, host, cb) {
+  return origSend.call(this, buf, port, host, (err) => {
+    if (err && err.code === 'EPERM') {
+      const dst = localUdpSockets.get(Number(port));
+      if (dst) {
+        const srcPort = this.address().port;
+        setImmediate(() => dst.emit('message', Buffer.from(buf), { address: '127.0.0.1', family: 'IPv4', port: srcPort, size: buf.length }));
+      }
+      if (typeof cb === 'function') cb(null);
+      return;
+    }
+    if (typeof cb === 'function') cb(err);
+  });
+};
 
 const WORK = process.env.WORK || new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const ids = JSON.parse(process.env.IDS);

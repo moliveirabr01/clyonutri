@@ -604,8 +604,8 @@ class DashboardController
                     <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="ant_height">Altura (cm) *</label>
-                    <input type="number" step="0.1" min="45" max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175.0" required>
+                    <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
+                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
                   </div>
                 </div>
 
@@ -810,7 +810,7 @@ class DashboardController
               <div class="card" style="margin-bottom: 0;">
                 <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">RCQ (CINTURA / QUADRIL)</div>
                 <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
-                  <?= $latestEval['whr'] ?>
+                  <?= htmlspecialchars(LabelMap::num($latestEval['whr'] ?? null, 2)) ?>
                 </div>
                 <span class="badge badge-<?= $latestEval['whr_risk'] === 'baixo' ? 'success' : ($latestEval['whr_risk'] === 'moderado' ? 'warning' : 'danger') ?>">
                   <?= $latestEval['whr_classification'] ?>
@@ -1073,8 +1073,8 @@ class DashboardController
                     <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="ant_height">Altura (cm) *</label>
-                    <input type="number" step="0.1" min="45" max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175.0" required>
+                    <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
+                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
                   </div>
                 </div>
 
@@ -1762,7 +1762,7 @@ class DashboardController
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
           <div role="status" aria-live="polite" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
-            ✓ Anamnese salva. As versões anteriores continuam disponíveis no histórico.
+            ✓ <?= $_GET['success'] === 'rascunho_salvo' ? 'Rascunho da anamnese salvo com sucesso. Você pode continuar preenchendo a qualquer momento.' : ($_GET['success'] === 'anamnese_concluida' ? 'Anamnese concluída e assinada com sucesso! A versão foi arquivada no histórico do prontuário.' : 'Anamnese salva. As versões anteriores continuam disponíveis no histórico.') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
@@ -2172,7 +2172,8 @@ class DashboardController
         try {
             $anamnesisService->saveAnamnesis($patientId, $profId, $_POST, $isDraft);
             \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'anamnese');
-            header("Location: /pacientes/{$patientId}/anamnese?success=anamnese_salva");
+            $successParam = $isDraft ? 'rascunho_salvo' : 'anamnese_concluida';
+            header("Location: /pacientes/{$patientId}/anamnese?success={$successParam}");
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
@@ -2270,8 +2271,9 @@ class DashboardController
             header("Location: /agenda?date={$targetDate}&novo=1&error=conflito#card-novo-agendamento");
             exit;
         } catch (\Throwable $e) {
+            $targetDate = date('Y-m-d', strtotime($scheduledAt) ?: time());
             $this->rememberAgendaForm('new', $e->getMessage(), false);
-            header("Location: /agenda?novo=1&error=falha#card-novo-agendamento");
+            header("Location: /agenda?date={$targetDate}&novo=1&error=falha#card-novo-agendamento");
             exit;
         }
     }
@@ -2497,13 +2499,33 @@ class DashboardController
         $isEarly = $canStart && AppointmentService::isEarlyStart((string)$app['scheduled_at']);
         $inProgress = $app['status'] === AppointmentService::STATUS_IN_PROGRESS;
 
-        // UX-03 (v14): rascunho por consulta + usuário, restaurado ao retomar.
+        // UX-03 (v14/v16): rascunho por consulta + usuário, restaurado ao retomar ou após falha no POST de conclusão.
+        $clinicId = (int)TenantContext::getClinicId();
+        $userId = (int)TenantContext::getUserId();
+        $draftScope = "{$clinicId}:{$userId}:{$id}";
         $draft = ['evolution_summary' => null, 'weight_kg' => null, 'waist_cm' => null, 'version' => 0, 'updated_at_utc' => null];
         if ($inProgress) {
             try {
-                $draft = (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->get($id, (int)TenantContext::getUserId(), (int)TenantContext::getClinicId());
+                $draft = (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->get($id, $userId, $clinicId);
             } catch (\Throwable $e) {
                 error_log('[consulta] rascunho indisponível: ' . get_class($e));
+            }
+        }
+        $draftRecoveredFromPost = false;
+        if (isset($_SESSION['consultation_form_recovery'][$id]) && is_array($_SESSION['consultation_form_recovery'][$id])) {
+            $rec = $_SESSION['consultation_form_recovery'][$id];
+            unset($_SESSION['consultation_form_recovery'][$id]);
+            if (
+                (int)($rec['clinic_id'] ?? 0) === $clinicId
+                && (int)($rec['user_id'] ?? 0) === $userId
+                && (time() - (int)($rec['saved_at'] ?? 0)) <= 900
+            ) {
+                foreach (['evolution_summary', 'weight_kg', 'waist_cm'] as $fKey) {
+                    if (array_key_exists($fKey, $rec) && $rec[$fKey] !== null && $rec[$fKey] !== '') {
+                        $draft[$fKey] = (string)$rec[$fKey];
+                    }
+                }
+                $draftRecoveredFromPost = true;
             }
         }
         $draftSavedLocal = !empty($draft['updated_at_utc'])
@@ -2618,6 +2640,16 @@ class DashboardController
                 <a href="/planos/<?= $plan['id'] ?>" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Abrir Editor da Prescrição ↗</a>
               <?php endif; ?>
             </div>
+
+            <!-- Anamnese Nutricional -->
+            <div class="card">
+              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0;">Anamnese Nutricional</h3>
+                <a href="/pacientes/<?= (int)$app['patient_id'] ?>/anamnese" target="_blank" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Abrir Anamnese ↗</a>
+              </div>
+              <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin: 0 0 8px 0;">Consulte ou atualize o histórico clínico, alergias e rotina do paciente.</p>
+              <a href="/pacientes/<?= (int)$app['patient_id'] ?>/anamnese" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Ver / Preencher Anamnese Estruturada ↗</a>
+            </div>
           </div>
 
           <!-- Coluna 2: Formulário de Execução e Conclusão da Consulta -->
@@ -2646,11 +2678,20 @@ class DashboardController
                 </form>
               </section>
               <?php elseif (!$inProgress): ?>
-              <p data-testid="consult-closed" style="padding: 12px; background: #F8FAFC; border-radius: 8px;">Consulta com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong>; não há anotações em andamento.</p>
+              <p data-testid="consult-closed" data-draft-scope="<?= htmlspecialchars($draftScope) ?>" style="padding: 12px; background: #F8FAFC; border-radius: 8px;">Consulta com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong>; não há anotações em andamento.</p>
+              <script src="/assets/js/consulta-rascunho.js" defer></script>
               <?php else: ?>
+              <?php if (!empty($_GET['error'])): ?>
+                <div role="alert" data-testid="consult-submit-error" style="padding: 12px 14px; margin-bottom: 12px; border-radius: 8px; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; font-size: 0.875rem;">
+                  <strong>Não foi possível concluir a consulta:</strong>
+                  <?= ($_GET['error'] === 'resumo_obrigatorio')
+                      ? 'Informe o resumo da evolução clínica antes de assinar o prontuário. Os demais campos preenchidos foram preservados.'
+                      : 'Ocorreu uma falha temporária ao concluir o atendimento. Suas anotações foram preservadas abaixo; revise e tente novamente.' ?>
+                </div>
+              <?php endif; ?>
               <form action="/consulta/<?= $app['id'] ?>/concluir" method="POST" data-no-dirty data-consult-draft
-                    data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
-                <p id="consulta-draft-status" role="status" aria-live="polite" data-testid="draft-status" style="font-size: 0.8125rem; color: var(--neutral-gray-600, #475569); margin: 0 0 8px;"><?= $draftSavedLocal ? 'Rascunho recuperado (salvo em ' . htmlspecialchars($draftSavedLocal) . '). Continue de onde parou.' : 'As anotações são salvas automaticamente como rascunho enquanto você digita.' ?></p>
+                    data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-scope="<?= htmlspecialchars($draftScope) ?>"<?= $draftRecoveredFromPost ? ' data-draft-recovered="1"' : '' ?> data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
+                <p id="consulta-draft-status" role="status" aria-live="polite" data-testid="draft-status" style="font-size: 0.8125rem; color: var(--neutral-gray-600, #475569); margin: 0 0 8px;"><?= $draftRecoveredFromPost ? 'Preenchimento recuperado após tentativa de conclusão. Suas anotações estão preservadas.' : ($draftSavedLocal ? 'Rascunho recuperado (salvo em ' . htmlspecialchars($draftSavedLocal) . '). Continue de onde parou.' : 'As anotações são salvas automaticamente como rascunho enquanto você digita.') ?></p>
                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
                 <div class="form-group" style="margin-bottom: var(--space-4);">
@@ -2677,7 +2718,7 @@ class DashboardController
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
-                  <a href="/agenda" class="btn btn-secondary" data-draft-pause>Pausar e Voltar à Agenda</a>
+                  <a href="/agenda?date=<?= date('Y-m-d', strtotime($app['scheduled_at'])) ?>" class="btn btn-secondary" data-draft-pause>Pausar e Voltar à Agenda</a>
                   <button type="submit" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Concluir Consulta & Assinar Prontuário
@@ -2752,67 +2793,139 @@ class DashboardController
             echo json_encode($work(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } catch (\InvalidArgumentException $e) {
             http_response_code(422);
-            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['status' => 'invalid', 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        } catch (\PDOException $e) {
+            $cid = bin2hex(random_bytes(8));
+            $sqlState = (string)($e->errorInfo[0] ?? $e->getCode());
+            error_log(sprintf(
+                '[consulta] rascunho persistência indisponível correlation_id=%s clinic_id=%d user_id=%d sqlstate=%s',
+                $cid,
+                (int)TenantContext::getClinicId(),
+                (int)TenantContext::getUserId(),
+                $sqlState
+            ));
+            http_response_code(503);
+            echo json_encode([
+                'status' => 'error',
+                'error' => 'Não foi possível salvar o rascunho agora (persistência temporariamente indisponível).',
+                'correlation_id' => $cid,
+            ], JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
-            error_log('[consulta] rascunho falhou: ' . get_class($e));
+            $cid = bin2hex(random_bytes(8));
+            error_log(sprintf(
+                '[consulta] rascunho falhou correlation_id=%s clinic_id=%d user_id=%d exception=%s',
+                $cid,
+                (int)TenantContext::getClinicId(),
+                (int)TenantContext::getUserId(),
+                get_class($e)
+            ));
             http_response_code(500);
-            echo json_encode(['error' => 'Não foi possível salvar o rascunho agora.'], JSON_UNESCAPED_UNICODE);
+            echo json_encode([
+                'status' => 'error',
+                'error' => 'Não foi possível salvar o rascunho agora.',
+                'correlation_id' => $cid,
+            ], JSON_UNESCAPED_UNICODE);
         }
     }
 
     public function completeConsultation(array $params): void
     {
+        $id = (int)($params['id'] ?? 0);
+        $clinicId = (int)TenantContext::getClinicId();
+        $userId = (int)TenantContext::getUserId();
+        $summary = is_string($_POST['evolution_summary'] ?? null) ? trim($_POST['evolution_summary']) : '';
+        $weightRaw = is_string($_POST['weight_kg'] ?? null) ? trim($_POST['weight_kg']) : '';
+        $waistRaw = is_string($_POST['waist_cm'] ?? null) ? trim($_POST['waist_cm']) : '';
+
+        if ($id > 0 && ($summary !== '' || $weightRaw !== '' || $waistRaw !== '')) {
+            $_SESSION['consultation_form_recovery'][$id] = [
+                'clinic_id' => $clinicId,
+                'user_id' => $userId,
+                'appointment_id' => $id,
+                'evolution_summary' => $summary,
+                'weight_kg' => $weightRaw,
+                'waist_cm' => $waistRaw,
+                'saved_at' => time(),
+            ];
+        }
+
         $token = $_POST['_csrf_token'] ?? '';
         if (!Csrf::validate($token)) {
-            header('Location: /agenda?error=csrf');
+            header($id > 0 ? "Location: /consulta/{$id}?error=csrf" : 'Location: /agenda?error=csrf');
             exit;
-        }
-
-        $id = (int)($params['id'] ?? 0);
-        $summary = trim((string)($_POST['evolution_summary'] ?? ''));
-
-        if (empty($summary)) {
-            header("Location: /consulta/{$id}?error=resumo_obrigatorio");
-            exit;
-        }
-
-        $details = [];
-        if (!empty($_POST['weight_kg'])) {
-            $details['weight_kg'] = (float)$_POST['weight_kg'];
-        }
-        if (!empty($_POST['waist_cm'])) {
-            $details['waist_cm'] = (float)$_POST['waist_cm'];
         }
 
         $service = new AppointmentService();
         $app = $service->getAppointment($id);
         if (!$app) {
+            unset($_SESSION['consultation_form_recovery'][$id]);
             header('Location: /agenda');
             exit;
         }
 
-        try {
-            $result = $service->completeConsultation($id, $summary, $details, TenantContext::getUserId());
+        // Garante que qualquer texto enviado no POST (mesmo antes do debounce de 1,5s do autosave) fique salvo no rascunho do servidor
+        if (($app['status'] ?? '') === AppointmentService::STATUS_IN_PROGRESS && ($summary !== '' || $weightRaw !== '' || $waistRaw !== '')) {
             try {
-                (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->discard($id, (int)TenantContext::getUserId(), (int)TenantContext::getClinicId());
+                $draftSvc = new \ClyoNutri\Domain\Appointment\ConsultationDraftService();
+                $curDraft = $draftSvc->get($id, $userId, $clinicId);
+                $draftSvc->save($id, $userId, $clinicId, (int)($curDraft['version'] ?? 0), [
+                    'evolution_summary' => $summary !== '' ? $summary : (string)($curDraft['evolution_summary'] ?? ''),
+                    'weight_kg' => $weightRaw !== '' ? $weightRaw : (string)($curDraft['weight_kg'] ?? ''),
+                    'waist_cm' => $waistRaw !== '' ? $waistRaw : (string)($curDraft['waist_cm'] ?? ''),
+                ]);
             } catch (\Throwable $e) {
-                error_log('[consulta] rascunho não apagado: ' . get_class($e));
+                error_log('[consulta] backup pré-conclusão não persistido no banco: ' . get_class($e));
+            }
+        }
+
+        if ($summary === '') {
+            header("Location: /consulta/{$id}?error=resumo_obrigatorio");
+            exit;
+        }
+
+        $details = [];
+        $weightNormalized = str_replace(',', '.', $weightRaw);
+        $waistNormalized = str_replace(',', '.', $waistRaw);
+        if ($weightNormalized !== '' && is_numeric($weightNormalized)) {
+            $details['weight_kg'] = (float)$weightNormalized;
+        }
+        if ($waistNormalized !== '' && is_numeric($waistNormalized)) {
+            $details['waist_cm'] = (float)$waistNormalized;
+        }
+
+        try {
+            $result = $service->completeConsultation($id, $summary, $details, $userId);
+
+            // Se registrou peso e o paciente já possui estatura registrada, atualiza também anthropometric_assessments sem quebrar a conclusão
+            if (!empty($details['weight_kg'])) {
+                try {
+                    $db = Connection::getInstance();
+                    $hStmt = $db->prepare('SELECT height_cm FROM anthropometric_assessments WHERE clinic_id = ? AND patient_id = ? AND height_cm > 0 ORDER BY assessed_at DESC, id DESC LIMIT 1');
+                    $hStmt->execute([$clinicId, (int)$app['patient_id']]);
+                    $lastHeight = $hStmt->fetchColumn();
+                    if ($lastHeight !== false && (float)$lastHeight > 0) {
+                        (new AnthropometryService($db))->recordAssessment(
+                            (int)$app['patient_id'],
+                            (int)$app['professional_id'],
+                            [
+                                'weight_kg' => (string)$details['weight_kg'],
+                                'height_cm' => (string)$lastHeight,
+                                'waist_cm' => isset($details['waist_cm']) ? (string)$details['waist_cm'] : '',
+                                'notes' => "Registrado na conclusão da consulta #{$id}",
+                            ],
+                            $userId
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[consulta] atualização antropométrica opcional ignorada: ' . get_class($e));
+                }
             }
 
-            // Se registrou peso, salva também na tabela de avaliações do paciente
-            if (!empty($_POST['weight_kg'])) {
-                $db = Connection::getInstance();
-                $stmt = $db->prepare("
-                    INSERT INTO assessments (clinic_id, patient_id, professional_id, weight_kg, waist_circumference_cm, assessed_at)
-                    VALUES (:cid, :pid, :prid, :weight, :waist, CURRENT_TIMESTAMP)
-                ");
-                $stmt->execute([
-                    'cid' => TenantContext::getClinicId(),
-                    'pid' => $app['patient_id'],
-                    'prid' => $app['professional_id'],
-                    'weight' => (float)$_POST['weight_kg'],
-                    'waist' => !empty($_POST['waist_cm']) ? (float)$_POST['waist_cm'] : null,
-                ]);
+            unset($_SESSION['consultation_form_recovery'][$id]);
+            try {
+                (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->discard($id, $userId, $clinicId);
+            } catch (\Throwable $e) {
+                error_log('[consulta] rascunho não apagado: ' . get_class($e));
             }
 
             header("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8));
@@ -3581,6 +3694,24 @@ class DashboardController
                           </td>
                           <td style="padding: 12px 20px; font-weight: 600; color: #334155; width: 20%;">
                             <?= number_format((float)$it['amount'], 0, ',', '.') ?> <?= htmlspecialchars($it['measure_unit']) ?>
+                            <?php
+                              $itUnit = trim((string)$it['measure_unit']);
+                              $itIsG = (bool)preg_match('/^(g|gramas?)$/i', $itUnit);
+                              $itGrams = null;
+                              if (!$itIsG) {
+                                  if (isset($it['weight_grams']) && (float)$it['weight_grams'] > 0) {
+                                      $itGrams = round((float)$it['weight_grams']);
+                                  } elseif (preg_match('/\((\d+(?:[.,]\d+)?)\s*g\)/i', $itUnit, $gm)) {
+                                      $singleG = (float)str_replace(',', '.', $gm[1]);
+                                      if ((float)$it['amount'] != 1.0) {
+                                          $itGrams = round((float)$it['amount'] * $singleG);
+                                      }
+                                  }
+                              }
+                            ?>
+                            <?php if ($itGrams !== null): ?>
+                              <span style="display: block; font-size: 0.8rem; font-weight: normal; color: #64748b; margin-top: 2px;"<?= !empty($it['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($itGrams, 0, ',', '.') ?>g<?= !empty($it['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
+                            <?php endif; ?>
                           </td>
                           <td style="padding: 12px 20px; color: #64748b; width: 25%; font-size: 0.85rem;">
                             <?= number_format((float)$it['energy_kcal'], 0, ',', '.') ?> kcal <span style="font-size: 0.75rem;">(P:<?= number_format((float)$it['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$it['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$it['lipid_g'], 1, ',', '.') ?>)</span>
@@ -3632,6 +3763,24 @@ class DashboardController
                               </td>
                               <td style="padding: 8px 20px; font-size: 0.85rem; color: #44403c;">
                                 <?= number_format((float)$sub['amount'], 0, ',', '.') ?> <?= htmlspecialchars($sub['measure_unit']) ?>
+                                <?php
+                                  $subUnit = trim((string)$sub['measure_unit']);
+                                  $subIsG = (bool)preg_match('/^(g|gramas?)$/i', $subUnit);
+                                  $subGrams = null;
+                                  if (!$subIsG) {
+                                      if (isset($sub['weight_grams']) && (float)$sub['weight_grams'] > 0) {
+                                          $subGrams = round((float)$sub['weight_grams']);
+                                      } elseif (preg_match('/\((\d+(?:[.,]\d+)?)\s*g\)/i', $subUnit, $gm)) {
+                                          $singleG = (float)str_replace(',', '.', $gm[1]);
+                                          if ((float)$sub['amount'] != 1.0) {
+                                              $subGrams = round((float)$sub['amount'] * $singleG);
+                                          }
+                                      }
+                                  }
+                                ?>
+                                <?php if ($subGrams !== null): ?>
+                                  <span style="display: block; font-size: 0.75rem; color: #78716c; margin-top: 2px;"<?= !empty($sub['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($subGrams, 0, ',', '.') ?>g<?= !empty($sub['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
+                                <?php endif; ?>
                               </td>
                               <td style="padding: 8px 20px; font-size: 0.8rem; color: #78716c;">
                                 <?= number_format((float)$sub['energy_kcal'], 0, ',', '.') ?> kcal (P:<?= number_format((float)$sub['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$sub['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$sub['lipid_g'], 1, ',', '.') ?>)
@@ -5026,6 +5175,16 @@ class DashboardController
               <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
               <input type="hidden" name="_submission_id" value="<?= $submissionId ?>">
               <div class="modal-body">
+                <?php if ($patientError): ?>
+                  <div role="alert" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; color: #B91C1C;">
+                    <strong>Atenção:</strong> <?= htmlspecialchars($patientError) ?>
+                    <?php if ($duplicateId): ?>
+                      <div style="margin-top: 8px;">
+                        <a href="/pacientes/<?= (int)$duplicateId ?>" class="btn btn-sm btn-secondary" style="color: #B91C1C; text-decoration: underline; font-weight: 600;">Conferir cadastro existente ➔</a>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
                 <div class="form-group">
                   <label class="form-label" for="p_name">Nome completo *</label>
                   <input type="text" id="p_name" name="name" class="form-control" placeholder="Ex: Juliana Mendes" required autofocus>

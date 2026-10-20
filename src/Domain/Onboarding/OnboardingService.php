@@ -165,6 +165,12 @@ class OnboardingService
 
                 case 3:
                     // Passo 3: Preferências de Atendimento (Modalidades, Duração, Dias, Preço)
+                    $practicePayload = is_array($progress['practice_preferences'] ?? null)
+                        ? $progress['practice_preferences']
+                        : (is_string($progress['practice_preferences'] ?? null) ? json_decode($progress['practice_preferences'], true) : []);
+                    if (!is_array($practicePayload)) {
+                        $practicePayload = [];
+                    }
                     $modalities = is_array($data['modalities'] ?? null)
                         ? $data['modalities']
                         : ['presencial', 'online'];
@@ -175,11 +181,25 @@ class OnboardingService
                     $price = max(0.0, (float)($data['default_price'] ?? 250.00));
                     $interval = max(0, (int)($data['appointment_interval_minutes'] ?? 10));
 
-                    $practicePayload = $progress['practice_preferences'] ?? [];
+                    $allDays = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+                    $weekly = $practicePayload['weekly_availability'] ?? [];
+                    foreach ($allDays as $d) {
+                        $isEnabled = in_array($d, $workingDays, true);
+                        $existing = is_array($weekly[$d] ?? null) ? $weekly[$d] : [];
+                        $weekly[$d] = [
+                            'enabled' => $isEnabled,
+                            'start' => ($existing['start'] ?? '') !== '' ? $existing['start'] : ($isEnabled ? '08:00' : ''),
+                            'end' => ($existing['end'] ?? '') !== '' ? $existing['end'] : ($isEnabled ? '18:00' : ''),
+                            'break_start' => ($existing['break_start'] ?? '') !== '' ? $existing['break_start'] : ($isEnabled ? '12:00' : ''),
+                            'break_end' => ($existing['break_end'] ?? '') !== '' ? $existing['break_end'] : ($isEnabled ? '13:00' : ''),
+                        ];
+                    }
+
                     $practicePayload = array_replace($practicePayload, [
                         'modalities' => $modalities,
                         'default_duration_minutes' => $duration,
                         'working_days' => $workingDays,
+                        'weekly_availability' => $weekly,
                         'default_price' => $price,
                         'appointment_interval_minutes' => $interval,
                         'teleconsultation_enabled' => in_array('online', $modalities, true),

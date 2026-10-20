@@ -608,9 +608,28 @@ class AnthropometryService
         if ($count === 0) {
             return "Nenhuma medição registrada para a métrica informada.";
         }
+
+        $units = [
+            'weight_kg' => ' kg',
+            'bmi' => ' kg/m²',
+            'waist_cm' => ' cm',
+            'hip_cm' => ' cm',
+            'neck_cm' => ' cm',
+            'chest_cm' => ' cm',
+            'arm_cm' => ' cm',
+            'thigh_cm' => ' cm',
+            'calf_cm' => ' cm',
+            'body_fat_pct' => '%',
+            'muscle_mass_pct' => '%',
+            'whr' => '',
+            'whtr' => '',
+        ];
+        $unit = $units[$metric] ?? '';
+        $fmt = static fn(float $v, int $dec = 2) => number_format($v, $dec, ',', '.');
+
         if ($count === 1) {
             $p = $series[0];
-            return "Única medição registrada em {$p['formatted_date']} com valor de {$p['value']}.";
+            return "Única medição registrada em {$p['formatted_date']} com valor de " . $fmt((float)$p['value']) . "{$unit}.";
         }
 
         $first = $series[0];
@@ -621,6 +640,6 @@ class AnthropometryService
         $trendWord = $totalDelta > 0 ? "aumento" : ($totalDelta < 0 ? "redução" : "estabilidade");
         $absDelta = abs($totalDelta);
 
-        return "Evolução clínica de {$first['formatted_date']} ({$first['value']}) a {$last['formatted_date']} ({$last['value']}): {$trendWord} total de {$absDelta} ({$totalDeltaPct}%) ao longo de {$count} avaliações.";
+        return "Evolução clínica de {$first['formatted_date']} (" . $fmt((float)$first['value']) . "{$unit}) a {$last['formatted_date']} (" . $fmt((float)$last['value']) . "{$unit}): {$trendWord} total de " . $fmt($absDelta) . "{$unit} (" . ($totalDeltaPct > 0 ? '+' : '') . $fmt($totalDeltaPct) . "%) ao longo de {$count} avaliações.";
     }
 }
