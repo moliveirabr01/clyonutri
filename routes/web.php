@@ -41,6 +41,14 @@ $router->get('/pacientes/{id}/antropometria/comparar', [DashboardController::cla
 $router->get('/pacientes/{id}/antropometria/dobras', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'show'])->name('anthropometry.skinfolds');
 $router->post('/pacientes/{id}/antropometria/dobras', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'store'])->name('anthropometry.skinfolds.store');
 $router->post('/pacientes/{id}/antropometria/dobras/{mid}/corrigir', [\ClyoNutri\Application\Controllers\SkinfoldController::class, 'correct'])->name('anthropometry.skinfolds.correct');
+$router->get('/pacientes/{id}/pre-consulta', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'index'])->name('preconsultation.index');
+$router->post('/pacientes/{id}/pre-consulta', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'create'])->name('preconsultation.create');
+$router->get('/pacientes/{id}/pre-consulta/{qid}', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'show'])->name('preconsultation.show');
+$router->post('/pacientes/{id}/pre-consulta/{qid}/perguntas', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'updateQuestions'])->name('preconsultation.questions');
+$router->post('/pacientes/{id}/pre-consulta/{qid}/enviar', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'send'])->name('preconsultation.send');
+$router->post('/pacientes/{id}/pre-consulta/{qid}/revogar', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'revoke'])->name('preconsultation.revoke');
+$router->post('/pacientes/{id}/pre-consulta/{qid}/revisar', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'review'])->name('preconsultation.review');
+$router->post('/pacientes/{id}/pre-consulta/{qid}/importar', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'import'])->name('preconsultation.import');
 
 // Agenda e Execução de Consulta (NI2-10)
 $router->get('/agenda', [DashboardController::class, 'agenda'])->name('agenda.index');

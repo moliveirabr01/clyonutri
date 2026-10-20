@@ -1780,6 +1780,9 @@ class DashboardController
             <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Cada conclusão gera uma nova versão; as anteriores ficam no histórico</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="/pacientes/<?= $patient['id'] ?>/pre-consulta" class="btn btn-secondary" data-testid="link-pre-consulta">
+              Pré-consulta
+            </a>
             <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
               Prontuário ➔
             </a>

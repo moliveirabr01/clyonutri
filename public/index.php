@@ -335,6 +335,21 @@ $skinfoldCtrl = new \ClyoNutri\Application\Controllers\SkinfoldController();
 $router->get('/pacientes/{id}/antropometria/dobras', $requireAuth([$skinfoldCtrl, 'show']));
 $router->post('/pacientes/{id}/antropometria/dobras', $requireAuth([$skinfoldCtrl, 'store']));
 $router->post('/pacientes/{id}/antropometria/dobras/{mid}/corrigir', $requireAuth([$skinfoldCtrl, 'correct']));
+// NI2-437: pré-consulta e anamnese adaptativa
+$preconsCtrl = new \ClyoNutri\Application\Controllers\PreConsultationController();
+$router->get('/pacientes/{id}/pre-consulta', $requireAuth([$preconsCtrl, 'index']));
+$router->post('/pacientes/{id}/pre-consulta', $requireAuth([$preconsCtrl, 'create']));
+$router->get('/pacientes/{id}/pre-consulta/{qid}', $requireAuth([$preconsCtrl, 'show']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/perguntas', $requireAuth([$preconsCtrl, 'updateQuestions']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/enviar', $requireAuth([$preconsCtrl, 'send']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/revogar', $requireAuth([$preconsCtrl, 'revoke']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/revisar', $requireAuth([$preconsCtrl, 'review']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/importar', $requireAuth([$preconsCtrl, 'import']));
+// Paciente (público, acesso pelo token do link + data de nascimento)
+$router->get('/pre-consulta', [$preconsCtrl, 'patientPage']);
+$router->post('/pre-consulta/verificar', [$preconsCtrl, 'patientVerify']);
+$router->post('/pre-consulta/salvar', [$preconsCtrl, 'patientSave']);
+$router->get('/pre-consulta/{token}', [$preconsCtrl, 'patientLink']);
 $router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'search']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
