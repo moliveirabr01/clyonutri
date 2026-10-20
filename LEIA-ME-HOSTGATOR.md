@@ -1,88 +1,75 @@
-# ClyoNutri na HostGator: passo a passo só pelo cPanel — Versão 19
+# ClyoNutri na HostGator: passo a passo só pelo cPanel (versão 21)
 
-Versão 19 (16/10/2026): **v18 + Remediação Completa da Auditoria por Navegação Assistida (P01 a P13)**. Tudo o que as versões anteriores (v13 a v18) traziam continua valendo. Novidades e correções homologadas nesta versão:
-- **P01 / P07 (Onboarding → Configurações e Disponibilidade da Agenda):**
-  - A etapa 3 do onboarding agora salva a disponibilidade semanal (`weekly_availability`) a partir dos dias e turnos selecionados, populando automaticamente o perfil em `/configuracoes` e a disponibilidade da agenda.
-  - Seletor dedicado de região do Conselho Regional de Nutricionistas (CRN-1 a CRN-11).
-- **P02 (Teleconsulta: Modo Somente Áudio e Bypass de Dispositivos):**
-  - Sala de espera do paciente (`/teleconsulta/sala-espera`) com botões "Entrar apenas com áudio" e "Continuar com aviso" para dispositivos sem webcam ou com bloqueio de mídia.
-  - Mensagens de erro de permissão e hardware 100% traduzidas em português.
-  - Nutricionista visualiza no lobby se o paciente ingressou em modo normal, somente áudio ou com aviso ignorado.
-- **P03 (Convite do App do Paciente e Portal Web `/app`):**
-  - Tela `/pacientes/{id}/convite-app` modernizada com botões de 1 clique para Copiar Link e Copiar Código de Primeiro Acesso, link direto de WhatsApp e QR Code offline de alta resolução com fallback SVG (sem dependências externas de CDN, compatível com CSP estrito).
-  - Nova rota amigável `/app` com fluxo responsivo de primeiro acesso, criação de senha e login do paciente.
-- **P04 (LGPD e Termos de Uso no Cadastro):**
-  - Checkbox obrigatório de consentimento expresso dos Termos de Uso e Política de Privacidade da ClyoNutri em `/cadastro`, com validação estrita no frontend e backend.
-- **P08 / P09 (Ficha da Consulta e Anamnese sem Inflação de Versões):**
-  - Cartão de atalho direto para "Anamnese Nutricional" na tela da consulta (`/consulta/{id}`).
-  - Botão "Pausar e Voltar à Agenda" preservando o dia consultado (`/agenda?date=YYYY-MM-DD`).
-  - Salvamento de rascunhos de anamnese atualizados *in-place* sem duplicar registros ou inflar versões legadas, com mensagens de feedback distintas entre rascunho salvo e anamnese concluída.
-- **P10 / P12 / P13 (Antropometria, Preços e Modal de Paciente Duplicado):**
-  - Campo de altura no formulário de antropometria aceita metros (ex: `1,70` ou `1.70`) e centímetros (`170`) com `min="0.5"` e `step="any"` sem alertas em inglês do navegador.
-  - Resumo de evolução antropométrica acessível em pt-BR com vírgula decimal e unidades explícitas (`kg`, `kg/m²`, `%`).
-  - Campo de valor padrão de consulta com `step="any"` para centavos flexíveis.
-  - Modal de paciente duplicado exibe alerta de atenção com destaque visual proeminente dentro do corpo do modal.
-- **P11 (Equivalência em Gramas no Plano Alimentar):**
-  - Editor e impressão do plano alimentar exibem equivalência estimada em gramas (`(~...g)`) ao lado de medidas caseiras que não estejam originalmente em gramas.
-- **Migração 41 (`migracao-2026-10-16-ux-v19.sql` e `preflight-2026-10-16-ux-v19.sql`):**
-  - Termo de consentimento ativo para atendimento clínico (`clinical_care`, v2026.10-r1);
-  - Colunas de branding e endereço em `clinics` (`logo_path`, `address_street`, etc.);
-  - Coluna `device_check_mode` em `teleconsultation_sessions`;
-  - Medidas caseiras padrão em `food_household_measures` (banana, pão, ovo, arroz, feijão, etc.);
-  - Artigos da central de ajuda sobre teleconsulta e app do paciente.
+Versão 21 (20/10/2026), commit `f9c6b8c`. Ela traz tudo o que as versões v13 a v19 já traziam. Novidades:
+
+- **Autoagendamento (NI2-433 / NI2-434, migration 42):** página pública `/agendar` com reserva temporária de horário, confirmação, cancelamento e reagendamento pelo paciente.
+- **Planos alimentares, correções do code review NI2-9 (migration 43):**
+  - **Peso em gramas gravado:** o peso de cada item e de cada substituição fica salvo. Quando a medida caseira não está cadastrada para o alimento, o plano mostra "peso estimado".
+  - **Publicação atômica com auditoria:** publicar um plano que esbarra em alergia agora exige justificativa (mínimo de 10 caracteres).
+  - **Trava de alérgenos fail-closed:** alimento sem informação de alérgenos conta como "não verificado".
+  - **Limite de 5 kg por porção.**
+  - **App do paciente:** lê exatamente a versão publicada do plano.
+- **Dobras cutâneas (NI2-439, migration 44):** `/pacientes/{id}/antropometria/dobras`, com protocolos versionados, faixas de validade, %GC e exportação LGPD.
+- **Pré-consulta (NI2-437, migration 45):**
+  - **Envio:** em Anamnese → Pré-consulta, o nutricionista envia ao paciente um link pessoal com as perguntas sugeridas pelo objetivo.
+  - **Paciente:** confirma a data de nascimento, salva e continua depois, e aceita o termo de uso das respostas.
+  - **Revisão:** as respostas viram rascunho da anamnese.
+  - ⚠ **O banco de perguntas ainda aguarda revisão clínica.** Não use com pacientes reais antes disso (NI2-435).
+- **Central de Ajuda:** os 7 artigos padrão passam a ser garantidos um a um. Numa instalação nova, a v19 criava só os 3 de teleconsulta.
+- **Anamnese:** finalizar um rascunho promove o próprio rascunho, sem criar uma versão extra.
 
 ---
 
 ## 0. Antes de começar
-- **HTTPS válido** em `clyonutri.com` (necessário para câmera/microfone da teleconsulta e segurança de cookies).
-- Tenha à mão o zip da versão que está no ar hoje (v10 a v18). Ele é o seu plano de volta.
+- O **HTTPS precisa estar válido** em `clyonutri.com`.
+- Tenha à mão o **zip da v19**. Ele é o seu plano de volta.
 
 ## 1. Backup (obrigatório)
-1. **File Manager** → pasta `/home3/maic6824/clyonutri.com` → baixe o `.env`.
+1. No **File Manager**, abra a pasta `/home3/maic6824/clyonutri.com` e baixe o `.env`.
 2. Compacte a pasta `storage/` (clique direito → Compress) e baixe o zip.
-3. **phpMyAdmin** → banco `maic6824_Clyonutri2` → **Exportar** → Rápido → SQL → Executar. Guarde o arquivo.
+3. No **phpMyAdmin**, abra o banco `maic6824_Clyonutri2`, vá em **Exportar** → Rápido → SQL → Executar e guarde o arquivo.
 
-## 2. Banco (obrigatório, antes de subir os arquivos)
-1. **Passo 2A — Preflight somente-leitura (recomendado):** no **phpMyAdmin**, selecione `maic6824_Clyonutri2`, aba **SQL**, cole o conteúdo de `database/manual/preflight-2026-10-16-ux-v19.sql` e clique em **Executar**. Confira que:
-   - `preflight_status = OK — PRONTO PARA MIGRAR`
-   - `pronto_para_migrar = 1`
-   - `tipos_colunas_40_compativeis = 1`
-   - `rascunhos_orfaos_40 = 0`
-2. **Passo 2B — Migração Fail-Fast com Rotação Zero-Gap:** na aba **SQL**, cole todo o conteúdo de `database/manual/migracao-2026-10-16-ux-v19.sql` e clique em **Executar**.
-3. O resultado tem que ser **`resultado = OK`**, **`preflight_ok = 1`** e **`dados_rascunho_preservados = 1`**.
-   - É **cumulativa, idempotente e fail-fast**: se qualquer pré-condição falhar (`@preflight_ok = 0`), o script interrompe antes de executar qualquer DDL/DML.
-   - **Não contém nenhum comando `DELETE`, `DROP TABLE` ou `TRUNCATE`.**
-   - **Garantia de zero perda de dados:** `@drafts_count_before = @drafts_count_after`.
-4. Confira as colunas do resultado final:
-   - `resultado` = **OK**
-   - `tabela_rascunho_consulta` = **1**
-   - `fks_rascunho_consulta` = **2** (ambas com `DELETE_RULE = RESTRICT`)
-   - `rascunhos_orfaos_40` = **0**
-   - `dados_rascunho_preservados` = **1**
-   - `artigo_reagendar` = **1**
+## 2. Banco (obrigatório, ANTES de subir os arquivos)
+No **phpMyAdmin**, selecione `maic6824_Clyonutri2` e abra a aba **SQL**. Rode os scripts **na ordem abaixo**: cole o conteúdo do arquivo e clique em **Executar**. Todos os scripts estão em `database/manual/` dentro do zip.
+
+Cada preflight é **somente leitura**. Rode a migração do mesmo bloco só se o preflight disser que está pronto.
+
+| # | Preflight (somente leitura) | Esperado | Migração | Esperado |
+|---|---|---|---|---|
+| 42 | `preflight-2026-10-16-autoagendamento-v20.sql` | `PREFLIGHT_OK…` e `estrutura_antiga = 0` | `migracao-2026-10-16-autoagendamento-v20.sql` | `OK — migração 42 aplicada` |
+| 43 | `preflight-2026-10-19-planos-ni2-9.sql` | `OK — PRONTO PARA MIGRAR`, `versoes_repetidas = 0` | `migracao-2026-10-19-planos-ni2-9.sql` | `OK — migração 43 aplicada` |
+| 44 | `preflight-2026-10-19-dobras-ni2-439.sql` | `OK — PRONTO PARA MIGRAR` | `migracao-2026-10-19-dobras-ni2-439.sql` | `OK — migração 44 aplicada` |
+| 45 | `preflight-2026-10-19-pre-consulta-ni2-437.sql` | `OK — PRONTO PARA MIGRAR` | `migracao-2026-10-19-pre-consulta-ni2-437.sql` | `OK — migração 45 aplicada` |
+
+**Como os scripts se comportam:**
+- **Se já rodou antes:** se o preflight mostrar `migracao_ja_aplicada = 1`, pule a migração daquele bloco. Rodar de novo também é seguro, porque todos os scripts são idempotentes.
+- **O que eles nunca fazem:** nenhum script usa `DELETE`, `DROP` ou `TRUNCATE`.
+- **Se aparecer FALHA:** pare e não suba os arquivos. Em especial, `estrutura_antiga = 1` no bloco 42 significa que a versão antiga e defeituosa do script v20 chegou a rodar. Nesse caso fale com o suporte técnico antes de seguir.
+- **Se o banco ainda não estiver na v19:** rode primeiro `preflight-2026-10-16-ux-v19.sql` + `migracao-2026-10-16-ux-v19.sql`.
+
+Os scripts foram testados em MySQL 8.0 sobre um banco no estado da v19. O resultado ficou igual a uma instalação feita pelas migrations, e o `migrate.php` não encontrou nada pendente.
 
 ## 3. Arquivos
-1. Envie `clyonutri-hostgator-2026-10-16-v19.zip` para `/home3/maic6824/clyonutri.com`, clique em **Extract** (confirme sobrescrever) e apague o zip.
+1. Envie `clyonutri-hostgator-2026-10-20-v21.zip` para `/home3/maic6824/clyonutri.com`, clique em **Extract** (confirme sobrescrever) e depois apague o zip.
 2. Confira que o **`.env` e a pasta `storage/` continuam lá**. O zip **não** traz `.env`, banco nem senhas.
 3. Os dois `.htaccess` (raiz e `public/`) precisam ser sobrescritos.
-4. **Segurança:** apague o `.env.hostgator` que ficou na pasta (é só modelo). Se ainda não fez, troque a senha do banco e a do e-mail `nao-responda@` (os pacotes v7 a v11 traziam senhas nesse arquivo).
+4. **Segurança:** apague o `.env.hostgator` que ficou na pasta. Ele é só um modelo.
 
 ## 4. `.env`
-Nada novo na v19. Valem as variáveis da v12/v13 (`APP_KEY`, `TELECONSULT_PROVIDER=webrtc_p2p` etc.).
+Não há variável nova. A pré-consulta usa as que já existem:
+- `APP_URL=https://clyonutri.com`, para o link do e-mail sair completo.
+- O e-mail (`MAIL_*`) já configurado. Sem e-mail, o link aparece na tela para copiar e mandar por outro canal.
 
 ## 5. Checklist de teste (aba anônima, Ctrl+F5)
-1. `/`, `/login` e o login funcionam; `/health` mostra só `{"status":"ok"}`.
-2. **Readiness CLI (via SSH ou Terminal cPanel):** `php bin/healthcheck.php --readiness` exibe `SAUDÁVEL (Healthy) ✓ Pronto para operação e release`.
-3. **P04 (Cadastro & LGPD):** abra `/cadastro` → confirme o checkbox obrigatório de Termos e Privacidade.
-4. **P01 / P07 (Onboarding & Configurações):** no perfil em `/configuracoes`, confira seletor de região do CRN e horários/dias preenchidos.
-5. **P03 (Convite App & Portal `/app`):** abra `/pacientes/{id}/convite-app` → botões Copiar Link, Copiar Código e QR Code; teste rota `/app`.
-6. **P08 / P09 (Consulta & Anamnese):** abra uma consulta → confira atalho "Anamnese Nutricional" e botão "Pausar e Voltar à Agenda". Salve um rascunho de anamnese e confira a mensagem de rascunho salvo.
-7. **P10 (Altura & Antropometria):** na avaliação física, digite `1,70` na altura → salva sem rejeição nem erro em inglês.
-8. **P11 (Equivalência em Gramas):** no editor de plano alimentar, confira a exibição de gramas estimadas ao lado da medida caseira.
-9. **P02 (Teleconsulta: Áudio e Bypass):** na sala de espera da teleconsulta (`/teleconsulta/sala-espera`), confira os botões de entrar apenas com áudio e continuar com aviso.
-10. **Teleconsulta WebRTC:** fluxo completo entre dois navegadores/aparelhos (sala de espera, aceite de termo, admissão, vídeo e áudio bidirecionais).
+1. `/`, `/login` e o login funcionam. `/up` mostra `{"status":"ok"}`.
+2. **Planos:** abra um plano e adicione um alimento em medida caseira. Ao lado deve aparecer `(~…g)`, ou `peso estimado` quando a medida for genérica. Publique e imprima.
+3. **Plano com alergia:** com um paciente com alergia registrada, publicar um plano com alimento suspeito deve pedir justificativa.
+4. **Dobras:** na ficha do paciente, vá em Antropometria → Dobras cutâneas, registre uma avaliação e confira o %GC.
+5. **Pré-consulta:** em Anamnese → Pré-consulta, marque um objetivo e gere o link. Abra o link numa aba anônima, confirme a data de nascimento, responda e envie. De volta ao painel, revise e leve as respostas para o rascunho da anamnese.
+6. **Autoagendamento:** abra `/agendar` e confira os horários disponíveis.
+7. **Central de Ajuda:** confira que aparecem os artigos de planos, antropometria, anamnese, convite, app e LGPD, e não só os de teleconsulta.
 
 ## 6. Se algo der errado (voltar)
-- **Voltar para a versão anterior:** suba o zip da versão anterior (`v18.zip` ou `v17.zip`) e extraia por cima. O `.env` continua igual.
-- **O banco não precisa ser desfeito.** As tabelas e colunas adicionadas são retrocompatíveis com as versões anteriores.
-- **Em último caso**, restaure o backup do banco do passo 1 (phpMyAdmin → Importar).
+- **Arquivos:** suba o zip da v19 e extraia por cima. O `.env` continua igual.
+- **Banco:** não precisa desfazer nada, porque as tabelas e colunas novas não atrapalham a v19.
+- **Em último caso:** restaure o backup do passo 1 (phpMyAdmin → Importar).
