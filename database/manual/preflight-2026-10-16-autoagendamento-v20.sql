@@ -29,9 +29,16 @@ SET @has_pk_clinics = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TAB
 SET @has_pk_profs = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'professionals' AND COLUMN_NAME = 'id' AND COLUMN_KEY = 'PRI');
 SET @has_pk_appts = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'appointments' AND COLUMN_NAME = 'id' AND COLUMN_KEY = 'PRI');
 
--- 5. Relatório Preflight
+-- 5. Tabelas criadas pela versão antiga deste pacote (colunas erradas)?
+SET @old_settings = @has_settings = 1 AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'booking_settings' AND COLUMN_NAME IN ('max_future_days', 'require_cpf')) < 2;
+SET @old_holds = @has_holds = 1 AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'booking_holds' AND COLUMN_NAME IN ('payment_status', 'notification_status')) < 2;
+SET @int_signed = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME IN ('clinics', 'professionals', 'patients', 'appointments') AND COLUMN_NAME = 'id' AND COLUMN_TYPE = 'int');
+
+-- 6. Relatório Preflight
 SELECT
   CASE
+    WHEN @old_settings OR @old_holds
+    THEN 'PREFLIGHT_FAIL: tabelas de autoagendamento existem com a estrutura antiga; não rode a migração e fale com o suporte técnico'
     WHEN @has_clinics = 1 AND @has_professionals = 1 AND @has_appointments = 1 AND @bad_engines = 0 AND @has_pk_clinics = 1
     THEN 'PREFLIGHT_OK: Banco pronto para receber migracao-2026-10-16-autoagendamento-v20.sql'
     ELSE 'PREFLIGHT_FAIL: Pré-requisitos não atendidos'
@@ -42,4 +49,6 @@ SELECT
   @has_appointments AS has_appointments,
   @has_holds AS booking_holds_already_exists,
   @has_settings AS booking_settings_already_exists,
-  @bad_engines AS bad_engines_count;
+  @bad_engines AS bad_engines_count,
+  (@old_settings OR @old_holds) AS estrutura_antiga,
+  @int_signed AS ids_int_compativeis_esperado_4;
