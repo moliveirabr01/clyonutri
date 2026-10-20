@@ -90,3 +90,19 @@ Na HostGator a `APP_URL` está configurada, mas o canal padrão passou a ser o W
 - O link do WhatsApp usa `rel="noopener noreferrer"` e `rawurlencode`, e o `href` é escapado.
 - A auditoria do envio pelo WhatsApp não grava o token nem dados do paciente.
 - O fallback de cópia tem mensagem de status acessível (`role="status"`).
+
+## Correções aplicadas (20/10/2026)
+
+| Achado | Correção | Teste |
+|---|---|---|
+| 2, telefone estrangeiro | Com `+` ou `00` no início, usa o DDI informado. Sem DDI, aceita só número brasileiro com DDD. | `tests/ni2_437_whatsapp_test.php` (24 verificações) |
+| 3, horário do chip | O horário vindo de um chip é trocado ao clicar em outro chip. O horário digitado à mão é preservado. | `tests/ni2_444_meal_chips_browser_test.cjs` |
+| 4, link relativo | Sem `APP_URL` absoluta, o canal WhatsApp é recusado com aviso e auditoria `PRECONSULTATION_WHATSAPP_SKIPPED`. O botão só aparece com link absoluto. | `ni2_437_real_http_test.cjs` (+2) |
+| 5, acessibilidade e texto | Emoji com `aria-hidden`, grupo com `role="group"` e uma lista só para chips e datalist (sem "Snack Noturno"). | `ni2_444_meal_chips_browser_test.cjs` (axe e nome acessível) |
+
+O achado 1 (status no Jira) depende de decisão do produto e não foi alterado.
+
+**Testes finais:**
+- PHP: `ni2_437_preconsultation_test` 67/67, `ni2_437_whatsapp_test` 24/24, `ni2_439` 62/62 e `ni2_9` 42/42, além das suítes de planos e da jornada canônica.
+- E2E da NI2-437: 48 verificações.
+- Navegador NI2-444 + WhatsApp: 16 verificações, com a CSP ativa e axe sem violações.
