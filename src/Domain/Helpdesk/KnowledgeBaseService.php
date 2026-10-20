@@ -264,13 +264,12 @@ class KnowledgeBaseService
 
     /**
      * Garante que os artigos canônicos do ClyoNutri II estejam pré-cadastrados.
+     * Confere artigo por artigo (slug): outras fontes, como a migração 41 com os artigos
+     * de teleconsulta, podem ter populado a tabela antes, e os canônicos não podem faltar.
      */
     public function ensureDefaultArticlesSeeded(): void
     {
-        $count = (int)$this->db->query("SELECT COUNT(*) FROM helpdesk_articles")->fetchColumn();
-        if ($count > 0) {
-            return;
-        }
+        $existing = array_flip($this->db->query('SELECT slug FROM helpdesk_articles')->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
         $articles = [
             [
@@ -337,6 +336,9 @@ class KnowledgeBaseService
         ");
 
         foreach ($articles as $art) {
+            if (isset($existing[$art['slug']])) {
+                continue;
+            }
             $stmt->execute([
                 'category' => $art['category'],
                 'slug' => $art['slug'],

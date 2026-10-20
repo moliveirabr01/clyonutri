@@ -104,13 +104,13 @@ try {
     $db->exec("INSERT INTO professionals (user_id, crn, crn_region) VALUES ({$nutriId1}, '98765', 'CRN-3')");
     $profId1 = (int)$db->lastInsertId();
 
-    // Alimentos TACO de referência
-    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-               VALUES (9901, 'Arroz Integral Cozido TACO', 'Cereais', 'TACO', 124.00, 2.60, 25.80, 1.00, 2.70)");
-    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-               VALUES (9902, 'Filé de Peito de Frango Grelhado TACO', 'Carnes', 'TACO', 159.00, 32.00, 0.00, 2.50, 0.00)");
-    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-               VALUES (9903, 'Tofu Grelhado TACO', 'Leguminosas', 'TACO', 64.00, 6.60, 2.10, 4.00, 0.40)");
+    // Alimentos TACO de referência (com alérgenos verificados: a publicação é fail-closed, NI2-9)
+    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, allergens)
+               VALUES (9901, 'Arroz Integral Cozido TACO', 'Cereais', 'TACO', 124.00, 2.60, 25.80, 1.00, 2.70, '')");
+    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, allergens)
+               VALUES (9902, 'Filé de Peito de Frango Grelhado TACO', 'Carnes', 'TACO', 159.00, 32.00, 0.00, 2.50, 0.00, '')");
+    $db->exec("INSERT OR IGNORE INTO foods (id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, allergens)
+               VALUES (9903, 'Tofu Grelhado TACO', 'Leguminosas', 'TACO', 64.00, 6.60, 2.10, 4.00, 0.40, 'soja')");
 
     TenantContext::set($clinicId1, ['id' => $nutriId1, 'name' => 'Dra. Gabriela Bench']);
     logBenchmarkPass('MULTI_TENANT', 'Tenants e perfis profissionais registrados e contextualizados');

@@ -157,7 +157,9 @@ $finalAnamnesis = $anamnesisService->saveAnamnesis($patientId, $profAId, [
     'water_intake_ml' => 3000,
     'notes' => 'Paciente muito motivado. Prescrever plano hiperproteico limpo',
 ], false);
-assert($finalAnamnesis['version'] === 2, "Versão finalizada deve ser incrementada para 2");
+// Finalizar promove o rascunho existente (mesma linha e mesma versão): rascunho não vira versão clínica à parte.
+assert($finalAnamnesis['version'] === 1, "Finalizar deve promover o rascunho v1, sem criar versão nova");
+assert((int)$finalAnamnesis['id'] === (int)$draftAnamnesis['id'], "Finalização deve reaproveitar a linha do rascunho");
 assert($finalAnamnesis['is_draft'] === false, "Deve ser finalizada (is_draft = false)");
 
 // 2.3 Validação fail-closed: tentativa de salvar anamnese finalizada 100% vazia
@@ -198,21 +200,22 @@ $anamnesisV4 = $anamnesisService->saveAnamnesis($patientId, $profAId, [
     'clinical_history' => 'Histórico familiar de DM2. Sem medicações contínuas',
     'water_intake_ml' => 3500,
 ], false);
-assert($anamnesisV4['version'] === 4, "Versão deve ser 4");
+// O rascunho salvo em 2.4 (v2) é promovido por esta finalização.
+assert($anamnesisV4['version'] === 2, "Versão deve ser 2 (rascunho de 2.4 promovido)");
 
 // 3.2 Listar histórico completo e verificar imutabilidade
 $history = $anamnesisService->getAnamnesisHistory($patientId);
-assert(count($history) === 4, "Deve conter exatamente 4 versões no histórico");
-assert($history[0]['version'] === 4, "Primeira da lista reversa deve ser a versão 4");
-assert($history[3]['version'] === 1, "Última da lista reversa deve ser a versão 1");
+assert(count($history) === 2, "Deve conter exatamente 2 versões no histórico");
+assert($history[0]['version'] === 2, "Primeira da lista reversa deve ser a versão 2");
+assert($history[1]['version'] === 1, "Última da lista reversa deve ser a versão 1");
 
 // Validar que a versão 2 não foi alterada pelas novas versões
-$v2Original = $anamnesisService->getAnamnesisVersion($patientId, 2);
+$v2Original = $anamnesisService->getAnamnesisVersion($patientId, 1);
 assert($v2Original['allergies'] === 'Alergia severa a amendoim e nozes. Risco de choque anafilático', "v2 não pode ter 'camarão'");
 assert($history[0]['allergies'] === 'Alergia severa a amendoim, nozes e camarão.', "v4 contém a nova alergia registrada");
 
 // 3.3 Ferramenta de Comparação / Diff Clínico entre Versões
-$diff = $anamnesisService->compareVersions($patientId, 2, 4);
+$diff = $anamnesisService->compareVersions($patientId, 1, 2);
 assert($diff['patient_id'] === $patientId, "Diff deve referenciar o paciente correto");
 assert($diff['diff']['allergies']['changed'] === true, "Alergias devem estar marcadas como alteradas no diff");
 assert($diff['diff']['allergies']['v1'] === 'Alergia severa a amendoim e nozes. Risco de choque anafilático', "v1 do diff deve conter texto original");
@@ -298,8 +301,8 @@ assert(str_contains($summaryActive['allergies'], 'camarão'), "Deve listar camar
 assert(count($summaryActive['critical_alerts']) === 2, "Deve destacar 2 alertas críticos (Alergia e Restrição)");
 assert($summaryActive['critical_alerts'][0]['type'] === 'ALERGIA', "Alerta 1 deve ser ALERGIA");
 assert($summaryActive['critical_alerts'][0]['severity'] === 'CRITICAL', "Severidade de alergia deve ser CRITICAL");
-assert($summaryActive['source']['version'] === 4, "Origem deve rastrear versão exata 4");
-assert($summaryActive['source']['url'] === "/pacientes/{$patientId}/anamnese?version=4", "Link da fonte deve ser rastreável");
+assert($summaryActive['source']['version'] === 2, "Origem deve rastrear versão exata 2");
+assert($summaryActive['source']['url'] === "/pacientes/{$patientId}/anamnese?version=2", "Link da fonte deve ser rastreável");
 
 // 5.3 Integração com segurança prescritiva: Validador de alergênicos contra prescrição
 $foodCatalog = new FoodCatalogService($db);
