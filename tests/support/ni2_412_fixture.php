@@ -30,7 +30,29 @@ if ($mode === 'prepare') {
     foreach (['2026-10-14 09:00:00', '2026-10-21 10:00:00', '2026-12-30 11:00:00', '2027-01-06 14:00:00', '2026-12-31 15:00:00', '2027-01-01 16:00:00'] as $at) {
         $ins->execute([$at]);
     }
+    // Segunda clínica (isolamento) com paciente e alimento personalizado próprios.
+    $db->prepare("INSERT INTO clinics(id,uuid,name,status) VALUES(2,'ux-c2','Clínica Fictícia Vizinha','active')")->execute();
+    $db->prepare("INSERT INTO patients(id,clinic_id,uuid,name,email,status) VALUES(901,2,'ux-p901','Lucas Aluno','lucas@vizinha.test','active')")->execute();
+    $food = $db->prepare("INSERT INTO foods(clinic_id,name,category,source,energy_kcal,protein_g,carbohydrate_g,lipid_g,fiber_g,is_custom) VALUES(?,?,?,?,?,?,?,?,?,1)");
+    $food->execute([1, 'Arroz integral da casa (receita própria)', 'Preparações', 'Clínica', 140, 3.1, 28.0, 1.6, 2.0]);
+    $food->execute([2, 'Arroz secreto da clínica vizinha', 'Preparações', 'Clínica', 150, 3.0, 30.0, 2.0, 1.0]);
+    // Dois cadastros com o MESMO nome e composição (duplicata real) e um com mesmo nome e composição diferente.
+    $food->execute([1, 'Feijão tropeiro fictício', 'Preparações', 'Clínica', 200, 10.0, 20.0, 9.0, 5.0]);
+    $food->execute([1, 'Feijão tropeiro fictício', 'Preparações', 'Clínica', 200, 10.0, 20.0, 9.0, 5.0]);
+    $food->execute([1, 'Feijão tropeiro fictício', 'Preparações', 'Clínica', 260, 12.0, 22.0, 14.0, 6.0]);
     echo json_encode(['ok' => true]);
+} elseif ($mode === 'attention') {
+    // Pendência real para o painel (NI2-421): falta há 3 dias sem remarcação, para a paciente fictícia 1.
+    $at = (new DateTimeImmutable('now', new DateTimeZone('America/Sao_Paulo')))->modify('-3 days')->format('Y-m-d') . ' 08:00:00';
+    $db->prepare("INSERT INTO appointments(clinic_id,patient_id,professional_id,scheduled_at,duration_minutes,status,type) VALUES(1,1,1,?,60,'no_show','follow_up')")->execute([$at]);
+    echo json_encode(['ok' => true, 'no_show_at' => $at]);
+} elseif ($mode === 'sql') {
+    // Consulta somente leitura para conferir persistência no teste (SELECT apenas).
+    $q = (string)($argv[2] ?? '');
+    if (!preg_match('/^\s*SELECT\s/i', $q)) {
+        throw new RuntimeException('Somente SELECT');
+    }
+    echo json_encode($db->query($q)->fetchAll(PDO::FETCH_ASSOC));
 } elseif ($mode === 'inspect') {
     echo json_encode([
         'anamneses' => $db->query('SELECT patient_id,version,is_draft,objectives FROM anamneses ORDER BY id')->fetchAll(PDO::FETCH_ASSOC),

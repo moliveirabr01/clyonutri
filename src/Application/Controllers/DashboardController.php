@@ -438,7 +438,7 @@ class DashboardController
 
                   <!-- Objetivos -->
                   <div style="padding: 8px 12px; border-radius: 6px; background: #F8FAFC; border: 1px solid #E2E8F0;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: #0284C7; display: block;">OBJETIVOS & METAS</span>
+                    <span style="font-size: 0.75rem; font-weight: 700; color: #0369A1; display: block;">OBJETIVOS & METAS</span>
                     <span style="font-size: 0.85rem; color: #1E293B;">
                       <?= htmlspecialchars($latestAnamnesis['objectives'] ?? 'Não especificados') ?>
                     </span>
@@ -1370,7 +1370,7 @@ class DashboardController
                 <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['restrictions'] ?? null)) ?></span>
               </div>
               <div style="padding: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
-                <span style="font-size: 0.75rem; font-weight: 700; color: #0284C7; display: block;">OBJETIVOS PRINCIPAIS</span>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #0369A1; display: block;">OBJETIVOS PRINCIPAIS</span>
                 <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['objectives'] ?? null)) ?></span>
               </div>
             </div>
@@ -3678,7 +3678,7 @@ class DashboardController
               <!-- Lista de Itens -->
               <div style="padding: 0;">
                 <?php if (empty($m['items'])): ?>
-                  <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.9rem;">
+                  <div style="padding: 20px; text-align: center; color: #64748b; font-size: 0.9rem;">
                     Nenhum alimento cadastrado nesta refeição.
                   </div>
                 <?php else: ?>

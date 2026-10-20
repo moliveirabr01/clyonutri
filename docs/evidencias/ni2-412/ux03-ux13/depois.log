@@ -1,0 +1,129 @@
+PASS [NI2-425] Login: autocomplete username/current-password
+PASS [NI2-425] Colar a senha é permitido (Ctrl+V preenche o campo)
+PASS [NI2-425] Mostrar senha só muda a apresentação (type=text) e não envia o formulário
+PASS [NI2-425] Estado anunciado (rótulo "Ocultar senha", aria-pressed=true)
+PASS [NI2-425] Ocultar volta a type=password
+PASS [NI2-425] Senha errada e conta inexistente recebem a mesma mensagem (não revela conta)
+PASS [NI2-425] Recuperação de senha continua disponível na tela de login
+PASS [NI2-425] Cadastro: "8 caracteres" e autocomplete new-password
+PASS [NI2-425] Servidor recusa senha de 7 caracteres e não cria a conta
+PASS [NI2-425] Login com senha colada funciona
+PASS [NI2-421] Sem pendências: orientação apropriada no lugar da lista
+PASS [NI2-421] 1366×768: prioridades com ação na primeira dobra
+PASS [NI2-421] 1366×900: prioridades com ação na primeira dobra
+PASS [NI2-421] 1366 px: 5 métricas numa linha (sem métrica isolada)
+PASS [NI2-421] Prioridades antes das métricas na ordem de leitura/teclado
+PASS [NI2-421] 1024 px: 3 + 2 métricas (sem cartão sozinho numa linha)
+PASS [NI2-421] Links do painel abrem páginas autorizadas (sem 4xx/5xx)
+PASS [NI2-417] Cadastro exposto como role=dialog aria-modal=true
+PASS [NI2-417] Título associado ao diálogo (aria-labelledby → "Novo Paciente")
+PASS [NI2-417] Foco inicial no primeiro campo (Nome)
+PASS [NI2-417] Tab e Shift+Tab (40×) ficam dentro do diálogo
+PASS [NI2-417] Fundo inerte enquanto o diálogo está aberto
+PASS [NI2-422] Campo de sexo/gênero com ajuda associada explicando o uso no cálculo
+BLOCKED [NI2-422] "Não informado" é opção distinta de qualquer resposta registrada (observado: [{"v":"","t":"Selecione..."},{"v":"Feminino","t":"Feminino"},{"v":"Masculino","t":"Masculino"},{"v":"Outro","t":"Outro / Não informado"}] — não atende)
+PASS [NI2-417] Escape sem alterações fecha e devolve o foco ao gatilho
+PASS [NI2-417] Escape com alteração pede descarte; recusar mantém o diálogo e o valor
+PASS [NI2-417] Cadastro pelo diálogo persiste o paciente
+PASS [NI2-418] Sem consulta: próximo passo = Agendar atendimento
+PASS [NI2-418] Agenda abre o formulário de nova consulta
+PASS [NI2-418] Paciente explícito e pré-selecionado
+PASS [NI2-418] Abrir pelo GET não cria consulta
+PASS [NI2-418] Consulta de hoje agendada e persistida
+PASS [NI2-418] Consulta de hoje: próximo passo = Iniciar atendimento
+PASS [NI2-418] Confirmação nomeia o paciente antes de iniciar
+PASS [NI2-418] Início antecipado: pede confirmação explícita e ainda não inicia
+PASS [NI2-418] Iniciar leva à mesma consulta e grava in_progress
+PASS [NI2-418] Em andamento: Continuar atendimento aponta para a mesma consulta
+PASS [NI2-418] Navegação não duplicou consultas (1 registro)
+PASS [NI2-420] Índice com 8 seções
+PASS [NI2-420] Paciente visível na anamnese
+PASS [NI2-420] Índice leva direto à seção mantendo os valores
+PASS [NI2-420] Resumo distingue vazio de negação ("Alergias (não avaliado)")
+PASS [NI2-420] Estado de salvamento indica alteração pendente
+PASS [NI2-420] Salvar rascunho visível sem rolar o formulário (1366×900)
+PASS [NI2-419] "Concluir anamnese" substitui o jargão de versão imutável
+PASS [NI2-420] Rascunho parcial persistido no banco
+PASS [NI2-420] Retomar recupera o rascunho persistido e mostra o estado
+PASS [NI2-419] Ajuda clara de que o histórico anterior é preservado
+PASS [NI2-416] Os 3 campos têm nome acessível (label associado)
+PASS [NI2-416] Obrigatoriedade exposta no campo (required)
+PASS [NI2-416] Clicar no label foca o campo
+PASS [NI2-416] Envio inválido: foco no primeiro inválido e aria-invalid
+PASS [NI2-416] Erro associado ao campo (aria-describedby com texto)
+PASS [NI2-416] Envio inválido mantém o que foi preenchido e não cria registro
+PASS [NI2-416] Plano válido criado e aberto
+PASS [NI2-415] Resultados mostram a fonte (Catálogo TACO) e a referência (nº TACO)
+PASS [NI2-415] Alimento personalizado identificado como da própria clínica
+PASS [NI2-415] Personalizado de outra clínica não aparece
+PASS [NI2-415] Composição por 100 g visível sem abrir outra tela
+PASS [NI2-415] Escolha por teclado (seta + Enter)
+PASS [NI2-415] Duplicata real (mesmo nome e composição) aparece agrupada, sem mesclar no banco
+PASS [NI2-415] Mesmo nome com composição diferente traz aviso explícito
+PASS [NI2-424] Módulo de conversas oferece "Nova conversa"
+PASS [NI2-424] Destinatário explícito antes de abrir
+PASS [NI2-424] Cancelar não cria conversa
+PASS [NI2-424] Busca indica conversa já existente
+PASS [NI2-424] Mesma conversa reaberta, sem duplicar
+PASS [NI2-424] Nenhuma mensagem enviada no fluxo
+PASS [NI2-424] Paciente de outra clínica: 404 e nada criado
+PASS [NI2-424] Busca não lista paciente de outra clínica
+PASS [NI2-424] Atalho GET /chat?patient_id de outra clínica: 404
+PASS [NI2-424] POST sem CSRF bloqueado
+PASS [NI2-424] Atalho contextual no perfil continua disponível
+PASS [NI2-423] 360 px · login: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · painel: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · perfil: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · anamnese: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 360 px · conversas: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · login: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · painel: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · perfil: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · anamnese: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 390 px · conversas: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · login: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · painel: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · perfil: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · anamnese: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 768 px · conversas: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · login: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · painel: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · perfil: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · anamnese: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 px · conversas: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · login: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · painel: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · perfil: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · anamnese: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-423] 1366 com zoom 200% · conversas: sem rolagem horizontal e ação essencial alcançável
+PASS [NI2-416] axe painel: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe painel: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe pacientes: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe pacientes: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe perfil: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe perfil: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe anamnese: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe anamnese: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe planos: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe planos: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe editor de plano: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe editor de plano: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe conversas: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe conversas: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe agenda: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe agenda: WCAG 2 A/AA sem violações
+PASS [geral] Nenhum erro de script nem bloqueio de CSP nos fluxos
+
+AXE {"painel":[],"pacientes":[],"perfil":[],"anamnese":[],"planos":[],"editor de plano":[],"conversas":[],"agenda":[]}
+
+NI2-412 UX-03..UX-13: 124 PASS, 0 FAIL, 1 BLOCKED

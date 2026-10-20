@@ -1,0 +1,69 @@
+FAIL [NI2-425] Login: autocomplete username/current-password
+PASS [NI2-425] Colar a senha é permitido (Ctrl+V preenche o campo)
+FAIL (seção NI2-425 (UX-13) login interrompida) locator.click: Timeout 5000ms exceeded.
+FAIL (seção NI2-421 (UX-09) painel interrompida) locator.innerText: Timeout 5000ms exceeded.
+FAIL (seção NI2-417 / NI2-422 cadastro de paciente interrompida) locator.focus: Timeout 5000ms exceeded.
+FAIL (seção NI2-418 (UX-06) próximo passo no perfil interrompida) page.getAttribute: Timeout 5000ms exceeded.
+FAIL [NI2-420] Índice com 8 seções → 0
+FAIL [NI2-420] Paciente visível na anamnese
+FAIL (seção NI2-420 / NI2-419 anamnese interrompida) page.fill: Timeout 5000ms exceeded.
+FAIL (seção NI2-416 (UX-04) novo plano interrompida) locator.click: Timeout 5000ms exceeded.
+FAIL (seção NI2-415 (UX-03) busca de alimentos interrompida) locator.click: Timeout 5000ms exceeded.
+FAIL [NI2-424] Módulo de conversas oferece "Nova conversa"
+FAIL (seção NI2-424 (UX-12) nova conversa interrompida) locator.click: Timeout 5000ms exceeded.
+PASS [NI2-423] 360 px · login: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 360 px · painel: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 360 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 360 px · perfil: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+FAIL [NI2-423] 360 px · anamnese: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 360 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 360 px · conversas: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 390 px · login: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 390 px · painel: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 390 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 390 px · perfil: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+FAIL [NI2-423] 390 px · anamnese: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 390 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 390 px · conversas: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 768 px · login: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 768 px · painel: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 768 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 768 px · perfil: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+FAIL [NI2-423] 768 px · anamnese: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 768 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 768 px · conversas: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 px · login: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 px · painel: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 px · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 px · perfil: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+FAIL [NI2-423] 1366 px · anamnese: sem rolagem horizontal e ação essencial alcançável → {"scroll":0,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 px · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 px · conversas: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 com zoom 200% · login: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 com zoom 200% · painel: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 com zoom 200% · pacientes + cadastro: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 com zoom 200% · perfil: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+FAIL [NI2-423] 1366 com zoom 200% · anamnese: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-423] 1366 com zoom 200% · planos + novo plano: sem rolagem horizontal e ação essencial alcançável
+FAIL [NI2-423] 1366 com zoom 200% · conversas: sem rolagem horizontal e ação essencial alcançável → {"scroll":-15,"reach":false,"dialogScroll":null}
+PASS [NI2-416] axe painel: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe painel: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe pacientes: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe pacientes: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe perfil: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe perfil: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe anamnese: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe anamnese: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe planos: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe planos: WCAG 2 A/AA sem violações
+PASS [NI2-416] axe editor de plano: nenhum campo, botão ou link sem nome acessível
+FAIL [geral] axe editor de plano: WCAG 2 A/AA sem violações → [{"id":"document-title","n":1,"alvo":["html | <html> | Document does not have a non-empty <title> element"]},{"id":"html-has-lang","n":1,"alvo":["html | <html> | The <html> element does not have a lang attribute"]}]
+PASS [NI2-416] axe conversas: nenhum campo, botão ou link sem nome acessível
+PASS [geral] axe conversas: WCAG 2 A/AA sem violações
+FAIL [NI2-416] axe agenda: nenhum campo, botão ou link sem nome acessível → [{"id":"label","n":1,"alvo":["input[type=\"date\"] | <input type=\"date\" value=\"2026-10-20\" onchange=\"location.href='/agenda?view=week&amp;date='+this.value\" style=\"padding: 8px 12px; border: 1px solid var(--neutra | Element does not have an implicit (wrapped) <label>"]}]
+FAIL [geral] axe agenda: WCAG 2 A/AA sem violações → [{"id":"label","n":1,"alvo":["input[type=\"date\"] | <input type=\"date\" value=\"2026-10-20\" onchange=\"location.href='/agenda?view=week&amp;date='+this.value\" style=\"padding: 8px 12px; border: 1px solid var(--neutra | Element does not have an implicit (wrapped) <label>"]}]
+PASS [geral] Nenhum erro de script nem bloqueio de CSP nos fluxos
+
+AXE {"painel":[],"pacientes":[],"perfil":[],"anamnese":[],"planos":[],"editor de plano":["document-title(1)","html-has-lang(1)"],"conversas":[],"agenda":["label(1)"]}
+
+NI2-412 UX-03..UX-13: 30 PASS, 35 FAIL, 0 BLOCKED

@@ -514,7 +514,7 @@ class ChatController
         }
         .chat-textarea:focus { border-color: #059669; }
         .btn-send {
-            background: #059669;
+            background: #047857;
             color: white;
             border: none;
             padding: 0 20px;
@@ -524,7 +524,7 @@ class ChatController
             cursor: pointer;
             transition: background 0.15s ease;
         }
-        .btn-send:hover { background: #047857; }
+        .btn-send:hover { background: #065F46; }
         .file-label {
             cursor: pointer;
             padding: 10px;
