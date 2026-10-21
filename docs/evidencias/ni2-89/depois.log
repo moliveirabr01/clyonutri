@@ -1,0 +1,52 @@
+PASS [versão] Rotas do paciente estão todas sob /api/v1
+PASS [versão] Toda rota de paciente chamada pelo app existe no servidor
+PASS [auth] Sem token: as 18 rotas protegidas respondem 401 em JSON
+PASS [auth] Token inexistente → 401
+PASS [auth] Senha errada → 401
+PASS [auth] Conta inexistente recebe a mesma resposta da senha errada
+PASS [auth] Login só com identificador (sem senha/OTP) → 401
+PASS [auth] Login válido emite token opaco com expiração
+PASS [auth] Banco guarda só o hash do token
+PASS [auth] Com token: /home responde 200 com os dados da própria paciente
+PASS [idor] Diário: o próprio paciente registra (pré-condição)
+PASS [idor] Diário: a paciente só vê as próprias entradas
+PASS [idor] Diário: o dono vê a própria entrada
+PASS [idor] Home traz o plano da própria paciente, nunca o de outra clínica
+PASS [idor] Confirmar consulta de outro paciente da mesma clínica: recusado e nada muda
+PASS [erros] Confirmar consulta de outro paciente da mesma clínica: resposta 403/404 em JSON sem detalhe interno
+PASS [idor] Cancelar consulta de outro paciente da mesma clínica: recusado e nada muda
+PASS [idor] Confirmar consulta de paciente de outra clínica: recusado e nada muda
+PASS [erros] Confirmar consulta de paciente de outra clínica: resposta 403/404 em JSON sem detalhe interno
+PASS [idor] Cancelar consulta de paciente de outra clínica: recusado e nada muda
+PASS [idor] Confirmar a própria consulta funciona
+PASS [idor] Enviar mensagem na conversa de outro paciente: recusado e nada gravado
+PASS [idor] Enviar mensagem na conversa de outra clínica: recusado
+PASS [idor] Marcar como lida a conversa de outro paciente → 403 e nada muda
+PASS [idor] Baixar anexo de outro paciente: recusado sem vazar conteúdo
+PASS [idor] O dono do anexo consegue baixá-lo
+PASS [idor] Mensagens: a paciente não recebe mensagens de outras conversas
+PASS [idor] Receita privada de outra clínica → 404
+PASS [idor] Receita da biblioteca não prescrita → 404
+PASS [idor] Favoritar receita de outra clínica → 404 e nada gravado
+PASS [idor] A paciente com a prescrição vê a receita
+PASS [erros] Rota inexistente da API → 404 em JSON
+PASS [erros] Método não suportado → 404/405 em JSON
+PASS [erros] JSON malformado → 400 em JSON
+PASS [erros] Validação de entrada → 400/422 em JSON
+PASS [erros] Hidratação negativa é recusada
+PASS [erros] Diário sem dados → 400/422 em JSON (não 500)
+PASS [erros] Diário com escala de fome fora de 1–5 → 422
+PASS [erros] Diário com refeição no futuro → 422
+PASS [erros] Entradas inválidas não gravam nada no diário
+PASS [idor] Diário: caminho de foto enviado pelo cliente é ignorado
+PASS [erros] Todas as 41 respostas de erro observadas são JSON {error} sem detalhe interno
+PASS [erros] Todo erro traz "code" legível por máquina e "request_id" para suporte
+PASS [auth] Cookie de sessão web com origem externa → 403
+PASS [auth] Paciente inativada: token deixa de valer (401)
+PASS [auth] Paciente anonimizada: token deixa de valer (401)
+PASS [auth] Logout revoga o token (401 depois)
+PASS [auth] Token expirado → 401
+PASS [docs] OpenAPI documenta as rotas do paciente que existem
+PASS [docs] OpenAPI não descreve rotas que não existem
+
+NI2-89: 50 PASS, 0 FAIL

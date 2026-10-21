@@ -47,10 +47,11 @@ $stmtPat = $db->prepare("
     VALUES (955, 995, 'patient-955-uuid', 'Mariana Alencar', 'mariana.mobile@teste.com', '11988887777', :hash, 'active');
 ");
 $stmtPat->execute(['hash' => $patientHash]);
-$db->exec("
+// Data relativa: uma data fixa vira passado e deixa de ser "próxima consulta" (NI2-89).
+$db->prepare("
     INSERT INTO appointments (id, clinic_id, patient_id, professional_id, scheduled_at, status)
-    VALUES (9551, 995, 955, 1, '2026-10-20 10:00:00', 'scheduled');
-");
+    VALUES (9551, 995, 955, 1, ?, 'scheduled');
+")->execute([(new DateTimeImmutable('+2 days'))->format('Y-m-d 10:00:00')]);
 
 $passed = 0;
 $failed = 0;

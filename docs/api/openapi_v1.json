@@ -1,83 +1,977 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "ClyoNutri II API",
-    "version": "1.0.0",
-    "description": "API RESTful oficial do ecossistema ClyoNutri II para plataforma Web, mobile (React Native/Expo) e integrações parceiras. Arquitetura multi-tenant com autenticação Sanctum, isolamento estrito por organização e segurança clínica."
+    "title": "ClyoNutri — API do paciente",
+    "version": "1.1.0",
+    "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
   },
   "servers": [
     {
-      "url": "https://api.clyonutri.com.br/api/v1",
-      "description": "Ambiente de Produção"
-    },
-    {
-      "url": "https://staging-api.clyonutri.com.br/api/v1",
-      "description": "Ambiente de Staging"
+      "url": "/api/v1",
+      "description": "Relativo ao domínio da instalação (HostGator)"
     }
   ],
-  "security": [
+  "tags": [
     {
-      "BearerAuth": []
+      "name": "Autenticação"
+    },
+    {
+      "name": "Paciente"
+    },
+    {
+      "name": "Consultas"
+    },
+    {
+      "name": "Diário"
+    },
+    {
+      "name": "Evolução"
+    },
+    {
+      "name": "Conversas"
+    },
+    {
+      "name": "Receitas"
     }
   ],
   "paths": {
-    "/auth/login": {
+    "/auth/patient-login": {
       "post": {
-        "summary": "Autenticação e emissão de token Sanctum",
-        "operationId": "authLogin",
+        "summary": "Login da paciente (app/portal)",
+        "operationId": "patientLogin",
+        "tags": [
+          "Autenticação"
+        ],
         "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Conta inexistente e senha errada recebem a mesma resposta 401. Limite de tentativas por conta e IP (429 com Retry-After). Com o cabeçalho X-ClyoNutri-Web: 1 e origem permitida, também grava o cookie HttpOnly clyonutri_mobile.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientLoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/patient-logout": {
+      "post": {
+        "summary": "Revoga o token atual",
+        "operationId": "patientLogout",
+        "tags": [
+          "Autenticação"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/auth/patient-onboarding/preview": {
+      "post": {
+        "summary": "Confere o convite de primeiro acesso",
+        "operationId": "patientOnboardingPreview",
+        "tags": [
+          "Autenticação"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "patient": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "clinic_name": {
+                      "type": "string"
+                    },
+                    "professional_name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["email", "password"],
                 "properties": {
-                  "email": { "type": "string", "format": "email" },
-                  "password": { "type": "string" },
-                  "device_name": { "type": "string", "default": "mobile_app" }
-                }
+                  "invitation_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invitation_code"
+                ]
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/auth/patient-onboarding/complete": {
+      "post": {
+        "summary": "Conclui o primeiro acesso e emite o token",
+        "operationId": "patientOnboardingComplete",
+        "tags": [
+          "Autenticação"
+        ],
+        "security": [],
         "responses": {
           "200": {
-            "description": "Autenticado com sucesso",
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "O convite é de uso único.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invitation_code": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "password_confirmation": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invitation_code",
+                  "name",
+                  "email",
+                  "phone",
+                  "password",
+                  "password_confirmation"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/home": {
+      "get": {
+        "summary": "Resumo do dia: plano vigente, hidratação e próxima consulta",
+        "operationId": "patientHome",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientHome"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/hydration": {
+      "post": {
+        "summary": "Registra água consumida",
+        "operationId": "patientLogHydration",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": { "type": "string" },
-                    "token_type": { "type": "string", "example": "Bearer" },
-                    "user": { "$ref": "#/components/schemas/User" },
-                    "clinic": { "$ref": "#/components/schemas/Clinic" }
+                    "id": {
+                      "type": "integer"
+                    },
+                    "amount_ml": {
+                      "type": "integer"
+                    },
+                    "total_water_today": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/401Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount_ml": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000,
+                    "default": 250
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
-    "/auth/logout": {
+    "/patient/appointment/confirm": {
       "post": {
-        "summary": "Revogação de token ativo",
-        "operationId": "authLogout",
-        "responses": {
-          "200": { "description": "Token revogado com sucesso" }
-        }
-      }
-    },
-    "/patients": {
-      "get": {
-        "summary": "Listar pacientes da clínica ativa",
-        "operationId": "listPatients",
+        "summary": "Confirma a própria consulta agendada",
+        "operationId": "patientConfirmAppointment",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "false quando a consulta não está mais agendada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Consulta de outro paciente ou de outra clínica é recusada (403/404) e não muda.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appointment_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "appointment_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/appointments/{id}/cancel": {
+      "post": {
+        "summary": "Cancela a própria consulta",
+        "operationId": "patientCancelAppointment",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
+          }
+        ]
+      }
+    },
+    "/patient/appointments/{id}/reschedule": {
+      "post": {
+        "summary": "Remarca a própria consulta para um horário oferecido",
+        "operationId": "patientRescheduleAppointment",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "new_scheduled_at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "new_scheduled_at"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
+          }
+        ]
+      }
+    },
+    "/patient/food-diary": {
+      "get": {
+        "summary": "Lista o diário alimentar da paciente",
+        "operationId": "patientFoodDiary",
+        "tags": [
+          "Diário"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Registra uma refeição no diário",
+        "operationId": "patientLogMeal",
+        "tags": [
+          "Diário"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDiaryEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodDiaryEntryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/evolution": {
+      "get": {
+        "summary": "Linha do tempo de evolução (registros clínicos e autorrelatos)",
+        "operationId": "patientEvolution",
+        "tags": [
+          "Evolução"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evolution"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/self-metrics": {
+      "post": {
+        "summary": "Registra um autorrelato (ex.: peso)",
+        "operationId": "patientSelfMetric",
+        "tags": [
+          "Evolução"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Criado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metric_type": {
+                    "type": "string",
+                    "default": "weight_kg"
+                  },
+                  "value": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "unit": {
+                    "type": "string",
+                    "default": "kg"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/chat/messages": {
+      "get": {
+        "summary": "Mensagens da conversa da paciente com a nutricionista",
+        "operationId": "patientChatMessages",
+        "tags": [
+          "Conversas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessages"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "after_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Cursor: só mensagens depois deste id"
+          }
+        ]
+      }
+    },
+    "/patient/chat/send": {
+      "post": {
+        "summary": "Envia mensagem",
+        "operationId": "patientChatSend",
+        "tags": [
+          "Conversas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "integer",
+                    "description": "Opcional; precisa ser da própria paciente"
+                  },
+                  "idempotency_key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/chat/read": {
+      "post": {
+        "summary": "Marca a conversa como lida",
+        "operationId": "patientChatRead",
+        "tags": [
+          "Conversas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/chat/attachment/{id}": {
+      "get": {
+        "summary": "Baixa um anexo da própria conversa",
+        "operationId": "patientChatAttachment",
+        "tags": [
+          "Conversas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Arquivo (Content-Type do anexo)"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Anexo"
+          }
+        ]
+      }
+    },
+    "/patient/recipes": {
+      "get": {
+        "summary": "Receitas prescritas para a paciente",
+        "operationId": "patientRecipes",
+        "tags": [
+          "Receitas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -85,291 +979,613 @@
                   "properties": {
                     "data": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/Patient" }
+                      "items": {
+                        "type": "object"
+                      }
                     }
                   }
                 }
               }
             }
-          }
-        }
-      },
-      "post": {
-        "summary": "Cadastrar novo paciente",
-        "operationId": "createPatient",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["name", "email"],
-                "properties": {
-                  "name": { "type": "string" },
-                  "email": { "type": "string", "format": "email" },
-                  "phone": { "type": "string" }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Paciente cadastrado com sucesso",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Patient" }
-              }
-            }
           },
-          "422": { "$ref": "#/components/responses/422Unprocessable" }
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
-    "/patients/{id}/profile-360": {
+    "/patient/recipes/{id}": {
       "get": {
-        "summary": "Recuperar Perfil Clínico 360 do paciente",
-        "operationId": "getPatientProfile360",
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        "summary": "Detalhe de uma receita prescrita",
+        "operationId": "patientRecipe",
+        "tags": [
+          "Receitas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
         ],
         "responses": {
           "200": {
+            "description": "OK",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Profile360" }
-              }
-            }
-          },
-          "403": { "$ref": "#/components/responses/403Forbidden" },
-          "404": { "$ref": "#/components/responses/404NotFound" }
-        }
-      }
-    },
-    "/patients/{id}/clinical-records": {
-      "post": {
-        "summary": "Adicionar registro clínico longitudinal append-only com encadeamento de hash",
-        "operationId": "appendClinicalRecord",
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["title", "content"],
-                "properties": {
-                  "title": { "type": "string" },
-                  "content": { "type": "object" }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
           }
         },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ClinicalRecord" }
-              }
+        "description": "Só receitas prescritas à própria paciente; as demais respondem 404.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Receita"
+          },
+          {
+            "name": "prescription_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
             }
           },
-          "403": { "$ref": "#/components/responses/403Forbidden" }
-        }
+          {
+            "name": "version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
-    "/patients/{id}/active-plan": {
-      "get": {
-        "summary": "Consultar plano alimentar publicado vigente do paciente",
-        "operationId": "getActivePublishedMealPlan",
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+    "/patient/recipes/{id}/favorite": {
+      "post": {
+        "summary": "Marca ou desmarca receita como favorita",
+        "operationId": "patientRecipeFavorite",
+        "tags": [
+          "Receitas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
         ],
         "responses": {
           "200": {
+            "description": "OK",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/MealPlanVersion" }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "is_favorite": {
+                      "type": "boolean"
+                    }
+                  }
+                }
               }
             }
           },
-          "404": { "$ref": "#/components/responses/404NotFound" }
-        }
-      }
-    },
-    "/meal-plans/{id}/publish": {
-      "post": {
-        "summary": "Publicação atômica do plano alimentar com validação de alergênicos",
-        "operationId": "publishMealPlan",
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "allow_allergen_override": { "type": "boolean", "default": false }
-                }
-              }
-            }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Receita"
           }
-        },
-        "responses": {
-          "200": { "description": "Plano alimentar publicado com snapshot imutável gravado" },
-          "400": { "description": "Conflito de alergênicos detectado sem autorização clínica" },
-          "403": { "$ref": "#/components/responses/403Forbidden" }
-        }
+        ]
       }
     },
-    "/food-diary": {
-      "post": {
-        "summary": "Registrar refeição pelo paciente",
-        "operationId": "logFoodDiaryMeal",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["meal_name"],
-                "properties": {
-                  "meal_name": { "type": "string" },
-                  "description": { "type": "string" },
-                  "hunger_level": { "type": "integer", "minimum": 1, "maximum": 5 },
-                  "satiety_level": { "type": "integer", "minimum": 1, "maximum": 5 },
-                  "symptoms": { "type": "string" }
+    "/patient/recipes-shopping-list": {
+      "get": {
+        "summary": "Lista de compras das receitas prescritas",
+        "operationId": "patientRecipesShoppingList",
+        "tags": [
+          "Receitas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
           }
         },
-        "responses": {
-          "201": { "description": "Refeição registrada no diário" }
-        }
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 7
+            }
+          }
+        ]
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "BearerAuth": {
+      "bearerToken": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "Sanctum"
+        "description": "Token opaco de 64 caracteres hexadecimais emitido no login"
+      },
+      "webSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "clyonutri_mobile"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Erro",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     },
     "schemas": {
       "User": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "role": { "type": "string", "enum": ["nutritionist", "assistant", "patient", "admin"] }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "nutritionist",
+              "assistant",
+              "patient",
+              "admin"
+            ]
+          }
         }
       },
       "Clinic": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
         }
       },
       "Patient": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "phone": { "type": "string" },
-          "status": { "type": "string", "enum": ["active", "inactive", "anonymized"] }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive",
+              "anonymized"
+            ]
+          }
         }
       },
       "ClinicalRecord": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "version": { "type": "integer" },
-          "title": { "type": "string" },
-          "record_hash": { "type": "string" },
-          "previous_hash": { "type": "string" },
-          "created_at": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "record_hash": {
+            "type": "string"
+          },
+          "previous_hash": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "MealPlanVersion": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "version_number": { "type": "integer" },
-          "title": { "type": "string" },
-          "daily_energy_kcal": { "type": "number" },
-          "payload": { "type": "array", "items": { "type": "object" } },
-          "status": { "type": "string", "enum": ["published", "superseded"] },
-          "published_at": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "integer"
+          },
+          "version_number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "daily_energy_kcal": {
+            "type": "number"
+          },
+          "payload": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "superseded"
+            ]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "Profile360": {
         "type": "object",
         "properties": {
-          "patient": { "$ref": "#/components/schemas/Patient" },
-          "active_plan": { "$ref": "#/components/schemas/MealPlanVersion" },
-          "assessments_count": { "type": "integer" },
-          "timeline": { "type": "array", "items": { "type": "object" } }
+          "patient": {
+            "$ref": "#/components/schemas/Patient"
+          },
+          "active_plan": {
+            "$ref": "#/components/schemas/MealPlanVersion"
+          },
+          "assessments_count": {
+            "type": "integer"
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
         }
-      }
-    },
-    "responses": {
-      "401Unauthorized": {
-        "description": "Não autenticado ou token Sanctum inválido",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "message": { "type": "string", "example": "Unauthenticated." }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Mensagem para o usuário, sem detalhe interno"
+          },
+          "code": {
+            "type": "string",
+            "description": "Código estável (ex.: VALIDATION_ERROR, FORBIDDEN, HTTP_401, INTERNAL_ERROR)"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Identificador da requisição para suporte (também no cabeçalho X-Request-ID)"
+          }
+        },
+        "required": [
+          "error",
+          "code",
+          "request_id"
+        ]
+      },
+      "PatientLoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Alternativa ao e-mail"
+          },
+          "password": {
+            "type": "string",
+            "description": "Senha ou PIN de acesso"
+          },
+          "otp": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "Código de uso único, alternativo à senha"
+          }
+        },
+        "description": "Informe e-mail ou telefone, e senha/PIN ou OTP. Só o identificador é recusado (401)."
+      },
+      "PatientSession": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Token opaco; o servidor guarda só o hash SHA-256"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "UTC, formato Y-m-d H:i:s (30 dias)"
+          },
+          "patient": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "clinic_id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "token",
+          "expires_at",
+          "patient"
+        ]
+      },
+      "PatientHome": {
+        "type": "object",
+        "properties": {
+          "patient_name": {
+            "type": "string"
+          },
+          "water_ml_today": {
+            "type": "integer"
+          },
+          "water_goal_ml": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Meta prescrita; null quando não há"
+          },
+          "next_appointment": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "active_plan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Plano publicado vigente da própria paciente"
+          }
+        },
+        "required": [
+          "patient_name",
+          "water_ml_today",
+          "water_goal_ml",
+          "next_appointment",
+          "active_plan"
+        ]
+      },
+      "FoodDiaryEntryInput": {
+        "type": "object",
+        "properties": {
+          "meal_name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "consumed_at": {
+            "type": "string",
+            "description": "Data/hora; não pode estar mais de 1 dia no futuro. Padrão: agora"
+          },
+          "hunger_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "satiety_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "symptoms": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Repetir a mesma chave devolve o registro já criado"
+          }
+        },
+        "required": [
+          "meal_name"
+        ],
+        "description": "photo_path enviado pelo cliente é ignorado nesta rota."
+      },
+      "FoodDiaryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "meal_name": {
+            "type": "string"
+          },
+          "patient_id": {
+            "type": "integer"
+          },
+          "consumed_at": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotent_replay": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ChatMessages": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "professional": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "after_id": {
+                "type": "integer"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "has_more": {
+                "type": "boolean"
               }
             }
           }
         }
       },
-      "403Forbidden": {
-        "description": "Acesso negado: recurso pertence a outra organização (Isolamento Multi-Tenant)",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "message": { "type": "string", "example": "Acesso negado: o paciente ID não pertence à clínica ativa (403 Forbidden)." }
-              }
+      "Evolution": {
+        "type": "object",
+        "properties": {
+          "patient_id": {
+            "type": "integer"
+          },
+          "clinical_records": {
+            "type": "array",
+            "items": {
+              "type": "object"
             }
-          }
-        }
-      },
-      "404NotFound": {
-        "description": "Recurso não encontrado ou inexistente (Anti-Enumeração)",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "message": { "type": "string", "example": "Recurso não encontrado." }
-              }
+          },
+          "self_reports": {
+            "type": "array",
+            "items": {
+              "type": "object"
             }
-          }
-        }
-      },
-      "422Unprocessable": {
-        "description": "Erro de validação de dados de entrada",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "message": { "type": "string" },
-                "errors": { "type": "object" }
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "clinical_count": {
+                "type": "integer"
+              },
+              "self_report_count": {
+                "type": "integer"
+              },
+              "total_entries": {
+                "type": "integer"
+              },
+              "has_data": {
+                "type": "boolean"
               }
             }
           }

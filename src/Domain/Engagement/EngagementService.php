@@ -10,6 +10,9 @@ use PDO;
 
 class EngagementService
 {
+    public const HYDRATION_MIN_ML = 1;
+    public const HYDRATION_MAX_ML = 5000;
+
     private PDO $db;
 
     public function __construct(?PDO $db = null)
@@ -21,6 +24,10 @@ class EngagementService
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        // NI2-89: registro precisa ser um volume plausível (um copo a uma garrafa grande).
+        if ($amountMl < self::HYDRATION_MIN_ML || $amountMl > self::HYDRATION_MAX_ML) {
+            throw new \InvalidArgumentException('Informe um volume de água entre ' . self::HYDRATION_MIN_ML . ' e ' . self::HYDRATION_MAX_ML . ' ml.');
+        }
 
         $stmt = $this->db->prepare("
             INSERT INTO hydration_logs (clinic_id, patient_id, amount_ml, logged_at)

@@ -18,6 +18,43 @@ class FoodDiaryService
     }
 
     /**
+     * NI2-89: valida a entrada do diário antes de gravar (erro de validação vira 422, nunca 500).
+     */
+    private function validateMealEntry(array $data): array
+    {
+        $name = $data['meal_name'] ?? null;
+        if (!is_string($name) || trim($name) === '') {
+            throw new \InvalidArgumentException('Informe a refeição (meal_name).');
+        }
+        if (mb_strlen(trim($name), 'UTF-8') > 100) {
+            throw new \InvalidArgumentException('O nome da refeição deve ter no máximo 100 caracteres.');
+        }
+        foreach (['description' => 2000, 'symptoms' => 1000, 'photo_path' => 255] as $field => $max) {
+            if (!isset($data[$field])) continue;
+            if (!is_string($data[$field])) throw new \InvalidArgumentException("Campo {$field} inválido.");
+            if (mb_strlen($data[$field], 'UTF-8') > $max) throw new \InvalidArgumentException("O campo {$field} deve ter no máximo {$max} caracteres.");
+        }
+        foreach (['hunger_level', 'satiety_level'] as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') continue;
+            if (!is_numeric($data[$field]) || (int)$data[$field] != $data[$field] || (int)$data[$field] < 1 || (int)$data[$field] > 5) {
+                throw new \InvalidArgumentException("O campo {$field} deve ser um número de 1 a 5.");
+            }
+        }
+        if (isset($data['consumed_at']) && $data['consumed_at'] !== '') {
+            $ts = is_string($data['consumed_at']) ? strtotime($data['consumed_at']) : false;
+            if ($ts === false) throw new \InvalidArgumentException('Data e hora da refeição inválidas (consumed_at).');
+            if ($ts > time() + 86400) throw new \InvalidArgumentException('A refeição não pode estar registrada no futuro.');
+            $data['consumed_at'] = date('Y-m-d H:i:s', $ts);
+        } else {
+            unset($data['consumed_at']);
+        }
+        if (isset($data['idempotency_key']) && !is_string($data['idempotency_key'])) {
+            throw new \InvalidArgumentException('Chave de idempotência inválida.');
+        }
+        return $data;
+    }
+
+    /**
      * Registro de refeição pelo paciente
      */
     public function logMeal(int $patientId, array $data): array
@@ -25,6 +62,7 @@ class FoodDiaryService
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
+        $data = $this->validateMealEntry($data);
         $idempotencyKey = trim((string)($data['idempotency_key'] ?? '')) ?: null;
         if ($idempotencyKey !== null && strlen($idempotencyKey) > 64) {
             throw new \InvalidArgumentException('Chave de idempotência inválida.');

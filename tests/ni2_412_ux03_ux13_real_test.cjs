@@ -94,7 +94,12 @@ const shots = process.env.SCREENSHOT_DIR;
     // =========================================================== NI2-421 (UX-09) painel
     await section('NI2-421 (UX-09) painel', async () => {
     await page.goto(B + '/dashboard');
-    check('NI2-421', 'Sem pendências: orientação apropriada no lugar da lista', /Nenhuma pendência crítica/.test(await page.locator('[data-testid=attention-panel]').innerText()));
+    // A fixture da agenda tem consultas em datas fixas; em 21/10 uma delas cai "hoje" e vira pendência real.
+    const todayIso = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })).toLocaleDateString('sv-SE');
+    const pendingToday = Number(one(`SELECT COUNT(*) FROM appointments WHERE clinic_id = 1 AND status = 'scheduled' AND date(scheduled_at) = '${todayIso}'`));
+    const panelTxt = await page.locator('[data-testid=attention-panel]').innerText();
+    if (pendingToday === 0) check('NI2-421', 'Sem pendências: orientação apropriada no lugar da lista', /Nenhuma pendência crítica/.test(panelTxt));
+    else check('NI2-421', 'Com consulta de hoje não confirmada: aparece como pendência (e não a orientação de vazio)', !/Nenhuma pendência crítica/.test(panelTxt) && (await page.locator('[data-testid=attention-item]').count()) >= 1, panelTxt.slice(0, 200));
     php(['attention']);
     for (const h of [768, 900]) {
       await page.setViewportSize({ width: 1366, height: h }); await page.goto(B + '/dashboard');

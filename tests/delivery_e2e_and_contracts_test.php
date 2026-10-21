@@ -45,19 +45,20 @@ echo "[1/5] Testando NI2-167: Validação Automatizada de Contratos OpenAPI 3.1.
 $contractValidator = new ApiContractValidator(__DIR__ . '/../docs/api/openapi_v1.json');
 
 // Validar presença dos endpoints essenciais no contrato
+// NI2-89: o contrato descreve as rotas reais da API do paciente (conferidas por HTTP em tests/ni2_89_patient_api_real_test.cjs).
 $endpoints = [
-    '/auth/login' => 'post',
-    '/auth/logout' => 'post',
-    '/patients' => 'get',
-    '/patients' => 'post',
-    '/patients/{id}/profile-360' => 'get',
-    '/patients/{id}/clinical-records' => 'post',
-    '/patients/{id}/active-plan' => 'get',
-    '/meal-plans/{id}/publish' => 'post',
-    '/food-diary' => 'post',
+    ['/auth/patient-login', 'post'],
+    ['/auth/patient-logout', 'post'],
+    ['/patient/home', 'get'],
+    ['/patient/food-diary', 'get'],
+    ['/patient/food-diary', 'post'],
+    ['/patient/hydration', 'post'],
+    ['/patient/appointment/confirm', 'post'],
+    ['/patient/chat/messages', 'get'],
+    ['/patient/recipes/{id}', 'get'],
 ];
 
-foreach ($endpoints as $path => $method) {
+foreach ($endpoints as [$path, $method]) {
     $ep = $contractValidator->assertEndpointExists($path, $method);
     assert(isset($ep['responses']), "Endpoint {$method} {$path} deve possuir respostas documentadas");
 }

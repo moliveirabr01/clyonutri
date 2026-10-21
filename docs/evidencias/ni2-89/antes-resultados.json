@@ -1,0 +1,335 @@
+[
+ {
+  "crit": "versão",
+  "name": "Rotas do paciente estão todas sob /api/v1",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "versão",
+  "name": "Toda rota de paciente chamada pelo app existe no servidor",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Sem token: as 18 rotas protegidas respondem 401 em JSON",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Token inexistente → 401",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Senha errada → 401",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Conta inexistente recebe a mesma resposta da senha errada",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Login só com identificador (sem senha/OTP) → 401",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Login válido emite token opaco com expiração",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Banco guarda só o hash do token",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Com token: /home responde 200 com os dados da própria paciente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Diário: o próprio paciente registra (pré-condição)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Diário: a paciente só vê as próprias entradas",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Diário: o dono vê a própria entrada",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Home traz o plano da própria paciente, nunca o de outra clínica",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Confirmar consulta de outro paciente da mesma clínica: recusado e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Confirmar consulta de outro paciente da mesma clínica: resposta 403/404 em JSON sem detalhe interno",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Cancelar consulta de outro paciente da mesma clínica: recusado e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Confirmar consulta de paciente de outra clínica: recusado e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Confirmar consulta de paciente de outra clínica: resposta 403/404 em JSON sem detalhe interno",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Cancelar consulta de paciente de outra clínica: recusado e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Confirmar a própria consulta funciona",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Enviar mensagem na conversa de outro paciente: recusado e nada gravado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Enviar mensagem na conversa de outra clínica: recusado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Marcar como lida a conversa de outro paciente → 403 e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Baixar anexo de outro paciente: recusado sem vazar conteúdo",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "O dono do anexo consegue baixá-lo",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Mensagens: a paciente não recebe mensagens de outras conversas",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Receita privada de outra clínica → 404",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Receita da biblioteca não prescrita → 404",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Favoritar receita de outra clínica → 404 e nada gravado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "A paciente com a prescrição vê a receita",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Rota inexistente da API → 404 em JSON",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Método não suportado → 404/405 em JSON",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "JSON malformado → 400 em JSON",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Validação de entrada → 400/422 em JSON",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Hidratação negativa é recusada",
+  "ok": false,
+  "detail": {
+   "status": 200,
+   "body": "{\"id\":1,\"amount_ml\":-900,\"total_water_today\":-900}"
+  }
+ },
+ {
+  "crit": "erros",
+  "name": "Diário sem dados → 400/422 em JSON (não 500)",
+  "ok": false,
+  "detail": {
+   "status": 500,
+   "body": "{\"error\":\"Não foi possível concluir a solicitação. Tente novamente.\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"99f661f21b89c4555f3433a4\"}"
+  }
+ },
+ {
+  "crit": "erros",
+  "name": "Diário com escala de fome fora de 1–5 → 422",
+  "ok": false,
+  "detail": {
+   "status": 200,
+   "body": "{\"id\":2,\"meal_name\":\"Lanche\",\"patient_id\":1,\"consumed_at\":\"2026-10-21 00:17:40\",\"description\":null,\"idempotent_replay\":false}"
+  }
+ },
+ {
+  "crit": "erros",
+  "name": "Diário com refeição no futuro → 422",
+  "ok": false,
+  "detail": {
+   "status": 200,
+   "body": "{\"id\":3,\"meal_name\":\"Jantar\",\"patient_id\":1,\"consumed_at\":\"2030-01-01 20:00:00\",\"description\":null,\"idempotent_replay\":false}"
+  }
+ },
+ {
+  "crit": "erros",
+  "name": "Entradas inválidas não gravam nada no diário",
+  "ok": false,
+  "detail": null
+ },
+ {
+  "crit": "idor",
+  "name": "Diário: caminho de foto enviado pelo cliente é ignorado",
+  "ok": false,
+  "detail": {
+   "status": 200
+  }
+ },
+ {
+  "crit": "erros",
+  "name": "Todas as 38 respostas de erro observadas são JSON {error} sem detalhe interno",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "erros",
+  "name": "Todo erro traz \"code\" legível por máquina e \"request_id\" para suporte",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Cookie de sessão web com origem externa → 403",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Paciente inativada: token deixa de valer (401)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Paciente anonimizada: token deixa de valer (401)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Logout revoga o token (401 depois)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "auth",
+  "name": "Token expirado → 401",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "docs",
+  "name": "OpenAPI documenta as rotas do paciente que existem",
+  "ok": false,
+  "detail": {
+   "faltam": 21,
+   "exemplos": [
+    "/api/v1/patient/appointments/X/cancel",
+    "/api/v1/patient/appointments/X/reschedule",
+    "/api/v1/auth/patient-onboarding/preview",
+    "/api/v1/auth/patient-onboarding/complete",
+    "/api/v1/auth/patient-login",
+    "/api/v1/auth/patient-logout"
+   ]
+  }
+ },
+ {
+  "crit": "docs",
+  "name": "OpenAPI não descreve rotas que não existem",
+  "ok": false,
+  "detail": [
+   "/api/v1/auth/login",
+   "/api/v1/auth/logout",
+   "/api/v1/patients",
+   "/api/v1/patients/X/profile-360",
+   "/api/v1/patients/X/clinical-records",
+   "/api/v1/patients/X/active-plan",
+   "/api/v1/meal-plans/X/publish",
+   "/api/v1/food-diary"
+  ]
+ }
+]

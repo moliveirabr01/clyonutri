@@ -892,10 +892,21 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
     $input = $getJsonInput();
-    $amount = (int)($input['amount_ml'] ?? 250);
+    $rawAmount = $input['amount_ml'] ?? 250;
+    if (!is_numeric($rawAmount) || (int)$rawAmount != $rawAmount) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Informe o volume de água em ml (número inteiro).', 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
 
     $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-    $res = $apiCtrl->logHydration($patientId, $amount);
+    try {
+        $res = $apiCtrl->logHydration($patientId, (int)$rawAmount);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
 
     // Retornar novo total acumulado hoje (ANSI SQL portável)
     $todayDate = date('Y-m-d');
@@ -936,9 +947,17 @@ $router->post('/api/v1/patient/food-diary', function() use ($authenticatePatient
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
     $input = $getJsonInput();
+    // NI2-89: o app não envia arquivos por esta rota; caminho de foto vindo do cliente não é aceito.
+    unset($input['photo_path']);
 
     $foodDiary = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
-    $res = $foodDiary->logMeal($patientId, $input);
+    try {
+        $res = $foodDiary->logMeal($patientId, $input);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
     echo json_encode($res);
 });
 

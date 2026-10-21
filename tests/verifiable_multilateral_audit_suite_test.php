@@ -212,9 +212,9 @@ echo "==> [Camada 4] Executando Validação de Contratos de API do Aplicativo...
 // 4.1 Validação do Contrato OpenAPI 3.1 com Schema Validator
 $contractValidator = new ApiContractValidator(__DIR__ . '/../docs/api/openapi_v1.json');
 try {
-    $contractValidator->assertEndpointExists('/patients/{id}/active-plan', 'get');
-    $contractValidator->assertEndpointExists('/food-diary', 'post');
-    $contractValidator->assertEndpointExists('/auth/login', 'post');
+    $contractValidator->assertEndpointExists('/patient/home', 'get');
+    $contractValidator->assertEndpointExists('/patient/food-diary', 'post');
+    $contractValidator->assertEndpointExists('/auth/patient-login', 'post');
     $spec = $contractValidator->getSpec();
     $pathsCount = count($spec['paths'] ?? []);
     recordTestResult('API_CONTRACT', 'Conformidade com OpenAPI 3.1 (/api/v1)', 'PASS', "Contrato formal validado ({$pathsCount} endpoints) e schemas em conformidade", $results);

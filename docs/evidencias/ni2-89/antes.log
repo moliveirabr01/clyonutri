@@ -1,0 +1,52 @@
+PASS [versão] Rotas do paciente estão todas sob /api/v1
+PASS [versão] Toda rota de paciente chamada pelo app existe no servidor
+PASS [auth] Sem token: as 18 rotas protegidas respondem 401 em JSON
+PASS [auth] Token inexistente → 401
+PASS [auth] Senha errada → 401
+PASS [auth] Conta inexistente recebe a mesma resposta da senha errada
+PASS [auth] Login só com identificador (sem senha/OTP) → 401
+PASS [auth] Login válido emite token opaco com expiração
+PASS [auth] Banco guarda só o hash do token
+PASS [auth] Com token: /home responde 200 com os dados da própria paciente
+PASS [idor] Diário: o próprio paciente registra (pré-condição)
+PASS [idor] Diário: a paciente só vê as próprias entradas
+PASS [idor] Diário: o dono vê a própria entrada
+PASS [idor] Home traz o plano da própria paciente, nunca o de outra clínica
+PASS [idor] Confirmar consulta de outro paciente da mesma clínica: recusado e nada muda
+PASS [erros] Confirmar consulta de outro paciente da mesma clínica: resposta 403/404 em JSON sem detalhe interno
+PASS [idor] Cancelar consulta de outro paciente da mesma clínica: recusado e nada muda
+PASS [idor] Confirmar consulta de paciente de outra clínica: recusado e nada muda
+PASS [erros] Confirmar consulta de paciente de outra clínica: resposta 403/404 em JSON sem detalhe interno
+PASS [idor] Cancelar consulta de paciente de outra clínica: recusado e nada muda
+PASS [idor] Confirmar a própria consulta funciona
+PASS [idor] Enviar mensagem na conversa de outro paciente: recusado e nada gravado
+PASS [idor] Enviar mensagem na conversa de outra clínica: recusado
+PASS [idor] Marcar como lida a conversa de outro paciente → 403 e nada muda
+PASS [idor] Baixar anexo de outro paciente: recusado sem vazar conteúdo
+PASS [idor] O dono do anexo consegue baixá-lo
+PASS [idor] Mensagens: a paciente não recebe mensagens de outras conversas
+PASS [idor] Receita privada de outra clínica → 404
+PASS [idor] Receita da biblioteca não prescrita → 404
+PASS [idor] Favoritar receita de outra clínica → 404 e nada gravado
+PASS [idor] A paciente com a prescrição vê a receita
+PASS [erros] Rota inexistente da API → 404 em JSON
+PASS [erros] Método não suportado → 404/405 em JSON
+PASS [erros] JSON malformado → 400 em JSON
+PASS [erros] Validação de entrada → 400/422 em JSON
+FAIL [erros] Hidratação negativa é recusada → {"status":200,"body":"{\"id\":1,\"amount_ml\":-900,\"total_water_today\":-900}"}
+FAIL [erros] Diário sem dados → 400/422 em JSON (não 500) → {"status":500,"body":"{\"error\":\"Não foi possível concluir a solicitação. Tente novamente.\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"99f661f21b89c4555f3433a4\"}"}
+FAIL [erros] Diário com escala de fome fora de 1–5 → 422 → {"status":200,"body":"{\"id\":2,\"meal_name\":\"Lanche\",\"patient_id\":1,\"consumed_at\":\"2026-10-21 00:17:40\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [erros] Diário com refeição no futuro → 422 → {"status":200,"body":"{\"id\":3,\"meal_name\":\"Jantar\",\"patient_id\":1,\"consumed_at\":\"2030-01-01 20:00:00\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [erros] Entradas inválidas não gravam nada no diário
+FAIL [idor] Diário: caminho de foto enviado pelo cliente é ignorado → {"status":200}
+PASS [erros] Todas as 38 respostas de erro observadas são JSON {error} sem detalhe interno
+PASS [erros] Todo erro traz "code" legível por máquina e "request_id" para suporte
+PASS [auth] Cookie de sessão web com origem externa → 403
+PASS [auth] Paciente inativada: token deixa de valer (401)
+PASS [auth] Paciente anonimizada: token deixa de valer (401)
+PASS [auth] Logout revoga o token (401 depois)
+PASS [auth] Token expirado → 401
+FAIL [docs] OpenAPI documenta as rotas do paciente que existem → {"faltam":21,"exemplos":["/api/v1/patient/appointments/X/cancel","/api/v1/patient/appointments/X/reschedule","/api/v1/auth/patient-onboarding/preview","/api/v1/auth/patient-onboarding/complete","/api/v1/auth/patient-login","/api/v1/auth/patient-logout"]}
+FAIL [docs] OpenAPI não descreve rotas que não existem → ["/api/v1/auth/login","/api/v1/auth/logout","/api/v1/patients","/api/v1/patients/X/profile-360","/api/v1/patients/X/clinical-records","/api/v1/patients/X/active-plan","/api/v1/meal-plans/X/publish","/api/v1/food-diary"]
+
+NI2-89: 42 PASS, 8 FAIL
