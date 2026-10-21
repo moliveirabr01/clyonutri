@@ -250,8 +250,10 @@ class PatientPortalService
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
 
         // 1. Medições clínicas oficiais do nutricionista
+        // Code review NI2-135 (A1): `notes` é anotação interna do profissional e NUNCA vai para a paciente.
+        // Liberar a avaliação (is_shared) libera as medidas, não as anotações clínicas.
         $cStmt = $this->db->prepare("
-            SELECT id, assessed_at AS date, weight_kg, height_cm, bmi, waist_cm, notes,
+            SELECT id, assessed_at AS date, weight_kg, height_cm, bmi, waist_cm,
                    'clinical_official' AS source
             FROM anthropometric_assessments
             WHERE patient_id = :patient_id AND clinic_id = :clinic_id AND is_shared = 1
@@ -439,6 +441,9 @@ class PatientPortalService
         // v11 (NI2-221 F19): estado honesto da modalidade para o app.
         $row['is_online'] = \ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($row['type'] ?? null);
         $row['video_status'] = !$row['is_online'] ? 'presencial' : ($row['meeting_url'] !== null ? 'sala_disponivel' : 'aguardando_sala');
+        // Code review NI2-135 (A1): a observação da agenda é interna (queixas, encaminhamentos, notas de status)
+        // e não vai para a paciente.
+        unset($row['notes']);
         return $row;
     }
 

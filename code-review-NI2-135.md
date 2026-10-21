@@ -10,6 +10,34 @@
 - Aba "Evolução & Metas" do app (`mobile/src/screens/PatientHomeScreen.tsx` 902–932) e cliente (`mobile/src/services/api.ts`).
 - Compartilhamento de avaliações (`AnthropometryService`, `is_shared`).
 
+## Status das correções
+
+**A1 corrigido em 21/10/2026.** As anotações internas do profissional não chegam mais à paciente. O mesmo problema apareceu na observação da agenda (queixas, encaminhamentos), que ia junto com a "próxima consulta" na home do app; também foi corrigido. Os demais achados seguem abertos.
+
+**O que mudou:**
+- `PatientPortalService::getEvolutionTimeline` deixa de selecionar `notes`.
+- `getNextAppointment` remove `notes` da consulta antes de devolver.
+- `AnthropometryService::getSharedAssessmentsForPatient` remove `notes`. O método monta a visão da paciente, mas hoje não é usado por nenhuma rota.
+- Tipos do app (`EvolutionData`, `Appointment`) sem `notes`.
+- Nada é apagado: o profissional continua vendo as anotações.
+
+**Teste:** `tests/ni2_135_internal_notes_real_test.cjs` (HTTP real).
+
+| Execução | Resultado |
+|---|---|
+| Antes | 6 PASS, **3 FAIL** (evolução, próxima consulta e o método de serviço vazavam) |
+| Depois | **9 PASS, 0 FAIL** |
+
+**Regressão:**
+- NI2-89: 50/50.
+- NI2-91: 34/34.
+- Cliente do app contra o servidor real: 34/34.
+- 97 suítes PHP: nenhuma falha causada pela correção. Duas mudam de resultado conforme a hora em que rodam: `ni2_292…` cria uma consulta para hoje às 14:30, que às 16h já é passado, e `dashboard_review_fixes` falha no logout só dentro do próprio teste; o fluxo real de logout foi conferido por HTTP em 20/10.
+- Tipagem do app: sem erros.
+- `review_ni2_135_provas.cjs`: P7 agora dá "ok".
+
+Evidências em `docs/evidencias/ni2-135/`.
+
 ## Critérios da história
 
 > Exibir medidas disponibilizadas pelo nutricionista e gráficos acessíveis; indicar data, unidade, fonte e tipo (clínico vs autorrelato); filtros temporais; registrar autorrelato somente nos campos habilitados; preservar histórico; linguagem neutra e inclusiva; não inferir diagnósticos nem recomendar alterações automáticas de tratamento.

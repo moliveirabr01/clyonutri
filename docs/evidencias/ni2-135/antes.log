@@ -1,0 +1,11 @@
+PASS Evolução responde 200 com a avaliação liberada
+FAIL Avaliação liberada chega sem a anotação interna (sem campo notes) → {"id":1,"date":"2026-09-01 09:00:00","weight_kg":70,"height_cm":165,"bmi":25.71,"waist_cm":88,"notes":"Obs. interna: suspeita de compulsão alimentar","source":"clinical_official"}
+PASS Medidas liberadas continuam visíveis (peso, altura, IMC, cintura, data, fonte)
+PASS Avaliação não liberada continua oculta
+PASS Home: próxima consulta continua presente
+FAIL Home: próxima consulta chega sem a observação interna da agenda → {"id":11,"clinic_id":1,"patient_id":1,"professional_id":1,"scheduled_at":"2026-10-24 10:00:00","duration_minutes":60,"status":"scheduled","type":"follow_up","notes":"Queixa inicial: refluxo; encaminhar para gastro","created_at":"2026-10-21 19:04:08","updated_at":"2026-10-21 19:04:08","professional_n
+PASS Outro paciente não vê avaliações nem anotações da Ana
+PASS Anotações continuam gravadas para o profissional (nada foi apagado)
+FAIL AnthropometryService::getSharedAssessmentsForPatient não leva a anotação interna → ["id","clinic_id","patient_id","professional_id","weight_kg","height_cm","bmi","waist_cm","hip_cm","whr","body_fat_pct","muscle_mass_pct","notes","assessed_at","created_at","neck_cm","chest_cm","arm_cm","thigh_cm","calf_cm","is_shared","shared_at","shared_by_user_id","professional_name","bmi_classif
+
+NI2-135 anotações internas: 6 PASS, 3 FAIL

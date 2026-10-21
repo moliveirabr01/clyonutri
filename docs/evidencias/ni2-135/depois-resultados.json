@@ -1,0 +1,47 @@
+[
+ {
+  "name": "Evolução responde 200 com a avaliação liberada",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Avaliação liberada chega sem a anotação interna (sem campo notes)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Medidas liberadas continuam visíveis (peso, altura, IMC, cintura, data, fonte)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Avaliação não liberada continua oculta",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Home: próxima consulta continua presente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Home: próxima consulta chega sem a observação interna da agenda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Outro paciente não vê avaliações nem anotações da Ana",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "Anotações continuam gravadas para o profissional (nada foi apagado)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "name": "AnthropometryService::getSharedAssessmentsForPatient não leva a anotação interna",
+  "ok": true,
+  "detail": null
+ }
+]

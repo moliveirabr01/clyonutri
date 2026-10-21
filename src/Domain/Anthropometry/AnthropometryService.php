@@ -480,6 +480,8 @@ class AnthropometryService
 
         $hydrated = [];
         foreach ($rows as $row) {
+            // Code review NI2-135 (A1): visão da paciente nunca leva a anotação interna do profissional.
+            unset($row['notes']);
             $hydrated[] = $this->hydrateAssessmentDerivatives($row);
         }
 

@@ -180,7 +180,6 @@ export interface Appointment {
   patient_id: number;
   scheduled_at: string;
   status: 'scheduled' | 'confirmed' | 'cancelled';
-  notes?: string;
   professional_name?: string;
   meeting_url?: string | null;
   is_online?: boolean;
@@ -232,7 +231,7 @@ export interface EvolutionData {
     weight_kg?: number;
     height_cm?: number;
     bmi?: number;
-    notes?: string;
+    waist_cm?: number;
     source: string;
   }>;
   self_reports: Array<{
