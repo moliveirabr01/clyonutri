@@ -1,0 +1,36 @@
+PASS [paciente] Sem token: /patient/privacy → 401
+PASS [paciente] Ana vê o próprio consentimento (termo, versão, data)
+PASS [paciente] Resposta não traz IP, user agent nem dados de outros pacientes
+PASS [paciente] Tipo de pedido fora de export/deletion → 422
+PASS [paciente] Comentário acima de 1000 caracteres → 422
+PASS [paciente] Ana pede cópia dos dados → 201 com protocolo e prazo de 15 dias
+PASS [paciente] Pedido repetido não duplica (200, already_open, mesmo id)
+PASS [paciente] Abertura auditada com canal "patient_app"
+PASS [paciente] Bruno pede exclusão → 201
+PASS [paciente] Ana só vê o próprio pedido
+PASS [fila] Recepção não acessa a fila de pedidos (403)
+PASS [fila] Sem login: redireciona para o login
+PASS [fila] Nutricionista vê a fila com os pedidos da própria clínica
+PASS [fila] Nutricionista não vê o formulário de anonimizar
+PASS [fila] Nutricionista tentando anonimizar por POST direto → 403 e nada muda
+PASS [fila] Exportar sem CSRF válido → 403
+PASS [fila] Exportação gera o pacote (download JSON) e conclui o pedido
+PASS [fila] Pedido registra quem concluiu (reviewed_by = nutricionista)
+PASS [fila] Auditoria da exportação tem autor e IP
+PASS [portabilidade] Pacote traz chat, autorrelatos, versão do plano, pedidos, receitas e pré-consulta
+PASS [portabilidade] Pacote não traz segredos (hash de senha, tokens, caminhos internos)
+PASS [portabilidade] Pacote traz checksum SHA-256
+PASS [fila] Pedido já concluído não é exportado de novo (volta à fila com aviso)
+PASS [fila] Pedido de outra clínica: não é exportado e continua pendente
+PASS [fila] Pedido com prazo vencido aparece destacado
+PASS [fila] Anonimizar sem digitar a palavra de confirmação: nada muda
+PASS [exclusão] Dona anonimiza: pedido "concluído com guarda legal" (não mais "rejeitado")
+PASS [exclusão] Cadastro anonimizado e credencial apagada
+PASS [exclusão] Prontuário preservado sob guarda legal
+PASS [exclusão] Token do app do paciente anonimizado deixa de valer (401)
+PASS [exclusão] Auditoria da exclusão tem autor e lista o que ficou sob guarda
+PASS [exclusão] Fila mostra o pedido como concluído com guarda legal
+PASS [exclusão] Processar de novo: recusado (já concluído) e só 1 registro de auditoria
+PASS [fila] Perfil do paciente tem link para a fila de pedidos
+
+NI2-91 (SQLite): 34 PASS, 0 FAIL

@@ -1,0 +1,206 @@
+[
+ {
+  "crit": "paciente",
+  "name": "Sem token: /patient/privacy → 401",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Ana vê o próprio consentimento (termo, versão, data)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Resposta não traz IP, user agent nem dados de outros pacientes",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Tipo de pedido fora de export/deletion → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Comentário acima de 1000 caracteres → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Ana pede cópia dos dados → 201 com protocolo e prazo de 15 dias",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Pedido repetido não duplica (200, already_open, mesmo id)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Abertura auditada com canal \"patient_app\"",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Bruno pede exclusão → 201",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Ana só vê o próprio pedido",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Recepção não acessa a fila de pedidos (403)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Sem login: redireciona para o login",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Nutricionista vê a fila com os pedidos da própria clínica",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Nutricionista não vê o formulário de anonimizar",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Nutricionista tentando anonimizar por POST direto → 403 e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Exportar sem CSRF válido → 403",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Exportação gera o pacote (download JSON) e conclui o pedido",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Pedido registra quem concluiu (reviewed_by = nutricionista)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Auditoria da exportação tem autor e IP",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "portabilidade",
+  "name": "Pacote traz chat, autorrelatos, versão do plano, pedidos, receitas e pré-consulta",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "portabilidade",
+  "name": "Pacote não traz segredos (hash de senha, tokens, caminhos internos)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "portabilidade",
+  "name": "Pacote traz checksum SHA-256",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Pedido já concluído não é exportado de novo (volta à fila com aviso)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Pedido de outra clínica: não é exportado e continua pendente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Pedido com prazo vencido aparece destacado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Anonimizar sem digitar a palavra de confirmação: nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Dona anonimiza: pedido \"concluído com guarda legal\" (não mais \"rejeitado\")",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Cadastro anonimizado e credencial apagada",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Prontuário preservado sob guarda legal",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Token do app do paciente anonimizado deixa de valer (401)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Auditoria da exclusão tem autor e lista o que ficou sob guarda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Fila mostra o pedido como concluído com guarda legal",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "exclusão",
+  "name": "Processar de novo: recusado (já concluído) e só 1 registro de auditoria",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "fila",
+  "name": "Perfil do paciente tem link para a fila de pedidos",
+  "ok": true,
+  "detail": null
+ }
+]

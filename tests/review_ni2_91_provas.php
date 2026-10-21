@@ -52,7 +52,8 @@ $say('P3', $missing !== [], 'pacote de portabilidade não traz: ' . ($missing ? 
 TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist']);
 $dsr = new \ClyoNutri\Domain\Privacy\DataSubjectRequestService($db);
 $req = $dsr->openRequest(2, 'deletion', 'Pedido fictício');
-$callers = preg_match_all('/processDeletionWithLegalHold/', $index . file_get_contents(__DIR__ . '/../src/Application/Controllers/DashboardController.php'));
+$ctl = __DIR__ . '/../src/Application/Controllers/PrivacyRequestController.php';
+$callers = preg_match_all('/processDeletionWithLegalHold/', $index . file_get_contents(__DIR__ . '/../src/Application/Controllers/DashboardController.php') . (is_file($ctl) ? file_get_contents($ctl) : ''));
 $say('P4', $callers === 0, "pedido de exclusão #{$req['id']} aberto com prazo {$req['deadline_at']}; chamadas a processDeletionWithLegalHold em rotas/controladores: {$callers}");
 $audit = $db->query("SELECT user_id, ip_address FROM audit_logs WHERE action = 'DATA_SUBJECT_REQUEST_OPENED' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $say('P5', $audit['user_id'] === null, 'auditoria da abertura do pedido: user_id=' . var_export($audit['user_id'], true) . ', ip=' . var_export($audit['ip_address'], true));

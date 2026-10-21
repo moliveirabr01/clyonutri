@@ -11,6 +11,45 @@ use PDO;
 
 class LgpdService
 {
+    /** Tabelas exportadas => colunas omitidas (segredos, caminhos internos de arquivo, tokens). */
+    public const EXPORTED_TABLES = [
+        'clinical_records' => [],
+        'nutrition_records' => [],
+        'meal_plans' => [],
+        'meal_plan_versions' => [],
+        'appointments' => [],
+        'checkins' => [],
+        'receivables' => [],
+        'food_diary_entries' => ['photo_path', 'idempotency_key'],
+        'hydration_logs' => [],
+        'skinfold_measurements' => [],
+        'patient_self_metrics' => [],
+        'health_sync_data' => [],
+        'preconsultation_questionnaires' => ['token_hash', 'token_generation', 'token_expires_at', 'failed_attempts', 'locked_until'],
+        'recipe_prescriptions' => [],
+        'chat_conversations' => [],
+        'patient_documents' => ['file_path', 'access_token'],
+        'clinical_attachments' => ['storage_path'],
+        'teleconsultation_sessions' => ['external_room_id', 'external_room_url', 'external_room_name', 'patient_token_hash', 'professional_token_hash', 'token_generation', 'token_issued_at', 'token_expires_at', 'token_revoked_at', 'invite_generation', 'invite_issued_at_utc', 'invite_revoked_at_utc'],
+        'patient_packages' => [],
+        'data_subject_requests' => [],
+    ];
+
+    /** Tabelas com patient_id que NÃO entram no pacote, e por quê (revisar com o jurídico). */
+    public const NOT_EXPORTED_TABLES = [
+        'patients' => 'exportada à parte, só com campos cadastrais',
+        'patient_consents' => 'exportada à parte (consents)',
+        'anamneses' => 'exportada à parte (anamneses)',
+        'anthropometric_assessments' => 'exportada à parte (assessments)',
+        'recipe_patient_favorites' => 'exportada à parte (sem clinic_id na tabela)',
+        'chat_messages' => 'exportada à parte, a partir das conversas da paciente',
+        'patient_app_invitations' => 'operacional: só hashes de convite, sem dado do titular',
+        'clinical_integrity_anchors' => 'operacional: hashes de integridade do prontuário',
+        'booking_holds' => 'operacional: reservas temporárias de horário (dados pessoais são apagados na anonimização)',
+        'onboarding_progress' => 'dados do profissional (first_patient_id é só referência)',
+        'personal_access_tokens' => 'segredo de autenticação',
+    ];
+
     private PDO $db;
     private AuditLogger $auditLogger;
 
@@ -53,12 +92,24 @@ class LgpdService
         // Authentication secrets never belong in a portability package.
         $patient = array_intersect_key($patient, array_flip(['id','clinic_id','uuid','name','email','phone','birth_date','gender','status','notes','created_at','updated_at']));
         $related = [];
-        foreach (['clinical_records','meal_plans','appointments','checkins','receivables','food_diary_entries','hydration_logs','skinfold_measurements'] as $table) {
+        // NI2-91: inventário explícito. Toda tabela com patient_id está em EXPORTED_TABLES ou em NOT_EXPORTED_TABLES (com motivo).
+        foreach (self::EXPORTED_TABLES as $table => $omit) {
             $stmt = $this->db->prepare("SELECT * FROM $table WHERE clinic_id = ? AND patient_id = ? ORDER BY id");
-            $stmt->execute([$clinicId, $patientId]); $related[$table] = $stmt->fetchAll();
+            $stmt->execute([$clinicId, $patientId]);
+            $related[$table] = array_map(fn(array $row) => array_diff_key($row, array_flip($omit)), $stmt->fetchAll(PDO::FETCH_ASSOC));
         }
+        // Favoritos não têm clinic_id próprio: o vínculo com a clínica vem do paciente, já conferido acima.
+        $fav = $this->db->prepare('SELECT id, recipe_id, created_at FROM recipe_patient_favorites WHERE patient_id = ? ORDER BY id');
+        $fav->execute([$patientId]);
+        $related['recipe_patient_favorites'] = $fav->fetchAll(PDO::FETCH_ASSOC);
+        // Mensagens das conversas da própria paciente.
+        $msg = $this->db->prepare('SELECT m.id, m.conversation_id, m.sender_type, m.message, m.attachment_name, m.attachment_mime, m.attachment_size, m.status, m.read_at, m.created_at
+            FROM chat_messages m JOIN chat_conversations c ON c.id = m.conversation_id AND c.clinic_id = m.clinic_id
+            WHERE c.clinic_id = ? AND c.patient_id = ? ORDER BY m.id');
+        $msg->execute([$clinicId, $patientId]);
+        $related['chat_messages'] = $msg->fetchAll(PDO::FETCH_ASSOC);
         // Registrar auditoria de exportação
-        $this->auditLogger->log('LGPD_DATA_EXPORT', 'patients', (string)$patientId, ['patient_id' => $patientId]);
+        $this->auditLogger->log('LGPD_DATA_EXPORT', 'patients', (string)$patientId, ['patient_id' => $patientId, 'tables' => array_keys($related)]);
 
         return [
             'exported_at' => date('c'),
@@ -100,6 +151,16 @@ class LgpdService
                 WHERE tokenable_type = 'patient' AND tokenable_id = :id
             ");
             $delTok->execute(['id' => $patientId]);
+
+            // NI2-91: credenciais e convites deixam de existir; dados pessoais de reservas antigas são apagados.
+            $this->db->prepare("UPDATE patients SET password_hash = NULL, access_pin = NULL, otp_code = NULL, otp_expires_at = NULL WHERE id = :id AND clinic_id = :clinic_id")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+            $this->db->prepare("UPDATE patient_app_invitations SET revoked_at = CURRENT_TIMESTAMP WHERE patient_id = :id AND clinic_id = :clinic_id AND accepted_at IS NULL AND revoked_at IS NULL")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+            $this->db->prepare("UPDATE booking_holds SET patient_name = NULL, patient_email = NULL, patient_phone = NULL, patient_cpf = NULL, patient_notes = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+            $this->db->prepare("UPDATE preconsultation_questionnaires SET revoked_at = CURRENT_TIMESTAMP WHERE patient_id = :id AND clinic_id = :clinic_id AND submitted_at IS NULL AND revoked_at IS NULL")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
 
             // Registrar revogação de consentimentos
             $revStmt = $this->db->prepare("

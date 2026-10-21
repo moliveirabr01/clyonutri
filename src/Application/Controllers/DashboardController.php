@@ -180,8 +180,8 @@ class DashboardController
         $db = Connection::getInstance();
         $db->beginTransaction();
         try {
-            $request = $service->openRequest($id, $type, 'Solicitação registrada pelo profissional na gestão de pacientes.');
-            $export = $type === 'export' ? $service->processExport($request['id'], TenantContext::getUserId()) : null;
+            $request = $service->openRequest($id, $type, 'Registrado na gestão de pacientes.');
+            $export = $type === 'export' ? $service->processExport($request['id'], (int)TenantContext::getUserId()) : null;
             $json = $export ? json_encode($export['export_package'], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : null;
             $db->commit();
             if ($json !== null) {
@@ -190,7 +190,11 @@ class DashboardController
                 header('Cache-Control: no-store');
                 echo $json; return;
             }
-            header('Location: /pacientes/'.$id.'?success=privacidade');
+            // Exclusão segue para a fila da clínica (/privacidade/pedidos), processada pela gestão.
+            header('Location: /pacientes/'.$id.'?success=' . ($request['already_open'] ? 'privacidade-ja-aberto' : 'privacidade'));
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            http_response_code(403); echo 'Ação não autorizada.';
         } catch (\Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
             http_response_code(500); echo 'Não foi possível registrar a solicitação. Tente novamente.';

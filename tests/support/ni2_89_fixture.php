@@ -9,7 +9,8 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Database\Migrator;
 
-if (!str_starts_with(getenv('DB_DATABASE') ?: '', '/tmp/ni2-89-')) {
+$isMysqlTestDb = getenv('DB_CONNECTION') === 'mysql' && preg_match('/^ni2_(89|91)_test_[a-z0-9]+$/', getenv('DB_DATABASE') ?: '');
+if (!$isMysqlTestDb && !preg_match('#^/tmp/ni2-(89|91)-#', getenv('DB_DATABASE') ?: '')) {
     throw new RuntimeException('Isolated test database required');
 }
 $db = Connection::getInstance();
@@ -46,7 +47,7 @@ if ($mode === 'prepare') {
     // Conversa do Bruno com mensagem e anexo.
     $db->exec("INSERT INTO chat_conversations(id,clinic_id,patient_id,professional_id,status) VALUES(31,1,2,1,'active'),(32,2,3,2,'active')");
     $db->exec("INSERT INTO chat_messages(id,conversation_id,clinic_id,sender_type,sender_id,message) VALUES(41,31,1,'professional',1,'Mensagem privada para o Bruno'),(42,32,2,'professional',2,'Mensagem privada para a Carla')");
-    $file = dirname((string)getenv('DB_DATABASE')) . '/anexo-bruno.txt';
+    $file = (getenv('NI2_FIXTURE_DIR') ?: dirname((string)getenv('DB_DATABASE'))) . '/anexo-bruno.txt';
     file_put_contents($file, 'conteudo privado do Bruno');
     $db->prepare("INSERT INTO chat_attachments(id,clinic_id,conversation_id,message_id,original_name,stored_name,mime_type,size_bytes,sha256_hash,storage_path,uploaded_by_type,uploaded_by_id) VALUES(51,1,31,41,'exame-bruno.txt','anexo-bruno.txt','text/plain',?,?,?,'professional',1)")
         ->execute([filesize($file), hash_file('sha256', $file), $file]);

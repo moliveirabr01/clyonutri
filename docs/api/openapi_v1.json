@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClyoNutri — API do paciente",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
   },
   "servers": [
@@ -32,6 +32,9 @@
     },
     {
       "name": "Receitas"
+    },
+    {
+      "name": "Privacidade"
     }
   ],
   "paths": {
@@ -1165,6 +1168,172 @@
           }
         ]
       }
+    },
+    "/patient/privacy": {
+      "get": {
+        "summary": "Consentimentos e pedidos LGPD da própria paciente",
+        "operationId": "patientPrivacy",
+        "tags": [
+          "Privacidade"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "purpose": {
+                            "type": "string"
+                          },
+                          "term_title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "term_version": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "granted": {
+                            "type": "boolean"
+                          },
+                          "granted_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "revoked_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "revocation_reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PrivacyRequest"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/privacy-requests": {
+      "post": {
+        "summary": "Abre pedido LGPD (cópia ou exclusão dos dados)",
+        "operationId": "patientCreatePrivacyRequest",
+        "tags": [
+          "Privacidade"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "description": "O pedido entra na fila da clínica (/privacidade/pedidos) com prazo de 15 dias. Pedido igual em aberto não é duplicado (200 com already_open). A exclusão anonimiza o cadastro; o prontuário fica sob guarda legal.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "request_type"
+                ],
+                "properties": {
+                  "request_type": {
+                    "type": "string",
+                    "enum": [
+                      "export",
+                      "deletion"
+                    ]
+                  },
+                  "details": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Criado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "request": {
+                      "$ref": "#/components/schemas/PrivacyRequest"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Já havia pedido igual em aberto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "request": {
+                      "$ref": "#/components/schemas/PrivacyRequest"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1588,6 +1757,57 @@
                 "type": "boolean"
               }
             }
+          }
+        }
+      },
+      "PrivacyRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "request_type": {
+            "type": "string",
+            "enum": [
+              "export",
+              "deletion",
+              "access",
+              "anonymization",
+              "rectification"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_review",
+              "completed",
+              "completed_legal_hold",
+              "rejected_legal_hold"
+            ]
+          },
+          "deadline_at": {
+            "type": "string",
+            "description": "Prazo de resposta (15 dias), fuso da aplicação"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "response_notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "already_open": {
+            "type": "boolean",
+            "description": "Só na criação: true quando já havia pedido igual em aberto"
           }
         }
       }

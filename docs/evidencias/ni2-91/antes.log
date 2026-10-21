@@ -1,0 +1,12 @@
+FAIL [paciente] Sem token: /patient/privacy → 401
+FAIL [paciente] Ana vê o próprio consentimento (termo, versão, data) → "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy\",\"request_id\":\"5927a7f3d8ce33a0389e747a\",\"code\":\"HTTP_404\"}"
+PASS [paciente] Resposta não traz IP, user agent nem dados de outros pacientes
+FAIL [paciente] Tipo de pedido fora de export/deletion → 422 → 404
+FAIL [paciente] Comentário acima de 1000 caracteres → 422 → 404
+FAIL [paciente] Ana pede cópia dos dados → 201 com protocolo e prazo de 15 dias → "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy-requests\",\"request_id\":\"e039e3e6c2d437e4e768d20c\",\"code\":\"HTTP_404\"}"
+FAIL [paciente] Pedido repetido não duplica (200, already_open, mesmo id) → "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy-requests\",\"request_id\":\"251be6c745c458e4ebbb37e3\",\"code\":\"HTTP_404\"}"
+FAIL (interrompido) TypeError: Cannot read properties of undefined (reading 'id')
+    at /home/claude/b412/tests/ni2_91_privacy_real_test.cjs:69:126
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+NI2-91: 1 PASS, 7 FAIL

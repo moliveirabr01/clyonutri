@@ -115,7 +115,7 @@ $reqDel = $requestService->openRequest($patientId, 'deletion', 'Titular solicito
 $delResult = $requestService->processDeletionWithLegalHold($reqDel['id'], $profAlfaId);
 
 // Assertivas críticas de segurança clínica e legal:
-assert($delResult['status'] === 'rejected_legal_hold', "Eliminação total de prontuário deve ser recusada sob salvaguarda legal de 20 anos");
+assert($delResult['status'] === 'completed_legal_hold', "Com prontuário: pedido concluído com guarda legal (cadastro anonimizado, prontuário preservado por 20 anos)");
 assert($delResult['legal_hold_applied'] === true, "Legal hold de prontuário deve ser aplicado");
 assert(str_contains($delResult['justification'], 'Lei Federal nº 13.787/2018'), "Justificativa legal do CFN e da Lei 13.787 deve ser formalizada");
 

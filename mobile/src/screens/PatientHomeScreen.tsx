@@ -11,6 +11,7 @@ import {
   TextInput,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import { displayDateTime, tabLabels } from '../utils/presentation';
 import BrandLogo from '../components/BrandLogo';
@@ -25,6 +26,7 @@ import {
   PatientRecipePrescription,
   PatientRecipeDetails,
   ChatMessage,
+  PatientPrivacyData,
 } from '../services/api';
 
 type ResourceState = { loading: boolean; error: string | null; updatedAt: string | null };
@@ -60,6 +62,31 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [homeUpdatedAt, setHomeUpdatedAt] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [privacy, setPrivacy] = useState<PatientPrivacyData | null>(null);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+  const [privacyConfirm, setPrivacyConfirm] = useState<'export' | 'deletion' | null>(null);
+  const [privacyFeedback, setPrivacyFeedback] = useState<string | null>(null);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+
+  const loadPrivacy = async () => {
+    setPrivacyError(null);
+    try { setPrivacy(await ApiService.getPrivacy()); }
+    catch (_) { setPrivacyError('Não foi possível carregar seus consentimentos e pedidos. Tente novamente.'); }
+  };
+  useEffect(() => { if (currentTab === 'Perfil') { void loadPrivacy(); } }, [currentTab]);
+  const submitPrivacyRequest = async (type: 'export' | 'deletion') => {
+    setPrivacyBusy(true); setPrivacyFeedback(null); setPrivacyError(null);
+    try {
+      const r = await ApiService.createPrivacyRequest(type);
+      setPrivacyFeedback(r.already_open
+        ? 'Você já tem um pedido igual em andamento. O prazo de resposta continua o mesmo.'
+        : `Pedido registrado. Prazo de resposta: até ${displayDateTime(r.deadline_at)}.`);
+      setPrivacyConfirm(null);
+      await loadPrivacy();
+    } catch (_) {
+      setPrivacyError('Não foi possível registrar o pedido. Verifique sua conexão e tente de novo.');
+    } finally { setPrivacyBusy(false); }
+  };
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   const [recipes, setRecipes] = useState<PatientRecipePrescription[]>([]);
@@ -914,6 +941,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               <Text style={styles.cardTitle}>{patientName}</Text>
               <Text style={styles.mealItem}>Paciente: {session.patient.email}</Text>
               {logoutError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{logoutError}</Text>}
+              {logoutError && Platform.OS !== 'web' && (
+                <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8 }} onPress={() => { ApiService.forgetLocalSession(); onLogout(); }}>
+                  <Text style={styles.mealItem}>Sair só deste aparelho (o acesso no servidor expira sozinho em até 30 dias)</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.copperButton, { marginTop: 16 }]}
                 onPress={async () => {
@@ -946,10 +978,42 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 • Prontuário Clínico: Armazenado em infraestrutura protegida com histórico auditável.
               </Text>
               <Text style={styles.mealItem}>
-                • Direitos do Titular: Confirmação de tratamento, acesso, correção ou portabilidade podem ser solicitados diretamente ao nutricionista responsável pela clínica.
+                • Seus direitos: peça abaixo uma cópia dos seus dados ou a exclusão do cadastro. Cada pedido fica registrado com prazo de resposta de 15 dias. Correções podem ser pedidas ao seu nutricionista pelo chat.
               </Text>
-              <TouchableOpacity accessibilityRole="button" style={styles.navyButton} onPress={() => { setChatInputText('Olá! Gostaria de solicitar atendimento sobre meus dados pessoais e direitos de privacidade.'); setCurrentTab('Chat'); }}><Text style={styles.navyButtonText}>Solicitar atendimento sobre meus dados</Text></TouchableOpacity>
-              <Text style={styles.helperText}>Você pode revisar a mensagem antes de enviá-la. O envio abre uma conversa, não executa automaticamente alterações nos seus dados.</Text>
+              <Text style={[styles.cardTitle, { marginTop: 12 }]} accessibilityRole="header">Consentimentos</Text>
+              {privacyError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{privacyError}</Text>}
+              {!privacy && !privacyError && <Text style={styles.helperText}>Carregando…</Text>}
+              {privacy && privacy.consents.length === 0 && <Text style={styles.helperText}>Nenhum consentimento registrado pelo seu consultório.</Text>}
+              {privacy?.consents.map((c, i) => (
+                <Text key={`c-${i}`} style={styles.mealItem}>
+                  • {c.term_title ?? c.purpose}{c.term_version ? ` (v${c.term_version})` : ''}: {c.granted ? `aceito em ${displayDateTime(c.granted_at)}` : c.revoked_at ? `retirado em ${displayDateTime(c.revoked_at)}` : 'recusado'}
+                </Text>
+              ))}
+              <Text style={styles.helperText}>Para retirar um consentimento, fale com seu nutricionista pelo chat.</Text>
+
+              <Text style={[styles.cardTitle, { marginTop: 12 }]} accessibilityRole="header">Seus pedidos (LGPD)</Text>
+              {privacy?.requests.map((r) => (
+                <Text key={`r-${r.id}`} style={styles.mealItem}>
+                  • {r.request_type === 'export' ? 'Cópia dos dados' : r.request_type === 'deletion' ? 'Exclusão dos dados' : 'Pedido'} de {displayDateTime(r.created_at)}: {r.status === 'pending' || r.status === 'in_review' ? `em andamento, prazo ${displayDateTime(r.deadline_at)}` : 'concluído'}
+                </Text>
+              ))}
+              {privacyFeedback && <Text accessibilityRole="alert" style={styles.mealItem}>{privacyFeedback}</Text>}
+              {privacyConfirm === null ? (
+                <>
+                  <TouchableOpacity accessibilityRole="button" style={styles.navyButton} disabled={privacyBusy} onPress={() => setPrivacyConfirm('export')}><Text style={styles.navyButtonText}>Pedir cópia dos meus dados</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" style={[styles.navyButton, { marginTop: 8 }]} disabled={privacyBusy} onPress={() => setPrivacyConfirm('deletion')}><Text style={styles.navyButtonText}>Pedir exclusão dos meus dados</Text></TouchableOpacity>
+                </>
+              ) : (
+                <View accessibilityRole="alert">
+                  <Text style={styles.mealItem}>
+                    {privacyConfirm === 'export'
+                      ? 'Seu consultório vai preparar uma cópia dos seus dados. O prazo de resposta é de 15 dias.'
+                      : 'Seu cadastro será anonimizado e o acesso ao app, encerrado. O prontuário clínico é guardado por exigência legal (20 anos). O prazo de resposta é de 15 dias.'}
+                  </Text>
+                  <TouchableOpacity accessibilityRole="button" style={styles.navyButton} disabled={privacyBusy} onPress={() => submitPrivacyRequest(privacyConfirm)}><Text style={styles.navyButtonText}>{privacyBusy ? 'Enviando…' : 'Confirmar pedido'}</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8 }} disabled={privacyBusy} onPress={() => setPrivacyConfirm(null)}><Text style={styles.mealItem}>Cancelar</Text></TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}

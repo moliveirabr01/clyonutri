@@ -15,7 +15,7 @@ $pid = (int)$p['id'];
 <h2 id="patient-checkins">Check-ins recentes</h2>
 <?php if (!$profile['checkins']): ?><p>Nenhum check-in registrado.</p><?php else: ?>
 <ul><?php foreach ($profile['checkins'] as $row): ?><li><?= $escape(date('d/m/Y',strtotime($row['checkin_date']))) ?> — Adesão: <?= $row['meal_adherence_pct'] === null ? 'Não informada' : $escape($row['meal_adherence_pct']).'%' ?>; energia: <?= $escape($row['energy_level'] ?? 'Não informada') ?>; fome: <?= $escape($row['hunger_level'] ?? 'Não informada') ?>
-<?php if ($row['notes']): ?><p><?= nl2br($escape($row['notes'])) ?></p><?php endif; ?></li><?php endforeach; ?></ul><?php endif; ?>
+<?php if ($row['notes']): ?><p><?= nl2br($escape($row['notes'])) ?></p><?php endif; ?></li><?php endforeach; ?></ul><p><a href="/privacidade/pedidos">Ver todos os pedidos LGPD da clínica</a></p><?php endif; ?>
 </section>
 <section class="card" style="margin-top:24px" aria-labelledby="patient-finance">
 <h2 id="patient-finance">Financeiro do paciente</h2><a class="btn btn-secondary" href="/financeiro">Abrir financeiro</a>
@@ -54,6 +54,6 @@ $pid = (int)$p['id'];
 <button class="btn btn-secondary" type="submit">Registrar solicitação</button>
 </form>
 <?php if ($profile['privacy_requests']): ?><h3>Solicitações recentes</h3><ul>
-<?php foreach ($profile['privacy_requests'] as $request): ?><li><?= $escape(['export'=>'Exportação','deletion'=>'Exclusão'][$request['request_type']] ?? 'Solicitação de privacidade') ?> · <?= $escape($request['created_at']) ?> · <?= $escape(['pending'=>'Aguardando revisão','in_review'=>'Em revisão','completed'=>'Concluída','rejected_legal_hold'=>'Retenção de prontuário aplicada'][$request['status']] ?? 'Em acompanhamento') ?></li><?php endforeach; ?>
+<?php foreach ($profile['privacy_requests'] as $request): ?><li><?= $escape(['export'=>'Exportação','deletion'=>'Exclusão'][$request['request_type']] ?? 'Solicitação de privacidade') ?> · <?= $escape($request['created_at']) ?> · <?= $escape(['pending'=>'Aguardando revisão','in_review'=>'Em revisão','completed'=>'Concluída','completed_legal_hold'=>'Concluída com guarda legal do prontuário','rejected_legal_hold'=>'Concluída com guarda legal do prontuário'][$request['status']] ?? 'Em acompanhamento') ?></li><?php endforeach; ?>
 </ul><?php endif; ?>
 </section>

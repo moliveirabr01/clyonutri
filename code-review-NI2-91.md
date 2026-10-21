@@ -11,6 +11,42 @@
 - `src/Domain/Privacy/*` (`LgpdService`, `DataSubjectRequestService`, `ConsentManagementService`).
 - Ações do profissional `patientPrivacyRequest` e `patientConsent` (`DashboardController`).
 
+## Status das correções (21/10/2026, mesmo dia)
+
+Corrigido o que não depende de decisão jurídica ou de produto. Teste real por HTTP: `tests/ni2_91_privacy_real_test.cjs`.
+
+| Execução | Resultado |
+|---|---|
+| Antes (`72d703a`) | 1 PASS, 7 FAIL (rotas inexistentes) |
+| Depois, SQLite | **34 PASS, 0 FAIL** |
+| Depois, MySQL 8.0.46 | **34 PASS, 0 FAIL** |
+
+Evidências em `docs/evidencias/ni2-91/`.
+
+| # | Status | O que mudou |
+|---|---|---|
+| C1 | **Parcial** | Novas rotas `GET /api/v1/patient/privacy` (consentimentos e pedidos da própria paciente, sem IP nem user agent) e `POST /api/v1/patient/privacy-requests` (cópia ou exclusão; pedido igual em aberto não duplica). No app, a aba Perfil mostra consentimentos e pedidos, com "Pedir cópia dos meus dados" e "Pedir exclusão dos meus dados" e confirmação em tela. OpenAPI 1.2.0. **Falta:** edição de dados (depende da lista de campos permitidos) e retirada de consentimento pela própria paciente (depende da base legal) |
+| A1 | **Pendente (decisão jurídica)** | Termo no primeiro acesso: P2 continua reproduzindo |
+| A2 | Corrigido | Fila da clínica em `/privacidade/pedidos` (menu "Pedidos LGPD"): em aberto primeiro, prazo, destaque de prazo vencido. Exportar: dono, admin ou nutricionista. Anonimizar: só dono/admin, com a palavra ANONIMIZAR e a confirmação de irreversível. Recepção: 403 |
+| A3 | Corrigido | O status passa a ser `completed_legal_hold` (concluído com guarda legal), e não mais "rejeitado". A guarda considera prontuário, anamneses, avaliações, planos, registros e dobras, e a auditoria lista o que ficou guardado. O pedido não é processado duas vezes |
+| A4 | Corrigido | O pacote passa a trazer: chat, autorrelatos, pré-consulta (sem tokens), receitas prescritas e favoritas, versões publicadas do plano, documentos e anexos (sem caminho interno), teleconsultas (sem tokens), pacotes, dados de saúde sincronizados e pedidos LGPD. Inventário explícito em `LgpdService::EXPORTED_TABLES` e `NOT_EXPORTED_TABLES` (com motivo) |
+| A5 | Corrigido | Abertura, exportação e exclusão auditadas pelo `AuditLogger`, com usuário e IP; o canal fica registrado (`patient_app` ou `professional`) |
+| M1 | **Parcial** | A anonimização apaga senha, PIN e OTP, revoga convites pendentes e links de pré-consulta não respondidos, e apaga dados pessoais de reservas antigas. **Pendente (jurídico):** data de nascimento, gênero e texto livre |
+| M2 | **Pendente (produto)** | A entrega do pacote ao titular continua sendo um download pelo profissional |
+| M3 | Corrigido (app nativo) | Quando a revogação falha, aparece "Sair só deste aparelho". No portal web o cookie é HttpOnly e só o servidor o apaga, então lá a opção não aparece |
+| B1 | Corrigido | O texto da aba fala dos pedidos formais com prazo |
+| B2 | Corrigido | O prazo é calculado no fuso da aplicação |
+| B3 | Corrigido | Teste real `ni2_91_privacy_real_test.cjs`. `review_ni2_91_provas.php` agora mostra "ok" em P1, P3, P4, P5 e P6, e "ACHADO" só em P2, P7 e P8 (os pendentes) |
+
+**Regressão:**
+- 97 suítes PHP: 77 → 78 PASS, nenhuma falha nova. `privacy_and_lgpd_governance_test` foi atualizado para o novo status.
+- NI2-89 (API do paciente): 50/50.
+- NI2-412 (navegador): 124 PASS + 36/36.
+- NI2-433: 69. NI2-437: 48. NI2-444: 16.
+- Cliente do app contra o servidor real: 34/34.
+- Tipagem do app (`tsc --noEmit`): sem erros.
+- Fila de pedidos: axe WCAG 2 A/AA sem violações, sem rolagem horizontal a 390 px.
+
 ## Critérios da história
 
 > Como paciente, quero gerenciar conta e direitos de privacidade.

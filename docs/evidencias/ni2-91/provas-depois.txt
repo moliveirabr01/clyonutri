@@ -1,0 +1,8 @@
+ok     P1: rotas da API do paciente para perfil, consentimento ou LGPD: /api/v1/patient/privacy, /api/v1/patient/privacy-requests (de 22 rotas)
+ACHADO P2: primeiro acesso concluído com termo ativo; consentimentos gravados para a paciente: 0
+ok     P3: pacote de portabilidade não traz: —
+ok     P4: pedido de exclusão #1 aberto com prazo 2026-11-05 03:41:01; chamadas a processDeletionWithLegalHold em rotas/controladores: 1
+ok     P5: auditoria da abertura do pedido: user_id=1, ip='127.0.0.1'
+ok     P6: status do pedido = completed_legal_hold, mas o cadastro foi anonimizado (status do paciente = anonymized)
+ACHADO P7: depois de anonimizar continuam gravados: birth_date, gender (nome='PACIENTE ANONIMIZADO', e-mail=NULL)
+ACHADO P8: pedido de exportação aberto pelo profissional é dado como concluído e baixado na hora pelo próprio profissional (sem envio ao titular)

@@ -198,6 +198,10 @@ export interface PatientRecipeDetails {
   ingredients: Array<{ id: number; food_name: string; amount: number; measure_unit: string }>;
 }
 
+export interface PatientConsent { purpose: string; term_title: string | null; term_version: string | null; granted: boolean; granted_at: string | null; revoked_at: string | null; revocation_reason: string | null; }
+export interface PrivacyRequest { id: number; request_type: string; status: string; deadline_at: string; completed_at?: string | null; response_notes?: string | null; created_at: string; already_open?: boolean; }
+export interface PatientPrivacyData { consents: PatientConsent[]; requests: PrivacyRequest[]; }
+
 export interface PatientHomeData {
   patient_name: string;
   water_ml_today: number;
@@ -360,6 +364,21 @@ export const ApiService = {
     }
     setAuthToken(data.token);
     return data;
+  },
+
+  async getPrivacy(): Promise<PatientPrivacyData> {
+    const data = await request<PatientPrivacyData>('/api/v1/patient/privacy');
+    if (!Array.isArray(data.consents) || !Array.isArray(data.requests)) throw new ApiError('Resposta de privacidade inválida.', 200, 'invalid');
+    return data;
+  },
+  async createPrivacyRequest(request_type: 'export' | 'deletion', details?: string): Promise<PrivacyRequest> {
+    const data = await request<{ request: PrivacyRequest }>('/api/v1/patient/privacy-requests', { method: 'POST', body: JSON.stringify({ request_type, details }) });
+    if (!data.request?.id) throw new ApiError('Resposta do pedido inválida.', 200, 'invalid');
+    return data.request;
+  },
+  /** Encerra a sessão só neste aparelho, sem depender da rede (code review NI2-91, M3). */
+  forgetLocalSession(): void {
+    setAuthToken(null);
   },
 
   async logout(): Promise<{ message: string }> {

@@ -109,6 +109,7 @@ $recipeCtrl = new \ClyoNutri\Application\Controllers\RecipeController($db);
 $onboardingCtrl = new \ClyoNutri\Application\Controllers\OnboardingController($db);
 $adminCtrl = new \ClyoNutri\Application\Controllers\AdminController($db);
 $subCtrl = new \ClyoNutri\Application\Controllers\SubscriptionController();
+$privacyCtrl = new \ClyoNutri\Application\Controllers\PrivacyRequestController();
 $patientAppCtrl = new \ClyoNutri\Application\Controllers\PatientAppController();
 $bookingCtrl = new \ClyoNutri\Application\Controllers\BookingController($db);
 
@@ -335,6 +336,10 @@ $router->post('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient'])
 $router->post('/pacientes/{id}/status', $requireAuth([$dashCtrl, 'patientStatus']));
 $router->post('/pacientes/{id}/consentimento/retirar', $requireAuth([$dashCtrl, 'patientConsent']));
 $router->post('/pacientes/{id}/privacidade', $requireAuth([$dashCtrl, 'patientPrivacyRequest']));
+// Fila de pedidos de titulares da clínica (code review NI2-91, A2)
+$router->get('/privacidade/pedidos', $requireAuth([$privacyCtrl, 'index']));
+$router->post('/privacidade/pedidos/{id}/exportar', $requireAuth([$privacyCtrl, 'export']));
+$router->post('/privacidade/pedidos/{id}/anonimizar', $requireAuth([$privacyCtrl, 'processDeletion']));
 $router->get('/pacientes/{id}', $requireAuth([$dashCtrl, 'profile360']));
 $router->post('/pacientes/{id}/convite-app', $requireAuth([new \ClyoNutri\Application\Controllers\PatientOnboardingController(), 'invite']));
 $router->get('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'patientMedicalRecord']));
@@ -1185,6 +1190,47 @@ $router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use 
         echo json_encode(['error' => $e->getMessage()]);
         exit;
     }
+});
+
+// 4.4 Privacidade da paciente: consentimentos e pedidos LGPD (code review NI2-91, C1)
+$router->get('/api/v1/patient/privacy', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $consents = array_map(fn(array $c) => [
+        'purpose' => $c['consent_type'],
+        'term_title' => $c['term_title'],
+        'term_version' => $c['term_version'],
+        'granted' => (bool)$c['granted'],
+        'granted_at' => $c['granted_at'],
+        'revoked_at' => $c['revoked_at'],
+        'revocation_reason' => $c['revocation_reason'],
+    ], (new \ClyoNutri\Domain\Privacy\ConsentManagementService($db))->getConsentAuditTrail($patientId));
+    $requests = (new \ClyoNutri\Domain\Privacy\DataSubjectRequestService($db))->listForPatient($patientId);
+    echo json_encode(['consents' => $consents, 'requests' => $requests], JSON_UNESCAPED_UNICODE);
+});
+
+$router->post('/api/v1/patient/privacy-requests', function() use ($authenticatePatientApi, $db, $getJsonInput) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $input = $getJsonInput();
+    $type = $input['request_type'] ?? null;
+    if (!in_array($type, ['export', 'deletion'], true)) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Escolha o tipo de pedido: export (cópia dos dados) ou deletion (exclusão).', 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    if (isset($input['details']) && (!is_string($input['details']) || mb_strlen($input['details']) > 1000)) {
+        http_response_code(422);
+        echo json_encode(['error' => 'O comentário deve ter no máximo 1000 caracteres.', 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    $request = (new \ClyoNutri\Domain\Privacy\DataSubjectRequestService($db))->openRequest(
+        (int)$auth['patient_id'], $type, $input['details'] ?? null, \ClyoNutri\Domain\Privacy\DataSubjectRequestService::CHANNEL_PATIENT_APP);
+    http_response_code($request['already_open'] ? 200 : 201);
+    echo json_encode(['request' => $request], JSON_UNESCAPED_UNICODE);
 });
 
 // 4.5 Receitas Prescritas & Lista de Compras do Paciente (NI2-268)

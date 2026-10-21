@@ -1,0 +1,49 @@
+[
+ {
+  "crit": "paciente",
+  "name": "Sem token: /patient/privacy → 401",
+  "ok": false,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Ana vê o próprio consentimento (termo, versão, data)",
+  "ok": false,
+  "detail": "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy\",\"request_id\":\"5927a7f3d8ce33a0389e747a\",\"code\":\"HTTP_404\"}"
+ },
+ {
+  "crit": "paciente",
+  "name": "Resposta não traz IP, user agent nem dados de outros pacientes",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "paciente",
+  "name": "Tipo de pedido fora de export/deletion → 422",
+  "ok": false,
+  "detail": 404
+ },
+ {
+  "crit": "paciente",
+  "name": "Comentário acima de 1000 caracteres → 422",
+  "ok": false,
+  "detail": 404
+ },
+ {
+  "crit": "paciente",
+  "name": "Ana pede cópia dos dados → 201 com protocolo e prazo de 15 dias",
+  "ok": false,
+  "detail": "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy-requests\",\"request_id\":\"e039e3e6c2d437e4e768d20c\",\"code\":\"HTTP_404\"}"
+ },
+ {
+  "crit": "paciente",
+  "name": "Pedido repetido não duplica (200, already_open, mesmo id)",
+  "ok": false,
+  "detail": "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/privacy-requests\",\"request_id\":\"251be6c745c458e4ebbb37e3\",\"code\":\"HTTP_404\"}"
+ },
+ {
+  "crit": "erro",
+  "name": "Cannot read properties of undefined (reading 'id')",
+  "ok": false
+ }
+]
