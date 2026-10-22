@@ -448,6 +448,11 @@ $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
 $router->post('/financeiro/recebiveis/novo', $requireAuth([$dashCtrl, 'createReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/pagar', $requireAuth([$dashCtrl, 'payReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/cancelar', $requireAuth([$dashCtrl, 'cancelReceivableAction']));
+// NI2-95: avisos do profissional na web (mensagem nova no chat etc.)
+$noticesCtrl = new \ClyoNutri\Application\Controllers\NotificationsController();
+$router->get('/avisos', $requireAuth([$noticesCtrl, 'index']));
+$router->post('/avisos/lidas', $requireAuth([$noticesCtrl, 'markAll']));
+$router->post('/avisos/{id}/lida', $requireAuth([$noticesCtrl, 'markOne']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->post('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->get('/configuracoes/assinatura', $requireAuth([$subCtrl, 'show']));
@@ -1148,6 +1153,38 @@ $router->post('/api/v1/patient/notification-preferences', function() use ($authe
     }
     (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('NOTIFICATION_PREFERENCES_UPDATED', 'patients', (string)$auth['patient_id'], ['before' => $res['before'], 'after' => $res['after']]);
     echo json_encode($res['after'], JSON_UNESCAPED_UNICODE);
+});
+// NI2-95: aparelho da paciente para o aviso no celular (token do Expo Push). O token nunca volta na resposta.
+$router->post('/api/v1/patient/push-tokens', function() use ($authenticatePatientApi, $getJsonInput, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $in = $getJsonInput();
+    try {
+        $res = (new \ClyoNutri\Domain\Notification\PushTokenService($db))->register((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $in['token'] ?? null, $in['platform'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    } catch (\RuntimeException $e) {
+        http_response_code(503);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'UNAVAILABLE'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('PUSH_DEVICE_REGISTERED', 'patients', (string)$auth['patient_id'], ['platform' => is_string($in['platform'] ?? null) ? substr($in['platform'], 0, 16) : 'unknown']);
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/push-tokens/remove', function() use ($authenticatePatientApi, $getJsonInput, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $in = $getJsonInput();
+    $removed = (new \ClyoNutri\Domain\Notification\PushTokenService($db))->remove((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $in['token'] ?? null);
+    if ($removed) {
+        (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('PUSH_DEVICE_REMOVED', 'patients', (string)$auth['patient_id'], []);
+    }
+    // Idempotente: sair duas vezes, ou com token que não é seu, responde igual (sem revelar se existe).
+    echo json_encode(['removed' => true], JSON_UNESCAPED_UNICODE);
 });
 
 // 4.4 Privacidade da paciente: consentimentos e pedidos LGPD (code review NI2-91, C1)

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClyoNutri — API do paciente",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
   },
   "servers": [
@@ -2272,6 +2272,129 @@
           }
         }
       }
+    },
+    "/patient/push-tokens": {
+      "post": {
+        "summary": "Cadastra o aparelho da paciente para o aviso no celular (Expo Push)",
+        "description": "Chamado pelo app depois do login, quando a paciente permite notificações. O mesmo token cadastrado de novo só atualiza a data; se o token estava com outra conta, passa para a paciente atual. Até 10 aparelhos ativos por paciente (o mais antigo é desligado). O token nunca volta nas respostas. Mesmo cadastrado, o envio só acontece com PUSH_ENABLED ligado no servidor.",
+        "operationId": "patientPushTokenRegister",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenRegister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aparelho cadastrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTokenRegistered"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "description": "VALIDATION_ERROR: token fora do formato ExponentPushToken[...]",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "UNAVAILABLE: migration 51 (avisos) ainda não aplicada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/push-tokens/remove": {
+      "post": {
+        "summary": "Desliga o aviso no celular deste aparelho (logout)",
+        "description": "Idempotente: responde igual se o token já estava desligado, não existe ou é de outra conta.",
+        "operationId": "patientPushTokenRemove",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "removed"
+                  ],
+                  "properties": {
+                    "removed": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3767,7 +3890,7 @@
           },
           "push_available": {
             "type": "boolean",
-            "description": "false enquanto não houver provedor de push"
+            "description": "true quando o servidor está com PUSH_ENABLED ligado e a migration 51 aplicada; o app só mostra as chaves de push nesse caso"
           }
         }
       },
@@ -3831,6 +3954,45 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "PushTokenRegister": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^(ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_\\-]{10,200}\\]$",
+            "description": "Token de getExpoPushTokenAsync()"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android",
+              "web",
+              "unknown"
+            ],
+            "default": "unknown"
+          }
+        }
+      },
+      "PushTokenRegistered": {
+        "type": "object",
+        "required": [
+          "registered",
+          "push_enabled"
+        ],
+        "properties": {
+          "registered": {
+            "type": "boolean"
+          },
+          "push_enabled": {
+            "type": "boolean",
+            "description": "false enquanto PUSH_ENABLED estiver desligado no servidor"
           }
         }
       }

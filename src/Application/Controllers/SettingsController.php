@@ -48,6 +48,24 @@ final class SettingsController
                     ]);
                     (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('NOTIFICATION_PREFERENCES_UPDATED','professionals',(string)$profId,['before'=>$res['before'],'after'=>$res['after']]);
                 }
+                elseif($section==='reminders'){
+                    // NI2-95: antecedência do lembrete de consulta (1 a 72 h). A gestão define o da clínica; cada
+                    // profissional pode ter o seu (em branco = segue o da clínica).
+                    $rs=new \ClyoNutri\Domain\Notification\ReminderSettingsService(Connection::getInstance());
+                    $clinicId=TenantContext::getClinicId();$profId=self::professionalId();$changes=[];
+                    $isManager=in_array($profile['member_role'],['owner','admin'],true);
+                    if(array_key_exists('reminder_clinic_hours',$_POST)&&!$isManager)throw new \DomainException('Somente a gestão do consultório pode alterar o lembrete padrão da clínica.');
+                    if(array_key_exists('reminder_own_hours',$_POST)&&$profId<=0)throw new \DomainException('Somente profissionais com cadastro completo têm lembrete próprio.');
+                    // Os dois campos juntos: ou salva os dois, ou nenhum (um valor inválido não deixa o outro gravado pela metade).
+                    $rdb=Connection::getInstance();$rdb->beginTransaction();
+                    try{
+                        if(array_key_exists('reminder_clinic_hours',$_POST))$changes['clinic']=$rs->save($clinicId,0,is_string($_POST['reminder_clinic_hours'])?trim($_POST['reminder_clinic_hours']):null,(int)TenantContext::getUserId());
+                        if(array_key_exists('reminder_own_hours',$_POST))$changes['professional']=$rs->save($clinicId,$profId,is_string($_POST['reminder_own_hours'])?trim($_POST['reminder_own_hours']):null,(int)TenantContext::getUserId());
+                        if($changes===[])throw new \InvalidArgumentException('Informe com quantas horas de antecedência o lembrete deve sair.');
+                        $rdb->commit();
+                    }catch(\Throwable $e){if($rdb->inTransaction())$rdb->rollBack();throw $e;}
+                    (new \ClyoNutri\Core\Audit\AuditLogger($rdb))->log('APPOINTMENT_REMINDER_SETTINGS_UPDATED','notification_reminder_settings',(string)$clinicId,['professional_id'=>$profId,'changes'=>$changes]);
+                }
                 elseif($section==='patient_actions'){
                     // NI2-137: o que a paciente pode fazer com a consulta pelo app. Regra da clínica: só a gestão altera.
                     if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o que a paciente faz pelo app.');
@@ -94,13 +112,16 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $lastSec=$_POST['section']??'';
-            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':($lastSec==='chat'?'Regras do chat atualizadas.':($lastSec==='notifications'?'Avisos atualizados.':'Configurações atualizadas com sucesso.')))));
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':($lastSec==='chat'?'Regras do chat atualizadas.':($lastSec==='notifications'?'Avisos atualizados.':($lastSec==='reminders'?'Lembrete de consulta atualizado.':'Configurações atualizadas com sucesso.'))))));
         }
         $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
         $chatSettings=(new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->get(TenantContext::getClinicId());
         $bookingProfessionalId=self::professionalId();
         $notificationPrefs=null;
         try{if($bookingProfessionalId>0)$notificationPrefs=(new \ClyoNutri\Domain\Notification\NotificationService(Connection::getInstance()))->preferences(TenantContext::getClinicId(),'professional',$bookingProfessionalId);}catch(\Throwable $e){$notificationPrefs=null;}
+        $reminderSettings=null;
+        try{$rsSvc=new \ClyoNutri\Domain\Notification\ReminderSettingsService(Connection::getInstance());if($rsSvc->available())$reminderSettings=$rsSvc->values(TenantContext::getClinicId(),max(0,$bookingProfessionalId))+['effective'=>$rsSvc->effective(TenantContext::getClinicId(),max(0,$bookingProfessionalId))];}catch(\Throwable $e){$reminderSettings=null;}
+        if($error&&($_POST['section']??'')==='reminders'&&$reminderSettings){foreach(['clinic'=>'reminder_clinic_hours','professional'=>'reminder_own_hours'] as $k=>$f)if(is_string($_POST[$f]??null))$reminderSettings['posted_'.$k]=$_POST[$f];}
         $bookingBase=rtrim((string)(getenv('APP_URL')?:($_ENV['APP_URL']??'')),'/');
         $bookingLink=$bookingProfessionalId>0?$bookingBase.'/agendar/'.$bookingProfessionalId:null;
         $bookingHasAvailability=!empty($weekly)&&count(array_filter($weekly,static fn($r)=>is_array($r)&&!empty($r['enabled'])))>0;

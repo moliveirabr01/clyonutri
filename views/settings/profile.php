@@ -134,10 +134,34 @@
 <div class="form-group"><label class="form-label" for="quiet-start">Silêncio a partir de</label><input class="form-control" type="time" id="quiet-start" name="quiet_start" value="<?= htmlspecialchars((string)$np['quiet_hours']['start'],ENT_QUOTES) ?>"></div>
 <div class="form-group"><label class="form-label" for="quiet-end">Até</label><input class="form-control" type="time" id="quiet-end" name="quiet_end" value="<?= htmlspecialchars((string)$np['quiet_hours']['end'],ENT_QUOTES) ?>"></div>
 </div>
-<small>Horário de Brasília. Avisos no celular (push) ainda não estão disponíveis.</small>
+<small>Horário de Brasília. Seus avisos também ficam em <a href="/avisos">Avisos</a>, no menu. O aviso no celular (push) é para as pacientes, pelo app.</small>
 <div style="margin-top: 12px;"><button type="submit" class="btn btn-primary">Salvar avisos</button></div>
 </form>
 <?php endif; ?>
+<?php if(!empty($reminderSettings)): $rsCan=!empty($canManageBooking); $rsOwn=($bookingProfessionalId??0)>0; ?>
+<?php if($rsCan||$rsOwn): ?>
+<form class="card" method="POST" action="/configuracoes" id="reminder-settings" data-testid="reminder-settings">
+<h2>Lembrete de consulta</h2>
+<p>A paciente recebe um aviso no app (e por e-mail ou no celular, se ela deixou ligado) antes da consulta. Escolha com quantas horas de antecedência, de 1 a 72.</p>
+<input type="hidden" name="section" value="reminders">
+<input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+<?php if($rsCan): ?>
+<div class="form-group"><label class="form-label" for="reminder-clinic-hours">Padrão do consultório (horas antes)</label>
+<input class="form-control" type="number" min="1" max="72" step="1" inputmode="numeric" id="reminder-clinic-hours" name="reminder_clinic_hours" placeholder="<?= (int)$reminderSettings['default'] ?>" value="<?= htmlspecialchars((string)($reminderSettings['posted_clinic'] ?? $reminderSettings['clinic'] ?? ''),ENT_QUOTES) ?>">
+<small>Em branco, vale <?= (int)$reminderSettings['default'] ?> h.</small></div>
+<?php endif; ?>
+<?php if($rsOwn): ?>
+<div class="form-group"><label class="form-label" for="reminder-own-hours">Para as suas consultas (horas antes)</label>
+<input class="form-control" type="number" min="1" max="72" step="1" inputmode="numeric" id="reminder-own-hours" name="reminder_own_hours" placeholder="<?= (int)($reminderSettings['clinic'] ?? $reminderSettings['default']) ?>" value="<?= htmlspecialchars((string)($reminderSettings['posted_professional'] ?? $reminderSettings['professional'] ?? ''),ENT_QUOTES) ?>">
+<small>Em branco, segue o padrão do consultório.</small></div>
+<?php endif; ?>
+</div>
+<?php $rsEff=$reminderSettings['effective']; ?>
+<p style="margin-top: 8px;">Hoje o lembrete das suas consultas sai <strong><?= (int)$rsEff['hours'] ?> h antes</strong><?= $rsEff['source']==='professional'?' (seu ajuste)':($rsEff['source']==='clinic'?' (padrão do consultório)':' (padrão do sistema)') ?>. Mudanças valem para os próximos lembretes; quem já foi avisada não recebe de novo.</p>
+<div style="margin-top: 12px;"><button type="submit" class="btn btn-primary">Salvar lembrete</button></div>
+</form>
+<?php endif; endif; ?>
 <form class="card" method="POST" action="/configuracoes">
 <h2>Alterar senha</h2>
 <input type="hidden" name="section" value="password">
