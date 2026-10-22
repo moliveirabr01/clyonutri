@@ -282,11 +282,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   useEffect(() => {
     flushWater();
     const timer = setInterval(() => { if (waterQueueRef.current?.items().length) flushWater(); }, 30000);
-    const onOnline = () => flushWater();
+    const onReconnect = () => flushWater();
     const w: any = typeof window !== 'undefined' ? window : null;
-    w?.addEventListener?.('online', onOnline);
+    w?.addEventListener?.('online', onReconnect);
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') flushWater(); });
-    return () => { clearInterval(timer); w?.removeEventListener?.('online', onOnline); sub.remove(); };
+    return () => { clearInterval(timer); w?.removeEventListener?.('online', onReconnect); sub.remove(); };
   }, [flushWater]);
 
   const reloadHome = useCallback(async () => {
