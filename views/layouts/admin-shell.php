@@ -5,9 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($title ?? 'Console Administrativo') ?> — ClyoNutri II Backoffice SaaS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <style>
     :root {
       --admin-navy-950: #070d17;
@@ -211,7 +210,7 @@
       height: 8px;
       border-radius: 50%;
       background-color: var(--admin-success);
-      box-shadow: 0 0 6px rgba(22, 163, 74, 0.6);
+      box-shadow: 0 0 6px rgba(24, 121, 78, 0.6);
     }
 
     /* Main Content Area */

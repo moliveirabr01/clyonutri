@@ -1,11 +1,15 @@
+/* Landing e páginas legais. Navy, cobre 500 e warm 50 seguem clinical-botanical.css
+   (estavam nos valores antigos, de antes do PX-21). Cobre 600, cinza 500 e tinta 900
+   ficam um pouco mais escuros aqui de propósito: texto pequeno sobre fundo creme
+   precisa de folga de contraste. NI2-25 — ver docs/design-system/tokens.md. */
 :root {
-  --brand-navy-900: #0F2A44;
+  --brand-navy-900: #0F2747;
   --brand-navy-800: #193C58;
-  --brand-copper-500: #E67E3A;
+  --brand-copper-500: #E67A3F;
   --brand-copper-600: #A94716;
   --brand-green-500: #2E7D58;
   --brand-green-200: #A7C7A1;
-  --neutral-warm-50: #F8F4ED;
+  --neutral-warm-50: #FAF7F2;
   --neutral-white: #FFFFFF;
   --neutral-gray-100: #F4F5F6;
   --neutral-gray-200: #E5E7EB;
