@@ -61,7 +61,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
       && Number(one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE channel = 'email' AND status = 'logged'")) === 6
       && Number(one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE channel = 'push' AND status <> 'blocked'")) === 0, sql('SELECT channel, status, reason FROM notification_deliveries'));
     const out2 = execFileSync('php', ['bin/cron_scheduler.php'], { cwd: root, env, encoding: 'utf8' });
-    check('cron', 'Segundo ciclo não duplica lembrete nem reenvia', /Consultas : 0 lembrete/.test(out2) && Number(one('SELECT COUNT(*) AS n FROM notification_events')) === 6, out2);
+    check('cron', 'Segundo ciclo não duplica lembrete nem reenvia', /Consultas : 0 lembrete/.test(out2) && Number(one("SELECT COUNT(*) AS n FROM notification_events WHERE dedupe_key NOT LIKE 'web95:%'")) === 6, out2);
 
     r = await call('GET', '/api/v1/patient/notifications', { token: ana });
     check('caixa', 'Ana vê plano + lembrete da consulta, mais novo primeiro', r.json.items.length === 2 && r.json.items[0].event_type === 'appointment.reminder' && r.json.unread_count === 2, r.json);
@@ -141,9 +141,76 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     check('web', 'Sem CSRF válido não salva', w.status !== 200 || !/Avisos atualizados/.test(w.text));
     check('web', 'Mudança do profissional fica na auditoria', Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'NOTIFICATION_PREFERENCES_UPDATED' AND resource = 'professionals'")) === 1);
 
+    // ------------------------------------------------------------ web: lembrete de consulta (Configurações)
+    w = await web('GET', '/configuracoes');
+    check('lembrete', 'Configurações mostram o lembrete de consulta (24 h padrão)', w.status === 200 && /data-testid="reminder-settings"/.test(w.text) && /name="reminder_clinic_hours"/.test(w.text) && /24 h/.test(w.text), w.status);
+    w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_clinic_hours: '6', reminder_own_hours: '2' });
+    check('lembrete', 'Gestão salva 6 h para a clínica e 2 h para as próprias consultas', w.status === 200 && /Lembrete de consulta atualizado/.test(w.text)
+      && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 0')) === 6
+      && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 2, w.status);
+    check('lembrete', 'Mudança do lembrete fica na auditoria', Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'APPOINTMENT_REMINDER_SETTINGS_UPDATED'")) === 1);
+    for (const [label, form] of [['73 h', { reminder_clinic_hours: '73' }], ['0 h', { reminder_own_hours: '0' }], ['texto', { reminder_own_hours: 'doze' }], ['um válido e um inválido', { reminder_clinic_hours: '5', reminder_own_hours: '1.5' }]]) {
+      w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', ...form });
+      check('lembrete', `Recusa ${label} com 422 e nada muda`, w.status === 422 && /1 (e|a) 72/.test(w.text) && !LEAK.test(w.text)
+        && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 0')) === 6
+        && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 2, w.status);
+    }
+    w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_own_hours: '' });
+    check('lembrete', 'Apagar o próprio volta a seguir a clínica (6 h)', w.status === 200 && Number(one('SELECT COUNT(*) AS n FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 0 && /6 h/.test(w.text), w.status);
+
+    // ------------------------------------------------------------ web: caixa de avisos do profissional
+    w = await web('GET', '/avisos');
+    check('avisos', 'Caixa de avisos web abre com os avisos do profissional e o contador no menu', w.status === 200 && (w.text.match(/action="\/avisos\/\d+\/lida"/g) || []).length === 2 && /Avisos <strong class="badge"[^>]*>\(2\)/.test(w.text), w.status);
+    const ints = sql("SELECT id, dedupe_key FROM notification_events WHERE dedupe_key LIKE 'web95:%'");
+    const idOf = (k) => ints.find((x) => x.dedupe_key === k).id;
+    w = await web('POST', `/avisos/${idOf('web95:outro')}/lida`, { _csrf_token: csrf((await web('GET', '/avisos')).text), abrir: '1' });
+    check('avisos', 'Aviso de outro profissional: não abre nem marca', w.status === 303 && w.location === '/avisos' && one(`SELECT read_at FROM notification_events WHERE id = ${idOf('web95:outro')}`) === null, w);
+    w = await web('POST', `/avisos/${idOf('web95:externo')}/lida`, { _csrf_token: csrf((await web('GET', '/avisos')).text), abrir: '1' });
+    check('avisos', 'Link externo no aviso não redireciona para fora', w.status === 303 && w.location === '/avisos' && one(`SELECT read_at FROM notification_events WHERE id = ${idOf('web95:externo')}`) !== null, w);
+    w = await web('POST', `/avisos/${idOf('web95:interno')}/lida`, { _csrf_token: csrf((await web('GET', '/avisos')).text), abrir: '1' });
+    check('avisos', 'Abrir marca como lido e vai para a página do aviso', w.status === 303 && w.location === '/pacientes/1' && one(`SELECT read_at FROM notification_events WHERE id = ${idOf('web95:interno')}`) !== null, w);
+    w = await web('POST', '/avisos/lidas', { _csrf_token: 'errado' });
+    check('avisos', 'Sem CSRF válido não marca nada', w.status !== 303);
+    w = await web('GET', '/avisos');
+    check('avisos', 'Sem avisos novos o contador some', w.status === 200 && !/Avisos <strong class="badge"/.test(w.text), w.status);
+
+    cookie = '';
+    w = await web('GET', '/login');
+    w = await web('POST', '/login', { _csrf_token: csrf(w.text), email: 'nutri95c@example.test', password: 'Equipe@2026' });
+    w = await web('GET', '/configuracoes');
+    w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_clinic_hours: '4' });
+    check('lembrete', 'Profissional que não é da gestão não muda o padrão da clínica', w.status === 409 && /gestão do consultório/.test(w.text)
+      && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 0')) === 6, w.status);
+    w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_own_hours: '3' });
+    check('lembrete', 'Mas ajusta o lembrete das próprias consultas', w.status === 200 && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 3')) === 3, w.status);
+    w = await web('GET', '/avisos');
+    check('avisos', 'Caixa de outro profissional da mesma clínica vem vazia', w.status === 200 && !/action="\/avisos\/\d+\/lida"/.test(w.text), w.status);
+
+    // ------------------------------------------------------------ API: aparelhos para push
+    const TOKEN_ANA = 'ExponentPushToken[TESTEana95xxxxxxxxxxxx]';
+    r = await call('POST', '/api/v1/patient/push-tokens', { body: { token: TOKEN_ANA, platform: 'ios' } });
+    check('push', 'Cadastrar aparelho sem login → 401', r.status === 401, r.status);
+    for (const [label, body] of [['token fora do formato', { token: 'abc', platform: 'ios' }], ['sem token', { platform: 'android' }], ['token não texto', { token: 123 }]]) {
+      r = await call('POST', '/api/v1/patient/push-tokens', { token: ana, body });
+      check('push', `Recusa ${label} com 422`, r.status === 422 && r.json.code === 'VALIDATION_ERROR' && !LEAK.test(r.text), r);
+    }
+    r = await call('POST', '/api/v1/patient/push-tokens', { token: ana, body: { token: TOKEN_ANA, platform: 'ios' } });
+    check('push', 'Cadastra o aparelho da Ana (push ainda desligado no servidor)', r.status === 200 && r.json.registered === true && r.json.push_enabled === false && !r.text.includes('TESTEana95')
+      && Number(one(`SELECT active AS a FROM notification_push_tokens WHERE token = '${TOKEN_ANA}' AND recipient_id = 1 AND clinic_id = 1`)) === 1, r);
+    check('push', 'Auditoria registra o aparelho sem guardar o token', Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'PUSH_DEVICE_REGISTERED'")) === 1
+      && Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE details LIKE '%ExponentPushToken%'")) === 0);
+    r = await call('POST', '/api/v1/patient/push-tokens/remove', { token: carla, body: { token: TOKEN_ANA } });
+    check('push', 'Carla não desliga o aparelho da Ana (resposta igual, sem revelar nada)', r.status === 200 && r.json.removed === true
+      && Number(one(`SELECT active AS a FROM notification_push_tokens WHERE token = '${TOKEN_ANA}'`)) === 1, r);
+    r = await call('POST', '/api/v1/patient/push-tokens/remove', { token: ana, body: { token: TOKEN_ANA } });
+    const r2 = await call('POST', '/api/v1/patient/push-tokens/remove', { token: ana, body: { token: TOKEN_ANA } });
+    check('push', 'Ana sai do app: aparelho desligado; repetir não dá erro', r.status === 200 && r2.status === 200 && r2.json.removed === true
+      && Number(one(`SELECT active AS a FROM notification_push_tokens WHERE token = '${TOKEN_ANA}'`)) === 0
+      && Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'PUSH_DEVICE_REMOVED'")) === 1, [r, r2]);
+
     // ------------------------------------------------------------ contrato
     const spec = JSON.parse(readFileSync(join(root, 'docs/api/openapi_v1.json'), 'utf8'));
-    const need = ['/patient/notifications', '/patient/notifications/read-all', '/patient/notifications/{id}/read', '/patient/notification-preferences'];
+    const need = ['/patient/notifications', '/patient/notifications/read-all', '/patient/notifications/{id}/read', '/patient/notification-preferences', '/patient/push-tokens', '/patient/push-tokens/remove'];
     check('openapi', 'Rotas novas documentadas no OpenAPI', need.every((p) => spec.paths[p]) && spec.paths['/patient/notification-preferences'].post && spec.components.schemas.NotificationInbox);
   } catch (e) {
     check('erro', 'Exceção inesperada', false, String(e && e.stack || e));

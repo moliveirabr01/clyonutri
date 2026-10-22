@@ -78,7 +78,7 @@ $clock = function () use (&$clockTs) { return $clockTs; };
 $mailer = new ArrayMailer();
 $svc = new NotificationService($db, $mailer, $clock);
 
-check('S0', 'Migration 49 aplicada (tabelas do domínio existem)', $svc->available());
+check('S0', 'Migration 51 aplicada (tabelas do domínio existem)', $svc->available());
 
 // ------------------------------------------------------------------ S1: publicação, fila e dedupe
 $r = $svc->publish($cA, 'meal_plan.published', 'patient', $ana, 'meal_plan.published:1:v1', '/');
@@ -190,13 +190,13 @@ $apOk = $mkAppt($cA, $bia, $profA, $clockTs + 23 * 3600);
 $apConf = $mkAppt($cA, $ana, $profA, $clockTs + 5 * 3600, 'confirmed');
 $apLonge = $mkAppt($cA, $bia, $profA, $clockTs + 30 * 3600);
 $apCanc = $mkAppt($cA, $bia, $profA, $clockTs + 20 * 3600, 'cancelled');
-$apAgora = $mkAppt($cA, $bia, $profA, $clockTs + 30 * 60);
+$apAgora = $mkAppt($cA, $bia, $profA, $clockTs + 10 * 60);
 $apB = $mkAppt($cB, $beto, $profB, $clockTs + 10 * 3600);
 $sched = new AppointmentReminderScheduler($db, $svc, $clock);
 $rep = $sched->schedule(24);
 $rem = rows($db, "SELECT clinic_id, recipient_id, body, dedupe_key FROM notification_events WHERE event_type = 'appointment.reminder' ORDER BY id");
 $keys = array_column($rem, 'dedupe_key');
-check('S5', 'Lembretes só para consultas ativas entre 1 h e 24 h (cancelada, distante e em 30 min ficam de fora)', $rep['created'] === 3 && count($rem) === 3
+check('S5', 'Lembretes só para consultas ativas entre 15 min e 24 h (cancelada, distante e em 10 min ficam de fora)', $rep['created'] === 3 && count($rem) === 3
     && !preg_grep("/:{$apLonge}:|:{$apCanc}:|:{$apAgora}:/", $keys), [$rep, $keys]);
 check('S5', 'Cada lembrete vai para a paciente certa, na clínica certa', in_array(['clinic_id' => (string)$cB, 'recipient_id' => (string)$beto], array_map(fn($x) => ['clinic_id' => (string)$x['clinic_id'], 'recipient_id' => (string)$x['recipient_id']], $rem), true));
 $bodyOk = array_values(array_filter($rem, fn($x) => str_contains($x['dedupe_key'], ":{$apOk}:")))[0]['body'] ?? '';

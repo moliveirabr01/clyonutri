@@ -27,8 +27,9 @@ if ($mode === 'prepare') {
     $u = $db->prepare("INSERT INTO users(id,uuid,name,email,password_hash,role,status,is_verified) VALUES(?,?,?,?,?,'nutritionist','active',1)");
     $u->execute([1, 'n95-u1', 'Nutri TESTE Um', 'nutri95a@example.test', password_hash('Equipe@2026', PASSWORD_DEFAULT)]);
     $u->execute([2, 'n95-u2', 'Nutri TESTE Dois', 'nutri95b@example.test', password_hash('Equipe@2026', PASSWORD_DEFAULT)]);
-    $db->exec("INSERT INTO clinic_members(clinic_id,user_id,role,status) VALUES(1,1,'owner','active'),(2,2,'owner','active')");
-    $db->exec("INSERT INTO professionals(id,user_id,crn,crn_region) VALUES(1,1,'CRN-T1','CRN-3'),(2,2,'CRN-T2','CRN-3')");
+    $u->execute([3, 'n95-u3', 'Nutri TESTE Três', 'nutri95c@example.test', password_hash('Equipe@2026', PASSWORD_DEFAULT)]);
+    $db->exec("INSERT INTO clinic_members(clinic_id,user_id,role,status) VALUES(1,1,'owner','active'),(2,2,'owner','active'),(1,3,'nutritionist','active')");
+    $db->exec("INSERT INTO professionals(id,user_id,crn,crn_region) VALUES(1,1,'CRN-T1','CRN-3'),(2,2,'CRN-T2','CRN-3'),(3,3,'CRN-T3','CRN-3')");
     $db->exec("INSERT INTO foods(id,name,energy_kcal) VALUES(1,'Arroz TESTE',124)");
     $soon = (new DateTimeImmutable('+20 hours'))->format('Y-m-d H:i:00');
     $a = $db->prepare("INSERT INTO appointments(id,clinic_id,patient_id,professional_id,scheduled_at,duration_minutes,status,type) VALUES(?,?,?,?,?,60,'scheduled','follow_up')");
@@ -43,6 +44,12 @@ if ($mode === 'prepare') {
         $plan = $svc->createPlan($patient, $user, $title, null, [['name' => 'Almoço', 'time_of_day' => '12:00', 'items' => [['food_id' => 1, 'amount' => 100, 'measure_unit' => 'g']]]]);
         $svc->publishPlan((int)$plan['id']);
     }
+    // Avisos da caixa web do profissional 1: um com link interno, um com link externo (não pode redirecionar), um do profissional 2.
+    $ev = $db->prepare("INSERT INTO notification_events(clinic_id,event_type,category,recipient_type,recipient_id,title,body,link,critical,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?,0,?,?)");
+    $now = date('Y-m-d H:i:s');
+    $ev->execute([1, 'chat.message_created', 'chat', 'professional', 1, 'Nova mensagem no ClyoNutri', 'Você recebeu uma nova mensagem no chat do consultório.', '/pacientes/1', 'web95:interno', $now]);
+    $ev->execute([1, 'chat.message_created', 'chat', 'professional', 1, 'Nova mensagem no ClyoNutri', 'Você recebeu uma nova mensagem no chat do consultório.', '//fora.example.test/x', 'web95:externo', $now]);
+    $ev->execute([2, 'chat.message_created', 'chat', 'professional', 2, 'Nova mensagem no ClyoNutri', 'Você recebeu uma nova mensagem no chat do consultório.', '/pacientes/3', 'web95:outro', $now]);
     echo json_encode(['ok' => true, 'reminder_at' => $soon]);
 } elseif ($mode === 'sql') {
     $q = (string)($argv[2] ?? '');
