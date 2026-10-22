@@ -40,7 +40,7 @@ if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/v1/')) {
         header('Vary: Origin');
     }
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, X-ClyoNutri-Web');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, X-ClyoNutri-Web, Idempotency-Key');
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
         header('Access-Control-Max-Age: 600');
         header_remove('Content-Type');
