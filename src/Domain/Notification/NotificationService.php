@@ -66,8 +66,8 @@ final class NotificationService
         'checkin.submitted' => [
             'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Check-in recebido',
-            'body' => 'Uma paciente enviou o check-in do dia. Entre no ClyoNutri para ver.',
-            'push_body' => 'Uma paciente enviou o check-in do dia.',
+            'body' => 'Um novo check-in foi enviado. Entre no ClyoNutri para ver.',
+            'push_body' => 'Um novo check-in foi enviado.',
         ],
     ];
     public const CHANNELS = ['email', 'push'];

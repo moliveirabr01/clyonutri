@@ -129,7 +129,7 @@
 <input type="hidden" name="section" value="notifications">
 <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
 <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_chat_email" value="1" <?= !empty($npChat['email_enabled'])?'checked':'' ?>> Receber e-mail quando chegar mensagem nova</label>
-<label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_checkin_email" value="1" <?= !empty($npCheckin['email_enabled'])?'checked':'' ?>> Receber e-mail quando uma paciente enviar check-in (no máximo um por dia)</label>
+<label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_checkin_email" value="1" <?= !empty($npCheckin['email_enabled'])?'checked':'' ?>> Receber e-mail quando chegar um novo check-in (no máximo um por dia)</label>
 <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;"><input type="checkbox" name="quiet_enabled" value="1" <?= !empty($np['quiet_hours']['enabled'])?'checked':'' ?>> Não mandar e-mail no horário de silêncio</label>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
 <div class="form-group"><label class="form-label" for="quiet-start">Silêncio a partir de</label><input class="form-control" type="time" id="quiet-start" name="quiet_start" value="<?= htmlspecialchars((string)$np['quiet_hours']['start'],ENT_QUOTES) ?>"></div>

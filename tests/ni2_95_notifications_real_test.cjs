@@ -136,7 +136,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     w = await web('GET', '/configuracoes');
     check('web', 'Configurações mostram "Seus avisos" com e-mail do chat ligado por padrão', w.status === 200 && /data-testid="notification-settings"/.test(w.text)
       && /name="notify_chat_email" value="1" checked/.test(w.text), w.status + ' ' + w.location);
-    check('web', 'Configurações mostram o e-mail de check-in recebido ligado por padrão (no máximo um por dia)', /name="notify_checkin_email" value="1" checked/.test(w.text) && /no máximo um por dia/.test(w.text));
+    check('web', 'Configurações mostram o e-mail de check-in recebido ligado por padrão (no máximo um por dia)', /name="notify_checkin_email" value="1" checked/.test(w.text) && /no máximo um por dia/.test(w.text) && !/uma paciente enviar/.test(w.text));
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'notifications', quiet_enabled: '1', quiet_start: '20:00', quiet_end: '08:00' });
     check('web', 'Desligar e-mail do chat e ligar silêncio 20:00–08:00', w.status === 200 && /Avisos atualizados/.test(w.text)
       && Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'chat'")) === 0

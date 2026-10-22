@@ -272,7 +272,7 @@ check('C8', 'Cada check-in novo vira um aviso para o profissional responsável',
     && (int)one($db, "SELECT COUNT(*) FROM notification_events WHERE event_type = 'checkin.submitted' AND link = ?", ['/pacientes/' . $caio]) === 0, $r['submitted']);
 $eA = ev($db, $cA, 'checkin.submitted', $profA);
 check('C8', 'Aviso para a Nutri a (vínculo ativo), com link para o Perfil 360 da paciente', count($eA) === 1 && $eA[0]['link'] === '/pacientes/' . $ana && $eA[0]['recipient_type'] === 'professional'
-    && $eA[0]['title'] === 'Check-in recebido' && $eA[0]['body'] === 'Uma paciente enviou o check-in do dia. Entre no ClyoNutri para ver.');
+    && $eA[0]['title'] === 'Check-in recebido' && $eA[0]['body'] === 'Um novo check-in foi enviado. Entre no ClyoNutri para ver.');
 check('C8', 'Sem vínculo, vai para quem publicou o plano mais recente', count(ev($db, $cA, 'checkin.submitted', $profA2, '/pacientes/' . $bia)) === 1);
 check('C8', 'Outra clínica: só o profissional de lá recebe', count(ev($db, $cB, 'checkin.submitted', $profB, '/pacientes/' . $beto)) === 1
     && ev($db, $cA, 'checkin.submitted', $profB) === [] && ev($db, $cB, 'checkin.submitted', $profA) === []);
@@ -281,8 +281,9 @@ check('C8', 'Aparece na caixa de avisos do profissional (/avisos)', ($inbox['ite
 $svc->drain();
 check('C8', 'Push não se aplica a profissional (no_app)', dst($db, $eA[0]['id'], 'push') === 'skipped:no_app', dst($db, $eA[0]['id'], 'push'));
 $mailA = array_values(array_filter($mailer->sent, fn($m) => $m->toAddress === "nutri.ck.a.{$u}@example.test"));
-$allP = json_encode([rows($db, "SELECT title, body, link FROM notification_events WHERE event_type = 'checkin.submitted'"), array_map(fn($m) => [$m->subject, $m->textBody, $m->htmlBody], $mailer->sent)], JSON_UNESCAPED_UNICODE);
+$allP = json_encode([rows($db, "SELECT title, body, link FROM notification_events WHERE event_type = 'checkin.submitted' AND clinic_id IN (?, ?)", [$cA, $cB]), array_map(fn($m) => [$m->subject, $m->textBody, $m->htmlBody], $mailer->sent)], JSON_UNESCAPED_UNICODE);
 check('C8', 'E-mail do profissional sai (opt-out) e é neutro', count($mailA) === 1 && $mailA[0]->subject === 'Check-in recebido' && dst($db, $eA[0]['id'], 'email') === 'sent:');
+check('C8', 'Texto do profissional não supõe gênero (sem "uma paciente")', !preg_match('/\\b(uma|a|o) paciente\\b/iu', $allP), $allP);
 check('C8', 'Sem nome, notas, adesão, energia ou fome em aviso ou e-mail', !str_contains($allP, 'TESTE') && !str_contains($allP, '40%') && !preg_match('/ades[aã]o|energia|fome/iu', $allP));
 
 // ------------------------------------------------------------------ C9: idempotência, correção no dia, limite diário e opt-out
