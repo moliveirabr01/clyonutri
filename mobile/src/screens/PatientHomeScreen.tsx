@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
 import EvolutionChart from '../components/EvolutionChart';
+import NextAppointmentCard from '../components/NextAppointmentCard';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -297,35 +298,35 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     }
   };
 
-  // Confirmação de consulta real (NI2-176)
-  const handleConfirmAppointment = async () => {
-    if (!homeData?.next_appointment) return;
+  // NI2-137: o card da consulta recarrega só a home depois de cada ação (estado real do servidor).
+  const reloadHome = useCallback(async () => {
     try {
-      await ApiService.confirmAppointment(homeData.next_appointment.id);
-      Alert.alert('Presença Confirmada', 'Sua presença na consulta foi confirmada com sucesso.');
-      setHomeData(prev => prev && prev.next_appointment ? {
-        ...prev,
-        next_appointment: { ...prev.next_appointment, status: 'confirmed' },
-      } : prev);
-    } catch (err: any) {
-      Alert.alert('Erro', 'Não foi possível confirmar o agendamento no servidor.');
+      setHomeData(await ApiService.getHome());
+      setHomeUpdatedAt(new Date().toLocaleString('pt-BR'));
+      setIsOffline(false);
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'auth') return;
+      setIsOffline(error instanceof ApiError && error.kind === 'offline');
+      setErrorMessage(resourceError(error));
     }
-  };
+  }, []);
 
   // Teleconsulta e Diário Alimentar (MOB-UX-003, MOB-UX-004, MOB-UX-012)
   const [registeringMeal, setRegisteringMeal] = useState<string | null>(null);
 
+  // NI2-137 (B6): o link leva um bilhete de acesso; nunca é mostrado na tela, nem em mensagem de erro.
+  const [telehealthError, setTelehealthError] = useState<string | null>(null);
   const handleOpenTelehealth = async (url: string) => {
+    setTelehealthError(null);
     try {
       const trimmed = url.trim();
-      const supported = await Linking.canOpenURL(trimmed);
-      if (supported) {
+      if (await Linking.canOpenURL(trimmed)) {
         await Linking.openURL(trimmed);
       } else {
-        Alert.alert('Teleconsulta', `Não foi possível abrir o link: ${trimmed}`);
+        setTelehealthError('Não foi possível abrir a sala neste aparelho. Atualize a tela e tente de novo, ou entre pelo link do e-mail.');
       }
-    } catch (err: any) {
-      Alert.alert('Erro ao abrir link', err instanceof Error ? err.message : 'Falha ao acessar teleconsulta.');
+    } catch {
+      setTelehealthError('Não foi possível abrir a sala neste aparelho. Atualize a tela e tente de novo, ou entre pelo link do e-mail.');
     }
   };
 
@@ -464,54 +465,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               </View>
             </TouchableOpacity>
 
-            {/* Card Próxima Consulta com dados reais e empty state (Critério 2) */}
-            <View
-              style={styles.card}
-              accessible={true}
-              accessibilityLabel={
-                nextApp
-                  ? `Próxima consulta com ${nextApp.professional_name || 'Nutricionista'} em ${nextApp.scheduled_at}`
-                  : 'Nenhuma consulta futura agendada'
-              }
-            >
-              <Text style={styles.cardTitle}>🗓️ Próximo Atendimento</Text>
-              {nextApp ? (
-                <>
-                  <Text style={styles.appointmentDate}>{nextApp.scheduled_at}</Text>
-                  <Text style={styles.appointmentDoctor}>
-                    {nextApp.professional_name || 'Nutricionista'} • Status: {nextApp.status === 'confirmed' ? 'Confirmado' : 'Agendado'}
-                  </Text>
-                  {nextApp.meeting_url ? (
-                    <TouchableOpacity
-                      style={styles.telehealthButton}
-                      onPress={() => handleOpenTelehealth(nextApp.meeting_url!)}
-                      accessibilityRole="link"
-                      accessibilityLabel="Entrar na sala de teleconsulta online"
-                    >
-                      <Text style={styles.telehealthButtonText}>📹 Entrar na Teleconsulta</Text>
-                    </TouchableOpacity>
-                  ) : nextApp.is_online ? (
-                    <Text style={styles.appointmentDoctor} accessibilityRole="text">
-                      Consulta online: o vídeo ainda não está disponível pelo app. A clínica envia o link de acesso.
-                    </Text>
-                  ) : null}
-                  {nextApp.status !== 'confirmed' && (
-                    <TouchableOpacity
-                      style={styles.copperButton}
-                      onPress={handleConfirmAppointment}
-                      accessibilityRole="button"
-                      accessibilityLabel="Confirmar presença na próxima consulta"
-                    >
-                      <Text style={styles.copperButtonText}>Confirmar Presença</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyCardText}>Nenhum atendimento agendado no momento.</Text>
-                </View>
-              )}
-            </View>
+            {/* Card da próxima consulta (NI2-137): data com fuso, modalidade, local e ações liberadas pelo consultório */}
+            <NextAppointmentCard appointment={nextApp} onChanged={reloadHome} onOpenTelehealth={handleOpenTelehealth} />
+            {telehealthError && <Text style={{ color: t.error, marginBottom: t.space }} accessibilityRole="alert" accessibilityLiveRegion="assertive">{telehealthError}</Text>}
 
             {/* Card de Hidratação Diária com persistência no servidor (Critério 3 e PX-20 / NI2-313) */}
             <View

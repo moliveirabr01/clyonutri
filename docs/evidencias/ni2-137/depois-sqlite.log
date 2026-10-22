@@ -1,0 +1,87 @@
+PASS [card] GET /home traz a próxima consulta da Ana (201)
+PASS [card M5] Lista fechada de campos (sem notes, type, professional_id, created_at, updated_at, patient_id, clinic_id)
+PASS [card M5] Observação interna da agenda não sai para a paciente
+PASS [B4] OpenAPI: NextAppointment documenta exatamente os campos devolvidos
+PASS [card M1] scheduled_at_iso com offset -03:00 e igual à hora local gravada
+PASS [card M1] Fuso informado: America/Sao_Paulo, "horário de Brasília"
+PASS [card M2] Presencial aparece como "Presencial" com o endereço do consultório
+PASS [card A1] Padrão da clínica: confirmar liberado; cancelar e remarcar bloqueados com motivo
+PASS [card M2] Clínica desliga o endereço: location = null
+PASS [card] Bruno vê só a própria consulta (202)
+PASS [A1] Cancelar com a ação desligada → 403 ACTION_NOT_ALLOWED
+PASS [A1] Autoagendamento público desligado (is_enabled = 0) e cancelamento não passou
+PASS [A1] Horários para remarcar com a ação desligada → 403
+PASS [A1] Pedido de remarcação com a ação desligada → 403
+PASS [A1] Rota antiga /reschedule também bloqueada (403) e a consulta não se move
+PASS [A1] Clínica desliga a confirmação: allowed_actions.confirm=false e POST → 403
+PASS [auth] Sem token → 401
+PASS [B1] Bruno confirma a consulta da Ana → 404 "Consulta não encontrada." sem ids
+PASS [B1] Carla (outra clínica) pela rota antiga → 404 sem ids
+PASS [B1] Nada mudou na consulta da Ana
+PASS [M4] Ana confirma → 200 success:true, status confirmed
+PASS [M7] Histórico: scheduled → confirmed, autora = paciente 1, sem usuário
+PASS [M7] Histórico no fuso da aplicação (não UTC)
+PASS [M7] Auditoria: recurso appointment, actor_type patient, actor_id 1, canal app, de/para
+PASS [A4] Confirmar de novo → 409 INVALID_STATE com current_status (antes: 200 success:false)
+PASS [A4] Rota antiga também responde 409 (nunca 200 com success:false)
+PASS [M4] Consulta de 2 dias atrás não pode ser confirmada → 409 "já passou"
+PASS [A4] Consulta cancelada pela clínica: confirmar → 409 com current_status cancelled
+PASS [B1] Consulta inexistente → 404
+PASS [B3] Antecedência de 0 hora para cancelar é recusada no servidor
+PASS [C1] Antes: sessão de teleconsulta ativa e bilhete do portal emitido
+PASS [cancelar] Motivo acima de 300 caracteres → 422
+PASS [B1] Bruno cancela a consulta da Ana → 404 e nada muda
+PASS [cancelar] Ana cancela → 200, consulta cancelada
+PASS [C1] Teleconsulta cancelada junto e convite revogado
+PASS [C1] Depois do cancelamento o portal não emite mais bilhete
+PASS [M7] Histórico do cancelamento com a paciente e o motivo
+PASS [M7] Auditoria do cancelamento (paciente, canal, de/para, horário, sem o texto do motivo)
+PASS [cancelar] Cancelar de novo → 409 INVALID_STATE
+PASS [cancelar] Dentro das 4 horas antes → 422 POLICY_VIOLATION com o prazo na mensagem
+PASS [B2] Consulta em andamento não pode ser cancelada pela paciente → 409
+PASS [M3] Teleconsulta amanhã: sem meeting_url, video_status aguardando_horario e video_opens_at 15 min antes
+PASS [M3] Dentro da janela: meeting_url com bilhete da sala de espera
+PASS [A3] Remarcação liberada aparece em allowed_actions (201, confirmada)
+PASS [A1] Horários livres mesmo com o autoagendamento público desligado
+PASS [A3] Horários: dentro da jornada (07:00–22:00), ≥ 4 h à frente, sem o horário atual
+PASS [A3] Horários não colidem com a consulta do Bruno
+PASS [A3] Horário malformado → 422
+PASS [A3] Horário fora da disponibilidade → 409 SLOT_CONFLICT
+PASS [A3] Pedido válido → 202 com pedido pendente
+PASS [A3] Consulta não se move nem muda de status enquanto o pedido está pendente
+PASS [M7] Auditoria do pedido com horário de/para e canal
+PASS [A3] Segundo pedido com um pendente → 409 REQUEST_PENDING
+PASS [A3] Card mostra o pedido pendente e bloqueia novo pedido com o motivo
+PASS [equipe] Equipe de outra clínica não acha o pedido e nada muda
+PASS [equipe] Recepção vê o aviso na agenda, sem link (não remarca consultas)
+PASS [equipe] Recepção não abre a fila nem aceita (403), como no reagendamento da agenda
+PASS [equipe] Nutricionista vê o aviso na agenda com link para responder
+PASS [equipe] Painel "Atenção" do dashboard lista o pedido de remarcação com link
+PASS [equipe] Fila mostra a Ana, o horário atual, o pedido e o motivo
+PASS [A3] Nutricionista da equipe aceita → consulta vai para o horário pedido
+PASS [A3] Consulta confirmada volta para "agendada" (a paciente confirmou o horário antigo)
+PASS [A3] Histórico: remarcação (com o motivo da paciente) e confirmed → scheduled, pela nutricionista
+PASS [A3] Pedido marcado como aceito, por quem e quando
+PASS [equipe] Mensagem pede nova confirmação da paciente
+PASS [A3] Card: novo horário, pedido aceito e confirmar liberado de novo
+PASS [C1] Teleconsulta remarcada: janela recalculada para o novo horário e convite antigo revogado
+PASS [equipe] Mensagem lembra de enviar novo convite da teleconsulta
+PASS [A3] Recusar: consulta fica no horário atual e a paciente vê a resposta
+PASS [A3] Pedido já recusado não pode ser aceito depois
+PASS [B1] Bruno não retira o pedido da Ana → 404
+PASS [A3] Ana desiste do pedido → 200, pedido encerrado
+PASS [A3] Desistir de novo → 409
+PASS [A3] Horário ocupado quando a equipe aceita: erro claro, consulta e pedido intactos
+PASS [A3] Pedido cujo horário passou some da fila e fica "expirado"
+PASS [A3] Cancelar a consulta encerra o pedido pendente
+PASS [A3] Rota antiga /reschedule registra pedido (202) e não move a consulta
+PASS [CSRF] Portal web: origem estranha → 403 e nada muda
+PASS [CSRF] Portal web: sem o cabeçalho do app → 403
+PASS [M7] Portal web confirma (200) e a auditoria registra canal portal_web
+PASS [B3] Tela de Configurações recusa 0 hora para cancelar
+PASS [A1] Dona salva pela tela: só confirmar ligado, prazos 6 h e 12 h
+PASS [A1] Alteração auditada com antes e depois
+PASS [A1] Recepção não altera as regras (a clínica é quem decide)
+PASS [A1] Card do Bruno reflete as regras salvas (cancelar e remarcar bloqueados)
+
+NI2-137 (SQLite): 85 PASS, 0 FAIL

@@ -174,18 +174,43 @@ export interface ActiveMealPlan {
   meals: MealPlanMeal[];
 }
 
+export interface AppointmentActionState { allowed: boolean; reason: string | null; deadline_iso?: string }
+export interface RescheduleRequest {
+  id: number; appointment_id: number;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired'; status_label: string;
+  from_scheduled_at_iso: string; requested_scheduled_at_iso: string;
+  reason: string | null; decision_note: string | null; created_at_iso: string; decided_at_iso: string | null;
+}
+/** Próxima consulta (NI2-137): lista fechada de campos emitida por PatientAppointmentService::nextAppointment. */
 export interface Appointment {
   id: number;
-  clinic_id: number;
-  patient_id: number;
+  /** Hora local do consultório, sem fuso (compatibilidade). Prefira scheduled_at_iso. */
   scheduled_at: string;
+  scheduled_at_iso?: string;
+  ends_at_iso?: string;
+  timezone?: string;
+  timezone_label?: string;
+  duration_minutes?: number;
   status: 'scheduled' | 'confirmed' | 'cancelled';
-  professional_name?: string;
+  status_label?: string;
+  modality?: 'presencial' | 'online';
+  modality_label?: string;
+  professional_name?: string | null;
+  clinic_name?: string | null;
+  clinic_phone?: string | null;
+  location?: string | null;
   meeting_url?: string | null;
+  video_opens_at_iso?: string | null;
   is_online?: boolean;
-  /** Valores emitidos pelo servidor (PatientPortalService::getNextAppointment). */
-  video_status?: 'presencial' | 'aguardando_sala' | 'sala_disponivel';
+  video_status?: 'presencial' | 'aguardando_horario' | 'aguardando_sala' | 'sala_disponivel';
+  allowed_actions?: { confirm: AppointmentActionState; cancel: AppointmentActionState; reschedule: AppointmentActionState };
+  change_request?: RescheduleRequest | null;
 }
+export interface RescheduleOptions {
+  appointment_id: number; timezone: string; timezone_label: string; duration_minutes: number;
+  days: Array<{ date: string; slots: Array<{ scheduled_at: string; scheduled_at_iso: string; time_label: string }> }>;
+}
+export interface AppointmentActionResult { success: boolean; message?: string; status?: string; request?: RescheduleRequest }
 
 export interface PatientRecipePrescription {
   id: number; recipe_id: number; recipe_title: string; recipe_summary?: string;
@@ -272,7 +297,7 @@ export function setSessionExpiredHandler(handler: (() => void) | null) {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public kind: 'offline' | 'server' | 'invalid' | 'auth' | 'timeout' | 'unavailable' = status === 0 ? 'offline' : status === 408 ? 'timeout' : status === 401 ? 'auth' : 'server', public requestId?: string) { super(message); }
+  constructor(message: string, public status: number, public kind: 'offline' | 'server' | 'invalid' | 'auth' | 'timeout' | 'unavailable' = status === 0 ? 'offline' : status === 408 ? 'timeout' : status === 401 ? 'auth' : 'server', public requestId?: string, public code?: string) { super(message); }
 }
 
 export function setApiBaseUrl(url: string) {
@@ -335,7 +360,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     const message = response.status === 401 ? (isLogin ? 'E-mail ou senha incorretos.' : 'Sua sessão expirou. Entre novamente.')
       : response.status >= 500 ? 'Não foi possível carregar os dados. Tente novamente.'
       : typeof payload?.error === 'string' ? payload.error : 'Não foi possível concluir a solicitação.';
-    throw new ApiError(message, response.status, response.status === 401 ? 'auth' : payload?.code === 'prescription_content_unavailable' ? 'unavailable' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined);
+    throw new ApiError(message, response.status, response.status === 401 ? 'auth' : payload?.code === 'prescription_content_unavailable' ? 'unavailable' : 'server', payload?.request_id || response.headers.get('X-Request-ID') || undefined, typeof payload?.code === 'string' ? payload.code : undefined);
   }
   if (!payload || typeof payload !== 'object' || payload.error) {
     throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid');
@@ -424,11 +449,31 @@ export const ApiService = {
     });
   },
 
-  async confirmAppointment(appointmentId: number): Promise<{ success: boolean }> {
-    return request<{ success: boolean }>('/api/v1/patient/appointment/confirm', {
-      method: 'POST',
-      body: JSON.stringify({ appointment_id: appointmentId }),
-    });
+  /** NI2-137: o servidor responde 2xx só quando a consulta mudou de fato; qualquer recusa vem como erro com código. */
+  async confirmAppointment(appointmentId: number): Promise<AppointmentActionResult> {
+    const data = await request<AppointmentActionResult>(`/api/v1/patient/appointments/${appointmentId}/confirm`, { method: 'POST', body: '{}' });
+    if (data.success !== true) throw new ApiError('Não foi possível confirmar. Atualize a tela e tente de novo.', 200, 'invalid');
+    return data;
+  },
+  async cancelAppointment(appointmentId: number, reason: string): Promise<AppointmentActionResult> {
+    const data = await request<AppointmentActionResult>(`/api/v1/patient/appointments/${appointmentId}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+    if (data.success !== true) throw new ApiError('Não foi possível cancelar. Atualize a tela e tente de novo.', 200, 'invalid');
+    return data;
+  },
+  async getRescheduleOptions(appointmentId: number): Promise<RescheduleOptions> {
+    const data = await request<RescheduleOptions>(`/api/v1/patient/appointments/${appointmentId}/reschedule-options`);
+    if (!Array.isArray(data.days)) throw new ApiError('Resposta de horários inválida. Tente novamente.', 200, 'invalid');
+    return data;
+  },
+  async requestReschedule(appointmentId: number, requestedScheduledAt: string, reason: string): Promise<AppointmentActionResult> {
+    const data = await request<AppointmentActionResult>(`/api/v1/patient/appointments/${appointmentId}/reschedule-requests`, { method: 'POST', body: JSON.stringify({ requested_scheduled_at: requestedScheduledAt, reason }) });
+    if (data.success !== true || !data.request) throw new ApiError('Não foi possível enviar o pedido. Atualize a tela e tente de novo.', 200, 'invalid');
+    return data;
+  },
+  async withdrawRescheduleRequest(requestId: number): Promise<AppointmentActionResult> {
+    const data = await request<AppointmentActionResult>(`/api/v1/patient/reschedule-requests/${requestId}/cancel`, { method: 'POST', body: '{}' });
+    if (data.success !== true) throw new ApiError('Não foi possível retirar o pedido. Atualize a tela e tente de novo.', 200, 'invalid');
+    return data;
   },
 
   async getFoodDiary(): Promise<{ entries: FoodDiaryEntry[] }> {

@@ -1,0 +1,34 @@
+PASS [card] GET /home traz a próxima consulta da Ana (201)
+FAIL [card M5] Lista fechada de campos (sem notes, type, professional_id, created_at, updated_at, patient_id, clinic_id) → ["id","clinic_id","patient_id","professional_id","scheduled_at","duration_minutes","status","type","created_at","updated_at","professional_name","meeting_url","is_online","video_status"]
+PASS [card M5] Observação interna da agenda não sai para a paciente
+FAIL [B4] OpenAPI: NextAppointment documenta exatamente os campos devolvidos
+FAIL [card M1] scheduled_at_iso com offset -03:00 e igual à hora local gravada → [null,"2026-10-24 00:10:00"]
+FAIL [card M1] Fuso informado: America/Sao_Paulo, "horário de Brasília"
+FAIL [card M2] Presencial aparece como "Presencial" com o endereço do consultório → [null,null]
+FAIL [card A1] Padrão da clínica: confirmar liberado; cancelar e remarcar bloqueados com motivo
+FAIL [card M2] Clínica desliga o endereço: location = null
+PASS [card] Bruno vê só a própria consulta (202)
+FAIL [A1] Cancelar com a ação desligada → 403 ACTION_NOT_ALLOWED → "{\"success\":true,\"appointment_id\":201,\"status\":\"cancelled\"}"
+FAIL [A1] Autoagendamento público desligado (is_enabled = 0) e cancelamento não passou
+FAIL [A1] Horários para remarcar com a ação desligada → 403 → "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/appointments\\/201\\/reschedule-options\",\"request_id\":\"7431c9170d9e26dbc823c88c\",\"code\":\"HTTP_404\"}"
+FAIL [A1] Pedido de remarcação com a ação desligada → 403 → "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/appointments\\/201\\/reschedule-requests\",\"request_id\":\"23ef06a0bcbcc39c929bc94c\",\"code\":\"HTTP_404\"}"
+FAIL [A1] Rota antiga /reschedule também bloqueada (403) e a consulta não se move → [409,"{\"error\":\"Esta consulta não pode ser reagendada pois seu status é 'cancelled'.\",\"code\":\"INVALID_STATE\",\"request_id\":\"157c0e1d3625e3b4d3987033\"}"]
+FAIL [erro] Seção sem exceção → "TypeError: Cannot read properties of null (reading 'allowed_actions')     at /home/claude/base137/tests/ni2_137_patient_next_appointment_actions_real_test.cjs:118:205"
+FAIL [B3] Antecedência de 0 hora para cancelar é recusada no servidor
+PASS [C1] Antes: sessão de teleconsulta ativa e bilhete do portal emitido
+FAIL [cancelar] Motivo acima de 300 caracteres → 422 → "{\"success\":true,\"appointment_id\":206,\"status\":\"cancelled\"}"
+FAIL [B1] Bruno cancela a consulta da Ana → 404 e nada muda
+FAIL [cancelar] Ana cancela → 200, consulta cancelada → "{\"error\":\"Esta consulta não pode ser cancelada pois seu status é 'cancelled'.\",\"code\":\"INVALID_STATE\",\"request_id\":\"866127f062fa127e140c95aa\"}"
+FAIL [C1] Teleconsulta cancelada junto e convite revogado → {"status":"scheduled","invite_revoked_at_utc":null}
+FAIL [C1] Depois do cancelamento o portal não emite mais bilhete
+FAIL [erro] Seção sem exceção → "Error: Command failed: php /home/claude/base137/tests/support/ni2_137_fixture.php sql SELECT from_status, to_status, changed_by_patient_id, notes FROM appointment_status_history WHERE appointment_id = 206 ORDER BY id DESC PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: changed_by_patient_id in /home/claude/base137/tests/support/ni2_137_fixture.php:87"
+FAIL [M3] Teleconsulta amanhã: sem meeting_url, video_status aguardando_horario e video_opens_at 15 min antes → [211,"http://app.example.test/teleconsulta/sala-espera/q.2.1.1.1792645853.WOQir7DX7tSX2aAbEizWnQ.LyvpVPTj-kxrrLFLkGnrr-U3vMyViVE_DMi76mL83bc","sala_disponivel",null]
+PASS [M3] Dentro da janela: meeting_url com bilhete da sala de espera
+FAIL [erro] Seção sem exceção → "TypeError: Cannot read properties of null (reading 'id')     at /home/claude/base137/tests/ni2_137_patient_next_appointment_actions_real_test.cjs:204:87"
+FAIL [CSRF] Portal web: origem estranha → 403 e nada muda → 404
+FAIL [CSRF] Portal web: sem o cabeçalho do app → 403
+FAIL [M7] Portal web confirma (200) e a auditoria registra canal portal_web → [404,null]
+FAIL [B3] Tela de Configurações recusa 0 hora para cancelar → ["role=\"alert\" class=\"card\">Selecione uma seção válida."]
+FAIL [erro] Seção sem exceção → "Error: Command failed: php /home/claude/base137/tests/support/ni2_137_fixture.php sql SELECT patient_can_confirm, patient_can_cancel, patient_can_request_reschedule, patient_show_address, cancel_min_advance_hours, reschedule_min_advance_hours FROM booking_settings WHERE clinic_id = 1 PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: patient_can_confirm in /home/claude/base137/tests/support/ni2_137_fixture.php:87"
+
+NI2-137 (SQLite): 5 PASS, 27 FAIL

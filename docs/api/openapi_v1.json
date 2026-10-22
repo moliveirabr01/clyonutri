@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClyoNutri — API do paciente",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
   },
   "servers": [
@@ -350,8 +350,9 @@
     },
     "/patient/appointment/confirm": {
       "post": {
-        "summary": "Confirma a própria consulta agendada",
-        "operationId": "patientConfirmAppointment",
+        "summary": "Confirma presença (rota antiga, corpo com appointment_id)",
+        "operationId": "confirmPatientAppointmentLegacy",
+        "deprecated": true,
         "tags": [
           "Consultas"
         ],
@@ -363,34 +364,7 @@
             "webSessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "false quando a consulta não está mais agendada"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "description": "Consulta de outro paciente ou de outra clínica é recusada (403/404) e não muda.",
+        "description": "Mesmo comportamento de POST /patient/appointments/{id}/confirm.",
         "requestBody": {
           "required": true,
           "content": {
@@ -408,13 +382,40 @@
               }
             }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
+          }
         }
       }
     },
     "/patient/appointments/{id}/cancel": {
       "post": {
         "summary": "Cancela a própria consulta",
-        "operationId": "patientCancelAppointment",
+        "operationId": "cancelPatientAppointment",
         "tags": [
           "Consultas"
         ],
@@ -426,48 +427,6 @@
             "webSessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "reason": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "name": "id",
@@ -479,13 +438,58 @@
             },
             "description": "Consulta"
           }
-        ]
+        ],
+        "description": "Só quando a clínica libera (padrão: desligado), consulta agendada ou confirmada e dentro do prazo mínimo (cancel_min_advance_hours, mínimo 1 h). Cancela também a teleconsulta (convite revogado) e encerra pedido de remarcação pendente.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
+          }
+        }
       }
     },
     "/patient/appointments/{id}/reschedule": {
       "post": {
-        "summary": "Remarca a própria consulta para um horário oferecido",
-        "operationId": "patientRescheduleAppointment",
+        "summary": "Pede outro horário (rota antiga)",
+        "operationId": "createPatientRescheduleRequestLegacy",
+        "deprecated": true,
         "tags": [
           "Consultas"
         ],
@@ -497,33 +501,19 @@
             "webSessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "422": {
-            "$ref": "#/components/responses/Error"
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
           }
-        },
+        ],
+        "description": "Não move mais a consulta: registra o pedido, como /reschedule-requests. Aceita new_scheduled_at no lugar de requested_scheduled_at.",
         "requestBody": {
           "required": true,
           "content": {
@@ -535,7 +525,8 @@
                     "type": "string"
                   },
                   "reason": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300
                   }
                 },
                 "required": [
@@ -545,18 +536,33 @@
             }
           }
         },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "description": "Consulta"
+        "responses": {
+          "202": {
+            "description": "Pedido registrado (pendente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
           }
-        ]
+        }
       }
     },
     "/patient/food-diary": {
@@ -1362,6 +1368,251 @@
           }
         }
       }
+    },
+    "/patient/appointments/{id}/confirm": {
+      "post": {
+        "summary": "Confirma presença na própria consulta",
+        "operationId": "confirmPatientAppointment",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
+          }
+        ],
+        "description": "Pelo motor da agenda (trava, máquina de estados, histórico com a paciente como autora, auditoria). Só consulta agendada e futura, sem pedido de remarcação pendente, e com a confirmação liberada pela clínica (padrão: liberada). Nada mudou → 409, nunca 200 com success:false.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
+          }
+        }
+      }
+    },
+    "/patient/appointments/{id}/reschedule-options": {
+      "get": {
+        "summary": "Horários livres para pedir remarcação",
+        "operationId": "listPatientRescheduleOptions",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
+          }
+        ],
+        "description": "Disponibilidade semanal do profissional, sem conflito com consultas e reservas, a partir do prazo mínimo de remarcação; não depende do agendamento online público. Até 10 dias com horário nos próximos 30.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescheduleOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
+          }
+        }
+      }
+    },
+    "/patient/appointments/{id}/reschedule-requests": {
+      "post": {
+        "summary": "Pede outro horário (o consultório aceita ou recusa)",
+        "operationId": "createPatientRescheduleRequest",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Consulta"
+          }
+        ],
+        "description": "Cria um pedido pendente; a consulta continua no horário atual até a equipe clínica aceitar em /agenda/pedidos-remarcacao. Ao aceitar, a consulta volta para 'agendada' e, se for teleconsulta, a janela é recalculada e o convite antigo revogado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "requested_scheduled_at": {
+                    "type": "string",
+                    "example": "2026-10-30 10:00:00",
+                    "description": "Um dos scheduled_at de reschedule-options"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "requested_scheduled_at"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Pedido registrado (pendente)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/ActionNotAllowed"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ActionUnprocessable"
+          }
+        }
+      }
+    },
+    "/patient/reschedule-requests/{id}/cancel": {
+      "post": {
+        "summary": "Desiste do pedido de remarcação",
+        "operationId": "withdrawPatientRescheduleRequest",
+        "tags": [
+          "Consultas"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Pedido"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentActionResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/ActionNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/ActionConflict"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1384,6 +1635,46 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ActionNotFound": {
+        "description": "APPOINTMENT_NOT_FOUND / REQUEST_NOT_FOUND: consulta ou pedido de outra paciente, de outra clínica ou inexistente (mensagem sem ids)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppointmentActionError"
+            }
+          }
+        }
+      },
+      "ActionNotAllowed": {
+        "description": "ACTION_NOT_ALLOWED: a clínica não libera esta ação pelo app (Configurações > Consulta no app da paciente)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppointmentActionError"
+            }
+          }
+        }
+      },
+      "ActionConflict": {
+        "description": "INVALID_STATE (com current_status), SLOT_CONFLICT ou REQUEST_PENDING",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppointmentActionError"
+            }
+          }
+        }
+      },
+      "ActionUnprocessable": {
+        "description": "POLICY_VIOLATION (fora do prazo mínimo) ou VALIDATION_ERROR",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppointmentActionError"
             }
           }
         }
@@ -1627,9 +1918,13 @@
             "description": "Meta prescrita; null quando não há"
           },
           "next_appointment": {
-            "type": [
-              "object",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextAppointment"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "active_plan": {
@@ -1994,6 +2289,382 @@
           }
         },
         "description": "Sem cálculo de \"quanto falta\" nem recomendação."
+      },
+      "AppointmentActionState": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Por que a ação está bloqueada (texto para a paciente); null quando liberada"
+          },
+          "deadline_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Último momento para a ação pelo app (cancelar/remarcar)"
+          }
+        },
+        "required": [
+          "allowed",
+          "reason"
+        ]
+      },
+      "RescheduleRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "appointment_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "status_label": {
+            "type": "string"
+          },
+          "from_scheduled_at_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+          },
+          "requested_scheduled_at_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Resposta do consultório ao recusar"
+          },
+          "created_at_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+          },
+          "decided_at_iso": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "appointment_id",
+          "status",
+          "status_label",
+          "from_scheduled_at_iso",
+          "requested_scheduled_at_iso",
+          "reason",
+          "decision_note",
+          "created_at_iso",
+          "decided_at_iso"
+        ]
+      },
+      "NextAppointment": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Lista fechada de campos (NI2-137). Observações internas, tipo técnico e ids internos não saem.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "description": "Hora local do consultório sem fuso (compatibilidade). Prefira scheduled_at_iso."
+          },
+          "scheduled_at_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+          },
+          "ends_at_iso": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "America/Sao_Paulo"
+          },
+          "timezone_label": {
+            "type": "string",
+            "example": "horário de Brasília"
+          },
+          "duration_minutes": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "confirmed"
+            ]
+          },
+          "status_label": {
+            "type": "string"
+          },
+          "modality": {
+            "type": "string",
+            "enum": [
+              "presencial",
+              "online"
+            ]
+          },
+          "modality_label": {
+            "type": "string",
+            "example": "Presencial"
+          },
+          "is_online": {
+            "type": "boolean"
+          },
+          "professional_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clinic_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clinic_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Endereço do consultório (presencial e quando a clínica permite exibir)"
+          },
+          "meeting_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Link da sala de espera com bilhete de uso único; só dentro da janela de entrada"
+          },
+          "video_opens_at_iso": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Quando a sala online abre (teleconsulta)"
+          },
+          "video_status": {
+            "type": "string",
+            "enum": [
+              "presencial",
+              "aguardando_horario",
+              "aguardando_sala",
+              "sala_disponivel"
+            ]
+          },
+          "allowed_actions": {
+            "type": "object",
+            "properties": {
+              "confirm": {
+                "$ref": "#/components/schemas/AppointmentActionState"
+              },
+              "cancel": {
+                "$ref": "#/components/schemas/AppointmentActionState"
+              },
+              "reschedule": {
+                "$ref": "#/components/schemas/AppointmentActionState"
+              }
+            },
+            "required": [
+              "confirm",
+              "cancel",
+              "reschedule"
+            ]
+          },
+          "change_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pedido de remarcação pendente ou respondido nos últimos 7 dias"
+          }
+        },
+        "required": [
+          "id",
+          "scheduled_at",
+          "scheduled_at_iso",
+          "ends_at_iso",
+          "timezone",
+          "timezone_label",
+          "duration_minutes",
+          "status",
+          "status_label",
+          "modality",
+          "modality_label",
+          "is_online",
+          "professional_name",
+          "clinic_name",
+          "clinic_phone",
+          "location",
+          "meeting_url",
+          "video_opens_at_iso",
+          "video_status",
+          "allowed_actions",
+          "change_request"
+        ]
+      },
+      "RescheduleOptions": {
+        "type": "object",
+        "properties": {
+          "appointment_id": {
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "timezone_label": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "slots": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "scheduled_at": {
+                        "type": "string",
+                        "description": "Valor a enviar em requested_scheduled_at"
+                      },
+                      "scheduled_at_iso": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Horário do consultório com offset (ex.: 2026-10-28T14:00:00-03:00)"
+                      },
+                      "time_label": {
+                        "type": "string",
+                        "example": "14:00"
+                      }
+                    },
+                    "required": [
+                      "scheduled_at",
+                      "scheduled_at_iso",
+                      "time_label"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "date",
+                "slots"
+              ]
+            }
+          }
+        },
+        "required": [
+          "appointment_id",
+          "timezone",
+          "timezone_label",
+          "duration_minutes",
+          "days"
+        ]
+      },
+      "AppointmentActionResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "appointment_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RescheduleRequest"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "AppointmentActionError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "APPOINTMENT_NOT_FOUND",
+                  "REQUEST_NOT_FOUND",
+                  "ACTION_NOT_ALLOWED",
+                  "INVALID_STATE",
+                  "SLOT_CONFLICT",
+                  "REQUEST_PENDING",
+                  "POLICY_VIOLATION",
+                  "VALIDATION_ERROR"
+                ]
+              },
+              "current_status": {
+                "type": "string",
+                "description": "Status atual da consulta (só em INVALID_STATE)"
+              }
+            }
+          }
+        ]
       }
     }
   }

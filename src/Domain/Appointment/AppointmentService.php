@@ -265,11 +265,71 @@ class AppointmentService
         return $this->atomic(fn() => $this->updateStatusAtomically($appointmentId, $newStatus, $notes, $userId));
     }
 
+    /**
+     * NI2-137: mudança de status pedida pela própria paciente (confirmar ou cancelar pelo app/portal).
+     * Mesmo motor da agenda: trava a consulta, aplica ALLOWED_TRANSITIONS, chama os ganchos de teleconsulta
+     * e grava o histórico com a paciente como autora. $policy recebe a linha travada e lança
+     * PatientAppointmentActionException quando a clínica não permite a ação ou a antecedência não foi respeitada.
+     * Consulta de outra paciente ou de outra clínica: "não encontrada" (sem ids na mensagem).
+     *
+     * @param callable(array): void $policy
+     * @return array{from_status: string, to_status: string, appointment: array}
+     */
+    public function transitionByPatient(int $appointmentId, int $patientId, string $newStatus, string $notes, callable $policy): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        return $this->atomic(function () use ($appointmentId, $patientId, $newStatus, $notes, $policy, $clinicId): array {
+            $current = $this->lockAppointment($appointmentId, $clinicId);
+            if ($current === null || (int)$current['patient_id'] !== $patientId) {
+                throw PatientAppointmentActionException::notFound();
+            }
+            $policy($current);
+            $from = (string)$current['status'];
+            if ($from === $newStatus || !in_array($newStatus, self::ALLOWED_TRANSITIONS[$from] ?? [], true)) {
+                throw PatientAppointmentActionException::invalidState(
+                    'Esta consulta está como "' . \ClyoNutri\Core\I18n\LabelMap::appointmentStatus($from) . '" e a ação não está mais disponível. Atualize a tela.',
+                    $from
+                );
+            }
+            $this->updateStatusAtomically($appointmentId, $newStatus, $notes, null, $patientId);
+            return ['from_status' => $from, 'to_status' => $newStatus, 'appointment' => $current];
+        });
+    }
+
+    /**
+     * NI2-137: o profissional aceita o pedido de remarcação da paciente. Usa o mesmo caminho do reagendamento
+     * da agenda (disponibilidade semanal, conflito, trava do profissional e convite de teleconsulta revogado
+     * com a janela recalculada). Se a consulta estava confirmada, volta para "agendada": a paciente confirmou o
+     * horário antigo, não o novo.
+     */
+    public function rescheduleFromPatientRequest(int $appointmentId, string $newScheduledAt, ?int $userId, string $note): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        return $this->atomic(function () use ($appointmentId, $newScheduledAt, $userId, $note, $clinicId): array {
+            $current = $this->lockAppointment($appointmentId, $clinicId);
+            if ($current === null || !in_array($current['status'], [self::STATUS_SCHEDULED, self::STATUS_CONFIRMED], true)) {
+                throw new InvalidArgumentException('Só é possível remarcar consultas agendadas ou confirmadas.');
+            }
+            $this->editAtomically($appointmentId, ['scheduled_at' => $newScheduledAt, 'reschedule_reason' => $note], false, $userId);
+            if ($current['status'] === self::STATUS_CONFIRMED) {
+                $stmt = $this->db->prepare("UPDATE appointments SET status = 'scheduled', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :c AND status = 'confirmed'");
+                $stmt->execute(['id' => $appointmentId, 'c' => $clinicId]);
+                if ($stmt->rowCount() === 1) {
+                    $this->recordStatusHistory($clinicId, $appointmentId, self::STATUS_CONFIRMED, self::STATUS_SCHEDULED, $userId,
+                        'Confirmação anterior desfeita pela remarcação: a paciente precisa confirmar o novo horário.');
+                }
+            }
+            return $this->getAppointment($appointmentId);
+        });
+    }
+
     private function updateStatusAtomically(
         int $appointmentId,
         string $newStatus,
         ?string $notes = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $patientId = null
     ): bool {
         $clinicId = TenantContext::getClinicId();
         $current = $this->lockAppointment($appointmentId, $clinicId);
@@ -321,8 +381,9 @@ class AppointmentService
                 $appointmentId,
                 $currentStatus,
                 $newStatus,
-                $userId ?? TenantContext::getUserId(),
-                $notes
+                $patientId !== null ? null : ($userId ?? TenantContext::getUserId()),
+                $notes,
+                $patientId
             );
         }
 
@@ -538,8 +599,12 @@ class AppointmentService
     public function getStatusHistory(int $appointmentId): array
     {
         $clinicId = TenantContext::getClinicId();
+        // NI2-137: mudança feita pela paciente no app aparece como "Paciente (app)".
+        $byPatient = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'appointment_status_history', 'changed_by_patient_id')
+            ? "COALESCE(u.name, CASE WHEN h.changed_by_patient_id IS NOT NULL THEN 'Paciente (app)' END)"
+            : 'u.name';
         $stmt = $this->db->prepare("
-            SELECT h.*, u.name AS changed_by_name
+            SELECT h.*, {$byPatient} AS changed_by_name
             FROM appointment_status_history h
             LEFT JOIN users u ON u.id = h.changed_by_user_id
             WHERE h.appointment_id = :app_id AND h.clinic_id = :clinic_id
@@ -731,6 +796,19 @@ class AppointmentService
             ];
         }
 
+        // NI2-137: pedidos de remarcação da paciente aguardando resposta.
+        $pendingRequests = (new PatientAppointmentService($this->db))->countPendingForClinic();
+        if ($pendingRequests > 0) {
+            $items[] = [
+                'type' => 'reschedule_request',
+                'severity' => 'warning',
+                'title' => $pendingRequests === 1 ? 'Pedido de remarcação' : 'Pedidos de remarcação',
+                'description' => $pendingRequests === 1 ? '1 paciente pediu outro horário pelo app' : "{$pendingRequests} pacientes pediram outro horário pelo app",
+                'action_url' => '/agenda/pedidos-remarcacao',
+                'action_label' => 'Responder',
+            ];
+        }
+
         // 3. Prescrições em rascunho, agrupadas por paciente (mesma fonte do card do Dashboard)
         $drafts = new \ClyoNutri\Domain\MealPlan\DraftPlanSummary($this->db);
         foreach ($drafts->byPatient($clinicId) as $group) {
@@ -902,18 +980,21 @@ class AppointmentService
         ?string $fromStatus,
         string $toStatus,
         ?int $userId,
-        ?string $notes
+        ?string $notes,
+        ?int $patientId = null
     ): void {
+        // NI2-137: autoria da paciente (coluna da migração 47; sem ela, o histórico segue sem a coluna).
+        $withPatient = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'appointment_status_history', 'changed_by_patient_id');
         $stmt = $this->db->prepare("
             INSERT INTO appointment_status_history (
                 clinic_id, appointment_id, from_status, to_status,
-                changed_by_user_id, notes, created_at
+                changed_by_user_id, notes, created_at" . ($withPatient ? ', changed_by_patient_id' : '') . "
             ) VALUES (
                 :clinic_id, :app_id, :from_status, :to_status,
-                :user_id, :notes, :created_at
+                :user_id, :notes, :created_at" . ($withPatient ? ', :patient_id' : '') . "
             )
         ");
-        $stmt->execute([
+        $params = [
             'clinic_id' => $clinicId,
             'app_id' => $appointmentId,
             'from_status' => $fromStatus,
@@ -922,6 +1003,10 @@ class AppointmentService
             'notes' => $notes,
             // UX-07 (v14): horário no fuso da aplicação (o mesmo de scheduled_at), também no SQLite.
             'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if ($withPatient) {
+            $params['patient_id'] = $patientId;
+        }
+        $stmt->execute($params);
     }
 }

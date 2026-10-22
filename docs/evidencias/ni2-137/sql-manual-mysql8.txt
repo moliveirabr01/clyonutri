@@ -1,0 +1,37 @@
+# SQL manual da migração 47 (NI2-137) no MySQL 8.0.46-0ubuntu0.24.04.4
+## 1) Banco da instalação (chaves INT), com uma clínica com prazo 0 h
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_46_aplicada	clinicas_com_regras_de_agenda	clinicas_com_prazo_zero	consultas_futuras_ou_em_aberto	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	1	1	0	int
+### migração
+resultado
+OK — migração 47 aplicada (ações da paciente na consulta e pedidos de remarcação)
+### migração de novo (idempotente)
+resultado
+OK — migração 47 aplicada (ações da paciente na consulta e pedidos de remarcação)
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_46_aplicada	clinicas_com_regras_de_agenda	clinicas_com_prazo_zero	consultas_futuras_ou_em_aberto	tipo_das_chaves
+OK — migração 47 já aplicada	1	1	1	1	0	0	int
+clinic_id	patient_can_confirm	patient_can_cancel	patient_can_request_reschedule	patient_show_address	cancel_min_advance_hours	reschedule_min_advance_hours
+1	1	0	0	1	1	1
+migration
+2026_10_21_000047_create_patient_appointment_actions
+
+## 2) Banco no formato da produção (chaves BIGINT UNSIGNED)
+### preflight
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_46_aplicada	clinicas_com_regras_de_agenda	clinicas_com_prazo_zero	consultas_futuras_ou_em_aberto	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	1	1	0	bigint unsigned
+### migração
+resultado
+OK — migração 47 aplicada (ações da paciente na consulta e pedidos de remarcação)
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE
+appointment_change_requests	appointment_id	bigint unsigned
+appointment_change_requests	clinic_id	bigint unsigned
+appointment_change_requests	id	bigint unsigned
+appointment_change_requests	patient_id	bigint unsigned
+appointment_change_requests	professional_id	bigint unsigned
+appointment_status_history	changed_by_patient_id	bigint unsigned
+chaves_estrangeiras
+4
+cancel_min_advance_hours	reschedule_min_advance_hours	patient_can_confirm	patient_can_cancel	patient_can_request_reschedule
+1	6	1	0	0

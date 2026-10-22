@@ -30,10 +30,23 @@ final class SettingsController
                         'min_advance_hours'=>$_POST['booking_min_advance_hours']??'',
                         'max_future_days'=>$_POST['booking_max_future_days']??'',
                         'hold_ttl_minutes'=>$_POST['booking_hold_ttl_minutes']??'',
+                    ]);
+                    (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('BOOKING_SETTINGS_UPDATED','booking_settings',(string)TenantContext::getClinicId(),['before'=>$before,'after'=>$after]);
+                }
+                elseif($section==='patient_actions'){
+                    // NI2-137: o que a paciente pode fazer com a consulta pelo app. Regra da clínica: só a gestão altera.
+                    if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o que a paciente faz pelo app.');
+                    $bookingSvc=new BookingService(Connection::getInstance());
+                    $before=$bookingSvc->getSettings(TenantContext::getClinicId());
+                    $after=$bookingSvc->updateSettings(TenantContext::getClinicId(),[
+                        'patient_can_confirm'=>!empty($_POST['patient_can_confirm']),
+                        'patient_can_cancel'=>!empty($_POST['patient_can_cancel']),
+                        'patient_can_request_reschedule'=>!empty($_POST['patient_can_request_reschedule']),
+                        'patient_show_address'=>!empty($_POST['patient_show_address']),
                         'cancel_min_advance_hours'=>$_POST['booking_cancel_min_advance_hours']??'',
                         'reschedule_min_advance_hours'=>$_POST['booking_reschedule_min_advance_hours']??'',
                     ]);
-                    (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('BOOKING_SETTINGS_UPDATED','booking_settings',(string)TenantContext::getClinicId(),['before'=>$before,'after'=>$after]);
+                    (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('PATIENT_APPOINTMENT_ACTIONS_UPDATED','booking_settings',(string)TenantContext::getClinicId(),['before'=>$before,'after'=>$after]);
                 }
                 else throw new \InvalidArgumentException('Selecione uma seção válida.');
                 $profile=$service->read();$success=true;
@@ -66,7 +79,7 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $lastSec=$_POST['section']??'';
-            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':'Configurações atualizadas com sucesso.'));
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':'Configurações atualizadas com sucesso.')));
         }
         $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
         $pidStmt=Connection::getInstance()->prepare('SELECT id FROM professionals WHERE user_id=?');$pidStmt->execute([TenantContext::getUserId()]);

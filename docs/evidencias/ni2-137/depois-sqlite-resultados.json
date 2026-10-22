@@ -1,0 +1,517 @@
+{
+ "driver": "sqlite",
+ "pass": 85,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "card",
+   "name": "GET /home traz a próxima consulta da Ana (201)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M5",
+   "name": "Lista fechada de campos (sem notes, type, professional_id, created_at, updated_at, patient_id, clinic_id)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M5",
+   "name": "Observação interna da agenda não sai para a paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B4",
+   "name": "OpenAPI: NextAppointment documenta exatamente os campos devolvidos",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M1",
+   "name": "scheduled_at_iso com offset -03:00 e igual à hora local gravada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M1",
+   "name": "Fuso informado: America/Sao_Paulo, \"horário de Brasília\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M2",
+   "name": "Presencial aparece como \"Presencial\" com o endereço do consultório",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card A1",
+   "name": "Padrão da clínica: confirmar liberado; cancelar e remarcar bloqueados com motivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M2",
+   "name": "Clínica desliga o endereço: location = null",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card",
+   "name": "Bruno vê só a própria consulta (202)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Cancelar com a ação desligada → 403 ACTION_NOT_ALLOWED",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Autoagendamento público desligado (is_enabled = 0) e cancelamento não passou",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Horários para remarcar com a ação desligada → 403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Pedido de remarcação com a ação desligada → 403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Rota antiga /reschedule também bloqueada (403) e a consulta não se move",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Clínica desliga a confirmação: allowed_actions.confirm=false e POST → 403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auth",
+   "name": "Sem token → 401",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Bruno confirma a consulta da Ana → 404 \"Consulta não encontrada.\" sem ids",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Carla (outra clínica) pela rota antiga → 404 sem ids",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Nada mudou na consulta da Ana",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Ana confirma → 200 success:true, status confirmed",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Histórico: scheduled → confirmed, autora = paciente 1, sem usuário",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Histórico no fuso da aplicação (não UTC)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Auditoria: recurso appointment, actor_type patient, actor_id 1, canal app, de/para",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Confirmar de novo → 409 INVALID_STATE com current_status (antes: 200 success:false)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Rota antiga também responde 409 (nunca 200 com success:false)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Consulta de 2 dias atrás não pode ser confirmada → 409 \"já passou\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Consulta cancelada pela clínica: confirmar → 409 com current_status cancelled",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Consulta inexistente → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B3",
+   "name": "Antecedência de 0 hora para cancelar é recusada no servidor",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "C1",
+   "name": "Antes: sessão de teleconsulta ativa e bilhete do portal emitido",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Motivo acima de 300 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Bruno cancela a consulta da Ana → 404 e nada muda",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Ana cancela → 200, consulta cancelada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "C1",
+   "name": "Teleconsulta cancelada junto e convite revogado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "C1",
+   "name": "Depois do cancelamento o portal não emite mais bilhete",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Histórico do cancelamento com a paciente e o motivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Auditoria do cancelamento (paciente, canal, de/para, horário, sem o texto do motivo)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Cancelar de novo → 409 INVALID_STATE",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Dentro das 4 horas antes → 422 POLICY_VIOLATION com o prazo na mensagem",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B2",
+   "name": "Consulta em andamento não pode ser cancelada pela paciente → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M3",
+   "name": "Teleconsulta amanhã: sem meeting_url, video_status aguardando_horario e video_opens_at 15 min antes",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M3",
+   "name": "Dentro da janela: meeting_url com bilhete da sala de espera",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Remarcação liberada aparece em allowed_actions (201, confirmada)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Horários livres mesmo com o autoagendamento público desligado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Horários: dentro da jornada (07:00–22:00), ≥ 4 h à frente, sem o horário atual",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Horários não colidem com a consulta do Bruno",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Horário malformado → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Horário fora da disponibilidade → 409 SLOT_CONFLICT",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Pedido válido → 202 com pedido pendente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Consulta não se move nem muda de status enquanto o pedido está pendente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Auditoria do pedido com horário de/para e canal",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Segundo pedido com um pendente → 409 REQUEST_PENDING",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Card mostra o pedido pendente e bloqueia novo pedido com o motivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Equipe de outra clínica não acha o pedido e nada muda",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Recepção vê o aviso na agenda, sem link (não remarca consultas)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Recepção não abre a fila nem aceita (403), como no reagendamento da agenda",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Nutricionista vê o aviso na agenda com link para responder",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Painel \"Atenção\" do dashboard lista o pedido de remarcação com link",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Fila mostra a Ana, o horário atual, o pedido e o motivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Nutricionista da equipe aceita → consulta vai para o horário pedido",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Consulta confirmada volta para \"agendada\" (a paciente confirmou o horário antigo)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Histórico: remarcação (com o motivo da paciente) e confirmed → scheduled, pela nutricionista",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Pedido marcado como aceito, por quem e quando",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Mensagem pede nova confirmação da paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Card: novo horário, pedido aceito e confirmar liberado de novo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "C1",
+   "name": "Teleconsulta remarcada: janela recalculada para o novo horário e convite antigo revogado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "equipe",
+   "name": "Mensagem lembra de enviar novo convite da teleconsulta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Recusar: consulta fica no horário atual e a paciente vê a resposta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Pedido já recusado não pode ser aceito depois",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "Bruno não retira o pedido da Ana → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Ana desiste do pedido → 200, pedido encerrado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Desistir de novo → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Horário ocupado quando a equipe aceita: erro claro, consulta e pedido intactos",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Pedido cujo horário passou some da fila e fica \"expirado\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Cancelar a consulta encerra o pedido pendente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Rota antiga /reschedule registra pedido (202) e não move a consulta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "CSRF",
+   "name": "Portal web: origem estranha → 403 e nada muda",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "CSRF",
+   "name": "Portal web: sem o cabeçalho do app → 403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Portal web confirma (200) e a auditoria registra canal portal_web",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B3",
+   "name": "Tela de Configurações recusa 0 hora para cancelar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Dona salva pela tela: só confirmar ligado, prazos 6 h e 12 h",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Alteração auditada com antes e depois",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Recepção não altera as regras (a clínica é quem decide)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Card do Bruno reflete as regras salvas (cancelar e remarcar bloqueados)",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

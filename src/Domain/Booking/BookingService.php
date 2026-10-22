@@ -60,6 +60,11 @@ class BookingService
                 'require_cpf' => (bool)$row['require_cpf'],
                 'allow_telehealth' => (bool)$row['allow_telehealth'],
                 'allow_presential' => (bool)$row['allow_presential'],
+                // NI2-137 (migração 47). Sem a coluna, vale o padrão: confirmar ligado, cancelar e remarcar desligados.
+                'patient_can_confirm' => (bool)($row['patient_can_confirm'] ?? true),
+                'patient_can_cancel' => (bool)($row['patient_can_cancel'] ?? false),
+                'patient_can_request_reschedule' => (bool)($row['patient_can_request_reschedule'] ?? false),
+                'patient_show_address' => (bool)($row['patient_show_address'] ?? true),
             ];
         }
 
@@ -76,7 +81,18 @@ class BookingService
             'require_cpf' => false,
             'allow_telehealth' => true,
             'allow_presential' => true,
+            'patient_can_confirm' => true,
+            'patient_can_cancel' => false,
+            'patient_can_request_reschedule' => false,
+            'patient_show_address' => true,
         ];
+    }
+
+    /** NI2-137: antecedência mínima efetiva para a paciente cancelar ou pedir remarcação (nunca menos de 1 hora). */
+    public static function patientMinAdvanceHours(array $settings, string $action): int
+    {
+        $field = $action === 'cancel' ? 'cancel_min_advance_hours' : 'reschedule_min_advance_hours';
+        return max(1, (int)($settings[$field] ?? 4));
     }
 
     /**
@@ -89,13 +105,14 @@ class BookingService
         // Limites da política (validados no servidor, não só no formulário).
         foreach ([
             'min_advance_hours' => [0, 168], 'max_future_days' => [1, 365], 'hold_ttl_minutes' => [5, 60],
-            'cancel_min_advance_hours' => [0, 168], 'reschedule_min_advance_hours' => [0, 168],
+            // NI2-137 (B3): pelo app, cancelar ou pedir remarcação exige pelo menos 1 hora de antecedência.
+            'cancel_min_advance_hours' => [1, 168], 'reschedule_min_advance_hours' => [1, 168],
         ] as $field => [$min, $max]) {
             if (!is_numeric($merged[$field]) || (int)$merged[$field] < $min || (int)$merged[$field] > $max) {
                 throw new InvalidArgumentException("Valor inválido em {$field}: use de {$min} a {$max}.");
             }
         }
-        foreach (['is_enabled', 'require_cpf', 'allow_telehealth', 'allow_presential'] as $flag) {
+        foreach (['is_enabled', 'require_cpf', 'allow_telehealth', 'allow_presential', 'patient_can_confirm', 'patient_can_cancel', 'patient_can_request_reschedule', 'patient_show_address'] as $flag) {
             $merged[$flag] = filter_var($merged[$flag], FILTER_VALIDATE_BOOL);
         }
         if ($merged['is_enabled'] && !$merged['allow_telehealth'] && !$merged['allow_presential']) {
@@ -164,6 +181,21 @@ class BookingService
             'allow_pres' => $merged['allow_presential'] ? 1 : 0,
         ]);
 
+        // NI2-137: ações da paciente no app (colunas da migração 47).
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'booking_settings', 'patient_can_confirm')) {
+            $this->db->prepare('
+                UPDATE booking_settings SET patient_can_confirm = :pc, patient_can_cancel = :px,
+                    patient_can_request_reschedule = :pr, patient_show_address = :pa
+                WHERE clinic_id = :clinic_id
+            ')->execute([
+                'pc' => $merged['patient_can_confirm'] ? 1 : 0,
+                'px' => $merged['patient_can_cancel'] ? 1 : 0,
+                'pr' => $merged['patient_can_request_reschedule'] ? 1 : 0,
+                'pa' => $merged['patient_show_address'] ? 1 : 0,
+                'clinic_id' => $clinicId,
+            ]);
+        }
+
         return $this->getSettings($clinicId);
     }
 
@@ -177,21 +209,27 @@ class BookingService
         string $date,
         int $durationMinutes = 60,
         string $modality = 'presential',
-        ?int $excludeAppointmentId = null
+        ?int $excludeAppointmentId = null,
+        bool $forPatientReschedule = false
     ): array {
         $settings = $this->getSettings($clinicId);
-        if (!$settings['is_enabled']) {
-            return [];
-        }
         if (!$this->professionalInClinic($professionalId, $clinicId)) {
             return [];
         }
-
-        if ($modality === 'telehealth' && !$settings['allow_telehealth']) {
-            return [];
-        }
-        if ($modality === 'presential' && !$settings['allow_presential']) {
-            return [];
+        if ($forPatientReschedule) {
+            // NI2-137: o pedido de remarcação de quem já é paciente não depende da página pública de
+            // autoagendamento (nem das modalidades oferecidas nela); a antecedência é a de remarcação.
+            $settings['min_advance_hours'] = self::patientMinAdvanceHours($settings, 'reschedule');
+        } else {
+            if (!$settings['is_enabled']) {
+                return [];
+            }
+            if ($modality === 'telehealth' && !$settings['allow_telehealth']) {
+                return [];
+            }
+            if ($modality === 'presential' && !$settings['allow_presential']) {
+                return [];
+            }
         }
 
         $durationMinutes = max(15, min(240, $durationMinutes));
@@ -792,183 +830,6 @@ class BookingService
         ");
         $stmt->execute(['token' => $holdToken]);
         return $stmt->rowCount() > 0;
-    }
-
-    /**
-     * Cancelamento self-service de consulta pelo paciente.
-     */
-    public function cancelBookingByPatient(int $clinicId, int $patientId, int $appointmentId, string $reason): array
-    {
-        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-
-        $stmt = $this->db->prepare("SELECT * FROM appointments WHERE id = :id AND clinic_id = :clinic_id");
-        $stmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $appt = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$appt || (int)$appt['patient_id'] !== $patientId) {
-            throw new \ClyoNutri\Core\Security\TenantSecurityException("Consulta não pertence ao paciente autenticado.");
-        }
-
-        if (in_array($appt['status'], ['completed', 'cancelled', 'no_show'], true)) {
-            throw new RuntimeException("Esta consulta não pode ser cancelada pois seu status é '{$appt['status']}'.");
-        }
-
-        // Validação da política de cancelamento
-        $settings = $this->getSettings($clinicId);
-        $minAdvanceHours = $settings['cancel_min_advance_hours'];
-        $apptStart = new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone);
-        $limit = $this->now()->modify('+' . $minAdvanceHours . ' hours');
-
-        if ($apptStart < $limit) {
-            throw new InvalidArgumentException("Cancelamentos self-service devem ser realizados com pelo menos {$minAdvanceHours} horas de antecedência. Entre em contato direto com o consultório.");
-        }
-
-        $stmt = $this->db->prepare("
-            UPDATE appointments
-            SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND clinic_id = :clinic_id AND status = :status
-        ");
-        $stmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId, 'status' => $appt['status']]);
-        if ($stmt->rowCount() !== 1) {
-            throw new RuntimeException('A consulta mudou enquanto o cancelamento era feito. Atualize e tente de novo.');
-        }
-        $this->audit($clinicId, 'BOOKING_CANCELLED_BY_PATIENT', (string)$appointmentId, null);
-
-        // Registrar no histórico de status
-        $hist = $this->db->prepare("
-            INSERT INTO appointment_status_history (
-                clinic_id, appointment_id, from_status, to_status, notes, created_at
-            ) VALUES (
-                :clinic_id, :appt_id, :from_status, 'cancelled', :notes, CURRENT_TIMESTAMP
-            )
-        ");
-        $hist->execute([
-            'clinic_id' => $clinicId,
-            'appt_id' => $appointmentId,
-            'from_status' => $appt['status'],
-            'notes' => 'Cancelado pelo paciente via autoatendimento. Motivo: ' . mb_substr(trim($reason), 0, 300),
-        ]);
-
-        return [
-            'success' => true,
-            'appointment_id' => $appointmentId,
-            'status' => 'cancelled',
-        ];
-    }
-
-    /**
-     * Reagendamento self-service de consulta pelo paciente.
-     */
-    public function rescheduleBookingByPatient(
-        int $clinicId,
-        int $patientId,
-        int $appointmentId,
-        string $newScheduledAt,
-        string $reason
-    ): array {
-        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-
-        $stmt = $this->db->prepare("SELECT * FROM appointments WHERE id = :id AND clinic_id = :clinic_id");
-        $stmt->execute(['id' => $appointmentId, 'clinic_id' => $clinicId]);
-        $appt = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$appt || (int)$appt['patient_id'] !== $patientId) {
-            throw new \ClyoNutri\Core\Security\TenantSecurityException("Consulta não pertence ao paciente autenticado.");
-        }
-
-        if (in_array($appt['status'], ['completed', 'cancelled', 'no_show'], true)) {
-            throw new RuntimeException("Esta consulta não pode ser reagendada pois seu status é '{$appt['status']}'.");
-        }
-
-        $settings = $this->getSettings($clinicId);
-        $minAdvanceHours = $settings['reschedule_min_advance_hours'];
-        $apptStart = new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone);
-        $limit = $this->now()->modify('+' . $minAdvanceHours . ' hours');
-
-        if ($apptStart < $limit) {
-            throw new InvalidArgumentException("Reagendamentos self-service devem ser solicitados com no mínimo {$minAdvanceHours} horas de antecedência.");
-        }
-
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/', $newScheduledAt)) {
-            throw new InvalidArgumentException('Formato de data e hora inválido. Use AAAA-MM-DD HH:MM.');
-        }
-        $newStart = new DateTimeImmutable(str_replace('T', ' ', $newScheduledAt), $this->timezone);
-        $duration = (int)($appt['duration_minutes'] ?? 60);
-        $newEnd = $newStart->modify('+' . $duration . ' minutes');
-        $professionalId = (int)$appt['professional_id'];
-        if ($newStart->format('Y-m-d H:i:s') === (new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone))->format('Y-m-d H:i:s')) {
-            throw new InvalidArgumentException('O novo horário é igual ao atual.');
-        }
-        $apptModality = TeleconsultationService::isOnlineType((string)($appt['type'] ?? '')) ? 'telehealth' : 'presential';
-
-        // O novo horário precisa estar na disponibilidade real (jornada, pausa, antecedência),
-        // desconsiderando a própria consulta.
-        $offered = array_column($this->getAvailableSlots($clinicId, $professionalId, $newStart->format('Y-m-d'), $duration, $apptModality, $appointmentId), 'scheduled_at');
-        if (!in_array($newStart->format('Y-m-d H:i:s'), $offered, true)) {
-            throw new BookingConflictException('O novo horário (' . $newStart->format('d/m/Y H:i') . ') não está disponível.');
-        }
-
-        $ownsTransaction = false;
-        if (!$this->db->inTransaction()) {
-            $this->db->beginTransaction();
-            $ownsTransaction = true;
-        }
-        try {
-            $this->lockProfessional($professionalId);
-            $nowUtcStr = gmdate('Y-m-d H:i:s', $this->now()->getTimestamp());
-            if ($this->findAppointmentConflict($clinicId, $professionalId, $newStart, $newEnd, $appointmentId) !== null
-                || $this->findActiveHoldConflict($clinicId, $professionalId, $newStart, $newEnd, $nowUtcStr) !== null) {
-                throw new BookingConflictException('O novo horário solicitado (' . $newStart->format('d/m/Y H:i') . ') já está ocupado.');
-            }
-
-            $stmt = $this->db->prepare("
-                UPDATE appointments
-                SET scheduled_at = :new_time, updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id AND clinic_id = :clinic_id AND status = :status
-            ");
-            $stmt->execute([
-                'new_time' => $newStart->format('Y-m-d H:i:s'),
-                'id' => $appointmentId,
-                'clinic_id' => $clinicId,
-                'status' => $appt['status'],
-            ]);
-            if ($stmt->rowCount() !== 1) {
-                throw new BookingConflictException('A consulta mudou enquanto o reagendamento era feito. Atualize e tente de novo.');
-            }
-
-            $hist = $this->db->prepare("
-                INSERT INTO appointment_status_history (
-                    clinic_id, appointment_id, from_status, to_status, notes, created_at
-                ) VALUES (
-                    :clinic_id, :appt_id, :from_status, :to_status, :notes, CURRENT_TIMESTAMP
-                )
-            ");
-            $hist->execute([
-                'clinic_id' => $clinicId,
-                'appt_id' => $appointmentId,
-                'from_status' => $appt['status'],
-                'to_status' => $appt['status'],
-                'notes' => 'Reagendado pelo paciente de ' . (new DateTimeImmutable((string)$appt['scheduled_at'], $this->timezone))->format('d/m/Y H:i') . ' para ' . $newStart->format('d/m/Y H:i') . '. Motivo: ' . mb_substr(trim($reason), 0, 300),
-            ]);
-            $this->audit($clinicId, 'BOOKING_RESCHEDULED_BY_PATIENT', (string)$appointmentId, null);
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->commit();
-            }
-        } catch (\Throwable $e) {
-            if ($ownsTransaction && $this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
-        }
-
-        return [
-            'success' => true,
-            'appointment_id' => $appointmentId,
-            'scheduled_at' => $newStart->format('Y-m-d H:i:s'),
-            'status' => $appt['status'],
-        ];
     }
 
     // =========================================================================

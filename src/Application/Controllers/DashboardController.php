@@ -3009,6 +3009,13 @@ class DashboardController
           </div>
         <?php endif; ?>
 
+        <?php $pendingChangeRequests = (new \ClyoNutri\Domain\Appointment\PatientAppointmentService())->countPendingForClinic(); ?>
+        <?php if ($pendingChangeRequests > 0): ?>
+          <div role="status" class="card" data-testid="agenda-change-requests" style="border-left: 4px solid #B45309; margin-bottom: var(--space-4);">
+            <strong><?= $pendingChangeRequests === 1 ? '1 pedido de remarcação' : $pendingChangeRequests . ' pedidos de remarcação' ?></strong> feito<?= $pendingChangeRequests === 1 ? '' : 's' ?> pela paciente no app aguardando resposta. <?php if (\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical(\ClyoNutri\Core\Auth\AuthContext::get()?->toArray() ?? [])): ?><a href="/agenda/pedidos-remarcacao">Responder pedidos</a><?php else: ?>O nutricionista responde em Pedidos de remarcação.<?php endif; ?>
+          </div>
+        <?php endif; ?>
+
         <!-- Cabeçalho & Controles da Agenda -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
           <div>

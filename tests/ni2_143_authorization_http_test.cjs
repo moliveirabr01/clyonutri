@@ -33,7 +33,7 @@ sql("UPDATE patients SET email='patient1@example.test',password_hash='"+execFile
 const pa=await api('/api/v1/auth/patient-login',{email:'patient1@example.test',password:'Patient@2026'});assert.equal(pa.status,200);
 const ownHome=await api('/api/v1/patient/home?patient_id=2&clinic_id=2',null,pa.data.token);assert.equal(ownHome.status,200);assert.equal(ownHome.data.patient_name,'Paciente sintético 1');
 sql("INSERT INTO appointments(id,clinic_id,patient_id,professional_id,scheduled_at,status) VALUES(99,2,2,2,'2026-10-20 10:00:00','scheduled')");
-assert.equal((await api('/api/v1/patient/appointment/confirm',{appointment_id:99},pa.data.token)).status,403,'Foreign appointment denied before update');
+assert.equal((await api('/api/v1/patient/appointment/confirm',{appointment_id:99},pa.data.token)).status,404,'Foreign appointment denied before update (NI2-137: 404 sem ids)');
 assert.equal(execFileSync('php',['-r','$db=new PDO("sqlite:".getenv("DB_DATABASE"));echo $db->query("SELECT status FROM appointments WHERE id=99")->fetchColumn();'],{env,encoding:'utf8'}),'scheduled','Foreign appointment remains unchanged');
 sql('UPDATE patients SET clinic_id=2 WHERE id=1');assert.equal((await api('/api/v1/patient/home',null,pa.data.token)).status,401,'Patient token must not follow a changed clinic');
 console.log('PASS NI2-143 HTTP: tenant-bound tokens, role downgrade, clinical denial, receptionist agenda, foreign invite and patient reassignment.');

@@ -1,0 +1,95 @@
+{
+    "mode": "all",
+    "mysql_version": "8.0.46-0ubuntu0.24.04.4",
+    "fresh": {
+        "ok": true,
+        "migrations_total": 47,
+        "migrations_applied": 47,
+        "rerun_pending": 0,
+        "schema": {
+            "version": "2026_10_21_000047_create_patient_appointment_actions",
+            "migrations_recorded": 47,
+            "tables": 89,
+            "columns": 987,
+            "indexes": 293,
+            "foreign_keys": 162,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c"
+        },
+        "detail": "Todas as migrations aplicadas; reexecução sem pendências."
+    },
+    "upgrade": {
+        "ok": true,
+        "base_version": "2026_10_16_000041_enhance_clinical_care_consent_and_clinic_branding",
+        "target_version": "2026_10_21_000047_create_patient_appointment_actions",
+        "migrations_upgraded": 6,
+        "rows_before": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "rows_after": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "data_preserved": true,
+        "schema": {
+            "version": "2026_10_21_000047_create_patient_appointment_actions",
+            "migrations_recorded": 47,
+            "tables": 89,
+            "columns": 987,
+            "indexes": 293,
+            "foreign_keys": 162,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c"
+        },
+        "detail": "Upgrade de 6 migrations com dados preservados."
+    },
+    "install_sql": {
+        "ok": true,
+        "pending_after_import": [],
+        "schema": {
+            "version": "2026_10_21_000047_create_patient_appointment_actions",
+            "migrations_recorded": 47,
+            "tables": 89,
+            "columns": 987,
+            "indexes": 293,
+            "foreign_keys": 162,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c"
+        },
+        "detail": "SQL de instalação importado; nenhuma migration pendente."
+    },
+    "fingerprints_identical": true,
+    "fingerprints": {
+        "fresh": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c",
+        "upgrade": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c",
+        "install_sql": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c"
+    },
+    "schema": {
+        "version": "2026_10_21_000047_create_patient_appointment_actions",
+        "migrations_recorded": 47,
+        "tables": 89,
+        "columns": 987,
+        "indexes": 293,
+        "foreign_keys": 162,
+        "collations": [
+            "ascii_bin",
+            "utf8mb4_unicode_ci"
+        ],
+        "fingerprint": "2c7ed9cb99475c8ebc468621806cc75215d03fa70d0de452fcb5ace2ff832f5c"
+    },
+    "ok": true
+}

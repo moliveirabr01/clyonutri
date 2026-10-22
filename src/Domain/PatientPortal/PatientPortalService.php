@@ -309,104 +309,32 @@ class PatientPortalService
     // NI2-137: Próxima Consulta e Agenda Integrada
     // =========================================================================
 
+    /**
+     * Card da próxima consulta (NI2-137): lista fechada de campos, data com fuso, modalidade, local,
+     * link da sala só na janela de entrada e as ações permitidas pela clínica.
+     */
     public function getNextAppointment(int $patientId): ?array
     {
-        $clinicId = TenantContext::getClinicId();
-        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-
-        $stmt = $this->db->prepare("
-            SELECT a.*, u.name AS professional_name
-            FROM appointments a
-            LEFT JOIN professionals p ON p.id = a.professional_id
-            LEFT JOIN users u ON u.id = p.user_id
-            WHERE a.patient_id = :patient_id AND a.clinic_id = :clinic_id AND a.status IN ('scheduled', 'confirmed')
-              AND a.scheduled_at >= :floor
-            ORDER BY a.scheduled_at ASC LIMIT 50
-        ");
-        // v13: consultas passadas não são "próxima consulta". scheduled_at está no fuso da aplicação;
-        // a consulta continua válida até início + duração + tolerância (TELECONSULT_JOIN_GRACE_MINUTES).
-        $appTz = new \DateTimeZone(date_default_timezone_get());
-        $now = ($this->fixedNow ?? new \DateTimeImmutable('now'))->setTimezone($appTz);
-        $stmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId, 'floor' => $now->modify('-1 day')->format('Y-m-d H:i:s')]);
-        $graceRaw = getenv('TELECONSULT_JOIN_GRACE_MINUTES');
-        $grace = is_numeric($graceRaw) ? max(0, min(240, (int)$graceRaw)) : 30;
-        $row = false;
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
-            try {
-                $start = new \DateTimeImmutable((string)$candidate['scheduled_at'], $appTz);
-            } catch (\Exception $e) {
-                continue;
-            }
-            $end = $start->modify('+' . (max(15, (int)($candidate['duration_minutes'] ?? 60)) + $grace) . ' minutes');
-            if ($end >= $now) {
-                $row = $candidate;
-                break;
-            }
-        }
-        if (!$row) {
-            return null;
-        }
-        // NI2-221: a URL vem do Consultório Online (bilhete assinado e curto para a sala de espera),
-        // nunca da tabela legada telehealth_sessions (URLs fictícias/públicas).
-        $row['meeting_url'] = null;
-        try {
-            $ticket = (new \ClyoNutri\Domain\Telehealth\TeleconsultationService($this->db))
-                ->issuePortalTicket($patientId, (int)$row['id'], $clinicId);
-            if ($ticket !== null) {
-                $base = rtrim((string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), '/');
-                $row['meeting_url'] = ($base !== '' ? $base : '') . '/teleconsulta/sala-espera/' . $ticket;
-            }
-        } catch (\Throwable $e) {
-            $row['meeting_url'] = null; // sem teleconsulta disponível; nunca um link inventado
-        }
-        // v11 (NI2-221 F19): estado honesto da modalidade para o app.
-        $row['is_online'] = \ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($row['type'] ?? null);
-        $row['video_status'] = !$row['is_online'] ? 'presencial' : ($row['meeting_url'] !== null ? 'sala_disponivel' : 'aguardando_sala');
-        // Code review NI2-135 (A1): a observação da agenda é interna (queixas, encaminhamentos, notas de status)
-        // e não vai para a paciente.
-        unset($row['notes']);
-        return $row;
+        return (new \ClyoNutri\Domain\Appointment\PatientAppointmentService($this->db, $this->fixedNow))->nextAppointment($patientId);
     }
 
+    /**
+     * Confirmação pela paciente, pelo motor da agenda (NI2-137). Devolve false quando a consulta não está mais
+     * em condição de ser confirmada (a API responde 409 com o motivo); consulta de outra paciente: exceção.
+     */
     public function confirmAppointment(int $patientId, int $appointmentId): bool
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        $appointment=TenantGuard::assertAppointmentBelongsToClinic($appointmentId,$clinicId,$this->db);
-        if ((int)$appointment['patient_id']!==$patientId) throw new \ClyoNutri\Core\Security\TenantSecurityException('Consulta não autorizada para este paciente.');
-
-        $stmt = $this->db->prepare("
-            UPDATE appointments
-            SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND patient_id = :patient_id AND clinic_id = :clinic_id AND status = 'scheduled'
-        ");
-        $stmt->execute([
-            'id' => $appointmentId,
-            'patient_id' => $patientId,
-            'clinic_id' => $clinicId,
-        ]);
-
-        $affected = $stmt->rowCount();
-        if ($affected > 0) {
-            try {
-                $hist = $this->db->prepare("
-                    INSERT INTO appointment_status_history (
-                        clinic_id, appointment_id, from_status, to_status, notes, created_at
-                    ) VALUES (
-                        :clinic_id, :app_id, 'scheduled', 'confirmed', 'Confirmado pelo paciente via aplicativo/portal', CURRENT_TIMESTAMP
-                    )
-                ");
-                $hist->execute([
-                    'clinic_id' => $clinicId,
-                    'app_id' => $appointmentId,
-                ]);
-            } catch (\Throwable $e) {
-                // Silencioso se tabela não existir
-            }
+        try {
+            (new \ClyoNutri\Domain\Appointment\PatientAppointmentService($this->db, $this->fixedNow))->confirm($patientId, $appointmentId);
             return true;
+        } catch (\ClyoNutri\Domain\Appointment\PatientAppointmentActionException $e) {
+            if ($e->errorCode === 'APPOINTMENT_NOT_FOUND') {
+                throw new \ClyoNutri\Core\Security\TenantSecurityException('Consulta não encontrada.');
+            }
+            return false;
         }
-
-        return false;
     }
 
     // =========================================================================

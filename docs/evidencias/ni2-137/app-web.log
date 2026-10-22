@@ -1,0 +1,33 @@
+PASS Card: data no horário do consultório, com dia da semana e fuso escrito
+PASS Card: modalidade "Presencial" e endereço do consultório
+PASS Card: sem emoji e sem Caixa De Título nos botões
+PASS Card: botões liberados pela clínica (confirmar, pedir outro horário, cancelar)
+PASS Card: nenhuma nota interna da agenda
+PASS Card sem violações WCAG 2 A/AA (axe)
+PASS Servidor recusa: aviso de erro dentro do card (role=alert), nada de "confirmada"
+PASS Banco: a consulta cancelada continua cancelada
+PASS Card recarrega do servidor e passa para a próxima consulta válida (301)
+PASS Confirmar: mensagem "Presença confirmada." e botão some (status Confirmada)
+PASS Lista de horários livres como opções (radio) com rótulo completo
+PASS Horário escolhido anunciado como selecionado (aria-checked)
+PASS Pedido enviado: aviso, caixa "aguardando o consultório" e consulta no horário atual
+PASS Com pedido pendente, "Pedir outro horário" some e o motivo aparece
+PASS Desistir do pedido: aviso e pedido encerrado no banco
+PASS Cancelar: aviso, card sem consulta e histórico com a paciente e o motivo
+PASS Sem rolagem horizontal a 390 px
+PASS Sem erro de script (Ana, 390 px)
+PASS Padrão da clínica: só "Confirmar presença"; cancelar e pedir outro horário escondidos com o motivo
+PASS Teleconsulta fora da janela: sem botão de entrar; diz quando a sala abre
+PASS Card (teleconsulta, ações bloqueadas) sem violações WCAG 2 A/AA
+PASS Sem erro de script (Bruno, 390 px)
+PASS Sem erro de script (Bruno, 1024 px)
+PASS Bruno pede outro horário pela API (202)
+PASS Agenda avisa o pedido de remarcação
+PASS Fila: paciente, horário atual, horário pedido, motivo e botões
+PASS Tabela da fila sem violações WCAG 2 A/AA
+PASS Recusar pela tela: aviso e pedido recusado no banco
+PASS Configurações: seção "Consulta no app da paciente" com as três ações e os prazos (mínimo 1 h)
+PASS Seção de Configurações sem violações WCAG 2 A/AA
+PASS Sem erro de script nas telas do consultório
+
+NI2-137 app (web): 31 PASS, 0 FAIL

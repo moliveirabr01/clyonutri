@@ -1,0 +1,128 @@
+{
+ "checks": [
+  {
+   "n": "Card: data no horário do consultório, com dia da semana e fuso escrito",
+   "ok": true
+  },
+  {
+   "n": "Card: modalidade \"Presencial\" e endereço do consultório",
+   "ok": true
+  },
+  {
+   "n": "Card: sem emoji e sem Caixa De Título nos botões",
+   "ok": true
+  },
+  {
+   "n": "Card: botões liberados pela clínica (confirmar, pedir outro horário, cancelar)",
+   "ok": true
+  },
+  {
+   "n": "Card: nenhuma nota interna da agenda",
+   "ok": true
+  },
+  {
+   "n": "Card sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Servidor recusa: aviso de erro dentro do card (role=alert), nada de \"confirmada\"",
+   "ok": true
+  },
+  {
+   "n": "Banco: a consulta cancelada continua cancelada",
+   "ok": true
+  },
+  {
+   "n": "Card recarrega do servidor e passa para a próxima consulta válida (301)",
+   "ok": true
+  },
+  {
+   "n": "Confirmar: mensagem \"Presença confirmada.\" e botão some (status Confirmada)",
+   "ok": true
+  },
+  {
+   "n": "Lista de horários livres como opções (radio) com rótulo completo",
+   "ok": true
+  },
+  {
+   "n": "Horário escolhido anunciado como selecionado (aria-checked)",
+   "ok": true
+  },
+  {
+   "n": "Pedido enviado: aviso, caixa \"aguardando o consultório\" e consulta no horário atual",
+   "ok": true
+  },
+  {
+   "n": "Com pedido pendente, \"Pedir outro horário\" some e o motivo aparece",
+   "ok": true
+  },
+  {
+   "n": "Desistir do pedido: aviso e pedido encerrado no banco",
+   "ok": true
+  },
+  {
+   "n": "Cancelar: aviso, card sem consulta e histórico com a paciente e o motivo",
+   "ok": true
+  },
+  {
+   "n": "Sem rolagem horizontal a 390 px",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (Ana, 390 px)",
+   "ok": true
+  },
+  {
+   "n": "Padrão da clínica: só \"Confirmar presença\"; cancelar e pedir outro horário escondidos com o motivo",
+   "ok": true
+  },
+  {
+   "n": "Teleconsulta fora da janela: sem botão de entrar; diz quando a sala abre",
+   "ok": true
+  },
+  {
+   "n": "Card (teleconsulta, ações bloqueadas) sem violações WCAG 2 A/AA",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (Bruno, 390 px)",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (Bruno, 1024 px)",
+   "ok": true
+  },
+  {
+   "n": "Bruno pede outro horário pela API (202)",
+   "ok": true
+  },
+  {
+   "n": "Agenda avisa o pedido de remarcação",
+   "ok": true
+  },
+  {
+   "n": "Fila: paciente, horário atual, horário pedido, motivo e botões",
+   "ok": true
+  },
+  {
+   "n": "Tabela da fila sem violações WCAG 2 A/AA",
+   "ok": true
+  },
+  {
+   "n": "Recusar pela tela: aviso e pedido recusado no banco",
+   "ok": true
+  },
+  {
+   "n": "Configurações: seção \"Consulta no app da paciente\" com as três ações e os prazos (mínimo 1 h)",
+   "ok": true
+  },
+  {
+   "n": "Seção de Configurações sem violações WCAG 2 A/AA",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script nas telas do consultório",
+   "ok": true
+  }
+ ]
+}

@@ -111,7 +111,8 @@ step('item 2: preflight OPTIONS responde 204 sem virar 500 no ApiErrorBoundary',
 
 step('item 1: tipo video_status do app cobre exatamente os valores do servidor', function () {
     $root = dirname(__DIR__);
-    preg_match_all("/(?<!\\[)'([a-z_]+)'(?!\\])/", (string)(preg_match("/\\\$row\\['video_status'\\] = (.+);/", file_get_contents($root . '/src/Domain/PatientPortal/PatientPortalService.php'), $m) ? $m[1] : ''), $srv);
+    // NI2-137: o card da próxima consulta vem do PatientAppointmentService, que declara os valores possíveis.
+    $srv = [1 => \ClyoNutri\Domain\Appointment\PatientAppointmentService::VIDEO_STATUSES];
     preg_match("/video_status\\?: ([^;]+);/", file_get_contents($root . '/mobile/src/services/api.ts'), $ts);
     preg_match_all("/'([a-z_]+)'/", $ts[1] ?? '', $app);
     $a = array_unique($srv[1]); sort($a); $b = array_unique($app[1]); sort($b);

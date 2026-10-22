@@ -235,18 +235,23 @@ function nextDate(isoWeekday, minDays = 3) {
     const app = { json: (path, data) => appC.json(path, data, { Authorization: 'Bearer ' + marinaToken }) };
     r = await client(base).json(`/api/v1/patient/appointments/${appt.id}/cancel`, { reason: 'x' });
     check('Cancelar sem sessão de paciente: 401', r.status === 401);
+    // NI2-137: por padrão a clínica só libera confirmar; cancelar e pedir remarcação dependem de Configurações.
+    r = await app.json(`/api/v1/patient/appointments/${appt.id}/cancel`, { reason: 'x' });
+    check('Cancelar com a ação desligada pela clínica: 403 ACTION_NOT_ALLOWED', r.status === 403 && r.json.code === 'ACTION_NOT_ALLOWED', r.json);
+    page = await owner.req('/configuracoes');
+    await owner.form('/configuracoes', { _csrf_token: csrf(page.text), section: 'patient_actions', patient_can_confirm: '1', patient_can_cancel: '1', patient_can_request_reschedule: '1', patient_show_address: '1', booking_cancel_min_advance_hours: '4', booking_reschedule_min_advance_hours: '4' });
     const otherAppt = fixture('inspect').appointments.find((a) => +a.patient_id === 1);
     r = await app.json(`/api/v1/patient/appointments/${otherAppt.id}/cancel`, { reason: 'não é minha' });
-    check('Paciente não cancela consulta de outra pessoa (403)', r.status === 403);
+    check('Paciente não cancela consulta de outra pessoa (404, sem ids)', r.status === 404 && !/\d/.test(r.json.error));
     r = await app.json(`/api/v1/patient/appointments/${appt.id}/reschedule`, { new_scheduled_at: `${WED} 12:00` });
-    check('Remarcar para a pausa: recusado (409)', r.status === 409);
+    check('Pedir remarcação para a pausa: recusado (409)', r.status === 409);
     r = await app.json(`/api/v1/patient/appointments/${appt.id}/reschedule`, { new_scheduled_at: `${WED} 10:00` });
-    check('Remarcar para horário ocupado: recusado (409)', r.status === 409);
+    check('Pedir remarcação para horário ocupado: recusado (409)', r.status === 409);
     r = await app.json(`/api/v1/patient/appointments/${appt.id}/reschedule`, { new_scheduled_at: `${WED} 17:00`, reason: 'trabalho' });
     ins = fixture('inspect');
-    check('Remarcar para horário livre: 200 e consulta movida', r.status === 200 && ins.appointments.find((a) => +a.id === +appt.id).scheduled_at.startsWith(`${WED} 17:00`), r.json);
+    check('Pedir horário livre: 202, pedido pendente e consulta ainda no horário original', r.status === 202 && r.json.request.status === 'pending' && ins.appointments.find((a) => +a.id === +appt.id).scheduled_at.startsWith(`${WED} 14:00`), r.json);
     r = await anon.req(`/api/v1/booking/slots?professional_id=1&date=${WED}`);
-    check('Horário antigo (14:00) liberado e novo (17:00) ocupado', r.json.available_slots.some((s) => s.time === '14:00') && !r.json.available_slots.some((s) => s.time === '17:00'));
+    check('Pedido não move nem reserva: 14:00 segue ocupado e 17:00 segue livre', !r.json.available_slots.some((s) => s.time === '14:00') && r.json.available_slots.some((s) => s.time === '17:00'));
     r = await app.json(`/api/v1/patient/appointments/${appt.id}/cancel`, { reason: 'imprevisto' });
     check('Paciente cancela a própria consulta (200)', r.status === 200 && fixture('inspect').appointments.find((a) => +a.id === +appt.id).status === 'cancelled');
     r = await app.json(`/api/v1/patient/appointments/${appt.id}/cancel`, { reason: 'de novo' });

@@ -1,0 +1,236 @@
+{
+ "driver": "sqlite",
+ "pass": 5,
+ "fail": 27,
+ "results": [
+  {
+   "crit": "card",
+   "name": "GET /home traz a próxima consulta da Ana (201)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "card M5",
+   "name": "Lista fechada de campos (sem notes, type, professional_id, created_at, updated_at, patient_id, clinic_id)",
+   "ok": false,
+   "detail": [
+    "id",
+    "clinic_id",
+    "patient_id",
+    "professional_id",
+    "scheduled_at",
+    "duration_minutes",
+    "status",
+    "type",
+    "created_at",
+    "updated_at",
+    "professional_name",
+    "meeting_url",
+    "is_online",
+    "video_status"
+   ]
+  },
+  {
+   "crit": "card M5",
+   "name": "Observação interna da agenda não sai para a paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B4",
+   "name": "OpenAPI: NextAppointment documenta exatamente os campos devolvidos",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "card M1",
+   "name": "scheduled_at_iso com offset -03:00 e igual à hora local gravada",
+   "ok": false,
+   "detail": [
+    null,
+    "2026-10-24 00:10:00"
+   ]
+  },
+  {
+   "crit": "card M1",
+   "name": "Fuso informado: America/Sao_Paulo, \"horário de Brasília\"",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "card M2",
+   "name": "Presencial aparece como \"Presencial\" com o endereço do consultório",
+   "ok": false,
+   "detail": [
+    null,
+    null
+   ]
+  },
+  {
+   "crit": "card A1",
+   "name": "Padrão da clínica: confirmar liberado; cancelar e remarcar bloqueados com motivo",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "card M2",
+   "name": "Clínica desliga o endereço: location = null",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "card",
+   "name": "Bruno vê só a própria consulta (202)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Cancelar com a ação desligada → 403 ACTION_NOT_ALLOWED",
+   "ok": false,
+   "detail": "{\"success\":true,\"appointment_id\":201,\"status\":\"cancelled\"}"
+  },
+  {
+   "crit": "A1",
+   "name": "Autoagendamento público desligado (is_enabled = 0) e cancelamento não passou",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Horários para remarcar com a ação desligada → 403",
+   "ok": false,
+   "detail": "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/appointments\\/201\\/reschedule-options\",\"request_id\":\"7431c9170d9e26dbc823c88c\",\"code\":\"HTTP_404\"}"
+  },
+  {
+   "crit": "A1",
+   "name": "Pedido de remarcação com a ação desligada → 403",
+   "ok": false,
+   "detail": "{\"error\":\"Rota não encontrada\",\"path\":\"\\/api\\/v1\\/patient\\/appointments\\/201\\/reschedule-requests\",\"request_id\":\"23ef06a0bcbcc39c929bc94c\",\"code\":\"HTTP_404\"}"
+  },
+  {
+   "crit": "A1",
+   "name": "Rota antiga /reschedule também bloqueada (403) e a consulta não se move",
+   "ok": false,
+   "detail": [
+    409,
+    "{\"error\":\"Esta consulta não pode ser reagendada pois seu status é 'cancelled'.\",\"code\":\"INVALID_STATE\",\"request_id\":\"157c0e1d3625e3b4d3987033\"}"
+   ]
+  },
+  {
+   "crit": "erro",
+   "name": "Seção sem exceção",
+   "ok": false,
+   "detail": "TypeError: Cannot read properties of null (reading 'allowed_actions')     at /home/claude/base137/tests/ni2_137_patient_next_appointment_actions_real_test.cjs:118:205"
+  },
+  {
+   "crit": "B3",
+   "name": "Antecedência de 0 hora para cancelar é recusada no servidor",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "C1",
+   "name": "Antes: sessão de teleconsulta ativa e bilhete do portal emitido",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Motivo acima de 300 caracteres → 422",
+   "ok": false,
+   "detail": "{\"success\":true,\"appointment_id\":206,\"status\":\"cancelled\"}"
+  },
+  {
+   "crit": "B1",
+   "name": "Bruno cancela a consulta da Ana → 404 e nada muda",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "cancelar",
+   "name": "Ana cancela → 200, consulta cancelada",
+   "ok": false,
+   "detail": "{\"error\":\"Esta consulta não pode ser cancelada pois seu status é 'cancelled'.\",\"code\":\"INVALID_STATE\",\"request_id\":\"866127f062fa127e140c95aa\"}"
+  },
+  {
+   "crit": "C1",
+   "name": "Teleconsulta cancelada junto e convite revogado",
+   "ok": false,
+   "detail": {
+    "status": "scheduled",
+    "invite_revoked_at_utc": null
+   }
+  },
+  {
+   "crit": "C1",
+   "name": "Depois do cancelamento o portal não emite mais bilhete",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "erro",
+   "name": "Seção sem exceção",
+   "ok": false,
+   "detail": "Error: Command failed: php /home/claude/base137/tests/support/ni2_137_fixture.php sql SELECT from_status, to_status, changed_by_patient_id, notes FROM appointment_status_history WHERE appointment_id = 206 ORDER BY id DESC PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: changed_by_patient_id in /home/claude/base137/tests/support/ni2_137_fixture.php:87"
+  },
+  {
+   "crit": "M3",
+   "name": "Teleconsulta amanhã: sem meeting_url, video_status aguardando_horario e video_opens_at 15 min antes",
+   "ok": false,
+   "detail": [
+    211,
+    "http://app.example.test/teleconsulta/sala-espera/q.2.1.1.1792645853.WOQir7DX7tSX2aAbEizWnQ.LyvpVPTj-kxrrLFLkGnrr-U3vMyViVE_DMi76mL83bc",
+    "sala_disponivel",
+    null
+   ]
+  },
+  {
+   "crit": "M3",
+   "name": "Dentro da janela: meeting_url com bilhete da sala de espera",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "erro",
+   "name": "Seção sem exceção",
+   "ok": false,
+   "detail": "TypeError: Cannot read properties of null (reading 'id')     at /home/claude/base137/tests/ni2_137_patient_next_appointment_actions_real_test.cjs:204:87"
+  },
+  {
+   "crit": "CSRF",
+   "name": "Portal web: origem estranha → 403 e nada muda",
+   "ok": false,
+   "detail": 404
+  },
+  {
+   "crit": "CSRF",
+   "name": "Portal web: sem o cabeçalho do app → 403",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "M7",
+   "name": "Portal web confirma (200) e a auditoria registra canal portal_web",
+   "ok": false,
+   "detail": [
+    404,
+    null
+   ]
+  },
+  {
+   "crit": "B3",
+   "name": "Tela de Configurações recusa 0 hora para cancelar",
+   "ok": false,
+   "detail": [
+    "role=\"alert\" class=\"card\">Selecione uma seção válida."
+   ]
+  },
+  {
+   "crit": "erro",
+   "name": "Seção sem exceção",
+   "ok": false,
+   "detail": "Error: Command failed: php /home/claude/base137/tests/support/ni2_137_fixture.php sql SELECT patient_can_confirm, patient_can_cancel, patient_can_request_reschedule, patient_show_address, cancel_min_advance_hours, reschedule_min_advance_hours FROM booking_settings WHERE clinic_id = 1 PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such column: patient_can_confirm in /home/claude/base137/tests/support/ni2_137_fixture.php:87"
+  }
+ ]
+}

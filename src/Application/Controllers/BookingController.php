@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace ClyoNutri\Application\Controllers;
 
-use ClyoNutri\Core\Auth\MobileWebSession;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Domain\Booking\BookingConflictException;
 use ClyoNutri\Domain\Booking\BookingService;
@@ -219,88 +218,6 @@ final class BookingController
     }
 
     /**
-     * POST /api/v1/patient/appointments/{id}/cancel
-     */
-    public function cancelByPatient(array $params = []): void
-    {
-        $patientAuth = $this->getAuthenticatedPatient();
-        if (!$patientAuth) {
-            $this->respondJson(401, ['error' => 'Paciente não autenticado.', 'code' => 'UNAUTHENTICATED']);
-            return;
-        }
-
-        $appointmentId = (int)($params['id'] ?? 0);
-        $body = $this->body();
-        $reason = trim((string)($body['reason'] ?? ''));
-
-        if ($appointmentId <= 0) {
-            $this->respondJson(400, ['error' => 'ID da consulta inválido.', 'code' => 'INVALID_APPOINTMENT_ID']);
-            return;
-        }
-
-        try {
-            $result = $this->service->cancelBookingByPatient(
-                $patientAuth['clinic_id'],
-                $patientAuth['patient_id'],
-                $appointmentId,
-                $reason !== '' ? $reason : 'Cancelado pelo paciente via portal'
-            );
-            $this->respondJson(200, $result);
-        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
-            $this->respondJson(403, ['error' => $e->getMessage(), 'code' => 'FORBIDDEN']);
-        } catch (InvalidArgumentException $e) {
-            $this->respondJson(422, ['error' => $e->getMessage(), 'code' => 'POLICY_VIOLATION']);
-        } catch (\RuntimeException $e) {
-            $this->respondJson(409, ['error' => $e->getMessage(), 'code' => 'INVALID_STATE']);
-        } catch (\Throwable $e) {
-            $this->internalError($e, 'Erro ao cancelar consulta.');
-        }
-    }
-
-    /**
-     * POST /api/v1/patient/appointments/{id}/reschedule
-     */
-    public function rescheduleByPatient(array $params = []): void
-    {
-        $patientAuth = $this->getAuthenticatedPatient();
-        if (!$patientAuth) {
-            $this->respondJson(401, ['error' => 'Paciente não autenticado.', 'code' => 'UNAUTHENTICATED']);
-            return;
-        }
-
-        $appointmentId = (int)($params['id'] ?? 0);
-        $body = $this->body();
-        $newTime = trim((string)($body['new_scheduled_at'] ?? ''));
-        $reason = trim((string)($body['reason'] ?? ''));
-
-        if ($appointmentId <= 0 || $newTime === '') {
-            $this->respondJson(400, ['error' => 'new_scheduled_at é obrigatório.', 'code' => 'MISSING_NEW_TIME']);
-            return;
-        }
-
-        try {
-            $result = $this->service->rescheduleBookingByPatient(
-                $patientAuth['clinic_id'],
-                $patientAuth['patient_id'],
-                $appointmentId,
-                $newTime,
-                $reason !== '' ? $reason : 'Reagendamento solicitado pelo paciente'
-            );
-            $this->respondJson(200, $result);
-        } catch (BookingConflictException $e) {
-            $this->respondJson(409, ['error' => $e->getMessage(), 'code' => 'SLOT_CONFLICT']);
-        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
-            $this->respondJson(403, ['error' => $e->getMessage(), 'code' => 'FORBIDDEN']);
-        } catch (InvalidArgumentException $e) {
-            $this->respondJson(422, ['error' => $e->getMessage(), 'code' => 'POLICY_VIOLATION']);
-        } catch (\RuntimeException $e) {
-            $this->respondJson(409, ['error' => $e->getMessage(), 'code' => 'INVALID_STATE']);
-        } catch (\Throwable $e) {
-            $this->internalError($e, 'Erro ao reagendar consulta.');
-        }
-    }
-
-    /**
      * GET /agendar/{professionalId}: página pública contextual do profissional.
      * Sem profissional apto (inexistente, inativo ou com autoagendamento desligado): 404.
      * Não lista profissionais de outras clínicas (marketplace está fora do escopo).
@@ -327,27 +244,4 @@ final class BookingController
         require __DIR__ . '/../../../views/booking/public_booking.php';
     }
 
-    /**
-     * Paciente autenticado pelo app/portal: mesmo token e mesma validação da API do paciente
-     * (Bearer ou cookie HttpOnly com checagem de origem; token com expiração; paciente e clínica ativos).
-     */
-    private function getAuthenticatedPatient(): ?array
-    {
-        $plain = MobileWebSession::token();
-        if ($plain === null || $plain === '') {
-            return null;
-        }
-        $stmt = $this->db->prepare("
-            SELECT p.id AS patient_id, p.clinic_id
-            FROM personal_access_tokens t
-            JOIN patients p ON p.id = t.tokenable_id
-            JOIN clinics c ON c.id = p.clinic_id
-            WHERE t.tokenable_type = 'patient' AND t.clinic_id = p.clinic_id AND p.status = 'active' AND c.status = 'active'
-              AND t.token = :h AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP
-            LIMIT 1
-        ");
-        $stmt->execute(['h' => hash('sha256', $plain)]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ? ['patient_id' => (int)$row['patient_id'], 'clinic_id' => (int)$row['clinic_id']] : null;
-    }
 }

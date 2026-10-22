@@ -321,8 +321,7 @@ $router->get('/api/v1/booking/slots', [$bookingCtrl, 'getSlots']);
 $router->post('/api/v1/booking/holds', [$bookingCtrl, 'createHold']);
 $router->post('/api/v1/booking/confirm', [$bookingCtrl, 'confirmBooking']);
 $router->post('/api/v1/booking/release', [$bookingCtrl, 'releaseHold']);
-$router->post('/api/v1/patient/appointments/{id}/cancel', [$bookingCtrl, 'cancelByPatient']);
-$router->post('/api/v1/patient/appointments/{id}/reschedule', [$bookingCtrl, 'rescheduleByPatient']);
+// Cancelar/remarcar pela paciente: rotas da NI2-137 na seção da API da paciente (motor da agenda).
 
 // Onboarding Guiado e Ativação do Consultório (NI2-282)
 $router->get('/onboarding', $requireAuth([$onboardingCtrl, 'show']));
@@ -384,6 +383,11 @@ $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
 $router->post('/agenda', $requireAuth([$dashCtrl, 'saveAppointment']));
 $router->get('/agenda/{id}/reagendar', $requireAuth([$dashCtrl, 'rescheduleAppointmentForm'])); // UX-04 (v14)
+// NI2-137: pedidos de remarcação feitos pela paciente no app (aceitar/recusar).
+$changeRequestCtrl = new \ClyoNutri\Application\Controllers\AppointmentChangeRequestController();
+$router->get('/agenda/pedidos-remarcacao', $requireAuth([$changeRequestCtrl, 'index']));
+$router->post('/agenda/pedidos-remarcacao/{id}/aceitar', $requireAuth([$changeRequestCtrl, 'approve']));
+$router->post('/agenda/pedidos-remarcacao/{id}/recusar', $requireAuth([$changeRequestCtrl, 'decline']));
 $router->post('/agenda/{id}/editar', $requireAuth([$dashCtrl, 'editAppointment']));
 $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointmentStatus']));
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
@@ -927,17 +931,44 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
     echo json_encode($res);
 });
 
-// Confirmar Próxima Consulta
-$router->post('/api/v1/patient/appointment/confirm', function() use ($authenticatePatientApi, $db, $getJsonInput) {
+// Próxima consulta: ações da paciente (NI2-137). Tudo passa pelo motor da agenda e pela política da clínica.
+$patientAppointmentApi = static fn() => new \ClyoNutri\Application\Api\PatientAppointmentApiController($db);
+$router->post('/api/v1/patient/appointment/confirm', function() use ($authenticatePatientApi, $getJsonInput, $patientAppointmentApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
     $input = $getJsonInput();
-    $appointmentId = (int)($input['appointment_id'] ?? 0);
-
-    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-    $success = $apiCtrl->portal()->confirmAppointment($patientId, $appointmentId);
-    echo json_encode(['success' => $success]);
+    $patientAppointmentApi()->confirm((int)$auth['patient_id'], is_numeric($input['appointment_id'] ?? null) ? (int)$input['appointment_id'] : 0);
+});
+$router->post('/api/v1/patient/appointments/{id}/confirm', function($params = []) use ($authenticatePatientApi, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->confirm((int)$auth['patient_id'], (int)($params['id'] ?? 0));
+});
+$router->post('/api/v1/patient/appointments/{id}/cancel', function($params = []) use ($authenticatePatientApi, $getJsonInput, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->cancel((int)$auth['patient_id'], (int)($params['id'] ?? 0), $getJsonInput());
+});
+$router->get('/api/v1/patient/appointments/{id}/reschedule-options', function($params = []) use ($authenticatePatientApi, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->rescheduleOptions((int)$auth['patient_id'], (int)($params['id'] ?? 0));
+});
+$router->post('/api/v1/patient/appointments/{id}/reschedule-requests', function($params = []) use ($authenticatePatientApi, $getJsonInput, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->requestReschedule((int)$auth['patient_id'], (int)($params['id'] ?? 0), $getJsonInput());
+});
+// Rota antiga: deixou de mover a consulta na hora; agora registra o pedido (202), como a rota acima.
+$router->post('/api/v1/patient/appointments/{id}/reschedule', function($params = []) use ($authenticatePatientApi, $getJsonInput, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->requestReschedule((int)$auth['patient_id'], (int)($params['id'] ?? 0), $getJsonInput());
+});
+$router->post('/api/v1/patient/reschedule-requests/{id}/cancel', function($params = []) use ($authenticatePatientApi, $patientAppointmentApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientAppointmentApi()->withdrawRequest((int)$auth['patient_id'], (int)($params['id'] ?? 0));
 });
 
 // Obter Diário Alimentar do Paciente

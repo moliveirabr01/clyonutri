@@ -371,38 +371,48 @@ echo "\n--- [11] Isolamento Multi-Tenant Estrito ---\n";
 
 $patientInClinicA = (int)$confirmed['patient_id'];
 
-// Tentativa de paciente da Clínica A cancelar consulta de outra clínica (Clínica B)
+// NI2-137: as ações da paciente passam pelo PatientAppointmentService (motor da agenda + regras da clínica).
+$patientActions = new \ClyoNutri\Domain\Appointment\PatientAppointmentService($db, $clock);
+
+// Tentativa de paciente cancelar consulta de outra clínica: com o contexto da Clínica B, a consulta "não existe".
+\ClyoNutri\Core\Auth\TenantContext::set(2, ['id' => $patientInClinicA, 'role' => 'patient']);
 $tenantBlocked = false;
 try {
-    $bookingService->cancelBookingByPatient(2, $patientInClinicA, $appointmentId, "Tentativa indevida");
+    $patientActions->cancel($patientInClinicA, $appointmentId, "Tentativa indevida");
+} catch (\ClyoNutri\Domain\Appointment\PatientAppointmentActionException $e) {
+    $tenantBlocked = $e->errorCode === 'APPOINTMENT_NOT_FOUND' && $e->httpStatus === 404;
 } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
     $tenantBlocked = true;
 }
-assertCheck($tenantBlocked, "Acesso cross-tenant bloqueado com TenantSecurityException (403)");
+assertCheck($tenantBlocked, "Acesso cross-tenant bloqueado (consulta não encontrada, sem ids)");
 
 // =============================================================================
-// TESTE 12: Reagendamento e Cancelamento Self-Service pelo Paciente
+// TESTE 12: Pedido de remarcação e cancelamento pela paciente (NI2-137)
 // =============================================================================
-echo "\n--- [12] Reagendamento e Cancelamento Self-Service pelo Paciente ---\n";
+echo "\n--- [12] Pedido de remarcação e cancelamento pela paciente ---\n";
 
-// Reagendar de 14:00 para 16:00
-$rescheduled = $bookingService->rescheduleBookingByPatient(
-    1,
-    $patientInClinicA,
-    $appointmentId,
-    '2026-10-20 16:00:00',
-    'Troca de turno no trabalho'
-);
-assertCheck($rescheduled['success'] === true, "Reagendamento self-service realizado com sucesso");
-assertCheck($rescheduled['scheduled_at'] === '2026-10-20 16:00:00', "Novo horário persistido em appointments");
+\ClyoNutri\Core\Auth\TenantContext::set(1, ['id' => $patientInClinicA, 'role' => 'patient']);
+$blockedByDefault = false;
+try {
+    $patientActions->cancel($patientInClinicA, $appointmentId, 'sem permissão');
+} catch (\ClyoNutri\Domain\Appointment\PatientAppointmentActionException $e) {
+    $blockedByDefault = $e->errorCode === 'ACTION_NOT_ALLOWED';
+}
+assertCheck($blockedByDefault, "Cancelar pelo app fica desligado por padrão (403 ACTION_NOT_ALLOWED)");
+$bookingService->updateSettings(1, ['patient_can_cancel' => true, 'patient_can_request_reschedule' => true]);
 
-// Cancelamento da consulta pelo paciente
-$cancelled = $bookingService->cancelBookingByPatient(
-    1,
-    $patientInClinicA,
-    $appointmentId,
-    'Imprevisto familiar de última hora'
-);
+$requested = $patientActions->requestReschedule($patientInClinicA, $appointmentId, '2026-10-20 16:00:00', 'Troca de turno no trabalho');
+assertCheck($requested['request']['status'] === 'pending', "Pedido de remarcação registrado como pendente");
+$stillAt = $db->prepare("SELECT scheduled_at FROM appointments WHERE id = :id");
+$stillAt->execute(['id' => $appointmentId]);
+assertCheck($stillAt->fetchColumn() === '2026-10-20 14:00:00', "Consulta continua no horário original até o consultório aceitar");
+
+\ClyoNutri\Core\Auth\TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist']);
+$approved = $patientActions->approveRequest((int)$requested['request']['id'], 1);
+assertCheck($approved['scheduled_at'] === '2026-10-20 16:00:00', "Pedido aceito: novo horário persistido em appointments");
+
+\ClyoNutri\Core\Auth\TenantContext::set(1, ['id' => $patientInClinicA, 'role' => 'patient']);
+$cancelled = $patientActions->cancel($patientInClinicA, $appointmentId, 'Imprevisto familiar de última hora');
 assertCheck($cancelled['success'] === true && $cancelled['status'] === 'cancelled', "Consulta cancelada com sucesso pelo paciente");
 
 $checkCancel = $db->prepare("SELECT status FROM appointments WHERE id = :id");
