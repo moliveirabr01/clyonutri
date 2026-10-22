@@ -1,0 +1,46 @@
+PASS M3: documento em pt-BR com título do produto
+PASS M3: conteúdo dentro de um landmark main
+PASS B1: abas com o nome visível, sem "Aba …" no rótulo
+PASS A3: barra de abas dentro de um tablist rotulado
+PASS Aba Hoje: marcada como selecionada
+PASS Aba Hoje: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Hoje sem emoji no texto
+PASS Aba Plano: marcada como selecionada
+PASS Aba Plano: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Plano sem emoji no texto
+PASS Aba Diário: marcada como selecionada
+PASS Aba Diário: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Diário sem emoji no texto
+PASS Aba Chat: marcada como selecionada
+PASS Aba Chat: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Chat sem emoji no texto
+PASS Aba Evolução: marcada como selecionada
+PASS Aba Evolução: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Evolução sem emoji no texto
+PASS Aba Perfil: marcada como selecionada
+PASS Aba Perfil: sem violações WCAG 2.1 A/AA (axe)
+PASS M6: aba Perfil sem emoji no texto
+PASS A1: botão "Encerrar sessão" no cobre AA (#B94F1F), não no #E67A3F
+PASS A4: falha ao registrar água mostra o erro no card, com role=alert
+PASS A4: nada gravado quando a requisição falha
+PASS A4: sucesso mostra "500 ml registrados" e o total, sem role=alert
+PASS A4: banco recebeu exatamente os 500 ml
+PASS Hoje com aviso de água: sem violações WCAG 2.1 A/AA
+PASS Sem rolagem horizontal a 390 px
+PASS Sem erro de script (390 px)
+PASS A3: com 200% de zoom a aba Perfil (a última) é alcançável e abre
+PASS A3: com 200% de zoom a aba Evolução também abre
+PASS A3: a página não rola na horizontal (só a barra de abas)
+PASS Sem erro de script (zoom 200%)
+PASS A8: /app com duas abas de verdade (role=tab) num tablist rotulado
+PASS A8: /app sem violações WCAG 2.1 A/AA (axe), inclusive aria-required-children e contraste
+PASS A8: logo sem alt redundante ao lado do nome
+PASS A8: botão principal no cobre do DS (#B94F1F)
+PASS A8: seta para a direita seleciona e foca "Já tenho cadastro" e troca o painel
+PASS A8: Home volta para a primeira aba
+PASS A8: Tab sai da aba e entra no painel aberto (campo de login)
+PASS B5: foco do teclado visível nos botões (:focus-visible)
+PASS A8/M6: /app sem emoji e sem Caixa De Título nos rótulos
+PASS Sem erro de script (/app)
+
+NI2-140 (MySQL): 44 PASS, 0 FAIL

@@ -1,0 +1,7 @@
+FAIL M3: documento em pt-BR com título do produto → ["en","clyonutri-mobile"]
+FAIL M3: conteúdo dentro de um landmark main → undefined
+FAIL B1: abas com o nome visível, sem "Aba …" no rótulo → ["Aba Hoje","Aba Plano","Aba Diário","Aba Chat","Aba Evolução","Aba Perfil"]
+FAIL A3: barra de abas dentro de um tablist rotulado → undefined
+FAIL Execução sem exceção → "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('tab', { name: 'Hoje', exact: true })\n\n    at <árvore d73ce0b>/tests/ni2_140_app_web_real_test.cjs:64:60"
+
+NI2-140 (SQLite): 0 PASS, 5 FAIL

@@ -232,8 +232,12 @@ echo "  ✓ Sincronização offline idempotente validada com zero registros dupl
 // -----------------------------------------------------------------------------
 echo "[10/11] Testando NI2-140: Acessibilidade e Design System Premium...\n";
 $mobileScreen = file_get_contents(__DIR__ . '/../mobile/src/screens/PatientHomeScreen.tsx');
-assert(str_contains($mobileScreen, '#0F2747'), "Cor Navy Premium (#0F2747) deve estar presente.");
-assert(str_contains($mobileScreen, '#E67A3F'), "Cor Copper Premium (#E67A3F) deve estar presente.");
+$mobileTokens = file_get_contents(__DIR__ . '/../mobile/src/theme/tokens.ts');
+// Cores vêm dos tokens do DS. O cobre #E67A3F reprova com texto branco (2,91:1); botão usa copper-600 #B94F1F (5,0:1).
+// O cálculo de contraste de todos os pares está em tests/ni2_140_patient_app_design_a11y_test.php.
+assert(str_contains($mobileTokens, "navy: '#0F2747'"), "Cor Navy Premium (#0F2747) deve estar nos tokens.");
+assert(str_contains($mobileTokens, "copper: '#B94F1F'"), "Cor Copper do botão (#B94F1F) deve estar nos tokens.");
+assert(!str_contains($mobileScreen, "'#E67A3F'"), "A tela não pode usar #E67A3F (reprovado no contraste com texto branco).");
 assert(str_contains($mobileScreen, 'minHeight: 44'), "Alvos de toque acessíveis (minHeight: 44) devem ser respeitados.");
 assert(str_contains($mobileScreen, 'accessibilityRole'), "Propriedades de acessibilidade devem estar configuradas.");
 echo "  ✓ Layout mobile do paciente em conformidade com WCAG 2.1 AA e Design System Premium.\n";

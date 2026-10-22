@@ -209,7 +209,7 @@ assert($memUsageMb < 32, "Consumo de memória deve ser inferior a 32MB");
 // 4.2 Gate de Acessibilidade (WCAG 2.1 AA Tokens)
 // Validação dos contrastes do Design System Premium
 $navyHex = '#0F2747'; // Fundo ou texto principal
-$copperHex = '#E67A3F'; // Acento nobre
+$copperHex = '#B94F1F'; // Cobre de ação (copper-600). O #E67A3F fica só como acento decorativo, sem texto.
 $whiteHex = '#FFFFFF';
 assert(!empty($navyHex) && !empty($copperHex), "Tokens de contraste do Design System definidos");
 echo "  ✓ Design System Premium: Contraste WCAG 2.1 AA aprovado para Navy e Copper.\n\n";

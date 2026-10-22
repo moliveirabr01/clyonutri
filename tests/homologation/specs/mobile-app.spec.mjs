@@ -40,14 +40,14 @@ test('paciente ativa o primeiro acesso com o convite pelo app', async ({ page },
 
 test('registro de água no app persiste no MySQL e o logout revoga o token', async ({ page }, testInfo) => {
   await loginPatient(page);
-  await page.getByLabel('Adicionar 250 mililitros de água').click();
+  await page.getByLabel('Adicionar 250 ml de água').click();
   await expect.poll(() => Number(dbOne('SELECT COALESCE(SUM(amount_ml),0) AS ml FROM hydration_logs WHERE patient_id = ?', [patient.id]).ml), { message: 'água registrada no banco' }).toBe(250);
   await shot(page, testInfo, '33-app-agua-registrada');
 
   const activeBefore = Number(dbOne("SELECT COUNT(*) AS n FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = ?", [patient.id]).n);
   await page.getByText('Perfil', { exact: true }).last().click();
   await shot(page, testInfo, '33b-app-perfil');
-  await page.getByLabel('Encerrar sessão e revogar token').click();
+  await page.getByRole('button', { name: 'Encerrar sessão', exact: true }).click();
   await expect(page.getByLabel('Entrar como Paciente')).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => Number(dbOne("SELECT COUNT(*) AS n FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = ?", [patient.id]).n)).toBeLessThan(activeBefore);
 });
@@ -72,5 +72,5 @@ async function loginPatient(page) {
   await page.getByLabel('E-mail do paciente').fill(patient.email);
   await page.getByLabel('Senha do paciente').fill(PATIENT_PASSWORD);
   await page.getByLabel('Entrar', { exact: true }).click();
-  await expect(page.getByLabel('Adicionar 250 mililitros de água')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel('Adicionar 250 ml de água')).toBeVisible({ timeout: 20_000 });
 }

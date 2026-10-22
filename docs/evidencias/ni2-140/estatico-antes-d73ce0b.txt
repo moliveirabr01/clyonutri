@@ -1,0 +1,63 @@
+FAIL M1: tokens.navy igual a --brand-navy-900 do DS → "#0F2A44"
+PASS M1: tokens.copper igual a --brand-copper-600 do DS
+FAIL M1: tokens.background igual a --neutral-warm-50 do DS → "#F8F4ED"
+FAIL M1: tokens.success igual a --semantic-success do DS → "#047857"
+PASS A1: texto branco sobre o botão cobre: 5.00:1 (mínimo 4.5)
+PASS A1: texto branco sobre o navy: 14.63:1 (mínimo 4.5)
+PASS M2: texto auxiliar (muted) sobre branco: 4.97:1 (mínimo 4.5)
+PASS M2: texto auxiliar (muted) sobre o fundo: 4.54:1 (mínimo 4.5)
+FAIL M2: borda de campo sobre branco (1.4.11): 0.00:1 (mínimo 3.0) → {"inputBorder":null,"white":"#FFFFFF"}
+FAIL Texto de erro sobre o fundo de erro: 0.00:1 (mínimo 4.5) → {"error":"#B42318","errorBg":null}
+FAIL Texto de sucesso sobre o fundo de sucesso: 0.00:1 (mínimo 4.5) → {"success":"#047857","successBg":null}
+PASS Texto cobre (links, horários) sobre o fundo: 4.56:1 (mínimo 4.5)
+PASS Texto principal sobre o fundo: 13.39:1 (mínimo 4.5)
+FAIL A1: copperAccent continua reprovado para texto, então só pode ser decorativo
+FAIL A4: PatientHomeScreen.tsx sem Alert.alert (no web ele não aparece)
+FAIL M6: PatientHomeScreen.tsx sem emoji ou glifo no texto → "⚠"
+FAIL A1/M1/M2: PatientHomeScreen.tsx sem as cores reprovadas ou antigas → "'#047857'"
+FAIL M1: PatientHomeScreen.tsx usa o token do navy, sem o hex solto
+PASS A4: PatientOnboardingScreen.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: PatientOnboardingScreen.tsx sem emoji ou glifo no texto
+FAIL A1/M1/M2: PatientOnboardingScreen.tsx sem as cores reprovadas ou antigas → "'#E67E3A'"
+PASS M1: PatientOnboardingScreen.tsx usa o token do navy, sem o hex solto
+PASS A4: PatientChat.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: PatientChat.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: PatientChat.tsx sem as cores reprovadas ou antigas
+PASS M1: PatientChat.tsx usa o token do navy, sem o hex solto
+PASS A4: NextAppointmentCard.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: NextAppointmentCard.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: NextAppointmentCard.tsx sem as cores reprovadas ou antigas
+PASS M1: NextAppointmentCard.tsx usa o token do navy, sem o hex solto
+PASS A4: DailyCheckinCard.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: DailyCheckinCard.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: DailyCheckinCard.tsx sem as cores reprovadas ou antigas
+PASS M1: DailyCheckinCard.tsx usa o token do navy, sem o hex solto
+PASS A4: BrandLogo.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: BrandLogo.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: BrandLogo.tsx sem as cores reprovadas ou antigas
+PASS M1: BrandLogo.tsx usa o token do navy, sem o hex solto
+FAIL A2: card de Hidratação sem container accessible (os botões continuam focáveis) e com barra de progresso
+FAIL A4: registro de água com aviso na tela e anúncio para o leitor de tela
+FAIL A4: avisos de refeição, medida, privacidade e saída também são anunciados → 0
+FAIL A3: rótulo das abas com limite de ampliação (maxFontSizeMultiplier)
+FAIL A3: barra de abas no fluxo, sem altura fixa → "navBar: {\n    position: 'absolute',\n    bottom: 0,\n    left: 0,\n    right: 0,\n    height: 70,\n    backgroundColor: '#FFFFFF',\n    borderTopWidth: 1,\n    borderTopColor: '#E5E7EB',\n    flexDirection: 'row',\n    justifyContent: 'space-around',\n    alignItems: 'center',\n    paddingBottom: 
+FAIL A3: barra de abas rola na horizontal dentro de um tablist
+FAIL B1: abas sem "Aba …" no rótulo
+FAIL B4: nenhum chip com 36 px de altura
+FAIL B2: botões e títulos em caixa de frase
+FAIL B2: "Toque", não "Clique"
+FAIL M3: conteúdo com landmark main
+FAIL A2: o alerta de erro do chat fica no texto, não no container do botão "Tentar de novo"
+FAIL B6: logo com rótulo
+FAIL M3: index.html do web em pt-BR, com título do produto
+FAIL B5: foco do teclado visível no web
+FAIL A8: abas com role=tab, aria-controls e painéis
+FAIL A8: abas navegáveis por setas e Home/End
+FAIL A8: sem as cores do Tailwind reprovadas no contraste → "#c2410c"
+FAIL A8: botão do /app no cobre do DS com 4,5:1 → "#c2410c"
+FAIL A8: texto auxiliar do /app com 4,5:1
+FAIL A8: logo decorativo com alt vazio
+FAIL M6: /app sem emoji lido em voz alta → "👋"
+FAIL B2: /app em caixa de frase
+
+NI2-140 (estático): 26 PASS, 35 FAIL
