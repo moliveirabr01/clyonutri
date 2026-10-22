@@ -155,9 +155,37 @@ class PatientApiController
         return $out;
     }
 
-    public function logHydration(int $patientId, int $amountMl): array
+    public function logHydration(int $patientId, mixed $amountMl, array $options = []): array
     {
-        return $this->engagementService->logHydration($patientId, $amountMl);
+        return $this->engagementService->logHydration($patientId, $amountMl, $options);
+    }
+
+    /** NI2-92: histórico paginado por dia (mais recente primeiro). */
+    public function getHydrationHistory(int $patientId, mixed $before = null, mixed $days = null): array
+    {
+        return $this->hydration()->history($patientId, $before, $days);
+    }
+
+    /** NI2-92: correção de um registro da própria paciente (até 24 h depois de feito). */
+    public function updateHydration(int $patientId, int $entryId, array $changes): array
+    {
+        return $this->hydration()->update($patientId, $entryId, $changes);
+    }
+
+    /** NI2-92: exclusão lógica de um registro da própria paciente (até 24 h depois de feito). */
+    public function deleteHydration(int $patientId, int $entryId): array
+    {
+        return $this->hydration()->delete($patientId, $entryId);
+    }
+
+    public function getHydrationTodayTotal(int $patientId): int
+    {
+        return $this->hydration()->todayTotal($patientId);
+    }
+
+    public function hydration(): \ClyoNutri\Domain\Engagement\HydrationService
+    {
+        return new \ClyoNutri\Domain\Engagement\HydrationService($this->db);
     }
 
     public function submitCheckin(int $patientId, array $data): array

@@ -296,24 +296,57 @@
             "webSessionCookie": []
           }
         ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{8,64}$"
+            },
+            "description": "Uma chave por toque, repetida nas novas tentativas (fila offline). Mesma chave + mesmo volume → devolve o registro existente (idempotent_replay=true), sem duplicar. Mesma chave com volume diferente → 409 IDEMPOTENCY_KEY_REUSED. Também aceita no corpo como idempotency_key; o cabeçalho prevalece."
+          }
+        ],
+        "description": "Grava um registro da própria paciente (clínica e paciente vêm do token, nunca do corpo). Regras: volume 1–5000 ml por registro; teto diário de 10.000 ml no dia local (HYDRATION_DAILY_MAX_ML) → 422 HYDRATION_DAILY_LIMIT; limite de 30 escritas/minuto por paciente (HYDRATION_RATE_LIMIT_PER_MINUTE) → 429 RATE_LIMITED com Retry-After. Responde 200 (contrato mantido) também no replay idempotente. Corpo vazio ou sem amount_ml → 422 (não há mais padrão de 250 ml).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount_ml"
+                ],
+                "properties": {
+                  "amount_ml": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000,
+                    "description": "Inteiro em ml. Texto numérico inteiro (\"250\") é aceito; decimal, notação científica, booleano, negativo e zero → 422."
+                  },
+                  "logged_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Opcional. Quando a paciente bebeu. ISO 8601 (com Z, offset ou sem fuso = America/Sao_Paulo). Até 5 min no futuro; retroativo até 00h00 de 7 dias atrás (HYDRATION_BACKDATE_DAYS). Ausente = agora.",
+                    "example": "2026-10-21T21:40:00-03:00"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{8,64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "integer"
-                    },
-                    "amount_ml": {
-                      "type": "integer"
-                    },
-                    "total_water_today": {
-                      "type": "integer"
-                    }
-                  }
+                  "$ref": "#/components/schemas/HydrationResult"
                 }
               }
             }
@@ -324,26 +357,14 @@
           "403": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "amount_ml": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 5000,
-                    "default": 250
-                  }
-                }
-              }
-            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -2034,6 +2055,211 @@
           }
         }
       }
+    },
+    "/patient/hydration/history": {
+      "get": {
+        "summary": "Histórico de água por dia (paginado)",
+        "operationId": "patientHydrationHistory",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "description": "Só da própria paciente, sem registros excluídos. Agrupado pelo dia local (America/Sao_Paulo), dias e itens do mais recente para o mais antigo.",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Cursor exclusivo (YYYY-MM-DD): traz dias anteriores a esta data. Ausente = a partir de hoje."
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31,
+              "default": 7
+            },
+            "description": "Quantos dias com registro por página"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydrationHistory"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/hydration/{id}/update": {
+      "post": {
+        "summary": "Corrige um registro de água",
+        "operationId": "patientUpdateHydration",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Registro de água"
+          }
+        ],
+        "description": "Só o próprio registro, feito no app, em até 24 h após a criação. Fora da janela → 409 HYDRATION_EDIT_WINDOW_CLOSED; registro importado → 409 HYDRATION_NOT_EDITABLE; de outra paciente/clínica, inexistente ou excluído → 404 HYDRATION_NOT_FOUND (sem revelar existência). Mesmas regras de volume, horário e teto diário. Auditado (antes/depois).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "minProperties": 1,
+                "properties": {
+                  "amount_ml": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5000,
+                    "description": "Inteiro em ml. Texto numérico inteiro (\"250\") é aceito; decimal, notação científica, booleano, negativo e zero → 422."
+                  },
+                  "logged_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Opcional. Quando a paciente bebeu. ISO 8601 (com Z, offset ou sem fuso = America/Sao_Paulo). Até 5 min no futuro; retroativo até 00h00 de 7 dias atrás (HYDRATION_BACKDATE_DAYS). Ausente = agora.",
+                    "example": "2026-10-21T21:40:00-03:00"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydrationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/hydration/{id}/delete": {
+      "post": {
+        "summary": "Exclui um registro de água",
+        "operationId": "patientDeleteHydration",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Registro de água"
+          }
+        ],
+        "description": "Exclusão lógica (deleted_at): sai dos totais, do histórico e da visão do profissional, mas fica para auditoria. Mesma janela de 24 h e mesmas respostas 404/409 da correção. Repetir a exclusão devolve already_deleted=true.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HydrationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3383,6 +3609,171 @@
             }
           }
         ]
+      },
+      "HydrationEntry": {
+        "type": "object",
+        "description": "Registro de água. logged_at é o horário em que a paciente bebeu, em ISO 8601 com o offset de America/Sao_Paulo; o dia é sempre o dia local nesse fuso (21h–23h59 contam para o próprio dia, nunca para o seguinte).",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "amount_ml": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          },
+          "logged_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-21T23:30:00-03:00"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "app",
+              "import"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "true se a própria paciente ainda pode corrigir ou excluir (feito no app e criado há menos de 24 h)"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "HydrationResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/HydrationEntry"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "string",
+                "format": "date",
+                "description": "Dia local do registro"
+              },
+              "day_total_ml": {
+                "type": "integer",
+                "description": "Total do dia do registro, sem excluídos"
+              },
+              "total_water_today": {
+                "type": "integer",
+                "description": "Total de hoje (America/Sao_Paulo), sem excluídos"
+              },
+              "idempotent_replay": {
+                "type": "boolean",
+                "description": "true quando a mesma Idempotency-Key já tinha sido gravada: nada novo foi criado"
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "already_deleted": {
+                "type": "boolean"
+              },
+              "previous_day": {
+                "type": "string",
+                "format": "date",
+                "description": "Só na correção: dia antes da mudança"
+              }
+            }
+          }
+        ]
+      },
+      "HydrationHistory": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "example": "America/Sao_Paulo"
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "today_total_ml": {
+            "type": "integer"
+          },
+          "goal_ml": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Meta da anamnese FINALIZADA mais recente; rascunho nunca vira meta. null = sem meta prescrita"
+          },
+          "daily_max_ml": {
+            "type": "integer",
+            "description": "Teto diário (padrão 10000, HYDRATION_DAILY_MAX_ML)"
+          },
+          "edit_window_hours": {
+            "type": "integer",
+            "example": 24
+          },
+          "backdate_days": {
+            "type": "integer",
+            "example": 7
+          },
+          "days": {
+            "type": "array",
+            "description": "Só dias com registro, mais recente primeiro",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "total_ml": {
+                  "type": "integer"
+                },
+                "entries_count": {
+                  "type": "integer"
+                },
+                "goal_ml": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "goal_reached": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "entries": {
+                  "type": "array",
+                  "description": "Mais recente primeiro",
+                  "items": {
+                    "$ref": "#/components/schemas/HydrationEntry"
+                  }
+                }
+              }
+            }
+          },
+          "next_before": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Cursor da próxima página (passe em ?before=); null = fim"
+          }
+        }
       }
     }
   }
