@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Migration 48 (NI2-92): registro de hidratação com histórico, edição e idempotência.
+ * Migration 50 (NI2-92; era a 48 antes do rebase sobre a NI2-138 e a NI2-96): registro de hidratação com histórico, edição e idempotência.
  *
  * - hydration_logs.idempotency_key: a mesma operação do app (toque + reenvios) grava uma linha só.
  *   Índice único (clinic_id, patient_id, idempotency_key); linhas antigas ficam com NULL (permitido em duplicidade).

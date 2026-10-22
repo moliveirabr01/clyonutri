@@ -192,8 +192,8 @@ check('profissional de outra clínica não vê (TenantGuard)', code(fn() => $svc
 
 echo "[10] LGPD e migração\n";
 check('exportação LGPD omite idempotency_key', \ClyoNutri\Domain\Privacy\LgpdService::EXPORTED_TABLES['hydration_logs'] === ['idempotency_key']);
-require_once __DIR__ . '/../database/migrations/2026_10_22_000048_harden_hydration_logs.php';
-check('migração 48 reexecutável sem erro', code(fn() => (new HardenHydrationLogs())->up($db)) === 'OK');
+require_once __DIR__ . '/../database/migrations/2026_10_22_000050_harden_hydration_logs.php';
+check('migração 50 reexecutável sem erro', code(fn() => (new HardenHydrationLogs())->up($db)) === 'OK');
 
 echo "\nNI2-92 regras: {$pass} PASS, {$fail} FAIL\n";
 exit($fail === 0 ? 0 : 1);

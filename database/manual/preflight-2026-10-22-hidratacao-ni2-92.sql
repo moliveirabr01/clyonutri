@@ -11,7 +11,7 @@ SET @idx = (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
   AND INDEX_NAME IN ('uq_hydration_operation','idx_hydration_patient_day'));
 SET @m47 = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'appointment_change_requests');
 SELECT
-  CASE WHEN @cols = 4 AND @idx = 2 THEN 'OK — migração 48 já aplicada'
+  CASE WHEN @cols = 4 AND @idx = 2 THEN 'OK — migração 50 já aplicada'
        WHEN @base = 4 THEN 'OK — PRONTO PARA MIGRAR'
        ELSE 'FALHA — tabelas base ausentes ou fora do InnoDB' END AS preflight_status,
   (@base = 4) AS pronto_para_migrar, (@cols = 4 AND @idx = 2) AS migracao_ja_aplicada, @m47 AS migracao_47_aplicada,
