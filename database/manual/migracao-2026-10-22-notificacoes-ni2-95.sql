@@ -1,12 +1,14 @@
 -- ============================================================================
--- ClyoNutri — Migração Manual 49 (NI2-95 · Notificações: avisos, preferências e fila)
--- Equivale a database/migrations/2026_10_22_000049_create_notification_domain.php.
--- Rodar no phpMyAdmin DEPOIS do backup, do preflight (preflight-2026-10-22-notificacoes-ni2-95.sql)
--- e da migração 48. Idempotente: pode rodar de novo sem efeito.
--- Efeito nos dados: só cria 4 tabelas vazias. Nada existente é alterado.
+-- ClyoNutri — Migração Manual 51 (NI2-95 · Notificações: avisos, preferências, fila, push e lembrete)
+-- Equivale a database/migrations/2026_10_22_000051_create_notification_domain.php.
+-- Ordem: 48 (chat NI2-138) → 49 (adesão NI2-96) → 50 (hidratação NI2-92) → esta 51.
+-- Rodar no phpMyAdmin DEPOIS do backup e do preflight (preflight-2026-10-22-notificacoes-ni2-95.sql).
+-- Idempotente: pode rodar de novo sem efeito.
+-- Efeito nos dados: só cria 7 tabelas vazias e índices nelas. Nada existente é alterado.
 --  * Preferências antigas do chat (chat_preferences) continuam valendo até a pessoa salvar as novas.
 --  * A tabela antiga `notifications` não é tocada (nunca foi usada pelo sistema).
---  * Depois de aplicar, o cron de 15 min passa a criar lembretes de consulta (~24 h antes) e a enviar a fila.
+--  * Depois de aplicar, o cron passa a criar lembretes de consulta (24 h antes, ou o que a clínica escolher
+--    em Configurações) e a enviar a fila. O push só sai com PUSH_ENABLED=true no .env.
 -- ============================================================================
 SET NAMES utf8mb4;
 SET @db = DATABASE();
@@ -90,7 +92,60 @@ SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `notification_quiet_hours`
 SET @q = REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT'));
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
--- 5. Índices (caso alguma tabela já exista de uma tentativa anterior sem eles).
+-- 5. Aparelhos da paciente para o aviso no celular (Expo Push). Um token = um aparelho.
+SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `notification_push_tokens` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `recipient_type` VARCHAR(20) NOT NULL,
+  `recipient_id` INT NOT NULL,
+  `token` VARCHAR(255) NOT NULL,
+  `platform` VARCHAR(16) NOT NULL DEFAULT ''unknown'',
+  `active` INT NOT NULL DEFAULT 1,
+  `last_error` VARCHAR(60) NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `last_sent_at` DATETIME NULL,
+  UNIQUE KEY `uq_notification_push_tokens_token` (`token`),
+  KEY `idx_notification_push_tokens_owner` (`clinic_id`, `recipient_type`, `recipient_id`, `active`),
+  CONSTRAINT `fk_notification_push_tokens_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT'));
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- 6. Recibos do Expo de cada push enviado (o cron confere depois de 15 min).
+SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `notification_push_tickets` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `delivery_id` INT NOT NULL,
+  `token_id` INT NOT NULL,
+  `ticket_id` VARCHAR(64) NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT ''pending'',
+  `error` VARCHAR(60) NULL,
+  `created_at` DATETIME NOT NULL,
+  `checked_at` DATETIME NULL,
+  KEY `idx_notification_push_tickets_receipt` (`status`, `created_at`),
+  CONSTRAINT `fk_notification_push_tickets_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notification_push_tickets_delivery` FOREIGN KEY (`delivery_id`) REFERENCES `notification_deliveries`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notification_push_tickets_token` FOREIGN KEY (`token_id`) REFERENCES `notification_push_tokens`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT'));
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- 7. Antecedência do lembrete de consulta (1 a 72 h). professional_id = 0 é o padrão da clínica.
+SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `notification_reminder_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `professional_id` INT NOT NULL DEFAULT 0,
+  `lead_hours` INT NOT NULL,
+  `updated_by` INT NULL,
+  `updated_at` DATETIME NOT NULL,
+  UNIQUE KEY `uq_notification_reminder_settings` (`clinic_id`, `professional_id`),
+  CONSTRAINT `fk_notification_reminder_settings_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT'));
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- 8. Índices (caso alguma tabela já exista de uma tentativa anterior sem eles).
 SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_events') = 1
   AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_events' AND INDEX_NAME = 'uq_notification_events_dedupe') = 0,
   'CREATE UNIQUE INDEX `uq_notification_events_dedupe` ON `notification_events` (`clinic_id`, `recipient_type`, `recipient_id`, `dedupe_key`)', 'DO 0');
@@ -115,15 +170,38 @@ SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA =
   AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_quiet_hours' AND INDEX_NAME = 'uq_notification_quiet_hours') = 0,
   'CREATE UNIQUE INDEX `uq_notification_quiet_hours` ON `notification_quiet_hours` (`clinic_id`, `recipient_type`, `recipient_id`)', 'DO 0');
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
-
-SET @ok = ((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db
-    AND TABLE_NAME IN ('notification_events','notification_deliveries','notification_preferences','notification_quiet_hours')) = 4
-  AND (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db
-    AND INDEX_NAME IN ('uq_notification_events_dedupe','idx_notification_events_inbox','uq_notification_deliveries_channel',
-                       'idx_notification_deliveries_queue','uq_notification_preferences','uq_notification_quiet_hours')) = 6);
-SET @q = IF(@ok, CONCAT('INSERT INTO `migrations` (`migration`, `executed_at`) SELECT ''2026_10_22_000049_create_notification_domain'', CURRENT_TIMESTAMP FROM DUAL ',
-  'WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = ''2026_10_22_000049_create_notification_domain'')'), 'DO 0');
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_events') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_events' AND INDEX_NAME = 'idx_notification_events_retention') = 0,
+  'CREATE INDEX `idx_notification_events_retention` ON `notification_events` (`read_at`)', 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tokens') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tokens' AND INDEX_NAME = 'uq_notification_push_tokens_token') = 0,
+  'CREATE UNIQUE INDEX `uq_notification_push_tokens_token` ON `notification_push_tokens` (`token`)', 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tokens') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tokens' AND INDEX_NAME = 'idx_notification_push_tokens_owner') = 0,
+  'CREATE INDEX `idx_notification_push_tokens_owner` ON `notification_push_tokens` (`clinic_id`, `recipient_type`, `recipient_id`, `active`)', 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tickets') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_push_tickets' AND INDEX_NAME = 'idx_notification_push_tickets_receipt') = 0,
+  'CREATE INDEX `idx_notification_push_tickets_receipt` ON `notification_push_tickets` (`status`, `created_at`)', 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_reminder_settings') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_reminder_settings' AND INDEX_NAME = 'uq_notification_reminder_settings') = 0,
+  'CREATE UNIQUE INDEX `uq_notification_reminder_settings` ON `notification_reminder_settings` (`clinic_id`, `professional_id`)', 'DO 0');
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
-SELECT IF(@ok, 'OK — migração 49 aplicada (avisos, preferências e fila de notificações)', 'FALHA — ver preflight') AS resultado,
-  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_22_000049_create_notification_domain') AS registrada_em_migrations;
+SET @ok = ((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db
+    AND TABLE_NAME IN ('notification_events','notification_deliveries','notification_preferences','notification_quiet_hours',
+                       'notification_push_tokens','notification_push_tickets','notification_reminder_settings')) = 7
+  AND (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db
+    AND INDEX_NAME IN ('uq_notification_events_dedupe','idx_notification_events_inbox','uq_notification_deliveries_channel',
+                       'idx_notification_deliveries_queue','uq_notification_preferences','uq_notification_quiet_hours',
+                       'idx_notification_events_retention','uq_notification_push_tokens_token','idx_notification_push_tokens_owner',
+                       'idx_notification_push_tickets_receipt','uq_notification_reminder_settings')) = 11);
+SET @q = IF(@ok, CONCAT('INSERT INTO `migrations` (`migration`, `executed_at`) SELECT ''2026_10_22_000051_create_notification_domain'', CURRENT_TIMESTAMP FROM DUAL ',
+  'WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = ''2026_10_22_000051_create_notification_domain'')'), 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SELECT IF(@ok, 'OK — migração 51 aplicada (avisos, preferências, fila, push e lembrete de consulta)', 'FALHA — ver preflight') AS resultado,
+  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_22_000051_create_notification_domain') AS registrada_em_migrations;
