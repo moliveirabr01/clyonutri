@@ -30,13 +30,15 @@
       --admin-gray-700: #334155;
       --admin-gray-800: #1e293b;
       --admin-gray-900: #0f172a;
-      --admin-success: #16a34a;
+      /* Semânticos = os mesmos do DS (clinical-botanical.css). Os Tailwind 600 de antes
+         ficavam abaixo de 4,5:1 como texto (sucesso 3,3; alerta 3,2; info 4,1). NI2-25. */
+      --admin-success: #18794E;
       --admin-success-bg: #dcfce7;
-      --admin-warning: #d97706;
+      --admin-warning: #946200;
       --admin-warning-bg: #fef3c7;
-      --admin-danger: #dc2626;
+      --admin-danger: #B42318;
       --admin-danger-bg: #fee2e2;
-      --admin-info: #0284c7;
+      --admin-info: #175CD3;
       --admin-info-bg: #e0f2fe;
     }
 

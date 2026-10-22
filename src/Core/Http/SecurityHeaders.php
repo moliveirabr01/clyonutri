@@ -81,8 +81,9 @@ final class SecurityHeaders
             'script-src ' . implode(' ', array_unique($script)),
             "script-src-attr 'none'",
             // style-src com 'unsafe-inline': ~1.600 atributos style="" nas telas; exceção documentada (NI2-429).
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com data:",
+            "style-src 'self' 'unsafe-inline'",
+            // Fontes servidas do próprio domínio (NI2-25): nada de Google Fonts, nenhum IP de visitante sai para terceiro.
+            "font-src 'self' data:",
             "img-src 'self' data: blob:",
             "media-src 'self' blob:",
             'connect-src ' . implode(' ', array_unique(array_merge(["'self'"], self::$extraFrame))),

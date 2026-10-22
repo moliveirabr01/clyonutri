@@ -7,9 +7,8 @@
   <title><?= htmlspecialchars($pageTitle ?? 'Política de Privacidade & LGPD — ClyoNutri II') ?></title>
   <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Diretrizes de proteção de dados, privacidade e segurança da informação em conformidade com a LGPD.') ?>">
   <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl ?? 'https://clyonutri.com.br/privacidade') ?>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/landing-premium.css">
   <style>
     .legal-page {

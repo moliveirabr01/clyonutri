@@ -41,6 +41,11 @@ DirectoryIndex index.php index.html
     RewriteRule ^ index.php [L]
 </IfModule>
 
+# Fontes próprias (NI2-25): garante o MIME certo do woff2 mesmo em Apache sem a entrada.
+<IfModule mod_mime.c>
+    AddType font/woff2 .woff2
+</IfModule>
+
 # Bloqueia dotfiles (.env, .htaccess, .git etc.)
 # v10 (2.2): dumps, backups, bancos, logs e configs nunca são servidos, mesmo se forem parar em public/.
 <FilesMatch "(?i)(\.(sql|sqlite3?|db|zip|tar|gz|tgz|rar|7z|bak|old|orig|save|swp|tmp|log|ini|conf|env|sh|lock|dist|phar|md)$|^error_log$|^composer\.(json|lock)$)">
