@@ -33,6 +33,8 @@ class LgpdService
         'teleconsultation_sessions' => ['external_room_id', 'external_room_url', 'external_room_name', 'patient_token_hash', 'professional_token_hash', 'token_generation', 'token_issued_at', 'token_expires_at', 'token_revoked_at', 'invite_generation', 'invite_issued_at_utc', 'invite_revoked_at_utc'],
         'patient_packages' => [],
         'data_subject_requests' => [],
+        'patient_goals' => [],
+        'patient_self_metric_permissions' => [],
     ];
 
     /** Tabelas com patient_id que NÃO entram no pacote, e por quê (revisar com o jurídico). */

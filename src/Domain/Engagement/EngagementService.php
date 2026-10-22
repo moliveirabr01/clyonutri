@@ -29,14 +29,17 @@ class EngagementService
             throw new \InvalidArgumentException('Informe um volume de água entre ' . self::HYDRATION_MIN_ML . ' e ' . self::HYDRATION_MAX_ML . ' ml.');
         }
 
+        // Horário no fuso da aplicação: o total "de hoje" (date(logged_at) = hoje) usa o mesmo fuso.
+        // Com CURRENT_TIMESTAMP (UTC no SQLite), registros feitos depois das 21h contavam para o dia seguinte.
         $stmt = $this->db->prepare("
             INSERT INTO hydration_logs (clinic_id, patient_id, amount_ml, logged_at)
-            VALUES (:clinic_id, :patient_id, :amount_ml, CURRENT_TIMESTAMP)
+            VALUES (:clinic_id, :patient_id, :amount_ml, :logged_at)
         ");
         $stmt->execute([
             'clinic_id' => $clinicId,
             'patient_id' => $patientId,
             'amount_ml' => $amountMl,
+            'logged_at' => (new \DateTimeImmutable('now', new \DateTimeZone(date_default_timezone_get())))->format('Y-m-d H:i:s'),
         ]);
 
         return [

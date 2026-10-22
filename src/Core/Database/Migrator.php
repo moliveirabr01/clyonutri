@@ -52,7 +52,8 @@ class Migrator
             $migrationName = basename($file, '.php');
             if (in_array($migrationName, $applied, true)) {
                 if ($migrationName === '2026_10_15_000040_create_consultation_note_drafts') {
-                    require_once $file;
+                    // A classe pode já ter sido carregada de outro diretório no mesmo processo (gate de upgrade).
+                    if (!class_exists('CreateConsultationNoteDrafts', false)) require_once $file;
                     if (class_exists('CreateConsultationNoteDrafts') && method_exists('CreateConsultationNoteDrafts', 'ensureRestrictForeignKeys')) {
                         \CreateConsultationNoteDrafts::ensureRestrictForeignKeys($this->db);
                     }

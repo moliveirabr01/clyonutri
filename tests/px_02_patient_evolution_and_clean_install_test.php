@@ -173,6 +173,10 @@ try {
     TenantContext::set($clinicIdAlfa, ['id' => $patientIdAlfa, 'role' => 'patient', 'name' => 'Larissa']);
     $portalServiceAlfa = new PatientPortalService($mainDb);
 
+    // NI2-135: o profissional libera peso e cintura para esta paciente (quadril fica bloqueado).
+    $mainDb->exec("INSERT INTO patient_self_metric_permissions (clinic_id, patient_id, metric_type, enabled, updated_at) VALUES
+        ({$clinicIdAlfa}, {$patientIdAlfa}, 'weight_kg', 1, CURRENT_TIMESTAMP), ({$clinicIdAlfa}, {$patientIdAlfa}, 'waist_cm', 1, CURRENT_TIMESTAMP)");
+
     // 4.1 Inserção do primeiro autorrelato (peso)
     $metric1 = $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'weight_kg', 64.5, 'kg', 'Medido após acordar em jejum');
 
@@ -309,14 +313,41 @@ try {
     }
     assertPx02($emptyTypeBlocked, "Deveria rejeitar metric_type vazio");
 
-    // 7.4 Unidade vazia
-    $emptyUnitBlocked = false;
+    // 7.4 Unidade incompatível com a métrica (NI2-135); unidade vazia passa a usar a do catálogo.
+    $badUnitBlocked = false;
     try {
-        $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'weight_kg', 70.0, '  ');
+        $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'weight_kg', 70.0, 'lb');
     } catch (\InvalidArgumentException $e) {
-        $emptyUnitBlocked = true;
+        $badUnitBlocked = true;
     }
-    assertPx02($emptyUnitBlocked, "Deveria rejeitar unit vazia");
+    assertPx02($badUnitBlocked, "Deveria rejeitar unidade incompatível (lb para peso)");
+    $defaultUnit = $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'weight_kg', 70.0, '  ');
+    assertPx02($defaultUnit['unit'] === 'kg', "Unidade vazia deve virar a do catálogo (kg)");
+
+    // 7.5 Fora da faixa plausível
+    $rangeBlocked = false;
+    try {
+        $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'weight_kg', 4000.0, 'kg');
+    } catch (\InvalidArgumentException $e) {
+        $rangeBlocked = true;
+    }
+    assertPx02($rangeBlocked, "Deveria rejeitar peso de 4000 kg");
+
+    // 7.6 Métrica não liberada pelo profissional e métrica fora do catálogo
+    $notEnabled = false;
+    try {
+        $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'hip_cm', 95.0, 'cm');
+    } catch (\ClyoNutri\Domain\Evolution\SelfMetricNotEnabledException $e) {
+        $notEnabled = true;
+    }
+    assertPx02($notEnabled, "Deveria rejeitar métrica não liberada (quadril)");
+    $unknown = false;
+    try {
+        $portalServiceAlfa->recordSelfMetric($patientIdAlfa, 'pressao_inventada', 120.0, 'mmHg');
+    } catch (\InvalidArgumentException $e) {
+        $unknown = true;
+    }
+    assertPx02($unknown, "Deveria rejeitar métrica fora do catálogo");
 
     logPx02Pass("INPUT_VALIDATION", "Validações negativas impedem valores nulos, negativos ou vazios", "InvalidArgumentException lançado corretamente");
 

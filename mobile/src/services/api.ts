@@ -223,26 +223,40 @@ export interface FoodDiaryEntry {
   reviewed_at?: string;
 }
 
+export interface EvolutionMetric { type: string; label: string; unit: string; min: number; max: number; decimals: number; }
+export interface EvolutionGoal {
+  id: number; metric_type: string; label: string; target_value: number; unit: string; direction: string; direction_label: string;
+  target_date: string | null; message_for_patient: string | null; status: string;
+  latest_clinical: { date: string; value: number } | null; latest_self_report: { date: string; value: number } | null;
+}
 export interface EvolutionData {
   patient_id: number;
+  period?: { from: string | null; to: string | null };
   clinical_records: Array<{
     id: number;
     date: string;
-    weight_kg?: number;
-    height_cm?: number;
-    bmi?: number;
-    waist_cm?: number;
+    weight_kg?: number | null;
+    height_cm?: number | null;
+    bmi?: number | null;
+    waist_cm?: number | null;
+    hip_cm?: number | null;
     source: string;
+    source_label?: string;
   }>;
   self_reports: Array<{
     id: number;
     date: string;
     metric_type: string;
+    label?: string;
     value: number;
     unit: string;
-    notes?: string;
+    notes?: string | null;
     source: string;
+    source_label?: string;
   }>;
+  series?: Array<{ type: string; label: string; unit: string; points: Array<{ date: string; value: number; source: string }> }>;
+  enabled_metrics?: EvolutionMetric[];
+  goals?: EvolutionGoal[];
 }
 
 let currentAuthToken: string | null = null;
@@ -441,13 +455,13 @@ export const ApiService = {
     return response.data;
   },
 
-  async getEvolution(): Promise<EvolutionData> {
-    const data = await request<EvolutionData>('/api/v1/patient/evolution');
+  async getEvolution(from?: string | null): Promise<EvolutionData> {
+    const data = await request<EvolutionData>('/api/v1/patient/evolution' + (from ? '?from=' + encodeURIComponent(from) : ''));
     if (!Array.isArray(data.clinical_records) || !Array.isArray(data.self_reports)) throw new ApiError('Resposta da evolução inválida. Tente novamente.', 200, 'invalid');
     return data;
   },
 
-  async logSelfMetric(metric: { metric_type: string; value: number; unit?: string; notes?: string }) {
+  async logSelfMetric(metric: { metric_type: string; value: number; unit?: string; notes?: string }): Promise<{ id: number; value: number; unit: string; label: string; recorded_at: string }> {
     return request('/api/v1/patient/self-metrics', {
       method: 'POST',
       body: JSON.stringify(metric),

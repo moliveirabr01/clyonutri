@@ -1,0 +1,17 @@
+ok     P1: autorrelato com tipo e unidade arbitrários ("pressao_arterial_inventada", "xyz") → HTTP 422
+ok     P2: peso autorrelatado de 4000 kg → HTTP 422
+ok     P3: tipo weight_kg com unidade "lb" (incoerente) → HTTP 422
+ok     P4: observação de 100.000 caracteres → HTTP 422
+ok     P5: sem metric_type nem unit, o servidor assume peso em kg → HTTP 422, tipo "undefined"
+ok     P6: horário devolvido na criação "2026-10-21 22:41:06" x gravado "2026-10-21 22:41:06" (UTC); a avaliação clínica usa o fuso da aplicação
+ok     P7: GET /evolution devolve à paciente a observação interna (notes) da avaliação liberada
+ok     P8: avaliação NÃO liberada (is_shared = 0) não aparece para a paciente
+ok     P9: filtro temporal: sem filtro 2 registros; com from/to em 2030 0 registros (parâmetros ignorados; não há filtro na API)
+ok     P10: Bruno não vê autorrelatos nem avaliações da Ana
+ok     P11: resposta da evolução não tem metas (chaves: patient_id, period, clinical_records, self_reports, series, enabled_metrics, goals, summary)
+ok     P12: resposta de /evolution sem paginação nem limite: 1059 bytes (inclui a observação de 100 mil caracteres)
+ok     P13: tela do app não oferece registrar autorrelato (ApiService.logSelfMetric existe, mas a tela não usa)
+ok     P14: aba Evolução não tem gráfico (só lista de cartões)
+ok     P15: aba Evolução não tem filtro de período
+ok     P16: tela mostra o código técnico do tipo (ex.: "weight_kg") e a data crua do banco, sem formatar nem converter o fuso
+ok     P17: nenhuma tela do profissional mostra os autorrelatos da paciente

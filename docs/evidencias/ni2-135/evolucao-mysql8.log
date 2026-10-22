@@ -1,0 +1,54 @@
+PASS [permissão] Sem liberação do nutricionista: peso → 403 METRIC_NOT_ENABLED e nada gravado
+PASS [permissão] Evolução informa que não há medidas liberadas
+PASS [permissão] Recepção não libera medidas (403)
+PASS [permissão] Sem CSRF válido → 403
+PASS [permissão] Medida fora do catálogo é recusada e nada muda
+PASS [permissão] Nutricionista libera peso e cintura
+PASS [permissão] Liberação auditada com autor
+PASS [permissão] Nutricionista de outra clínica não altera a paciente
+PASS [autorrelato] Evolução lista as medidas liberadas com unidade e faixa
+PASS [autorrelato] Peso liberado → 201, unidade do catálogo e valor arredondado
+PASS [autorrelato] Horário gravado no fuso do consultório (igual ao devolvido)
+PASS [autorrelato] Recusado: peso 4000 kg → 422
+PASS [autorrelato] Recusado: peso 10 kg → 422
+PASS [autorrelato] Recusado: peso em lb → 422
+PASS [autorrelato] Recusado: tipo inventado → 422
+PASS [autorrelato] Recusado: quadril não liberado → 403
+PASS [autorrelato] Recusado: observação de 501 caracteres → 422
+PASS [autorrelato] Recusado: valor não numérico → 422
+PASS [autorrelato] Recusado: sem valor → 422
+PASS [autorrelato] Recusado: sem tipo → 422
+PASS [autorrelato] Nenhuma tentativa inválida gravou registro
+PASS [autorrelato] Cintura liberada → 201 em cm
+PASS [autorrelato] Liberação é por paciente: Bruno sem liberação → 403
+PASS [evolução] Série de peso combina avaliação do nutricionista e autorrelato, cada ponto com a fonte
+PASS [evolução] Pontos em ordem cronológica
+PASS [evolução] Rótulos legíveis e fonte por extenso
+PASS [evolução] Anotação interna do profissional continua fora da resposta
+PASS [evolução] Filtro de 3 meses exclui a avaliação de janeiro
+PASS [evolução] Período fechado (jan/2026) só traz o que está nele
+PASS [evolução] Data inválida no filtro → 422
+PASS [evolução] Início depois do fim → 422
+PASS [evolução] Bruno não vê registros nem metas da Ana
+PASS [metas] Recepção não cria meta (403)
+PASS [metas] Meta recusada: valor fora da faixa
+PASS [metas] Meta recusada: data no passado
+PASS [metas] Meta recusada: medida fora do catálogo
+PASS [metas] Meta recusada: direção inválida
+PASS [metas] Nutricionista cria meta (valor com vírgula, data futura, mensagem)
+PASS [metas] Paciente vê a meta com o último registro de cada fonte, sem "quanto falta"
+PASS [metas] Mensagem do nutricionista chega à paciente
+PASS [metas] Meta da Ana não aparece para o Bruno
+PASS [metas] Nutricionista marca a meta como atingida
+PASS [metas] Meta encerrada não muda de novo
+PASS [metas] Meta encerrada sai da lista da paciente (fica no histórico do profissional)
+PASS [metas] Criação e encerramento auditados com autor
+PASS [profissional] Perfil mostra a seção "Evolução no app da paciente"
+PASS [profissional] Perfil lista os autorrelatos da paciente (valor, medida e observação)
+PASS [profissional] Perfil mostra a meta com status e histórico
+PASS [profissional] Caixas de liberação refletem o que está liberado
+PASS [profissional] Recepção vê a seção sem os formulários de alteração
+PASS [permissão] Peso deixa de ser liberado: novo registro → 403; anteriores continuam visíveis
+PASS [lgpd] Pacote de portabilidade inclui metas e liberações
+
+NI2-135 (MySQL): 52 PASS, 0 FAIL

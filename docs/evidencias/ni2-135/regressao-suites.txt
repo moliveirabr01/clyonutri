@@ -17,7 +17,7 @@ PASS tests/chat_secure_communication_and_engagement_e2e_test.php
 PASS tests/clinical_safety_and_precision_test.php
 PASS tests/cross_tenant_end_to_end_security_test.php
 PASS tests/cross_tenant_offensive_test.php
-FAIL tests/dashboard_review_fixes_test.php
+PASS tests/dashboard_review_fixes_test.php
 PASS tests/delivery_e2e_and_contracts_test.php
 PASS tests/demo_seeder_and_runtime_seed_protection_test.php
 FAIL tests/food_catalog_pagination_test.php
@@ -72,7 +72,7 @@ PASS tests/px_03_onboarding_birthdate_gender_optional_test.php
 PASS tests/px_04_adherence_real_calculation_and_empty_state_test.php
 PASS tests/px_07_accessible_clinical_fields_dom_test.php
 PASS tests/px_12_financial_empty_state_and_operations_test.php
-PASS tests/px_13_clinical_language_and_enum_sanitization_test.php
+FAIL tests/px_13_clinical_language_and_enum_sanitization_test.php
 PASS tests/px_20_prescribed_water_goal_and_empty_state_test.php
 PASS tests/px_29_password_reset_and_access_recovery_test.php
 PASS tests/reauditoria_v2_01_prescribe_form_idor_test.php

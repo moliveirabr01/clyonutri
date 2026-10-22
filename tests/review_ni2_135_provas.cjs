@@ -34,6 +34,8 @@ const say = (id, defect, text) => console.log(`${defect ? 'ACHADO' : 'ok    '} $
     const login = async (email) => (await (await fetch(B + '/api/v1/auth/patient-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'PacienteTeste@2026' }) })).json()).token;
     const ana = await login('ana@example.test'), bruno = await login('bruno@example.test');
 
+    // A paciente tem peso liberado pelo profissional (a partir da correção, nada fica liberado por padrão).
+    try { phpRun(`$db->exec("INSERT INTO patient_self_metric_permissions (clinic_id, patient_id, metric_type, enabled, updated_at) VALUES (1, 1, 'weight_kg', 1, CURRENT_TIMESTAMP)");`); } catch { /* árvore antiga: tabela não existe */ }
     // P1 campos habilitados
     let r = await call('POST', '/api/v1/patient/self-metrics', ana, { metric_type: 'pressao_arterial_inventada', value: 999, unit: 'xyz' });
     say('P1', r.status === 201, `autorrelato com tipo e unidade arbitrários ("pressao_arterial_inventada", "xyz") → HTTP ${r.status}`);
@@ -47,8 +49,9 @@ const say = (id, defect, text) => console.log(`${defect ? 'ACHADO' : 'ok    '} $
     say('P5', r.status === 201 && r.json && r.json.metric_type === 'weight_kg', `sem metric_type nem unit, o servidor assume peso em kg → HTTP ${r.status}, tipo "${r.json && r.json.metric_type}"`);
 
     // P6 horário do autorrelato
+    r = await call('POST', '/api/v1/patient/self-metrics', ana, { metric_type: 'weight_kg', value: 63.4 });
     const lastId = r.json && r.json.id;
-    const stored = sql(`SELECT recorded_at FROM patient_self_metrics WHERE id = ${lastId}`)[0].recorded_at;
+    const stored = lastId ? sql(`SELECT recorded_at FROM patient_self_metrics WHERE id = ${lastId}`)[0].recorded_at : null;
     say('P6', r.json && stored !== r.json.recorded_at, `horário devolvido na criação "${r.json && r.json.recorded_at}" x gravado "${stored}" (UTC); a avaliação clínica usa o fuso da aplicação`);
 
     // P7 evolução: notas internas e avaliações não liberadas

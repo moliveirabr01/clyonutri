@@ -1,0 +1,61 @@
+{
+ "checks": [
+  {
+   "n": "Meta visível com último registro de cada fonte",
+   "ok": true
+  },
+  {
+   "n": "Gráfico de peso com resumo acessível (role=img)",
+   "ok": true
+  },
+  {
+   "n": "Resumo diz número de registros, fontes, primeiro/último e meta",
+   "ok": true
+  },
+  {
+   "n": "Nenhuma anotação interna na tela",
+   "ok": true
+  },
+  {
+   "n": "Data formatada no padrão brasileiro, sem fuso deslocado",
+   "ok": true
+  },
+  {
+   "n": "Filtro 30 dias: avaliação de julho sai, a de outubro fica",
+   "ok": true
+  },
+  {
+   "n": "Filtro anunciado como opção selecionada",
+   "ok": true
+  },
+  {
+   "n": "App bloqueia 4000 kg com mensagem clara",
+   "ok": true
+  },
+  {
+   "n": "Registro pelo app grava no banco (68,9 kg, observação)",
+   "ok": true
+  },
+  {
+   "n": "Gráfico atualiza com o novo registro (6 pontos)",
+   "ok": true
+  },
+  {
+   "n": "Sem rolagem horizontal a 390 px",
+   "ok": true
+  },
+  {
+   "n": "Aba Evolução sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (390px)",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (1024px)",
+   "ok": true
+  }
+ ],
+ "axe": []
+}

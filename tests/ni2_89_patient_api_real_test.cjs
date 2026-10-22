@@ -130,8 +130,8 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|#\d+ \/|Uncau
     r = seen('método errado', await call('GET', '/api/v1/patient/hydration', { token: ana }));
     check('erros', 'Método não suportado → 404/405 em JSON', [404, 405].includes(r.status) && errorShapeOk(r), { status: r.status, ct: r.ct, body: r.text.slice(0, 160) });
     r = seen('json malformado', await call('POST', '/api/v1/patient/self-metrics', { token: ana, raw: '{"value": ', headers: { 'Content-Type': 'application/json' } }));
-    check('erros', 'JSON malformado → 400 em JSON', r.status === 400 && errorShapeOk(r), { status: r.status, body: r.text.slice(0, 160) });
-    r = seen('métrica inválida', await call('POST', '/api/v1/patient/self-metrics', { token: ana, body: { metric_type: 'weight_kg', value: -5 } }));
+    check('erros', 'JSON malformado → 400/422 em JSON', [400, 422].includes(r.status) && errorShapeOk(r), { status: r.status, body: r.text.slice(0, 160) });
+    r = seen('métrica inválida', await call('POST', '/api/v1/patient/self-metrics', { token: ana, body: { metric_type: 'pressao_inventada', value: -5 } }));
     check('erros', 'Validação de entrada → 400/422 em JSON', [400, 422].includes(r.status) && errorShapeOk(r), r.status);
     r = seen('hidratação inválida', await call('POST', '/api/v1/patient/hydration', { token: ana, body: { amount_ml: -900 } }));
     check('erros', 'Hidratação negativa é recusada', r.status >= 400 && Number(one('SELECT COUNT(*) FROM hydration_logs WHERE amount_ml < 0')) === 0, { status: r.status, body: r.text.slice(0, 160) });

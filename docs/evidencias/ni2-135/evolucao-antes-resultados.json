@@ -1,0 +1,19 @@
+[
+ {
+  "crit": "permissão",
+  "name": "Sem liberação do nutricionista: peso → 403 METRIC_NOT_ENABLED e nada gravado",
+  "ok": false,
+  "detail": "{\"id\":2,\"clinic_id\":1,\"patient_id\":1,\"metric_type\":\"weight_kg\",\"value\":64,\"unit\":\"kg\",\"source\":\"patient_self_report\",\"notes\":null,\"is_clinical\":false,\"recorded_at\":\"2026-10-21 22:40:56\"}"
+ },
+ {
+  "crit": "permissão",
+  "name": "Evolução informa que não há medidas liberadas",
+  "ok": false,
+  "detail": null
+ },
+ {
+  "crit": "erro",
+  "name": "Command failed: php /tmp/base412/tests/support/ni2_91_fixture.php sql SELECT COUNT(*) FROM patient_self_metric_permissions",
+  "ok": false
+ }
+]

@@ -38,6 +38,63 @@
 
 Evidências em `docs/evidencias/ni2-135/`.
 
+## Status das correções: P0 e P1 (21/10/2026, noite)
+
+Todos os achados da revisão foram corrigidos. Os testes de cada item estão abaixo; as evidências ficam em `docs/evidencias/ni2-135/`.
+
+### Decisões tomadas
+
+Pedidas na correção ("restringir métricas, unidades, faixas e permissões por paciente"):
+
+- **Catálogo fechado** (`SelfMetricCatalog`, versão 2026.10-r1):
+
+  | Medida | Unidade | Faixa aceita |
+  |---|---|---|
+  | Peso | kg | 20–400 |
+  | Cintura | cm | 30–250 |
+  | Quadril | cm | 40–250 |
+
+  As faixas são largas de propósito: barram erro de digitação ou de unidade, sem julgar o valor.
+- **Fechado por padrão:** nenhuma medida fica liberada até o nutricionista liberar, paciente por paciente.
+- **Metas:** criadas e encerradas só pelo nutricionista. A paciente vê a meta e os registros mais recentes. O app não calcula "quanto falta" nem sugere mudanças, para não inferir diagnóstico nem pressionar.
+
+### O que mudou
+
+| Prioridade | Achado | Correção |
+|---|---|---|
+| P0 | Integridade (A2, P1–P5) | `PatientEvolutionService::recordSelfMetric`:<br>• 403 `METRIC_NOT_ENABLED` para medida não liberada;<br>• 422 para tipo fora do catálogo, unidade diferente, valor fora da faixa ou não numérico, e observação acima de 500 caracteres;<br>• unidade e arredondamento definidos pelo catálogo.<br>Tabela nova `patient_self_metric_permissions` (migração 46) |
+| P0 | Jornada (A3, P13) | Formulário "Registrar uma medida" na aba Evolução do app: só aparecem as medidas liberadas, com validação de faixa no app e no servidor e confirmação depois de gravar |
+| P1 | Visualização (A3, P9, P14, P15) | Gráfico por medida, feito sem dependência nativa nova:<br>• círculo cheio = nutricionista, quadrado vazado = você, linha tracejada = meta;<br>• resumo em texto para leitor de tela (`role=img`).<br>Filtro 30 dias / 3 meses / 12 meses / Tudo (`?from=&to=` na API, 422 para data inválida). Lista de registros com data formatada no fuso do consultório |
+| P1 | Integração clínica (M3, P17) | Seção "Evolução no app da paciente" no perfil do paciente:<br>• liberar medidas;<br>• autorrelatos recentes (data, medida, valor, observação);<br>• metas com o último registro de cada fonte;<br>• criar e encerrar metas.<br>Ações só para o nutricionista; a recepção vê sem os formulários |
+| P1 | Metas (M2, P11) | Tabela `patient_goals` (migração 46). Formulário no perfil (medida, reduzir/aumentar/manter, valor, data opcional, mensagem). API devolve as metas ativas. Criação e encerramento auditados |
+| — | Datas (M1, P6, P16) | Autorrelato gravado no fuso do consultório (igual ao devolvido). Rótulos legíveis ("Peso", "Registrado por você"). **Hidratação:** registros feitos depois das 21h contavam para o dia seguinte (UTC); corrigido junto |
+| — | Leitor de tela (B1) | Títulos sem emoji; "Aferido presencialmente" virou "Registrado pelo seu nutricionista" |
+| — | LGPD | Metas e liberações entram no pacote de portabilidade |
+| — | Gate MySQL | `Migrator` não redeclara mais a classe da migração 40 quando o gate de upgrade carrega migrações de dois diretórios. O problema apareceu ao chegar a 46 migrações |
+
+### Testes
+
+| Teste | Antes | Depois |
+|---|---|---|
+| `ni2_135_evolution_real_test.cjs` (HTTP real: permissões, autorrelato, filtro, metas, perfil do profissional, LGPD), SQLite | 0 PASS, 3 FAIL (árvore anterior não tem as rotas) | **52/52** |
+| O mesmo, MySQL 8.0.46 | — | **52/52** |
+| `ni2_135_app_web_real_test.cjs` (app real, build web, no Chromium: meta, gráfico, filtro, registro gravado no banco, axe, 390 e 1024 px) | — | **14/14** |
+| `review_ni2_135_provas.cjs` | 15 ACHADOS | **17 "ok"** |
+| Gate de schema MySQL (instalação limpa, upgrade de 6 migrações com dados, SQL de instalação regenerado) | upgrade falhava com 46 migrações | **ok** |
+| SQL manual da migração 46 em MySQL com chaves BIGINT UNSIGNED (como a HostGator), rodado 2 vezes | — | ok, idempotente, 5 FKs |
+
+**Regressão:**
+- NI2-89: 50/50. NI2-91: 34/34.
+- Anotações internas (NI2-135): 9/9.
+- NI2-412: 124 + 1 BLOCKED. NI2-433: 69. NI2-437: 48.
+- Cliente do app contra o servidor: 34/34.
+- 97 suítes PHP: nenhuma falha causada pela mudança. `px_02` foi atualizada para as novas regras e passa. Duas suítes dependem do horário em que rodam: entre 21h e 24h, `px_13…` e `ni2_292…` (agenda do dia) falham; isso já acontecia antes.
+
+### Limites
+
+- **Autorrelatos antigos:** os gravados antes desta correção usaram `CURRENT_TIMESTAMP` (no SQLite, UTC; no MySQL, o fuso da sessão da HostGator, que não foi verificado). Podem aparecer até 3 h deslocados. Não foram convertidos.
+- **Não testado:** app em aparelho real, MySQL 5.7 real (o SQL manual usa só sintaxe compatível) e validação independente.
+
 ## Critérios da história
 
 > Exibir medidas disponibilizadas pelo nutricionista e gráficos acessíveis; indicar data, unidade, fonte e tipo (clínico vs autorrelato); filtros temporais; registrar autorrelato somente nos campos habilitados; preservar histórico; linguagem neutra e inclusiva; não inferir diagnósticos nem recomendar alterações automáticas de tratamento.

@@ -1,0 +1,314 @@
+[
+ {
+  "crit": "permissão",
+  "name": "Sem liberação do nutricionista: peso → 403 METRIC_NOT_ENABLED e nada gravado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Evolução informa que não há medidas liberadas",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Recepção não libera medidas (403)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Sem CSRF válido → 403",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Medida fora do catálogo é recusada e nada muda",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Nutricionista libera peso e cintura",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Liberação auditada com autor",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Nutricionista de outra clínica não altera a paciente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Evolução lista as medidas liberadas com unidade e faixa",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Peso liberado → 201, unidade do catálogo e valor arredondado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Horário gravado no fuso do consultório (igual ao devolvido)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: peso 4000 kg → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: peso 10 kg → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: peso em lb → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: tipo inventado → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: quadril não liberado → 403",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: observação de 501 caracteres → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: valor não numérico → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: sem valor → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Recusado: sem tipo → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Nenhuma tentativa inválida gravou registro",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Cintura liberada → 201 em cm",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "autorrelato",
+  "name": "Liberação é por paciente: Bruno sem liberação → 403",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Série de peso combina avaliação do nutricionista e autorrelato, cada ponto com a fonte",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Pontos em ordem cronológica",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Rótulos legíveis e fonte por extenso",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Anotação interna do profissional continua fora da resposta",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Filtro de 3 meses exclui a avaliação de janeiro",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Período fechado (jan/2026) só traz o que está nele",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Data inválida no filtro → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Início depois do fim → 422",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "evolução",
+  "name": "Bruno não vê registros nem metas da Ana",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Recepção não cria meta (403)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta recusada: valor fora da faixa",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta recusada: data no passado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta recusada: medida fora do catálogo",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta recusada: direção inválida",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Nutricionista cria meta (valor com vírgula, data futura, mensagem)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Paciente vê a meta com o último registro de cada fonte, sem \"quanto falta\"",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Mensagem do nutricionista chega à paciente",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta da Ana não aparece para o Bruno",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Nutricionista marca a meta como atingida",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta encerrada não muda de novo",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Meta encerrada sai da lista da paciente (fica no histórico do profissional)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "metas",
+  "name": "Criação e encerramento auditados com autor",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "profissional",
+  "name": "Perfil mostra a seção \"Evolução no app da paciente\"",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "profissional",
+  "name": "Perfil lista os autorrelatos da paciente (valor, medida e observação)",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "profissional",
+  "name": "Perfil mostra a meta com status e histórico",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "profissional",
+  "name": "Caixas de liberação refletem o que está liberado",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "profissional",
+  "name": "Recepção vê a seção sem os formulários de alteração",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "permissão",
+  "name": "Peso deixa de ser liberado: novo registro → 403; anteriores continuam visíveis",
+  "ok": true,
+  "detail": null
+ },
+ {
+  "crit": "lgpd",
+  "name": "Pacote de portabilidade inclui metas e liberações",
+  "ok": true,
+  "detail": null
+ }
+]

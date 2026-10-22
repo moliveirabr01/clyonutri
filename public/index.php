@@ -110,6 +110,7 @@ $onboardingCtrl = new \ClyoNutri\Application\Controllers\OnboardingController($d
 $adminCtrl = new \ClyoNutri\Application\Controllers\AdminController($db);
 $subCtrl = new \ClyoNutri\Application\Controllers\SubscriptionController();
 $privacyCtrl = new \ClyoNutri\Application\Controllers\PrivacyRequestController();
+$evolutionCtrl = new \ClyoNutri\Application\Controllers\PatientEvolutionController();
 $patientAppCtrl = new \ClyoNutri\Application\Controllers\PatientAppController();
 $bookingCtrl = new \ClyoNutri\Application\Controllers\BookingController($db);
 
@@ -337,6 +338,10 @@ $router->post('/pacientes/{id}/status', $requireAuth([$dashCtrl, 'patientStatus'
 $router->post('/pacientes/{id}/consentimento/retirar', $requireAuth([$dashCtrl, 'patientConsent']));
 $router->post('/pacientes/{id}/privacidade', $requireAuth([$dashCtrl, 'patientPrivacyRequest']));
 // Fila de pedidos de titulares da clínica (code review NI2-91, A2)
+// Evolução no app da paciente: medidas liberadas e metas (NI2-135)
+$router->post('/pacientes/{id}/autorrelatos/permissoes', $requireAuth([$evolutionCtrl, 'permissions']));
+$router->post('/pacientes/{id}/metas', $requireAuth([$evolutionCtrl, 'createGoal']));
+$router->post('/pacientes/{id}/metas/{goalId}/encerrar', $requireAuth([$evolutionCtrl, 'closeGoal']));
 $router->get('/privacidade/pedidos', $requireAuth([$privacyCtrl, 'index']));
 $router->post('/privacidade/pedidos/{id}/exportar', $requireAuth([$privacyCtrl, 'export']));
 $router->post('/privacidade/pedidos/{id}/anonimizar', $requireAuth([$privacyCtrl, 'processDeletion']));
@@ -971,42 +976,42 @@ $router->get('/api/v1/patient/evolution', function() use ($authenticatePatientAp
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
-
-    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-    $data = $apiCtrl->portal()->getEvolutionTimeline($patientId);
-    http_response_code(200);
-    echo json_encode($data);
+    $from = isset($_GET['from']) && is_string($_GET['from']) ? $_GET['from'] : null;
+    $to = isset($_GET['to']) && is_string($_GET['to']) ? $_GET['to'] : null;
+    try {
+        $data = (new \ClyoNutri\Domain\Evolution\PatientEvolutionService($db))->timeline($patientId, $from, $to);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
 });
 
-// Registrar Autorrelato de Métrica (Evolução)
+// Registrar Autorrelato (NI2-135): só métricas habilitadas pelo profissional, unidade e faixa do catálogo.
 $router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatientApi, $db, $getJsonInput) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
     $patientId = (int)$auth['patient_id'];
     $input = $getJsonInput();
-
-    $metricType = trim((string)($input['metric_type'] ?? ''));
-    if ($metricType === '') {
-        $metricType = 'weight_kg';
-    }
-    $value = isset($input['value']) ? (float)$input['value'] : 0.0;
-    $unit = trim((string)($input['unit'] ?? 'kg'));
-    $notes = isset($input['notes']) && trim((string)$input['notes']) !== '' ? trim((string)$input['notes']) : null;
-
-    if ($value <= 0) {
-        http_response_code(400);
-        echo json_encode(['error' => 'O valor da métrica deve ser um número positivo e válido.']);
+    $type = $input['metric_type'] ?? null;
+    $unit = $input['unit'] ?? null;
+    $notes = $input['notes'] ?? null;
+    if (!is_string($type) || ($unit !== null && !is_string($unit)) || ($notes !== null && !is_string($notes)) || !array_key_exists('value', $input)) {
+        http_response_code(422);
+        echo json_encode(['error' => 'Informe a medida (metric_type) e o valor (value).', 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
         return;
     }
-
     try {
-        $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
-        $res = $apiCtrl->portal()->recordSelfMetric($patientId, $metricType, $value, $unit, $notes);
+        $res = (new \ClyoNutri\Domain\Evolution\PatientEvolutionService($db))->recordSelfMetric($patientId, $type, $input['value'], $unit, $notes);
         http_response_code(201);
-        echo json_encode($res);
+        echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    } catch (\ClyoNutri\Domain\Evolution\SelfMetricNotEnabledException $e) {
+        http_response_code(403);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'METRIC_NOT_ENABLED'], JSON_UNESCAPED_UNICODE);
     } catch (\InvalidArgumentException $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
     }
 });
 

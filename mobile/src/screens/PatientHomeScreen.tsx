@@ -13,7 +13,8 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import { displayDateTime, tabLabels } from '../utils/presentation';
+import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
+import EvolutionChart from '../components/EvolutionChart';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -59,6 +60,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [evolutionData, setEvolutionData] = useState<EvolutionData | null>(null);
   const [diaryState, setDiaryState] = useState<ResourceState>(initialResource);
   const [evolutionState, setEvolutionState] = useState<ResourceState>(initialResource);
+  const [evolutionPeriod, setEvolutionPeriod] = useState<'30' | '90' | '365' | 'all'>('365');
+  const [metricType, setMetricType] = useState<string | null>(null);
+  const [metricValue, setMetricValue] = useState('');
+  const [metricNotes, setMetricNotes] = useState('');
+  const [metricError, setMetricError] = useState<string | null>(null);
+  const [metricFeedback, setMetricFeedback] = useState<string | null>(null);
+  const [metricSaving, setMetricSaving] = useState(false);
   const [homeUpdatedAt, setHomeUpdatedAt] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -217,14 +225,33 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const refreshEvolution = useCallback(async () => {
     setEvolutionState(prev => ({ ...prev, loading: true }));
     try {
-      const evolution = await ApiService.getEvolution();
+      const from = evolutionPeriod === 'all' ? null : new Date(Date.now() - Number(evolutionPeriod) * 86400000).toISOString().slice(0, 10);
+      const evolution = await ApiService.getEvolution(from);
       setEvolutionData(evolution);
       setEvolutionState({ loading: false, error: null, updatedAt: new Date().toLocaleString('pt-BR') });
     } catch (error) {
       if (error instanceof ApiError && error.kind === 'auth') return;
       setEvolutionState(prev => ({ ...prev, loading: false, error: resourceError(error) }));
     }
-  }, []);
+  }, [evolutionPeriod]);
+  useEffect(() => { void refreshEvolution(); }, [evolutionPeriod]);
+  const submitSelfMetric = async () => {
+    const metric = evolutionData?.enabled_metrics?.find((m) => m.type === metricType);
+    setMetricError(null); setMetricFeedback(null);
+    if (!metric) { setMetricError('Escolha o que você quer registrar.'); return; }
+    const value = Number(metricValue.replace(',', '.'));
+    if (!metricValue.trim() || !Number.isFinite(value)) { setMetricError(`Informe ${metric.label.toLowerCase()} em ${metric.unit}.`); return; }
+    if (value < metric.min || value > metric.max) { setMetricError(`${metric.label} deve estar entre ${metric.min} e ${metric.max} ${metric.unit}. Confira o valor digitado.`); return; }
+    setMetricSaving(true);
+    try {
+      const saved = await ApiService.logSelfMetric({ metric_type: metric.type, value, unit: metric.unit, notes: metricNotes.trim() || undefined });
+      setMetricFeedback(`${saved.label} registrado: ${saved.value.toLocaleString('pt-BR')} ${saved.unit}.`);
+      setMetricValue(''); setMetricNotes('');
+      await refreshEvolution();
+    } catch (error) {
+      setMetricError(error instanceof ApiError ? error.message : 'Não foi possível registrar. Tente novamente.');
+    } finally { setMetricSaving(false); }
+  };
   const fetchAllData = useCallback(async () => {
     setErrorMessage(null);
     const home = async () => {
@@ -901,33 +928,88 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
         {currentTab === 'Evolucao' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">Evolução & Metas</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Evolução e metas</Text>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }} accessibilityRole="radiogroup" accessibilityLabel="Período">
+              {([['30', '30 dias'], ['90', '3 meses'], ['365', '12 meses'], ['all', 'Tudo']] as const).map(([key, label]) => (
+                <TouchableOpacity key={key} onPress={() => setEvolutionPeriod(key)} accessibilityRole="radio" accessibilityState={{ checked: evolutionPeriod === key }} aria-checked={evolutionPeriod === key}
+                  style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.navy, backgroundColor: evolutionPeriod === key ? t.navy : t.white, minHeight: 36 }}>
+                  <Text style={{ color: evolutionPeriod === key ? t.white : t.navy, fontWeight: '600' }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {<ResourceNotice state={evolutionState} retry={refreshEvolution} name="evolução" />}
+
+            {(evolutionData?.goals ?? []).map((g) => (
+              <View key={'g' + g.id} style={styles.card} accessible accessibilityLabel={`Meta: ${g.direction_label} ${g.label.toLowerCase()} para ${g.target_value.toLocaleString('pt-BR')} ${g.unit}${g.target_date ? ' até ' + displayLocalDateTime(g.target_date, false) : ''}.`}>
+                <Text style={styles.cardTitle}>Meta: {g.direction_label} {g.label.toLowerCase()} · {g.target_value.toLocaleString('pt-BR')} {g.unit}</Text>
+                {g.target_date && <Text style={styles.mealItem}>Até {displayLocalDateTime(g.target_date, false)}</Text>}
+                {g.message_for_patient && <Text style={styles.mealItem}>{g.message_for_patient}</Text>}
+                <Text style={styles.metaLabel}>Último registro do nutricionista: {g.latest_clinical ? `${g.latest_clinical.value.toLocaleString('pt-BR')} ${g.unit} em ${displayLocalDateTime(g.latest_clinical.date)}` : 'nenhum'}</Text>
+                <Text style={styles.metaLabel}>Seu último registro: {g.latest_self_report ? `${g.latest_self_report.value.toLocaleString('pt-BR')} ${g.unit} em ${displayLocalDateTime(g.latest_self_report.date)}` : 'nenhum'}</Text>
+              </View>
+            ))}
+
+            {(evolutionData?.series ?? []).map((sr) => {
+              const goal = evolutionData?.goals?.find((g) => g.metric_type === sr.type)?.target_value ?? null;
+              return (
+                <View key={'s' + sr.type} style={styles.card}>
+                  <EvolutionChart series={sr} goal={goal} />
+                </View>
+              );
+            })}
+
+            {evolutionData && (evolutionData.enabled_metrics ?? []).length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle} accessibilityRole="header">Registrar uma medida</Text>
+                <Text style={styles.helperText}>Seu registro aparece como "Você" e não substitui a avaliação do seu nutricionista.</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Medida">
+                  {(evolutionData.enabled_metrics ?? []).map((m) => (
+                    <TouchableOpacity key={m.type} onPress={() => { setMetricType(m.type); setMetricError(null); }} accessibilityRole="radio" accessibilityState={{ checked: metricType === m.type }} aria-checked={metricType === m.type}
+                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.copper, backgroundColor: metricType === m.type ? t.copper : t.white, minHeight: 36 }}>
+                      <Text style={{ color: metricType === m.type ? t.white : t.copper, fontWeight: '600' }}>{m.label} ({m.unit})</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput value={metricValue} onChangeText={setMetricValue} keyboardType="decimal-pad" accessibilityLabel="Valor da medida"
+                  placeholder={metricType ? `Valor em ${evolutionData.enabled_metrics?.find((m) => m.type === metricType)?.unit}` : 'Escolha a medida acima'}
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, marginTop: 4 }]} />
+                <TextInput value={metricNotes} onChangeText={setMetricNotes} maxLength={500} accessibilityLabel="Observação (opcional)" placeholder="Observação (opcional)"
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, marginTop: 8 }]} />
+                {metricError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{metricError}</Text>}
+                {metricFeedback && <Text accessibilityRole="alert" style={styles.mealItem}>{metricFeedback}</Text>}
+                <TouchableOpacity accessibilityRole="button" style={[styles.navyButton, { marginTop: 12 }]} disabled={metricSaving} onPress={submitSelfMetric}>
+                  <Text style={styles.navyButtonText}>{metricSaving ? 'Salvando…' : 'Registrar'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Text style={[styles.cardTitle, { marginTop: 8 }]} accessibilityRole="header">Registros do período</Text>
             {evolutionData?.clinical_records && evolutionData.clinical_records.length > 0 ? (
               evolutionData.clinical_records.map((c) => (
-                <View key={c.id} style={styles.card}>
-                  <Text style={styles.cardTitle}>📊 Medição Clínica Oficial • {c.date}</Text>
-                  {c.weight_kg && <Text style={styles.mealItem}>Peso: {c.weight_kg} kg</Text>}
-                  {c.bmi && <Text style={styles.mealItem}>IMC: {c.bmi}</Text>}
-                  <Text style={styles.metaLabel}>Aferido presencialmente pelo profissional</Text>
+                <View key={'c' + c.id} style={styles.card}>
+                  <Text style={styles.cardTitle}>Avaliação · {displayLocalDateTime(c.date)}</Text>
+                  {c.weight_kg != null && <Text style={styles.mealItem}>Peso: {c.weight_kg.toLocaleString('pt-BR')} kg</Text>}
+                  {c.waist_cm != null && <Text style={styles.mealItem}>Cintura: {c.waist_cm.toLocaleString('pt-BR')} cm</Text>}
+                  {c.hip_cm != null && <Text style={styles.mealItem}>Quadril: {c.hip_cm.toLocaleString('pt-BR')} cm</Text>}
+                  {c.bmi != null && <Text style={styles.mealItem}>IMC: {c.bmi.toLocaleString('pt-BR')}</Text>}
+                  <Text style={styles.metaLabel}>Registrado pelo seu nutricionista</Text>
                 </View>
               ))
             ) : !evolutionState.error && !evolutionState.loading && evolutionData ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>Sem avaliações clínicas cadastradas</Text>
+                <Text style={styles.emptyTitle}>Nenhuma avaliação do nutricionista neste período</Text>
               </View>
             ) : null}
 
             {evolutionData?.self_reports && evolutionData.self_reports.length > 0 && (
-              evolutionData.self_reports.map((s) => (
-                <View key={s.id} style={styles.card}>
-                  <Text style={styles.cardTitle}>📝 Autorrelato • {s.date}</Text>
-                  <Text style={styles.mealItem}>
-                    {s.metric_type}: {s.value} {s.unit}
-                  </Text>
-                  {s.notes && <Text style={styles.metaLabel}>{s.notes}</Text>}
-                  <Text style={styles.metaLabel}>Origem: Autorrelato do paciente</Text>
+              evolutionData.self_reports.map((sr) => (
+                <View key={'r' + sr.id} style={styles.card}>
+                  <Text style={styles.cardTitle}>Seu registro · {displayLocalDateTime(sr.date)}</Text>
+                  <Text style={styles.mealItem}>{sr.label ?? sr.metric_type}: {sr.value.toLocaleString('pt-BR')} {sr.unit}</Text>
+                  {sr.notes && <Text style={styles.metaLabel}>{sr.notes}</Text>}
+                  <Text style={styles.metaLabel}>Registrado por você</Text>
                 </View>
               ))
             )}

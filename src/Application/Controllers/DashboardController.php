@@ -232,6 +232,10 @@ class DashboardController
         $latestAnamnesis = $anamnesisService->getLatestAnamnesis($id);
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
         $careStep = (new AppointmentService())->careStepForPatient($id);
+        // NI2-135: autorrelatos, medidas liberadas e metas do app da paciente.
+        $appEvolution = (new \ClyoNutri\Domain\Evolution\PatientEvolutionService())->professionalPanel($id);
+        $canEditAppEvolution = $this->canEditPlanItems(Connection::getInstance());
+        $appEvolutionFlash = $_SESSION['app_evolution_flash'] ?? null; unset($_SESSION['app_evolution_flash']);
 
         ob_start();
         ?>
@@ -589,6 +593,7 @@ class DashboardController
         </div>
 
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
+        <?php $pid = (int)$p['id']; require __DIR__ . '/../../../views/patients/app-evolution.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">

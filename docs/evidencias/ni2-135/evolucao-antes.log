@@ -1,0 +1,25 @@
+FAIL [permissão] Sem liberação do nutricionista: peso → 403 METRIC_NOT_ENABLED e nada gravado → "{\"id\":2,\"clinic_id\":1,\"patient_id\":1,\"metric_type\":\"weight_kg\",\"value\":64,\"unit\":\"kg\",\"source\":\"patient_self_report\",\"notes\":null,\"is_clinical\":false,\"recorded_at\":\"2026-10-21 22:40:56\"}"
+FAIL [permissão] Evolução informa que não há medidas liberadas
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metric_permissions in /tmp/base412/tests/support/ni2_91_fixture.php:38
+Stack trace:
+#0 /tmp/base412/tests/support/ni2_91_fixture.php(38): PDO->query()
+#1 {main}
+  thrown in /tmp/base412/tests/support/ni2_91_fixture.php on line 38
+FAIL (interrompido) Error: Command failed: php /tmp/base412/tests/support/ni2_91_fixture.php sql SELECT COUNT(*) FROM patient_self_metric_permissions
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_self_metric_permissions in /tmp/base412/tests/support/ni2_91_fixture.php:38
+Stack trace:
+#0 /tmp/base412/tests/support/ni2_91_fixture.php(38): PDO->query()
+#1 {main}
+  thrown in /tmp/base412/tests/support/ni2_91_fixture.php on line 38
+
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:916:11)
+    at execFileSync (node:child_process:952:15)
+    at fx (/home/claude/b412/tests/ni2_135_evolution_real_test.cjs:21:22)
+    at sql (/home/claude/b412/tests/ni2_135_evolution_real_test.cjs:22:31)
+    at one (/home/claude/b412/tests/ni2_135_evolution_real_test.cjs:23:32)
+    at /home/claude/b412/tests/ni2_135_evolution_real_test.cjs:70:88
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+NI2-135 (SQLite): 0 PASS, 3 FAIL

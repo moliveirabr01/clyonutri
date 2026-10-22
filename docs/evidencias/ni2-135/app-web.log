@@ -1,0 +1,16 @@
+PASS Meta visível com último registro de cada fonte
+PASS Gráfico de peso com resumo acessível (role=img)
+PASS Resumo diz número de registros, fontes, primeiro/último e meta
+PASS Nenhuma anotação interna na tela
+PASS Data formatada no padrão brasileiro, sem fuso deslocado
+PASS Filtro 30 dias: avaliação de julho sai, a de outubro fica
+PASS Filtro anunciado como opção selecionada
+PASS App bloqueia 4000 kg com mensagem clara
+PASS Registro pelo app grava no banco (68,9 kg, observação)
+PASS Gráfico atualiza com o novo registro (6 pontos)
+PASS Sem rolagem horizontal a 390 px
+PASS Aba Evolução sem violações WCAG 2 A/AA (axe)
+PASS Sem erro de script (390px)
+PASS Sem erro de script (1024px)
+
+NI2-135 app (web): 14 PASS, 0 FAIL
