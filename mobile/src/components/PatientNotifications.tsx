@@ -11,8 +11,8 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 /**
- * NI2-95: avisos da paciente (plano novo, lembrete de consulta, mensagem) e o que ela quer receber por e-mail.
- * Push ainda não existe: a tela diz isso em vez de mostrar uma chave que não faz nada.
+ * NI2-95: avisos da paciente (plano novo, lembrete de consulta, mensagem) e o que ela quer receber por e-mail
+ * e no celular. As chaves de push só aparecem quando o servidor está com o push ligado (push_available).
  */
 export default function PatientNotifications({ active }: { active: boolean }) {
   const [items, setItems] = useState<PatientNotification[]>([]);
@@ -97,20 +97,26 @@ export default function PatientNotifications({ active }: { active: boolean }) {
 
       {prefs && (
         <View style={s.card}>
-          <Text style={s.title} accessibilityRole="header">O que receber por e-mail</Text>
-          <Text style={s.helper}>Os avisos sempre aparecem aqui no app. O e-mail não leva detalhes da sua saúde nem o texto das mensagens.</Text>
+          <Text style={s.title} accessibilityRole="header">{prefs.push_available ? 'O que receber por e-mail e no celular' : 'O que receber por e-mail'}</Text>
+          <Text style={s.helper}>Os avisos sempre aparecem aqui no app. {prefs.push_available ? 'O e-mail e o aviso no celular não levam' : 'O e-mail não leva'} detalhes da sua saúde nem o texto das mensagens.</Text>
           {prefs.categories.map((c) => (
             <View key={c.category} style={s.row}>
               <Text style={s.body} nativeID={`pref-${c.category}`}>{c.label}</Text>
               <Switch accessibilityLabel={`E-mail: ${c.label}`} value={c.email_enabled} disabled={busy}
                 onValueChange={(v) => save({ categories: { [c.category]: { email_enabled: v } } }, v ? `Você vai receber e-mail de: ${c.label.toLowerCase()}.` : `E-mail desligado: ${c.label.toLowerCase()}.`)} />
+              {prefs.push_available && (
+                <Switch accessibilityLabel={`Celular: ${c.label}`} value={c.push_enabled} disabled={busy}
+                  onValueChange={(v) => save({ categories: { [c.category]: { push_enabled: v } } }, v ? `Aviso no celular ligado: ${c.label.toLowerCase()}.` : `Aviso no celular desligado: ${c.label.toLowerCase()}.`)} />
+              )}
             </View>
           ))}
-          {!prefs.push_available && <Text style={s.helper}>Notificação no celular (push) ainda não está disponível.</Text>}
+          {prefs.push_available
+            ? <Text style={s.helper}>Primeira chave: e-mail. Segunda: celular. Se o celular não avisar, confira se as notificações do app estão permitidas nos ajustes do aparelho.</Text>
+            : <Text style={s.helper}>Aviso no celular ainda não está disponível.</Text>}
 
           <Text style={[s.title, { marginTop: 12 }]} accessibilityRole="header">Horário de silêncio</Text>
           <View style={s.row}>
-            <Text style={s.body}>Não mandar e-mail neste horário</Text>
+            <Text style={s.body}>{prefs.push_available ? 'Não mandar e-mail nem aviso no celular neste horário' : 'Não mandar e-mail neste horário'}</Text>
             <Switch accessibilityLabel="Ligar horário de silêncio" value={prefs.quiet_hours.enabled} disabled={busy}
               onValueChange={(v) => save({ quiet_hours: { enabled: v, start: quietStart, end: quietEnd } }, v ? 'Horário de silêncio ligado.' : 'Horário de silêncio desligado.')} />
           </View>
@@ -120,7 +126,7 @@ export default function PatientNotifications({ active }: { active: boolean }) {
             <TextInput accessibilityLabel="Fim do silêncio (HH:MM)" style={s.input} value={quietEnd} onChangeText={setQuietEnd} maxLength={5} keyboardType="numbers-and-punctuation" />
             <TouchableOpacity accessibilityRole="button" style={s.button} disabled={busy} onPress={saveQuiet}><Text style={s.buttonText}>Salvar</Text></TouchableOpacity>
           </View>
-          <Text style={s.helper}>Horário de Brasília. Lembretes que caírem no silêncio chegam quando ele acabar.</Text>
+          <Text style={s.helper}>Horário de Brasília. Lembretes que caírem no silêncio chegam quando ele acabar; mensagens novas ficam só aqui no app.</Text>
           {feedback && <Text accessibilityRole="alert" style={s.ok}>{feedback}</Text>}
         </View>
       )}

@@ -18,6 +18,7 @@ import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
 import PatientChat from '../components/PatientChat';
 import PatientNotifications from '../components/PatientNotifications';
+import { setupPushNotifications, onPushOpened } from '../services/pushNotifications';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -196,6 +197,12 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // NI2-95: aviso no celular. Pede permissão depois do login e, ao tocar no aviso, abre a aba certa.
+  useEffect(() => {
+    void setupPushNotifications();
+    return onPushOpened((category) => setCurrentTab(category === 'chat' ? 'Chat' : 'Perfil'));
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

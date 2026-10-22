@@ -311,6 +311,8 @@ if (typeof window !== 'undefined' && window.location && window.location.hostname
 }
 let currentApiBaseUrl: string = (process.env.EXPO_PUBLIC_API_URL || defaultBaseUrl).replace(/\/+$/, '');
 let onSessionExpired: (() => void) | null = null;
+/** NI2-95: token do Expo Push deste aparelho, guardado só em memória para desligar no logout. */
+let currentPushToken: string | null = null;
 
 export function setSessionExpiredHandler(handler: (() => void) | null) {
   onSessionExpired = handler;
@@ -465,8 +467,27 @@ export const ApiService = {
     setAuthToken(null);
   },
 
+  /** NI2-95: cadastra este aparelho para o aviso no celular. */
+  async registerPushToken(token: string, platform: string): Promise<{ registered: boolean; push_enabled: boolean }> {
+    const res = await request<{ registered: boolean; push_enabled: boolean }>('/api/v1/patient/push-tokens', { method: 'POST', body: JSON.stringify({ token, platform }) });
+    currentPushToken = token;
+    return res;
+  },
+  /** NI2-95: desliga o aviso no celular deste aparelho. Nunca impede o logout. */
+  async removePushToken(): Promise<void> {
+    const token = currentPushToken;
+    if (!token || !getAuthToken()) return;
+    try {
+      await request<{ removed: boolean }>('/api/v1/patient/push-tokens/remove', { method: 'POST', body: JSON.stringify({ token }) });
+      currentPushToken = null;
+    } catch (_) {
+      // Sem rede ou sessão já expirada: o servidor desliga o token sozinho quando o Expo avisar que ele não vale mais.
+    }
+  },
+
   async logout(): Promise<{ message: string }> {
     // Keep the token on transport failure so the patient can retry server revocation.
+    await ApiService.removePushToken();
     try {
       const res = await request<{ message: string }>('/api/v1/auth/patient-logout', {
         method: 'POST',
