@@ -115,6 +115,14 @@ class LgpdService
             WHERE c.clinic_id = ? AND c.patient_id = ? ORDER BY m.id');
         $msg->execute([$clinicId, $patientId]);
         $related['chat_messages'] = $msg->fetchAll(PDO::FETCH_ASSOC);
+        // NI2-95: avisos recebidos e preferências de aviso (texto neutro; sem dados de entrega interna).
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'notification_events')) {
+            $ntf = $this->db->prepare("SELECT id, event_type, category, title, body, created_at, read_at FROM notification_events
+                WHERE clinic_id = ? AND recipient_type = 'patient' AND recipient_id = ? ORDER BY id");
+            $ntf->execute([$clinicId, $patientId]);
+            $related['notifications'] = $ntf->fetchAll(PDO::FETCH_ASSOC);
+            $related['notification_preferences'] = (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->preferences((int)$clinicId, 'patient', $patientId);
+        }
         // Registrar auditoria de exportação
         $this->auditLogger->log('LGPD_DATA_EXPORT', 'patients', (string)$patientId, ['patient_id' => $patientId, 'tables' => array_keys($related)]);
 
@@ -177,6 +185,16 @@ class LgpdService
             }
             $this->db->prepare("UPDATE chat_conversations SET status = 'archived' WHERE patient_id = :id AND clinic_id = :clinic_id")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+
+            // NI2-95: avisos e preferências de aviso saem junto (nada de aviso pendente para quem foi anonimizado).
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'notification_events')) {
+                $this->db->prepare("DELETE FROM notification_deliveries WHERE event_id IN (SELECT id FROM notification_events WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id)")
+                    ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                foreach (['notification_events', 'notification_preferences', 'notification_quiet_hours'] as $nt) {
+                    $this->db->prepare("DELETE FROM {$nt} WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id")
+                        ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                }
+            }
 
             // Registrar revogação de consentimentos
             $revStmt = $this->db->prepare("
