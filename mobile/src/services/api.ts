@@ -242,6 +242,25 @@ export interface PatientHomeData {
   water_goal_ml: number | null;
   next_appointment: Appointment | null;
   active_plan: ActiveMealPlan | null;
+  /** NI2-96: check-in de hoje (null se ainda não fez). */
+  checkin_today?: DailyCheckin | null;
+}
+
+/** NI2-96: check-in diário. meal_adherence_pct em passos de 25; energia e fome de 1 a 5. */
+export interface DailyCheckin {
+  id: number;
+  checkin_date: string;
+  meal_adherence_pct: number | null;
+  energy_level: number | null;
+  hunger_level: number | null;
+  notes: string | null;
+}
+
+export interface DailyCheckinInput {
+  meal_adherence_pct: number;
+  energy_level?: number | null;
+  hunger_level?: number | null;
+  notes?: string | null;
 }
 
 export interface FoodDiaryEntry {
@@ -463,6 +482,14 @@ export const ApiService = {
     return request<{ id: number; amount_ml: number; total_water_today: number }>('/api/v1/patient/hydration', {
       method: 'POST',
       body: JSON.stringify({ amount_ml: amountMl }),
+    });
+  },
+
+  /** NI2-96: um check-in por dia; reenviar no mesmo dia corrige o anterior. */
+  async submitCheckin(input: DailyCheckinInput): Promise<{ checkin: DailyCheckin; created: boolean }> {
+    return request<{ checkin: DailyCheckin; created: boolean }>('/api/v1/patient/checkin', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   },
 

@@ -41,6 +41,9 @@ Este documento formaliza o **Registro de Operações de Tratamento de Dados Pess
 | `receivables` / `payments` | `amount_cents`, `status`, `receipt_code` | Financeiro | Média | Cobrança de consultas e conformidade fiscal | Art. 7º, II (Obrigação fiscal) e V (Contrato) |
 | `audit_logs` | `action`, `resource`, `resource_id`, `clinic_id` | Técnico / Segurança | Média | Trilha de auditoria e segurança contra violações | Art. 7º, II e Art. 11, II, "g" (Prevenção à fraude e segurança) |
 | `patient_consents` | `purpose_code`, `granted`, `ip_address`, `timestamp` | Jurídico / Privacidade | Média | Gestão e prova verificável de consentimentos | Art. 7º, I e Art. 11, I (Comprovação de consentimento) |
+| `checkins` (NI2-96) | `meal_adherence_pct` (0–100 em passos de 25), `energy_level`, `hunger_level`, `notes`, `checkin_date` | **Dado Pessoal Sensível de Saúde** | **ALTA** | Check-in diário da paciente no app para o acompanhamento do nutricionista | Art. 11, II, "f" (Tutela da saúde) |
+| `analytics_daily_metrics` (NI2-96) | `metric_date`, `clinic_id`, `metric`, `event_count`, `unique_patients` | Dado agregado, sem titular identificável | Baixa | Métricas de produto: plano visto, check-ins e hidratação por dia e clínica | Não é dado pessoal após a agregação (Art. 12); ver `docs/privacy/METRICAS_DE_ADESAO_NI2-96.md` |
+| `analytics_daily_subjects` / `analytics_daily_salts` (NI2-96) | `subject_hash` (HMAC com sal aleatório do dia), `salt` | Pseudônimo transitório | Média | Contar pacientes distintos no dia; apagados no dia seguinte | Art. 7º, IX (Legítimo interesse), com medidas do Art. 10, §3º; ver documento da NI2-96 |
 
 ---
 

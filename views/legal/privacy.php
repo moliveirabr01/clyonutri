@@ -88,7 +88,7 @@
         Conformidade com a Lei Federal nº 13.709/2018 (LGPD)
       </div>
       <h1>Política de Privacidade & Governança de Dados</h1>
-      <p class="legal-updated">Última atualização: 08 de Outubro de 2026 · Versão 1.0.0</p>
+      <p class="legal-updated">Última atualização: 22 de Outubro de 2026 · Versão 1.1.0</p>
 
       <h2>1. Compromisso com a Privacidade</h2>
       <p>A privacidade e a proteção de dados pessoais e dados pessoais sensíveis de saúde são alicerces fundamentais da arquitetura do <strong>ClyoNutri II</strong>. Esta política detalha como coletamos, processamos, armazenamos e protegemos suas informações e as informações de seus pacientes.</p>
@@ -104,6 +104,7 @@
       <ul>
         <li><strong>Dados do Profissional:</strong> Nome completo, e-mail, número de registro profissional (CRN/Região), telefone de contato e credenciais de login. Finalidade: gestão de conta, autenticação segura e faturamento.</li>
         <li><strong>Dados dos Pacientes (inseridos pelo profissional):</strong> Nome, data de nascimento, gênero, contato, registros antropométricos, histórico clínico/anamnese e planos alimentares. Finalidade: suporte ao atendimento nutricional e acompanhamento longitudinal.</li>
+        <li><strong>Métricas de uso do app (agregadas):</strong> contamos, por dia e por clínica, quantas vezes o plano foi visto, quantos check-ins foram enviados e quantos registros de água foram feitos, e quantas pacientes diferentes fizeram cada ação. Não guardamos nessas métricas o nome, o identificador da paciente, os valores registrados (água, adesão, observações) nem o conteúdo do plano. Para contar pacientes diferentes no dia usamos um código temporário que é apagado no dia seguinte. Números com menos de 5 pacientes não são exibidos. Finalidade: melhorar o produto. Base legal: legítimo interesse, com a coleta desligável pela plataforma.</li>
       </ul>
 
       <h2 id="seguranca">4. Medidas Técnicas e Segurança da Informação</h2>

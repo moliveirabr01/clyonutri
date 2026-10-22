@@ -124,6 +124,22 @@ final class AdminController
         );
     }
 
+    /** GET — NI2-96: métricas de adesão agregadas (plano visto, check-in, hidratação), com corte mínimo de 5. */
+    public function adherenceMetrics(): void
+    {
+        $this->getAuthorizedUser('analytics.read');
+        $days = (int)($_GET['dias'] ?? 30);
+        $report = (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($this->db))->report($days);
+        header('Cache-Control: no-store');
+        $this->render(
+            __DIR__ . '/../../../views/admin/metricas-adesao.php',
+            compact('report'),
+            'Métricas de adesão',
+            'metricas-adesao',
+            [['label' => 'Métricas de adesão', 'url' => '']]
+        );
+    }
+
     public function dashboard(): void
     {
         $user = $this->getAuthorizedUser('dashboard.read');
@@ -646,6 +662,7 @@ final class AdminController
             'feature_flag_telehealth' => '1',
             'feature_flag_chat' => '1',
             'feature_flag_audit_immutable' => '1',
+            'analytics_adherence_enabled' => '1',
         ], $rawSettings ?: []);
 
         $this->render(
@@ -674,6 +691,7 @@ final class AdminController
             'feature_flag_telehealth' => function($v) { return in_array($v, ['0', '1'], true) ? null : 'Flag de Teleconsulta deve ser 0 ou 1.'; },
             'feature_flag_chat' => function($v) { return in_array($v, ['0', '1'], true) ? null : 'Flag de Chat deve ser 0 ou 1.'; },
             'feature_flag_audit_immutable' => function($v) { return in_array($v, ['0', '1'], true) ? null : 'Flag de Auditoria deve ser 0 ou 1.'; },
+            'analytics_adherence_enabled' => function($v) { return in_array($v, ['0', '1'], true) ? null : 'Métricas de adesão deve ser 0 ou 1.'; },
             'session_timeout_minutes' => function($v) {
                 if (!ctype_digit((string)$v)) return 'Timeout de sessão deve ser numérico inteiro.';
                 $n = (int)$v;

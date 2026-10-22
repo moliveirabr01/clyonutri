@@ -42,6 +42,7 @@ class PlatformSettings
             'feature_flag_telehealth' => '0', // fail-closed (NI2-221/F12): liga só se configurado
             'feature_flag_chat' => '1',
             'feature_flag_audit_immutable' => '1',
+            'analytics_adherence_enabled' => '1', // NI2-96: contadores agregados, legítimo interesse; desligável
         ];
 
         try {

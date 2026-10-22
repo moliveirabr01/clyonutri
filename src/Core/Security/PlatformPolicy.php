@@ -25,6 +25,7 @@ final class PlatformPolicy
     private const ROLE_PERMISSIONS = [
         self::ROLE_SUPERADMIN => [
             'dashboard.read',
+            'analytics.read', // NI2-96: métricas de adesão agregadas
             'clinics.read',
             'clinics.suspend',
             'clinics.activate',
@@ -44,6 +45,7 @@ final class PlatformPolicy
         ],
         self::ROLE_ADMIN_OPERACIONAL => [
             'dashboard.read',
+            'analytics.read', // NI2-96: métricas de adesão agregadas
             'clinics.read',
             'clinics.suspend',
             'clinics.activate',
@@ -60,6 +62,7 @@ final class PlatformPolicy
         ],
         self::ROLE_OPERATOR => [
             'dashboard.read',
+            'analytics.read', // NI2-96: métricas de adesão agregadas
             'clinics.read',
             'clinics.suspend',
             'clinics.activate',

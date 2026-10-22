@@ -1,0 +1,84 @@
+# SQL manual da migração 49 (NI2-96) no MySQL 8.0.46-0ubuntu0.24.04.4
+## 1) Banco da instalação até a migração 48 (instalacao_mysql8.sql do commit 6e2b1d6) (chaves INT)
+dados: 2 pacientes (1 com app), 3 check-ins (2 no mesmo dia da Ana)
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_48_aplicada	checkins_existentes	dias_com_mais_de_um_checkin	pacientes_com_app	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	3	1	1	int
+### migração
+resultado
+OK — migração 49 aplicada (check-in diário e métricas de adesão agregadas)
+### migração de novo (idempotente)
+resultado
+OK — migração 49 aplicada (check-in diário e métricas de adesão agregadas)
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_48_aplicada	checkins_existentes	dias_com_mais_de_um_checkin	pacientes_com_app	tipo_das_chaves
+OK — migração 49 já aplicada	1	1	1	3	1	1	int
+### check-ins intactos
+patient_id	meal_adherence_pct	checkin_date	updated_at
+1	80	2026-10-20	NULL
+1	60	2026-10-20	NULL
+2	90	2026-10-21	NULL
+### tipos e índices
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE
+analytics_daily_metrics	clinic_id	int
+analytics_daily_metrics	id	int
+analytics_daily_salts	id	int
+analytics_daily_subjects	clinic_id	int
+analytics_daily_subjects	id	int
+TABLE_NAME	INDEX_NAME	NON_UNIQUE
+analytics_daily_metrics	fk_analytics_metrics_clinic	1
+analytics_daily_metrics	uq_analytics_daily_metric	0
+analytics_daily_salts	uq_analytics_daily_salt	0
+analytics_daily_subjects	fk_analytics_subjects_clinic	1
+analytics_daily_subjects	uq_analytics_daily_subject	0
+checkins	idx_checkins_patient_date	1
+### chaves estrangeiras novas
+fks
+2
+### contador duplicado é recusado
+ERROR 1062 Duplicate entry (esperado)
+### migrations
+migration
+2026_10_22_000049_create_adherence_analytics
+
+## 2) Banco no formato da produção (chaves BIGINT UNSIGNED)
+dados: 2 pacientes (1 com app), 3 check-ins (2 no mesmo dia da Ana)
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_48_aplicada	checkins_existentes	dias_com_mais_de_um_checkin	pacientes_com_app	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	3	1	1	bigint unsigned
+### migração
+resultado
+OK — migração 49 aplicada (check-in diário e métricas de adesão agregadas)
+### migração de novo (idempotente)
+resultado
+OK — migração 49 aplicada (check-in diário e métricas de adesão agregadas)
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_48_aplicada	checkins_existentes	dias_com_mais_de_um_checkin	pacientes_com_app	tipo_das_chaves
+OK — migração 49 já aplicada	1	1	1	3	1	1	bigint unsigned
+### check-ins intactos
+patient_id	meal_adherence_pct	checkin_date	updated_at
+1	80	2026-10-20	NULL
+1	60	2026-10-20	NULL
+2	90	2026-10-21	NULL
+### tipos e índices
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE
+analytics_daily_metrics	clinic_id	bigint unsigned
+analytics_daily_metrics	id	bigint unsigned
+analytics_daily_salts	id	int
+analytics_daily_subjects	clinic_id	bigint unsigned
+analytics_daily_subjects	id	bigint unsigned
+TABLE_NAME	INDEX_NAME	NON_UNIQUE
+analytics_daily_metrics	fk_analytics_metrics_clinic	1
+analytics_daily_metrics	uq_analytics_daily_metric	0
+analytics_daily_salts	uq_analytics_daily_salt	0
+analytics_daily_subjects	fk_analytics_subjects_clinic	1
+analytics_daily_subjects	uq_analytics_daily_subject	0
+checkins	idx_checkins_patient_date	1
+### chaves estrangeiras novas
+fks
+2
+### contador duplicado é recusado
+ERROR 1062 Duplicate entry (esperado)
+### migrations
+migration
+2026_10_22_000049_create_adherence_analytics

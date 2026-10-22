@@ -1,0 +1,259 @@
+{
+ "driver": "mysql",
+ "pass": 42,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "checkin",
+   "name": "Resumo do app traz checkin_today = null antes do primeiro check-in",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Entradas inválidas → 422 VALIDATION_ERROR com mensagem (7 casos)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Nada gravado e nada contado nas métricas pelas inválidas",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Sem token → 401",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Primeiro envio → 201, created, campos fechados, observação aparada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "O dia vem do servidor (data enviada pelo cliente é ignorada) e vai para a própria paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Segundo envio no mesmo dia corrige o primeiro → 200, created=false, mesma linha",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "GET /checkin/today e o resumo do app mostram o check-in corrigido",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Auditado (registrado e corrigido), só com ids: sem % de adesão, energia ou observação",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "isolamento",
+   "name": "Check-in da Carla fica na clínica 2 e não toca no da Ana",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "checkin",
+   "name": "Perfil 360 da Ana mostra o check-in do app para a nutricionista",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Check-in: 2 envios da Ana contam 2 registros e 1 paciente no dia (clínica 1)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Plano visto: cada abertura do resumo com plano conta; 1 paciente distinta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Paciente sem plano publicado (Bruno) abre o app: não conta como plano visto",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Hidratação: 7 registros de 6 pacientes no dia",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Registro recusado (volume inválido, 422) não conta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Check-in da Carla conta na clínica 2, não na 1",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "privacidade",
+   "name": "Agregado sem coluna de paciente ou valor (só data, clínica, métrica e contagens)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "privacidade",
+   "name": "Pseudônimo do dia: só hash de 64 hex, que não sai do id nem da APP_KEY",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "privacidade",
+   "name": "Um sal aleatório por dia (64 hex), diferente da APP_KEY",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "privacidade",
+   "name": "Nenhum nome, e-mail, observação ou volume nas tabelas de métricas",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "resiliência",
+   "name": "Com o armazenamento das métricas quebrado, água e check-in da paciente funcionam (200)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "chave",
+   "name": "Desligado em Configurações: a paciente segue registrando, e nada é contado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "chave",
+   "name": "Mudança da chave auditada (ADMIN_SETTINGS_UPDATED com analytics_adherence_enabled)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "chave",
+   "name": "Painel avisa que a coleta está desligada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "chave",
+   "name": "Religado: volta a contar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "coleta",
+   "name": "Check-in: 5 pacientes distintas na clínica 1 (uma enviou com a coleta desligada e não conta)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Superadmin abre /admin/metricas-adesao (200) com o período de 7 dias",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Hidratação e check-in aparecem com números (6 e 6 pacientes no período, a Carla da clínica 2 entra no total)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Plano visto (1 paciente) aparece como \"menos de 5\" — corte mínimo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Por clínica: a clínica 1 (7 pacientes no app) aparece; a 2 (1 paciente) fica fora e é contada à parte",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Sem nome, e-mail ou valor de paciente na página",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Menu da plataforma mostra \"Métricas de adesão\" para quem tem a permissão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Suporte (sem analytics.read) não acessa: volta ao painel e não vê o menu",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Recusa do suporte auditada (ADMIN_ACCESS_DENIED analytics.read)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Dona de clínica (não é da plataforma) não acessa",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "painel",
+   "name": "Sem login → /login",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "retenção",
+   "name": "Virada do dia: sal e pseudônimos de ontem são apagados; agregados ficam",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "retenção",
+   "name": "Agregado com mais de 24 meses é apagado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "retenção",
+   "name": "Depois da limpeza o painel continua com os números de ontem",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "retenção",
+   "name": "Novo dia ganha sal novo; a Ana conta de novo como paciente distinta hoje",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "retenção",
+   "name": "O agendador (bin/cron_scheduler.php) executa a limpeza das métricas",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

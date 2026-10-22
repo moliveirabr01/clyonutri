@@ -1,0 +1,95 @@
+{
+    "mode": "all",
+    "mysql_version": "8.0.46-0ubuntu0.24.04.4",
+    "fresh": {
+        "ok": true,
+        "migrations_total": 49,
+        "migrations_applied": 49,
+        "rerun_pending": 0,
+        "schema": {
+            "version": "2026_10_22_000049_create_adherence_analytics",
+            "migrations_recorded": 49,
+            "tables": 94,
+            "columns": 1025,
+            "indexes": 309,
+            "foreign_keys": 168,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac"
+        },
+        "detail": "Todas as migrations aplicadas; reexecução sem pendências."
+    },
+    "upgrade": {
+        "ok": true,
+        "base_version": "2026_10_19_000043_harden_meal_plan_prescriptions",
+        "target_version": "2026_10_22_000049_create_adherence_analytics",
+        "migrations_upgraded": 6,
+        "rows_before": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "rows_after": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "data_preserved": true,
+        "schema": {
+            "version": "2026_10_22_000049_create_adherence_analytics",
+            "migrations_recorded": 49,
+            "tables": 94,
+            "columns": 1025,
+            "indexes": 309,
+            "foreign_keys": 168,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac"
+        },
+        "detail": "Upgrade de 6 migrations com dados preservados."
+    },
+    "install_sql": {
+        "ok": true,
+        "pending_after_import": [],
+        "schema": {
+            "version": "2026_10_22_000049_create_adherence_analytics",
+            "migrations_recorded": 49,
+            "tables": 94,
+            "columns": 1025,
+            "indexes": 309,
+            "foreign_keys": 168,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac"
+        },
+        "detail": "SQL de instalação importado; nenhuma migration pendente."
+    },
+    "fingerprints_identical": true,
+    "fingerprints": {
+        "fresh": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac",
+        "upgrade": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac",
+        "install_sql": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac"
+    },
+    "schema": {
+        "version": "2026_10_22_000049_create_adherence_analytics",
+        "migrations_recorded": 49,
+        "tables": 94,
+        "columns": 1025,
+        "indexes": 309,
+        "foreign_keys": 168,
+        "collations": [
+            "ascii_bin",
+            "utf8mb4_unicode_ci"
+        ],
+        "fingerprint": "95e7708e217d4581a82f47e2aab0cd6e6d54b2be0c187027307240d06655f1ac"
+    },
+    "ok": true
+}

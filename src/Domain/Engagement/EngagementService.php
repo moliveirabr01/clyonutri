@@ -48,6 +48,97 @@ class EngagementService
         ];
     }
 
+    /** NI2-96: escala do check-in do app ("quanto do plano você seguiu hoje"). */
+    public const CHECKIN_ADHERENCE_STEPS = [0, 25, 50, 75, 100];
+    public const CHECKIN_NOTES_MAX = 500;
+
+    /**
+     * NI2-96: check-in diário da paciente pelo app. Um por dia (no fuso da aplicação); um segundo envio no
+     * mesmo dia corrige o primeiro. O dia vem sempre do servidor. Auditado só com ids.
+     * @return array{checkin: array, created: bool}
+     */
+    public function submitDailyCheckin(int $patientId, array $input): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $adh = $input['meal_adherence_pct'] ?? null;
+        if (!is_int($adh) || !in_array($adh, self::CHECKIN_ADHERENCE_STEPS, true)) {
+            throw new \InvalidArgumentException('Escolha quanto do plano você seguiu hoje (0, 25, 50, 75 ou 100%).');
+        }
+        $level = static function ($v, string $label): ?int {
+            if ($v === null) {
+                return null;
+            }
+            if (!is_int($v) || $v < 1 || $v > 5) {
+                throw new \InvalidArgumentException("{$label} vai de 1 a 5.");
+            }
+            return $v;
+        };
+        $energy = $level($input['energy_level'] ?? null, 'A energia');
+        $hunger = $level($input['hunger_level'] ?? null, 'A fome');
+        $notes = $input['notes'] ?? null;
+        if ($notes !== null && !is_string($notes)) {
+            throw new \InvalidArgumentException('A observação precisa ser um texto.');
+        }
+        $notes = $notes !== null ? trim($notes) : null;
+        if ($notes === '') {
+            $notes = null;
+        }
+        if ($notes !== null && mb_strlen($notes) > self::CHECKIN_NOTES_MAX) {
+            throw new \InvalidArgumentException('A observação pode ter até ' . self::CHECKIN_NOTES_MAX . ' caracteres.');
+        }
+
+        $now = new \DateTimeImmutable('now', new \DateTimeZone(date_default_timezone_get()));
+        $today = $now->format('Y-m-d');
+        $stamp = $now->format('Y-m-d H:i:s');
+        $existing = $this->findCheckin($clinicId, $patientId, $today);
+        if ($existing) {
+            $this->db->prepare('UPDATE checkins SET energy_level = ?, hunger_level = ?, meal_adherence_pct = ?, notes = ?, updated_at = ? WHERE id = ?')
+                ->execute([$energy, $hunger, $adh, $notes, $stamp, (int)$existing['id']]);
+            $id = (int)$existing['id'];
+        } else {
+            $this->db->prepare('INSERT INTO checkins (clinic_id, patient_id, energy_level, hunger_level, meal_adherence_pct, notes, checkin_date, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')->execute([$clinicId, $patientId, $energy, $hunger, $adh, $notes, $today, $stamp, $stamp]);
+            $id = (int)$this->db->lastInsertId();
+        }
+        (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log($existing ? 'PATIENT_CHECKIN_UPDATED' : 'PATIENT_CHECKIN_RECORDED', 'checkins', (string)$id, ['patient_id' => $patientId]);
+
+        return ['checkin' => $this->presentCheckin($this->findCheckin($clinicId, $patientId, $today)), 'created' => !$existing];
+    }
+
+    /** Check-in de hoje da paciente (ou null). */
+    public function todayCheckin(int $patientId): ?array
+    {
+        $clinicId = TenantContext::getClinicId();
+        $row = $this->findCheckin($clinicId, $patientId, (new \DateTimeImmutable('now', new \DateTimeZone(date_default_timezone_get())))->format('Y-m-d'));
+        return $row ? $this->presentCheckin($row) : null;
+    }
+
+    private function findCheckin(int $clinicId, int $patientId, string $day): ?array
+    {
+        $st = $this->db->prepare('SELECT * FROM checkins WHERE clinic_id = ? AND patient_id = ? AND checkin_date = ? ORDER BY id DESC LIMIT 1');
+        $st->execute([$clinicId, $patientId, $day]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        $st->closeCursor();
+        return $row;
+    }
+
+    private function presentCheckin(?array $r): ?array
+    {
+        if (!$r) {
+            return null;
+        }
+        return [
+            'id' => (int)$r['id'],
+            'checkin_date' => (string)$r['checkin_date'],
+            'meal_adherence_pct' => $r['meal_adherence_pct'] !== null ? (int)$r['meal_adherence_pct'] : null,
+            'energy_level' => $r['energy_level'] !== null ? (int)$r['energy_level'] : null,
+            'hunger_level' => $r['hunger_level'] !== null ? (int)$r['hunger_level'] : null,
+            'notes' => $r['notes'] !== null ? (string)$r['notes'] : null,
+        ];
+    }
+
     public function recordCheckin(int $patientId, array $data): array
     {
         $clinicId = TenantContext::getClinicId();

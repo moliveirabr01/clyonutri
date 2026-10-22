@@ -1,0 +1,44 @@
+PASS [checkin] Resumo do app traz checkin_today = null antes do primeiro check-in
+PASS [checkin] Entradas inválidas → 422 VALIDATION_ERROR com mensagem (7 casos)
+PASS [checkin] Nada gravado e nada contado nas métricas pelas inválidas
+PASS [checkin] Sem token → 401
+PASS [checkin] Primeiro envio → 201, created, campos fechados, observação aparada
+PASS [checkin] O dia vem do servidor (data enviada pelo cliente é ignorada) e vai para a própria paciente
+PASS [checkin] Segundo envio no mesmo dia corrige o primeiro → 200, created=false, mesma linha
+PASS [checkin] GET /checkin/today e o resumo do app mostram o check-in corrigido
+PASS [checkin] Auditado (registrado e corrigido), só com ids: sem % de adesão, energia ou observação
+PASS [isolamento] Check-in da Carla fica na clínica 2 e não toca no da Ana
+PASS [checkin] Perfil 360 da Ana mostra o check-in do app para a nutricionista
+PASS [coleta] Check-in: 2 envios da Ana contam 2 registros e 1 paciente no dia (clínica 1)
+PASS [coleta] Plano visto: cada abertura do resumo com plano conta; 1 paciente distinta
+PASS [coleta] Paciente sem plano publicado (Bruno) abre o app: não conta como plano visto
+PASS [coleta] Hidratação: 7 registros de 6 pacientes no dia
+PASS [coleta] Registro recusado (volume inválido, 422) não conta
+PASS [coleta] Check-in da Carla conta na clínica 2, não na 1
+PASS [privacidade] Agregado sem coluna de paciente ou valor (só data, clínica, métrica e contagens)
+PASS [privacidade] Pseudônimo do dia: só hash de 64 hex, que não sai do id nem da APP_KEY
+PASS [privacidade] Um sal aleatório por dia (64 hex), diferente da APP_KEY
+PASS [privacidade] Nenhum nome, e-mail, observação ou volume nas tabelas de métricas
+PASS [resiliência] Com o armazenamento das métricas quebrado, água e check-in da paciente funcionam (200)
+PASS [chave] Desligado em Configurações: a paciente segue registrando, e nada é contado
+PASS [chave] Mudança da chave auditada (ADMIN_SETTINGS_UPDATED com analytics_adherence_enabled)
+PASS [chave] Painel avisa que a coleta está desligada
+PASS [chave] Religado: volta a contar
+PASS [coleta] Check-in: 5 pacientes distintas na clínica 1 (uma enviou com a coleta desligada e não conta)
+PASS [painel] Superadmin abre /admin/metricas-adesao (200) com o período de 7 dias
+PASS [painel] Hidratação e check-in aparecem com números (6 e 6 pacientes no período, a Carla da clínica 2 entra no total)
+PASS [painel] Plano visto (1 paciente) aparece como "menos de 5" — corte mínimo
+PASS [painel] Por clínica: a clínica 1 (7 pacientes no app) aparece; a 2 (1 paciente) fica fora e é contada à parte
+PASS [painel] Sem nome, e-mail ou valor de paciente na página
+PASS [painel] Menu da plataforma mostra "Métricas de adesão" para quem tem a permissão
+PASS [painel] Suporte (sem analytics.read) não acessa: volta ao painel e não vê o menu
+PASS [painel] Recusa do suporte auditada (ADMIN_ACCESS_DENIED analytics.read)
+PASS [painel] Dona de clínica (não é da plataforma) não acessa
+PASS [painel] Sem login → /login
+PASS [retenção] Virada do dia: sal e pseudônimos de ontem são apagados; agregados ficam
+PASS [retenção] Agregado com mais de 24 meses é apagado
+PASS [retenção] Depois da limpeza o painel continua com os números de ontem
+PASS [retenção] Novo dia ganha sal novo; a Ana conta de novo como paciente distinta hoje
+PASS [retenção] O agendador (bin/cron_scheduler.php) executa a limpeza das métricas
+
+NI2-96 (MySQL): 42 PASS, 0 FAIL

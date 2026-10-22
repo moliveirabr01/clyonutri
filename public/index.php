@@ -498,6 +498,7 @@ $router->post('/receitas/{id}/duplicar', $requireAuth([$recipeCtrl, 'duplicate']
 $router->get('/admin', $requireAuth([$adminCtrl, 'index']));
 $router->get('/admin/dashboard', $requireAuth([$adminCtrl, 'dashboard']));
 $router->get('/admin/teleconsulta/metricas', $requireAuth([$adminCtrl, 'teleconsultationMetrics']));
+$router->get('/admin/metricas-adesao', $requireAuth([$adminCtrl, 'adherenceMetrics']));
 $router->get('/admin/clinicas', $requireAuth([$adminCtrl, 'clinics']));
 $router->post('/admin/clinicas/{id}/status', $requireAuth([$adminCtrl, 'updateClinicStatus']));
 $router->get('/admin/usuarios', $requireAuth([$adminCtrl, 'users']));
@@ -895,12 +896,19 @@ $router->get('/api/v1/patient/home', function() use ($authenticatePatientApi, $d
     $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
     $waterToday = (int)$hStmt->fetchColumn();
 
+    $checkinToday = (new \ClyoNutri\Domain\Engagement\EngagementService($db))->todayCheckin($patientId);
+    // NI2-96: métrica agregada "plano visto" (sem conteúdo do plano, sem id da paciente no agregado).
+    if ($plan) {
+        (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::PLAN_VIEWED, (int)$auth['clinic_id'], $patientId);
+    }
+
     echo json_encode([
         'patient_name' => $auth['patient_name'],
         'water_ml_today' => $waterToday,
         'water_goal_ml' => $waterGoal,
         'next_appointment' => $nextApp,
         'active_plan' => $plan,
+        'checkin_today' => $checkinToday,
     ]);
 });
 
@@ -931,8 +939,32 @@ $router->post('/api/v1/patient/hydration', function() use ($authenticatePatientA
     $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = :today");
     $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
     $res['total_water_today'] = (int)$hStmt->fetchColumn();
+    (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::HYDRATION_LOGGED, (int)$auth['clinic_id'], $patientId);
 
     echo json_encode($res);
+});
+
+// Check-in diário (NI2-96): quanto do plano seguiu hoje (0–100 em passos de 25), energia e fome opcionais (1–5),
+// observação opcional. Um por dia; reenviar no mesmo dia corrige. O dia vem do servidor.
+$router->get('/api/v1/patient/checkin/today', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    echo json_encode(['checkin' => (new \ClyoNutri\Domain\Engagement\EngagementService($db))->todayCheckin((int)$auth['patient_id'])], JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/checkin', function() use ($authenticatePatientApi, $db, $getJsonInput) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    try {
+        $res = (new \ClyoNutri\Domain\Engagement\EngagementService($db))->submitDailyCheckin($patientId, $getJsonInput());
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::CHECKIN_SUBMITTED, (int)$auth['clinic_id'], $patientId);
+    http_response_code($res['created'] ? 201 : 200);
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
 });
 
 // Próxima consulta: ações da paciente (NI2-137). Tudo passa pelo motor da agenda e pela política da clínica.

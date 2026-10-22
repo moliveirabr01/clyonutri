@@ -1,0 +1,5 @@
+FAIL [checkin] Resumo do app traz checkin_today = null antes do primeiro check-in
+FAIL [checkin] Entradas inválidas → 422 VALIDATION_ERROR com mensagem (7 casos) → [[404,"Rota não encontrada"],[404,"Rota não encontrada"],[404,"Rota não encontrada"],[404,"Rota não encontrada"],[404,"Rota não encontrada"],[404,"Rota não encontrada"],[404,"Rota não encontrada"]]
+FAIL [erro] Execução sem exceção → "Error: Command failed: php <arvore-6e2b1d6>/tests/support/ni2_96_fixture.php sql SELECT event_count, unique_patients FROM analytics_daily_metrics WHERE metric = 'checkin_submitted' AND clinic_id = 1 AND metric_date = '2026-10-22'\nPHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: analytics_daily_metrics in <arvore-6e2b1d6>/tests/support/ni2_96_fixture.php:40\nStack trace:\n#0 <arvore-6e2b1d6>/tests/support/ni2_96_fixture.php(40): PDO->query()\n#1 {main}\n  thrown 
+
+NI2-96 (SQLite): 0 PASS, 3 FAIL

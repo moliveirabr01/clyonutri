@@ -16,6 +16,7 @@ import {
 import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
 import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
+import DailyCheckinCard from '../components/DailyCheckinCard';
 import PatientChat from '../components/PatientChat';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
@@ -390,6 +391,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             {/* Card da próxima consulta (NI2-137): data com fuso, modalidade, local e ações liberadas pelo consultório */}
             <NextAppointmentCard appointment={nextApp} onChanged={reloadHome} onOpenTelehealth={handleOpenTelehealth} />
             {telehealthError && <Text style={{ color: t.error, marginBottom: t.space }} accessibilityRole="alert" accessibilityLiveRegion="assertive">{telehealthError}</Text>}
+
+            {/* NI2-96: check-in do dia (um por dia, corrigível no mesmo dia) */}
+            <DailyCheckinCard checkin={homeData?.checkin_today ?? null} />
 
             {/* Card de Hidratação Diária com persistência no servidor (Critério 3 e PX-20 / NI2-313) */}
             <View

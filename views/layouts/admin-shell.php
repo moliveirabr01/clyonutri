@@ -573,6 +573,12 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
           <span>Dashboard</span>
         </a>
+        <?php if (\ClyoNutri\Core\Security\PlatformPolicy::can($operatorRole ?? '', 'analytics.read')): ?>
+        <a href="/admin/metricas-adesao" class="admin-nav__item <?= ($activeNav ?? '') === 'metricas-adesao' ? 'active' : '' ?>">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
+          <span>Métricas de adesão</span>
+        </a>
+        <?php endif; ?>
 
         <?php if (\ClyoNutri\Core\Security\PlatformPolicy::can($operatorRole ?? '', 'clinics.read') || \ClyoNutri\Core\Security\PlatformPolicy::can($operatorRole ?? '', 'users.read') || \ClyoNutri\Core\Security\PlatformPolicy::can($operatorRole ?? '', 'tickets.read')): ?>
         <div class="admin-nav__group-label">Gestão de Plataforma</div>

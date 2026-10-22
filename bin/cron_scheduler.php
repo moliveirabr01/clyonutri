@@ -50,6 +50,7 @@ class HostGatorCronScheduler
         $this->pruneOldLogs();
         $this->sendTeleconsultationReminders();
         $this->purgeChatRetention();
+        $this->purgeAnalyticsPseudonyms();
 
         $elapsed = round(microtime(true) - $startTime, 3);
         $this->executionLog['duration_seconds'] = $elapsed;
@@ -143,6 +144,16 @@ class HostGatorCronScheduler
         }
     }
 
+    /** NI2-96: a cada execução apaga sal e pseudônimos de dias encerrados e agregados com mais de 24 meses. */
+    private function purgeAnalyticsPseudonyms(): void
+    {
+        try {
+            $this->executionLog['analytics_purge'] = (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics())->purge();
+        } catch (\Throwable $e) {
+            $this->executionLog['analytics_purge'] = 'error: ' . get_class($e);
+        }
+    }
+
     private function pruneExpiredTokens(): void
     {
         // Purga sessões e tokens com mais de 30 dias
@@ -189,6 +200,8 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     $tele = $report['teleconsultation_reminders'] ?? 'n/d';
     echo " Lembretes : " . (is_array($tele) ? "enviados {$tele['sent']}, falhas {$tele['failed']}, sem e-mail {$tele['skipped']}" : $tele) . "\n";
     echo " Login     : " . ($report['login_attempts_pruned'] ?? '-') . " registro(s) antigo(s) de tentativa removido(s)\n";
+    $ap = $report['analytics_purge'] ?? '-';
+    echo " Métricas  : " . (is_array($ap) ? "analytics_purge pseudônimos {$ap['subjects']}, sais {$ap['salts']}, agregados antigos {$ap['aggregates']}" : "analytics_purge {$ap}") . "\n";
     echo " Duração   : " . $report['duration_seconds'] . "s\n";
     echo " Status    : ✓ Concluído dentro da janela de compliance da HostGator.\n";
     echo "========================================================================\n";

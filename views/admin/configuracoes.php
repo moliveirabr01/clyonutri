@@ -87,6 +87,22 @@
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background-color: var(--admin-gray-50); border: 1px solid var(--admin-gray-200); border-radius: 6px;">
           <label style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--admin-gray-800); cursor: pointer; flex: 1;">
             <?php if ($canManage): ?>
+              <input type="hidden" name="analytics_adherence_enabled" value="0">
+            <?php endif; ?>
+            <input type="checkbox" name="analytics_adherence_enabled" value="1" <?= ($settings['analytics_adherence_enabled'] ?? '1') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>
+            <div>
+              <strong>Métricas de adesão agregadas (NI2-96)</strong>
+              <div style="font-size: 0.78rem; color: var(--admin-gray-500);">Conta, por dia e clínica, plano visto, check-ins e registros de água. Sem id de paciente nem conteúdo clínico. Desligar para a coleta na hora.</div>
+            </div>
+          </label>
+          <span class="badge <?= ($settings['analytics_adherence_enabled'] ?? '1') === '1' ? 'badge--success' : 'badge--suspended' ?>">
+            <?= ($settings['analytics_adherence_enabled'] ?? '1') === '1' ? 'Coletando' : 'Desligado' ?>
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background-color: var(--admin-gray-50); border: 1px solid var(--admin-gray-200); border-radius: 6px;">
+          <label style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--admin-gray-800); cursor: pointer; flex: 1;">
+            <?php if ($canManage): ?>
               <input type="hidden" name="feature_flag_audit_immutable" value="0">
             <?php endif; ?>
             <input type="checkbox" name="feature_flag_audit_immutable" value="1" <?= ($settings['feature_flag_audit_immutable'] ?? '1') === '1' ? 'checked' : '' ?> <?= !$canManage ? 'disabled' : '' ?>>

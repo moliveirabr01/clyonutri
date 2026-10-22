@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClyoNutri — API do paciente",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
   },
   "servers": [
@@ -278,7 +278,8 @@
           "401": {
             "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "description": "NI2-96: quando há plano publicado, a abertura conta na métrica agregada plan_viewed (sem conteúdo do plano)."
       }
     },
     "/patient/hydration": {
@@ -345,7 +346,8 @@
               }
             }
           }
-        }
+        },
+        "description": "NI2-96: cada registro aceito conta na métrica agregada hydration_logged (sem o volume)."
       }
     },
     "/patient/appointment/confirm": {
@@ -2034,6 +2036,139 @@
           }
         }
       }
+    },
+    "/patient/checkin": {
+      "post": {
+        "summary": "Envia ou corrige o check-in de hoje",
+        "operationId": "patientSubmitCheckin",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "description": "Um check-in por dia. Reenviar no mesmo dia corrige o anterior (200). Auditado só com ids (PATIENT_CHECKIN_RECORDED / PATIENT_CHECKIN_UPDATED). Conta na métrica agregada checkin_submitted (NI2-96), sem valores.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyCheckinInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Criado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkin": {
+                      "$ref": "#/components/schemas/DailyCheckin"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "checkin",
+                    "created"
+                  ]
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Corrigido (mesmo dia)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkin": {
+                      "$ref": "#/components/schemas/DailyCheckin"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "checkin",
+                    "created"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/checkin/today": {
+      "get": {
+        "summary": "Check-in de hoje",
+        "operationId": "patientTodayCheckin",
+        "tags": [
+          "Paciente"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkin": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/DailyCheckin"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "checkin"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2404,6 +2539,17 @@
               "null"
             ],
             "description": "Plano publicado vigente da própria paciente"
+          },
+          "checkin_today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyCheckin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NI2-96: check-in de hoje, ou null"
           }
         },
         "required": [
@@ -3383,6 +3529,108 @@
             }
           }
         ]
+      },
+      "DailyCheckin": {
+        "type": "object",
+        "description": "NI2-96: check-in diário da paciente (um por dia, no fuso do consultório).",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "checkin_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "meal_adherence_pct": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "enum": [
+              0,
+              25,
+              50,
+              75,
+              100,
+              null
+            ]
+          },
+          "energy_level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "hunger_level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "checkin_date",
+          "meal_adherence_pct",
+          "energy_level",
+          "hunger_level",
+          "notes"
+        ],
+        "additionalProperties": false
+      },
+      "DailyCheckinInput": {
+        "type": "object",
+        "properties": {
+          "meal_adherence_pct": {
+            "type": "integer",
+            "enum": [
+              0,
+              25,
+              50,
+              75,
+              100
+            ],
+            "description": "Quanto do plano seguiu hoje"
+          },
+          "energy_level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "hunger_level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "meal_adherence_pct"
+        ],
+        "description": "O dia é sempre o do servidor; qualquer outro campo é ignorado."
       }
     }
   }

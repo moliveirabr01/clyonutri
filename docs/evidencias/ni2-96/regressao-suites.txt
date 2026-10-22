@@ -1,0 +1,47 @@
+# Regressão NI2-96 — 2026-10-22 (PHP 8, SQLite isolado por suíte)
+
+## 97 suítes legadas
+77 PASS na rodada completa. As 19 falhas da linha de base anteriores à NI2-138 seguem iguais:
+FAIL tests/agenda_and_consultation_lifecycle_test.php
+FAIL tests/anthropometry_lifecycle_and_evaluation_test.php
+FAIL tests/assisted_navigation_audit_test.php
+FAIL tests/aud_remediation_360_security_and_backoffice_test.php
+FAIL tests/food_catalog_pagination_test.php
+FAIL tests/helpdesk_indicators_performance_benchmark_test.php
+FAIL tests/landing_page_verification_test.php
+FAIL tests/laravel_replatform_verification_test.php
+FAIL tests/mysql8_migrations_and_ddl_validation_test.php
+FAIL tests/ni2_209_remediation_and_go_live_gate_test.php
+FAIL tests/ni2_298_calendar_integration_test.php
+FAIL tests/ni2_429_csp_headers_test.php
+FAIL tests/ni2_5_patient_management_test.php
+FAIL tests/onda_2_experience_foundations_e2e_test.php
+FAIL tests/onda_3_productivity_e2e_test.php
+FAIL tests/patient_portal_e2e_suite_test.php
+FAIL tests/replatform_infrastructure_test.php
+FAIL tests/runtime_platform_settings_and_commercial_metrics_test.php
+FAIL tests/verifiable_multilateral_audit_suite_test.php
+
+dashboard_review_fixes_test falhou 1 vez na rodada completa (rodando em paralelo com o lote HTTP: '[FAIL] Após logout o dashboard exige login'); sozinho, 3 de 3 PASS:
+PASS tests/dashboard_review_fixes_test.php
+PASS tests/dashboard_review_fixes_test.php
+PASS tests/dashboard_review_fixes_test.php
+
+## Testes HTTP/navegador (rotas reais, php -S)
+ni2_89_patient_api_real_test rc=0 NI2-89: 50 PASS, 0 FAIL
+ni2_91_privacy_real_test rc=0 NI2-91 (SQLite): 34 PASS, 0 FAIL
+ni2_135_evolution_real_test rc=0 NI2-135 (SQLite): 52 PASS, 0 FAIL
+ni2_135_internal_notes_real_test rc=0 NI2-135 anotações internas: 9 PASS, 0 FAIL
+ni2_135_app_web_real_test rc=0 NI2-135 app (web): 14 PASS, 0 FAIL
+ni2_137_patient_next_appointment_actions_real_test rc=0 NI2-137 (SQLite): 85 PASS, 0 FAIL
+ni2_137_app_web_real_test rc=0 NI2-137 app (web): 31 PASS, 0 FAIL
+ni2_138_secure_chat_real_test rc=0 NI2-138 (SQLite): 71 PASS, 0 FAIL
+ni2_138_app_web_real_test rc=0 NI2-138 app (web): 23 PASS, 0 FAIL
+ni2_433_self_service_booking_real_test rc=0 NI2-433 (SQLite): 70 verificações PASS
+ni2_412_ux01_ux02_real_test rc=0 NI2-412 UX-01/UX-02 (atual): 36/36 PASS
+ni2_412_ux03_ux13_real_test rc=0 NI2-412 UX-03..UX-13: 124 PASS, 0 FAIL, 1 BLOCKED
+ni2_298_real_http_test rc=0 23/23 checks passed
+ni2_437_real_http_test rc=0 NI2-437 E2E: 48 verificações PASS
+
+ni2_96 SQLite: 42 PASS, 0 FAIL · ni2_96 MySQL 8.0.46: 42 PASS, 0 FAIL · ni2_96 app/painel web: 15 PASS, 0 FAIL
+ni2_294 (cliente TS compilado): 34/34 checks passed · ni2_323 cliente mobile: PASS · typecheck do app (tsc --noEmit): OK

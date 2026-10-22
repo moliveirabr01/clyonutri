@@ -1,0 +1,64 @@
+{
+ "checks": [
+  {
+   "n": "Home mostra \"Check-in de hoje\" com a pergunta e as opções",
+   "ok": true
+  },
+  {
+   "n": "Enviar sem escolher: aviso dentro do card, nada gravado",
+   "ok": true
+  },
+  {
+   "n": "Card de check-in sem violações WCAG 2 A/AA (axe), preenchendo",
+   "ok": true
+  },
+  {
+   "n": "Falha de rede: erro dentro do card, escolhas mantidas, nada gravado",
+   "ok": true
+  },
+  {
+   "n": "Envio grava 75% / energia 4 / observação e o card mostra o resumo",
+   "ok": true
+  },
+  {
+   "n": "Correção no mesmo dia: uma linha, agora 50%",
+   "ok": true
+  },
+  {
+   "n": "Depois de recarregar, o card mostra o check-in salvo (vem do servidor)",
+   "ok": true
+  },
+  {
+   "n": "Card de check-in sem violações WCAG 2 A/AA (axe), enviado",
+   "ok": true
+  },
+  {
+   "n": "Sem rolagem horizontal a 390 px",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script no app",
+   "ok": true
+  },
+  {
+   "n": "Painel mostra hidratação e check-in (5 e 6 pacientes) e \"menos de 5\" para plano visto",
+   "ok": true
+  },
+  {
+   "n": "Menu \"Métricas de adesão\" ativo e aviso de privacidade visível",
+   "ok": true
+  },
+  {
+   "n": "Página de métricas sem violações WCAG 2 A/AA (axe, área de conteúdo)",
+   "ok": true
+  },
+  {
+   "n": "Configurações globais têm a chave \"Métricas de adesão agregadas\", ligada",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script no painel",
+   "ok": true
+  }
+ ]
+}
