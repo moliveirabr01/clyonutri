@@ -11,7 +11,7 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 /**
- * NI2-95: avisos da paciente (plano novo, lembrete de consulta, mensagem) e o que ela quer receber por e-mail
+ * NI2-95: avisos da paciente (plano novo, lembrete de consulta, mensagem, lembrete de check-in) e o que ela quer receber por e-mail
  * e no celular. As chaves de push só aparecem quando o servidor está com o push ligado (push_available).
  */
 export default function PatientNotifications({ active }: { active: boolean }) {
@@ -21,6 +21,7 @@ export default function PatientNotifications({ active }: { active: boolean }) {
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [quietStart, setQuietStart] = useState('22:00');
   const [quietEnd, setQuietEnd] = useState('07:00');
+  const [checkinTime, setCheckinTime] = useState('20:00');
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,6 +32,7 @@ export default function PatientNotifications({ active }: { active: boolean }) {
       const [inbox, p] = await Promise.all([ApiService.getNotifications(), ApiService.getNotificationPreferences()]);
       setItems(inbox.items); setUnread(inbox.unread_count); setNextBefore(inbox.next_before_id);
       setPrefs(p); setQuietStart(p.quiet_hours.start); setQuietEnd(p.quiet_hours.end);
+      if (p.checkin_reminder) setCheckinTime(p.checkin_reminder.time);
     } catch (e) {
       setError(errorText(e, 'Não foi possível carregar seus avisos. Tente novamente.'));
     }
@@ -62,6 +64,7 @@ export default function PatientNotifications({ active }: { active: boolean }) {
     try {
       const p = await ApiService.saveNotificationPreferences(update);
       setPrefs(p); setQuietStart(p.quiet_hours.start); setQuietEnd(p.quiet_hours.end); setFeedback(ok);
+      if (p.checkin_reminder) setCheckinTime(p.checkin_reminder.time);
     } catch (e) {
       setError(errorText(e, 'Não foi possível salvar. Verifique sua conexão e tente de novo.'));
     } finally { setBusy(false); }
@@ -69,6 +72,10 @@ export default function PatientNotifications({ active }: { active: boolean }) {
   const saveQuiet = () => {
     if (!HHMM.test(quietStart) || !HHMM.test(quietEnd)) { setError('Use o formato HH:MM, por exemplo 22:00.'); return; }
     void save({ quiet_hours: { start: quietStart, end: quietEnd } }, 'Horário de silêncio salvo.');
+  };
+  const saveCheckinTime = () => {
+    if (!HHMM.test(checkinTime)) { setError('Use o formato HH:MM, por exemplo 20:00.'); return; }
+    void save({ checkin_reminder: { time: checkinTime } }, `Lembrete de check-in às ${checkinTime}.`);
   };
 
   return (
@@ -114,6 +121,23 @@ export default function PatientNotifications({ active }: { active: boolean }) {
             ? <Text style={s.helper}>Primeira chave: e-mail. Segunda: celular. Se o celular não avisar, confira se as notificações do app estão permitidas nos ajustes do aparelho.</Text>
             : <Text style={s.helper}>Aviso no celular ainda não está disponível.</Text>}
 
+          {prefs.checkin_reminder?.available && (
+            <>
+              <Text style={[s.title, { marginTop: 12 }]} accessibilityRole="header">Lembrete de check-in</Text>
+              <View style={s.row}>
+                <Text style={s.body}>Me lembrar se eu ainda não tiver feito o check-in do dia</Text>
+                <Switch accessibilityLabel="Ligar lembrete de check-in" value={prefs.checkin_reminder.enabled} disabled={busy}
+                  onValueChange={(v) => save({ checkin_reminder: { enabled: v, time: checkinTime } }, v ? `Lembrete de check-in ligado, às ${checkinTime}.` : 'Lembrete de check-in desligado.')} />
+              </View>
+              <View style={s.row}>
+                <Text style={s.body}>Horário</Text>
+                <TextInput accessibilityLabel="Horário do lembrete de check-in (HH:MM)" style={s.input} value={checkinTime} onChangeText={setCheckinTime} maxLength={5} keyboardType="numbers-and-punctuation" />
+                <TouchableOpacity accessibilityRole="button" style={s.button} disabled={busy} onPress={saveCheckinTime}><Text style={s.buttonText}>Salvar</Text></TouchableOpacity>
+              </View>
+              <Text style={s.helper}>Vem desligado. É no máximo um lembrete por dia, e só se o check-in ainda estiver em aberto. Ele chega pelo canal ligado em “Check-in diário” acima.</Text>
+            </>
+          )}
+
           <Text style={[s.title, { marginTop: 12 }]} accessibilityRole="header">Horário de silêncio</Text>
           <View style={s.row}>
             <Text style={s.body}>{prefs.push_available ? 'Não mandar e-mail nem aviso no celular neste horário' : 'Não mandar e-mail neste horário'}</Text>
@@ -126,7 +150,7 @@ export default function PatientNotifications({ active }: { active: boolean }) {
             <TextInput accessibilityLabel="Fim do silêncio (HH:MM)" style={s.input} value={quietEnd} onChangeText={setQuietEnd} maxLength={5} keyboardType="numbers-and-punctuation" />
             <TouchableOpacity accessibilityRole="button" style={s.button} disabled={busy} onPress={saveQuiet}><Text style={s.buttonText}>Salvar</Text></TouchableOpacity>
           </View>
-          <Text style={s.helper}>Horário de Brasília. Lembretes que caírem no silêncio chegam quando ele acabar; mensagens novas ficam só aqui no app.</Text>
+          <Text style={s.helper}>Horário de Brasília. Lembretes de consulta que caírem no silêncio chegam quando ele acabar; mensagens novas e o lembrete de check-in ficam só aqui no app.</Text>
           {feedback && <Text accessibilityRole="alert" style={s.ok}>{feedback}</Text>}
         </View>
       )}

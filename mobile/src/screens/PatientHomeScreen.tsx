@@ -201,7 +201,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   // NI2-95: aviso no celular. Pede permissão depois do login e, ao tocar no aviso, abre a aba certa.
   useEffect(() => {
     void setupPushNotifications();
-    return onPushOpened((category) => setCurrentTab(category === 'chat' ? 'Chat' : 'Perfil'));
+    // Lembrete de check-in abre em Hoje, onde fica o check-in do dia (NI2-96); os outros avisos, em Perfil.
+    return onPushOpened((category) => setCurrentTab(category === 'chat' ? 'Chat' : category === 'checkin' ? 'Hoje' : 'Perfil'));
   }, []);
 
   const onRefresh = useCallback(() => {

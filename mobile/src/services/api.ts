@@ -236,14 +236,17 @@ export interface PatientConsent { purpose: string; term_title: string | null; te
 export interface PrivacyRequest { id: number; request_type: string; status: string; deadline_at: string; completed_at?: string | null; response_notes?: string | null; created_at: string; already_open?: boolean; }
 export interface PatientPrivacyData { consents: PatientConsent[]; requests: PrivacyRequest[]; }
 // NI2-95: avisos e preferências de aviso.
-export type NotificationCategory = 'chat' | 'appointments' | 'plan';
+export type NotificationCategory = 'chat' | 'appointments' | 'plan' | 'checkin';
 export interface PatientNotification { id: number; event_type: string; category: NotificationCategory; title: string; body: string; link: string | null; created_at: string; read: boolean; }
 export interface NotificationInbox { items: PatientNotification[]; unread_count: number; next_before_id: number | null; }
 export interface NotificationCategoryPref { category: NotificationCategory; label: string; email_enabled: boolean; push_enabled: boolean; }
-export interface NotificationPreferences { categories: NotificationCategoryPref[]; quiet_hours: { enabled: boolean; start: string; end: string }; timezone: string; push_available: boolean; }
+/** NI2-95: lembrete do check-in diário (opt-in). available=false quando o app ainda não tem check-in diário. */
+export interface CheckinReminderPref { available: boolean; enabled: boolean; time: string; }
+export interface NotificationPreferences { categories: NotificationCategoryPref[]; quiet_hours: { enabled: boolean; start: string; end: string }; timezone: string; push_available: boolean; checkin_reminder?: CheckinReminderPref; }
 export interface NotificationPreferencesUpdate {
   categories?: Partial<Record<NotificationCategory, { email_enabled?: boolean; push_enabled?: boolean }>>;
   quiet_hours?: { enabled?: boolean; start?: string; end?: string };
+  checkin_reminder?: { enabled?: boolean; time?: string };
 }
 
 export interface PatientHomeData {
