@@ -122,6 +122,8 @@ class LgpdService
             $ntf->execute([$clinicId, $patientId]);
             $related['notifications'] = $ntf->fetchAll(PDO::FETCH_ASSOC);
             $related['notification_preferences'] = (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->preferences((int)$clinicId, 'patient', $patientId);
+            // Aparelhos cadastrados para o aviso no celular: plataforma e datas (o token em si não sai na exportação).
+            $related['push_devices'] = (new \ClyoNutri\Domain\Notification\PushTokenService($this->db))->devicesForExport((int)$clinicId, 'patient', $patientId);
         }
         // Registrar auditoria de exportação
         $this->auditLogger->log('LGPD_DATA_EXPORT', 'patients', (string)$patientId, ['patient_id' => $patientId, 'tables' => array_keys($related)]);
@@ -188,6 +190,14 @@ class LgpdService
 
             // NI2-95: avisos e preferências de aviso saem junto (nada de aviso pendente para quem foi anonimizado).
             if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'notification_events')) {
+                if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'notification_push_tokens')) {
+                    $this->db->prepare("DELETE FROM notification_push_tickets WHERE token_id IN (SELECT id FROM notification_push_tokens WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id)")
+                        ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                    $this->db->prepare("DELETE FROM notification_push_tickets WHERE delivery_id IN (SELECT d.id FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE e.clinic_id = :clinic_id AND e.recipient_type = 'patient' AND e.recipient_id = :id)")
+                        ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                    $this->db->prepare("DELETE FROM notification_push_tokens WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id")
+                        ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                }
                 $this->db->prepare("DELETE FROM notification_deliveries WHERE event_id IN (SELECT id FROM notification_events WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id)")
                     ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
                 foreach (['notification_events', 'notification_preferences', 'notification_quiet_hours'] as $nt) {

@@ -22,7 +22,7 @@ use PDO;
  *
  * Texto neutro: sem nome, sem conteúdo da mensagem e sem dado clínico.
  *
- * NI2-95: com a migration 49 aplicada, a decisão por canal passa pelo NotificationService (preferências por
+ * NI2-95: com a migration 51 aplicada, a decisão por canal passa pelo NotificationService (preferências por
  * categoria, silêncio, caixa de avisos). Sem ela, vale o caminho antigo abaixo.
  */
 final class ChatNotificationDispatcher
@@ -48,7 +48,7 @@ final class ChatNotificationDispatcher
             if ($domain->available()) {
                 return $this->viaDomain($domain, $clinicId, $conversationId, $messageId, $recipientType, $recipientId);
             }
-            // Banco ainda sem a migration 49: segue o caminho do NI2-138.
+            // Banco ainda sem a migration 51: segue o caminho do NI2-138.
             $prefs = $this->preferences($clinicId, $recipientType, $recipientId);
             $result['in_app'] = $this->record($clinicId, $conversationId, $messageId, $recipientType, $recipientId, 'in_app', 'sent', null);
             $result['email'] = $this->email($clinicId, $conversationId, $messageId, $recipientType, $recipientId, $prefs);

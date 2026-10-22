@@ -22,7 +22,11 @@ use PDO;
  * - Horário de silêncio: o chat descarta o e-mail (a mensagem já está no app); os demais adiam para o fim do silêncio.
  * - Eventos imediatos (chat) entregam na hora; os demais ficam na fila drenada pelo cron (drain()).
  * - Falha de e-mail na fila: até MAX_ATTEMPTS tentativas com espera crescente; depois fica failed com motivo.
- * - Push: não há provedor configurado (Expo/FCM). A entrega fica blocked, nunca "enviada".
+ * - Push (Expo Push Service, só para a paciente no app): nunca sai dentro da requisição; fica na fila e o cron de cada
+ *   minuto manda em lotes de até 100. Texto do push é sempre neutro (PUSH_TITLE + push_body), sem data, nome nem dado
+ *   clínico, porque aparece na tela bloqueada. Com PUSH_ENABLED desligado a entrega fica blocked
+ *   (push_provider_not_configured), nunca "enviada". Falha temporária (rede, 429, 5xx, MessageRateExceeded) volta para
+ *   a fila em 1, 5 e 15 min; DeviceNotRegistered desativa o aparelho. O recibo do Expo é conferido depois (checkPushReceipts).
  */
 final class NotificationService
 {
@@ -37,27 +41,46 @@ final class NotificationService
             'category' => 'chat', 'critical' => false, 'immediate' => true, 'quiet' => 'skip',
             'title' => 'Nova mensagem no ClyoNutri',
             'body' => 'Você recebeu uma nova mensagem no chat do consultório. Entre no ClyoNutri para ler.',
+            'push_body' => 'Você tem uma mensagem nova do consultório. Abra o app para ler.',
         ],
         'appointment.reminder' => [
             'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Lembrete de consulta',
             'body' => 'Você tem consulta marcada em {date} às {time}. Abra o ClyoNutri para ver os detalhes.',
+            'push_body' => 'Sua consulta está chegando. Abra o app para ver o dia e o horário.',
         ],
         'meal_plan.published' => [
             'category' => 'plan', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Plano alimentar disponível',
             'body' => 'Seu plano alimentar foi atualizado pelo consultório. Abra o ClyoNutri para ver.',
+            'push_body' => 'O consultório deixou uma novidade para você. Abra o app para ver.',
         ],
     ];
     public const CHANNELS = ['email', 'push'];
     public const MAX_ATTEMPTS = 3;
+    public const PUSH_TITLE = 'ClyoNutri';
+    /** Espera antes de cada nova tentativa de push (minutos); o tamanho define o máximo de tentativas (1 + 3). */
+    public const PUSH_RETRY_MINUTES = [1, 5, 15];
+    public const RECEIPT_DELAY_MINUTES = 15;
+    public const RECEIPT_MAX_AGE_HOURS = 24;
+    public const RETENTION_READ_DAYS = 180;
+    public const RETENTION_TICKET_DAYS = 30;
     private const STALE_SENDING_MINUTES = 30;
+    private const PUSH_RETRYABLE = ['push_network_error', 'push_rate_limited', 'push_server_error', 'push_bad_response', 'message_rate_exceeded'];
 
     private PDO $db;
+    private ?ExpoPushClient $pushClient;
 
-    public function __construct(?PDO $db = null, private ?Mailer $mailer = null, private ?\Closure $clock = null)
+    public function __construct(?PDO $db = null, private ?Mailer $mailer = null, private ?\Closure $clock = null, ?ExpoPushClient $push = null)
     {
         $this->db = $db ?? Connection::getInstance();
+        $this->pushClient = $push;
+    }
+
+    /** Push ligado (PUSH_ENABLED) e tabela de aparelhos criada. */
+    public function pushAvailable(): bool
+    {
+        return ExpoPushClient::enabled() && SchemaInfo::hasTable($this->db, 'notification_push_tokens');
     }
 
     public function available(): bool
@@ -114,7 +137,7 @@ final class NotificationService
         return ['event_id' => $eventId, 'duplicate' => false, 'deliveries' => $deliveries];
     }
 
-    /** Fila: entrega o que venceu. Chamado pelo cron de 15 min. */
+    /** Fila: entrega o que venceu. Chamado pelo cron de cada minuto. Push sai em lotes de até 100 no fim. */
     public function drain(int $limit = 200): array
     {
         $report = ['processed' => 0, 'sent' => 0, 'logged' => 0, 'failed' => 0, 'skipped' => 0, 'blocked' => 0, 'requeued' => 0];
@@ -125,15 +148,31 @@ final class NotificationService
         // Entregas presas em "sending" (processo morto no meio) voltam para a fila.
         $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', updated_at = ? WHERE status = 'sending' AND updated_at < ?")
             ->execute([$now, date('Y-m-d H:i:s', $this->ts() - self::STALE_SENDING_MINUTES * 60)]);
-        $st = $this->db->prepare("SELECT id FROM notification_deliveries WHERE status = 'queued' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY id LIMIT " . max(1, min(1000, $limit)));
+        $st = $this->db->prepare("SELECT id, channel FROM notification_deliveries WHERE status = 'queued' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY id LIMIT " . max(1, min(1000, $limit)));
         $st->execute([$now]);
-        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
-            if (!$this->claim((int)$id)) {
-                continue;
-            }
-            $r = $this->deliver((int)$id);
+        $count = function (array $r) use (&$report): void {
             $report['processed']++;
             $report[$r['status'] === 'queued' ? 'requeued' : $r['status']]++;
+        };
+        $readyPush = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int)$row['id'];
+            if (!$this->claim($id)) {
+                continue;
+            }
+            if ($row['channel'] === 'push') {
+                $ready = $this->pushPrecheck($id);
+                if (isset($ready['tokens'])) {
+                    $readyPush[$id] = $ready;
+                    continue;
+                }
+                $count($ready);
+                continue;
+            }
+            $count($this->deliver($id));
+        }
+        foreach ($this->sendPush($readyPush) as $r) {
+            $count($r);
         }
         $pending = $this->db->query("SELECT COUNT(*) FROM notification_deliveries WHERE status = 'queued'")->fetchColumn();
         return $report + ['pending' => (int)$pending, 'status' => 'OK'];
@@ -248,7 +287,7 @@ final class NotificationService
             'categories' => array_values($categories),
             'quiet_hours' => $quiet,
             'timezone' => date_default_timezone_get(),
-            'push_available' => false,
+            'push_available' => $recipientType === 'patient' && $this->pushAvailable(),
         ];
     }
 
@@ -363,7 +402,7 @@ final class NotificationService
     /** @return array{status: string, reason: ?string} */
     private function deliver(int $deliveryId): array
     {
-        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical, e.read_at
             FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
         $st->execute([$deliveryId]);
         $d = $st->fetch(PDO::FETCH_ASSOC);
@@ -382,10 +421,14 @@ final class NotificationService
                 }
             }
             if ($d['channel'] === 'push') {
-                if (!$critical && $cat && !$cat['push_enabled']) {
-                    return $this->finish($deliveryId, 'skipped', 'preference_off', $attempts);
+                $ready = $this->pushDecision($d, $def, $prefs, $cat);
+                if (!isset($ready['tokens'])) {
+                    return $ready;
                 }
-                return $this->finish($deliveryId, 'blocked', 'push_provider_not_configured', $attempts);
+                // Push pronto para sair: nunca dentro da requisição. Volta para a fila e o cron manda no próximo minuto.
+                $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', next_attempt_at = ?, updated_at = ? WHERE id = ?")
+                    ->execute([$this->now(), $this->now(), $deliveryId]);
+                return ['status' => 'queued', 'reason' => null];
             }
             if (!$critical && $cat && !$cat['email_enabled']) {
                 return $this->finish($deliveryId, 'skipped', 'preference_off', $attempts);
@@ -434,6 +477,234 @@ final class NotificationService
             error_log('NI2-95 entrega de aviso falhou: ' . get_class($e));
             return $this->finish($deliveryId, 'failed', 'internal_error', $attempts + 1);
         }
+    }
+
+    // ---------------------------------------------------------------- push (Expo)
+
+    /** Carrega a entrega e decide; devolve o resultado final ou ['tokens' => ..., ...] quando está pronta para sair. */
+    private function pushPrecheck(int $deliveryId): array
+    {
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.critical, e.read_at
+            FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
+        $st->execute([$deliveryId]);
+        $d = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$d) {
+            return ['status' => 'failed', 'reason' => 'event_missing'];
+        }
+        try {
+            $prefs = $this->preferences((int)$d['clinic_id'], (string)$d['recipient_type'], (int)$d['recipient_id']);
+            $cat = null;
+            foreach ($prefs['categories'] as $c) {
+                if ($c['category'] === $d['category']) {
+                    $cat = $c;
+                }
+            }
+            return $this->pushDecision($d, self::EVENTS[$d['event_type']] ?? ['quiet' => 'defer'], $prefs, $cat);
+        } catch (\Throwable $e) {
+            error_log('NI2-95 push falhou antes do envio: ' . get_class($e));
+            return $this->finish($deliveryId, 'failed', 'internal_error', (int)$d['attempts'] + 1);
+        }
+    }
+
+    /**
+     * Ordem: preferência → push desligado (PUSH_ENABLED) → só paciente tem app → silêncio → já lido → sem aparelho.
+     * @return array{status: string, reason: ?string}|array{tokens: list<array{id: int, token: string}>, delivery: array, def: array}
+     */
+    private function pushDecision(array $d, array $def, array $prefs, ?array $cat): array
+    {
+        $id = (int)$d['id'];
+        $attempts = (int)$d['attempts'];
+        $critical = (bool)$d['critical'];
+        if (!$critical && $cat && !$cat['push_enabled']) {
+            return $this->finish($id, 'skipped', 'preference_off', $attempts);
+        }
+        if (!$this->pushAvailable()) {
+            return $this->finish($id, 'blocked', 'push_provider_not_configured', $attempts);
+        }
+        if ($d['recipient_type'] !== 'patient') {
+            return $this->finish($id, 'skipped', 'no_app', $attempts);
+        }
+        if (!$critical && self::inQuietHours($prefs['quiet_hours'], date('H:i', $this->ts()))) {
+            if (($def['quiet'] ?? 'defer') === 'skip') {
+                return $this->finish($id, 'skipped', 'quiet_hours', $attempts);
+            }
+            $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', reason = 'quiet_hours', next_attempt_at = ?, updated_at = ? WHERE id = ?")
+                ->execute([$this->quietEnd($prefs['quiet_hours']), $this->now(), $id]);
+            return ['status' => 'queued', 'reason' => 'quiet_hours'];
+        }
+        if ($d['read_at'] !== null) {
+            return $this->finish($id, 'skipped', 'already_read', $attempts);
+        }
+        $tokens = (new PushTokenService($this->db, $this->clock))->activeTokens((int)$d['clinic_id'], 'patient', (int)$d['recipient_id']);
+        if ($tokens === []) {
+            return $this->finish($id, 'skipped', 'no_device', $attempts);
+        }
+        return ['tokens' => $tokens, 'delivery' => $d, 'def' => $def];
+    }
+
+    /**
+     * Manda as entregas prontas em lotes de até 100 mensagens (uma por aparelho).
+     * @param array<int, array{tokens: list<array{id: int, token: string}>, delivery: array, def: array}> $ready
+     * @return list<array{status: string, reason: ?string}>
+     */
+    private function sendPush(array $ready): array
+    {
+        if ($ready === []) {
+            return [];
+        }
+        $client = $this->pushClient ??= new ExpoPushClient();
+        $tokens = new PushTokenService($this->db, $this->clock);
+        $messages = [];
+        foreach ($ready as $deliveryId => $r) {
+            foreach ($r['tokens'] as $t) {
+                $messages[] = ['delivery' => $deliveryId, 'token_id' => $t['id'], 'msg' => [
+                    'to' => $t['token'],
+                    'title' => self::PUSH_TITLE,
+                    'body' => $r['def']['push_body'] ?? 'Você tem um aviso novo. Abra o app para ver.',
+                    'data' => ['event_id' => (int)$r['delivery']['event_id'], 'category' => (string)$r['delivery']['category']],
+                    'sound' => 'default',
+                    'channelId' => 'default',
+                ]];
+            }
+        }
+        // Resultado por entrega: ok (algum aparelho aceitou), erro que vale tentar de novo, erros finais.
+        $outcome = array_fill_keys(array_keys($ready), ['ok' => false, 'retry' => null, 'errors' => []]);
+        $now = $this->now();
+        foreach (array_chunk($messages, ExpoPushClient::MAX_MESSAGES_PER_REQUEST) as $chunk) {
+            $res = $client->send(array_column($chunk, 'msg'));
+            foreach ($chunk as $i => $m) {
+                $o = &$outcome[$m['delivery']];
+                if (!$res['ok']) {
+                    if ($res['retryable']) {
+                        $o['retry'] = $res['error'];
+                    } else {
+                        $o['errors'][] = $res['error'];
+                    }
+                    unset($o);
+                    continue;
+                }
+                $t = $res['tickets'][$i];
+                if ($t['status'] === 'ok') {
+                    $o['ok'] = true;
+                    $this->db->prepare("INSERT INTO notification_push_tickets (clinic_id, delivery_id, token_id, ticket_id, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)")
+                        ->execute([(int)$ready[$m['delivery']]['delivery']['clinic_id'], $m['delivery'], $m['token_id'], $t['id'], $now]);
+                    $this->db->prepare('UPDATE notification_push_tokens SET last_sent_at = ? WHERE id = ?')->execute([$now, $m['token_id']]);
+                } elseif ($t['error'] === 'device_not_registered') {
+                    $tokens->deactivate($m['token_id'], 'device_not_registered');
+                    $o['errors'][] = 'device_not_registered';
+                } elseif (in_array($t['error'], self::PUSH_RETRYABLE, true)) {
+                    $o['retry'] = $t['error'];
+                } else {
+                    $o['errors'][] = $t['error'];
+                }
+                unset($o);
+            }
+        }
+        $results = [];
+        foreach ($outcome as $deliveryId => $o) {
+            $attempts = (int)$ready[$deliveryId]['delivery']['attempts'] + 1;
+            if ($o['ok']) {
+                $results[] = $this->finish($deliveryId, 'sent', null, $attempts);
+            } elseif ($o['retry'] !== null && $attempts <= count(self::PUSH_RETRY_MINUTES)) {
+                $wait = self::PUSH_RETRY_MINUTES[$attempts - 1];
+                $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', reason = ?, attempts = ?, next_attempt_at = ?, updated_at = ? WHERE id = ?")
+                    ->execute([$o['retry'], $attempts, date('Y-m-d H:i:s', $this->ts() + 60 * $wait), $this->now(), $deliveryId]);
+                $results[] = ['status' => 'queued', 'reason' => $o['retry']];
+            } else {
+                $results[] = $this->finish($deliveryId, 'failed', $o['retry'] ?? ($o['errors'][0] ?? 'push_error'), $attempts);
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * Confere os recibos do Expo dos pushes aceitos há mais de 15 min (o Expo guarda por cerca de 24 h).
+     * DeviceNotRegistered no recibo desativa o aparelho. Recibo que não veio em 24 h fica unknown.
+     */
+    public function checkPushReceipts(int $limit = 1000): array
+    {
+        $report = ['checked' => 0, 'ok' => 0, 'error' => 0, 'unknown' => 0, 'deactivated' => 0, 'status' => 'OK'];
+        if (!SchemaInfo::hasTable($this->db, 'notification_push_tickets')) {
+            return ['status' => 'NOT_MIGRATED'] + $report;
+        }
+        $now = $this->now();
+        $old = $this->db->prepare("UPDATE notification_push_tickets SET status = 'unknown', checked_at = ? WHERE status = 'pending' AND created_at < ?");
+        $old->execute([$now, date('Y-m-d H:i:s', $this->ts() - self::RECEIPT_MAX_AGE_HOURS * 3600)]);
+        $report['unknown'] = $old->rowCount();
+        if (!ExpoPushClient::enabled()) {
+            return array_merge($report, ['status' => 'PUSH_DISABLED']);
+        }
+        $st = $this->db->prepare("SELECT id, token_id, ticket_id FROM notification_push_tickets WHERE status = 'pending' AND ticket_id IS NOT NULL AND created_at <= ? ORDER BY id LIMIT " . max(1, min(5000, $limit)));
+        $st->execute([date('Y-m-d H:i:s', $this->ts() - self::RECEIPT_DELAY_MINUTES * 60)]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows === []) {
+            return $report;
+        }
+        $client = $this->pushClient ??= new ExpoPushClient();
+        $tokens = new PushTokenService($this->db, $this->clock);
+        foreach (array_chunk($rows, ExpoPushClient::MAX_RECEIPTS_PER_REQUEST) as $chunk) {
+            $res = $client->receipts(array_column($chunk, 'ticket_id'));
+            if (!$res['ok']) {
+                $report['status'] = 'RECEIPTS_UNAVAILABLE';
+                continue;
+            }
+            foreach ($chunk as $t) {
+                $r = $res['receipts'][$t['ticket_id']] ?? null;
+                if ($r === null) {
+                    continue; // ainda não ficou pronto no Expo; tenta no próximo minuto
+                }
+                $report['checked']++;
+                $this->db->prepare('UPDATE notification_push_tickets SET status = ?, error = ?, checked_at = ? WHERE id = ?')
+                    ->execute([$r['status'], $r['error'], $now, (int)$t['id']]);
+                $report[$r['status']]++;
+                if ($r['error'] === 'device_not_registered') {
+                    $tokens->deactivate((int)$t['token_id'], 'device_not_registered');
+                    $report['deactivated']++;
+                }
+            }
+        }
+        return $report;
+    }
+
+    /**
+     * Limpeza (rodada uma vez por dia pelo cron): avisos lidos há mais de 180 dias (com entregas e recibos),
+     * aparelhos desativados há mais de 180 dias e recibos de push com mais de 30 dias.
+     */
+    public function purge(?int $readDays = null, ?int $ticketDays = null): array
+    {
+        $out = ['events' => 0, 'tokens' => 0, 'tickets' => 0, 'status' => 'OK'];
+        if (!$this->available()) {
+            return ['status' => 'NOT_MIGRATED'] + $out;
+        }
+        $cut = date('Y-m-d H:i:s', $this->ts() - 86400 * ($readDays ?? self::RETENTION_READ_DAYS));
+        $hasTickets = SchemaInfo::hasTable($this->db, 'notification_push_tickets');
+        $this->db->beginTransaction();
+        try {
+            if ($hasTickets) {
+                $st = $this->db->prepare('DELETE FROM notification_push_tickets WHERE created_at < ? OR delivery_id IN (SELECT d.id FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE e.read_at IS NOT NULL AND e.read_at < ?)');
+                $st->execute([date('Y-m-d H:i:s', $this->ts() - 86400 * ($ticketDays ?? self::RETENTION_TICKET_DAYS)), $cut]);
+                $out['tickets'] = $st->rowCount();
+            }
+            $this->db->prepare('DELETE FROM notification_deliveries WHERE event_id IN (SELECT id FROM notification_events WHERE read_at IS NOT NULL AND read_at < ?)')->execute([$cut]);
+            $st = $this->db->prepare('DELETE FROM notification_events WHERE read_at IS NOT NULL AND read_at < ?');
+            $st->execute([$cut]);
+            $out['events'] = $st->rowCount();
+            if (SchemaInfo::hasTable($this->db, 'notification_push_tokens')) {
+                if ($hasTickets) {
+                    $this->db->prepare('DELETE FROM notification_push_tickets WHERE token_id IN (SELECT id FROM notification_push_tokens WHERE active = 0 AND updated_at < ?)')->execute([$cut]);
+                }
+                $st = $this->db->prepare('DELETE FROM notification_push_tokens WHERE active = 0 AND updated_at < ?');
+                $st->execute([$cut]);
+                $out['tokens'] = $st->rowCount();
+            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+        return $out;
     }
 
     private function finish(int $deliveryId, string $status, ?string $reason, int $attempts): array
