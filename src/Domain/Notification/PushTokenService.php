@@ -90,7 +90,7 @@ final class PushTokenService
     public function deactivate(int $tokenId, string $reason): void
     {
         $this->db->prepare('UPDATE notification_push_tokens SET active = 0, last_error = ?, updated_at = ? WHERE id = ?')
-            ->execute([substr($reason, 0, 60), $this->now(), $tokenId]);
+            ->execute([NotificationService::safeReason($reason), $this->now(), $tokenId]);
     }
 
     /** @return list<array{id: int, token: string}> */

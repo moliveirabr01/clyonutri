@@ -3765,7 +3765,9 @@
             "enum": [
               "chat.message_created",
               "appointment.reminder",
-              "meal_plan.published"
+              "meal_plan.published",
+              "checkin.reminder",
+              "checkin.submitted"
             ]
           },
           "category": {
@@ -3773,7 +3775,8 @@
             "enum": [
               "chat",
               "appointments",
-              "plan"
+              "plan",
+              "checkin"
             ]
           },
           "title": {
@@ -3849,7 +3852,8 @@
                   "enum": [
                     "chat",
                     "appointments",
-                    "plan"
+                    "plan",
+                    "checkin"
                   ]
                 },
                 "label": {
@@ -3862,7 +3866,8 @@
                   "type": "boolean"
                 }
               }
-            }
+            },
+            "description": "A categoria checkin só aparece para a paciente quando o app tem check-in diário (checkin_reminder.available). Padrão dela: e-mail desligado, celular ligado."
           },
           "quiet_hours": {
             "type": "object",
@@ -3891,6 +3896,30 @@
           "push_available": {
             "type": "boolean",
             "description": "true quando o servidor está com PUSH_ENABLED ligado e a migration 51 aplicada; o app só mostra as chaves de push nesse caso"
+          },
+          "checkin_reminder": {
+            "type": "object",
+            "description": "Lembrete do check-in diário (opt-in, um por dia, só se o check-in do dia ainda estiver em aberto). Só na resposta da paciente.",
+            "required": [
+              "available",
+              "enabled",
+              "time"
+            ],
+            "properties": {
+              "available": {
+                "type": "boolean",
+                "description": "false quando o check-in diário (NI2-96) ou a migration 52 ainda não estão no servidor"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Vem false até a paciente ligar"
+              },
+              "time": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                "description": "Hora do lembrete, no fuso de timezone (padrão 20:00)"
+              }
+            }
           }
         }
       },
@@ -3937,6 +3966,18 @@
                     "type": "boolean"
                   }
                 }
+              },
+              "checkin": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email_enabled": {
+                    "type": "boolean"
+                  },
+                  "push_enabled": {
+                    "type": "boolean"
+                  }
+                }
               }
             }
           },
@@ -3952,6 +3993,20 @@
               },
               "end": {
                 "type": "string"
+              }
+            }
+          },
+          "checkin_reminder": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Só para a paciente e com checkin_reminder.available = true; senão 422.",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "time": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
               }
             }
           }

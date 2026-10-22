@@ -35,6 +35,7 @@ final class NotificationService
         'chat' => 'Mensagens do chat',
         'appointments' => 'Lembretes de consulta',
         'plan' => 'Plano alimentar',
+        'checkin' => 'Check-in diário',
     ];
     public const EVENTS = [
         'chat.message_created' => [
@@ -55,8 +56,28 @@ final class NotificationService
             'body' => 'Seu plano alimentar foi atualizado pelo consultório. Abra o ClyoNutri para ver.',
             'push_body' => 'O consultório deixou uma novidade para você. Abra o app para ver.',
         ],
+        // Check-in diário (NI2-96), criados por CheckinNotificationScheduler. Sem notas, adesão, energia ou fome.
+        'checkin.reminder' => [
+            'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'skip',
+            'title' => 'Lembrete de check-in',
+            'body' => 'Quando puder, registre seu check-in de hoje no app ClyoNutri. Leva menos de um minuto.',
+            'push_body' => 'Quando puder, registre seu check-in de hoje no app.',
+        ],
+        'checkin.submitted' => [
+            'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Check-in recebido',
+            'body' => 'Uma paciente enviou o check-in do dia. Entre no ClyoNutri para ver.',
+            'push_body' => 'Uma paciente enviou o check-in do dia.',
+        ],
     ];
     public const CHANNELS = ['email', 'push'];
+    /**
+     * Padrão por destinatário quando não há linha em notification_preferences (o resto é tudo ligado).
+     * Check-in da paciente: só no celular; e-mail diário seria spam. O lembrete em si é opt-in (checkin_reminder).
+     */
+    private const CATEGORY_DEFAULTS = [
+        'patient' => ['checkin' => ['email_enabled' => false, 'push_enabled' => true]],
+    ];
     public const MAX_ATTEMPTS = 3;
     public const PUSH_TITLE = 'ClyoNutri';
     /** Espera antes de cada nova tentativa de push (minutos); o tamanho define o máximo de tentativas (1 + 3). */
@@ -258,8 +279,13 @@ final class NotificationService
         self::assertRecipientType($recipientType);
         $legacy = $this->legacyChatPreferences($clinicId, $recipientType, $recipientId);
         $categories = [];
+        $checkinReminder = $recipientType === 'patient' ? CheckinNotificationScheduler::settings($this->db, $clinicId, $recipientId) : null;
         foreach (self::CATEGORIES as $cat => $label) {
-            $categories[$cat] = ['category' => $cat, 'label' => $label, 'email_enabled' => true, 'push_enabled' => true];
+            if ($cat === 'checkin' && $checkinReminder !== null && !$checkinReminder['available']) {
+                continue; // sem check-in diário no app, a paciente não vê a chave
+            }
+            $def = self::CATEGORY_DEFAULTS[$recipientType][$cat] ?? ['email_enabled' => true, 'push_enabled' => true];
+            $categories[$cat] = ['category' => $cat, 'label' => $label] + $def;
             if ($cat === 'chat' && $legacy) {
                 $categories[$cat]['email_enabled'] = $legacy['email_enabled'];
                 $categories[$cat]['push_enabled'] = $legacy['push_enabled'];
@@ -283,12 +309,16 @@ final class NotificationService
                 $quiet = ['enabled' => (bool)$row['enabled'], 'start' => (string)$row['start_time'], 'end' => (string)$row['end_time']];
             }
         }
-        return [
+        $out = [
             'categories' => array_values($categories),
             'quiet_hours' => $quiet,
             'timezone' => date_default_timezone_get(),
             'push_available' => $recipientType === 'patient' && $this->pushAvailable(),
         ];
+        if ($checkinReminder !== null) {
+            $out['checkin_reminder'] = $checkinReminder;
+        }
+        return $out;
     }
 
     /**
@@ -304,16 +334,35 @@ final class NotificationService
         $before = $this->preferences($clinicId, $recipientType, $recipientId);
         $cats = $input['categories'] ?? [];
         $quiet = $input['quiet_hours'] ?? null;
-        if (!is_array($cats) || ($quiet !== null && !is_array($quiet)) || ($cats === [] && $quiet === null)) {
+        $checkin = $input['checkin_reminder'] ?? null;
+        if (!is_array($cats) || ($quiet !== null && !is_array($quiet)) || ($checkin !== null && !is_array($checkin)) || ($cats === [] && $quiet === null && $checkin === null)) {
             throw new \InvalidArgumentException('Envie as preferências de aviso que deseja alterar.');
         }
         $current = [];
         foreach ($before['categories'] as $c) {
             $current[$c['category']] = $c;
         }
+        $cr = null;
+        if ($checkin !== null) {
+            if ($recipientType !== 'patient' || empty($before['checkin_reminder']['available'])) {
+                throw new \InvalidArgumentException('O lembrete de check-in ainda não está disponível.');
+            }
+            $cr = ['enabled' => $before['checkin_reminder']['enabled'], 'time' => $before['checkin_reminder']['time']];
+            foreach ($checkin as $k => $v) {
+                if ($k === 'enabled' && is_bool($v)) {
+                    $cr['enabled'] = $v;
+                } elseif ($k === 'time' && is_string($v) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $v)) {
+                    $cr['time'] = $v;
+                } elseif ($k === 'time') {
+                    throw new \InvalidArgumentException('Informe a hora do lembrete no formato HH:MM, por exemplo 20:00.');
+                } else {
+                    throw new \InvalidArgumentException('Use verdadeiro ou falso para ligar ou desligar o lembrete de check-in.');
+                }
+            }
+        }
         $writes = [];
         foreach ($cats as $cat => $vals) {
-            if (!is_string($cat) || !isset(self::CATEGORIES[$cat]) || !is_array($vals)) {
+            if (!is_string($cat) || !isset(self::CATEGORIES[$cat]) || !isset($current[$cat]) || !is_array($vals)) {
                 throw new \InvalidArgumentException('Tipo de aviso inválido.');
             }
             $row = ['email_enabled' => $current[$cat]['email_enabled'], 'push_enabled' => $current[$cat]['push_enabled']];
@@ -356,6 +405,9 @@ final class NotificationService
                     $this->db->prepare('INSERT INTO notification_preferences (clinic_id, recipient_type, recipient_id, category, email_enabled, push_enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
                         ->execute([$clinicId, $recipientType, $recipientId, $cat, $row['email_enabled'] ? 1 : 0, $row['push_enabled'] ? 1 : 0, $now]);
                 }
+            }
+            if ($cr !== null) {
+                CheckinNotificationScheduler::saveSettings($this->db, $clinicId, $recipientId, $cr, $now);
             }
             if ($q !== null) {
                 $upd = $this->db->prepare('UPDATE notification_quiet_hours SET enabled = ?, start_time = ?, end_time = ?, updated_at = ? WHERE clinic_id = ? AND recipient_type = ? AND recipient_id = ?');
@@ -402,7 +454,7 @@ final class NotificationService
     /** @return array{status: string, reason: ?string} */
     private function deliver(int $deliveryId): array
     {
-        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical, e.read_at
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical, e.read_at, e.created_at
             FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
         $st->execute([$deliveryId]);
         $d = $st->fetch(PDO::FETCH_ASSOC);
@@ -419,6 +471,9 @@ final class NotificationService
                 if ($c['category'] === $d['category']) {
                     $cat = $c;
                 }
+            }
+            if (($stale = $this->staleReason($d)) !== null) {
+                return $this->finish($deliveryId, 'skipped', $stale, $attempts);
             }
             if ($d['channel'] === 'push') {
                 $ready = $this->pushDecision($d, $def, $prefs, $cat);
@@ -467,7 +522,7 @@ final class NotificationService
                 $attempts++;
                 if (!$def['immediate'] && $reason === 'mail_error' && $attempts < self::MAX_ATTEMPTS) {
                     $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', reason = ?, attempts = ?, next_attempt_at = ?, updated_at = ? WHERE id = ?")
-                        ->execute([$reason, $attempts, date('Y-m-d H:i:s', $this->ts() + 900 * $attempts), $this->now(), $deliveryId]);
+                        ->execute([self::safeReason($reason), $attempts, date('Y-m-d H:i:s', $this->ts() + 900 * $attempts), $this->now(), $deliveryId]);
                     return ['status' => 'queued', 'reason' => $reason];
                 }
                 return $this->finish($deliveryId, 'failed', $reason, $attempts);
@@ -484,7 +539,7 @@ final class NotificationService
     /** Carrega a entrega e decide; devolve o resultado final ou ['tokens' => ..., ...] quando está pronta para sair. */
     private function pushPrecheck(int $deliveryId): array
     {
-        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.critical, e.read_at
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.critical, e.read_at, e.created_at
             FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
         $st->execute([$deliveryId]);
         $d = $st->fetch(PDO::FETCH_ASSOC);
@@ -515,6 +570,9 @@ final class NotificationService
         $id = (int)$d['id'];
         $attempts = (int)$d['attempts'];
         $critical = (bool)$d['critical'];
+        if (($stale = $this->staleReason($d)) !== null) {
+            return $this->finish($id, 'skipped', $stale, $attempts);
+        }
         if (!$critical && $cat && !$cat['push_enabled']) {
             return $this->finish($id, 'skipped', 'preference_off', $attempts);
         }
@@ -608,7 +666,7 @@ final class NotificationService
             } elseif ($o['retry'] !== null && $attempts <= count(self::PUSH_RETRY_MINUTES)) {
                 $wait = self::PUSH_RETRY_MINUTES[$attempts - 1];
                 $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', reason = ?, attempts = ?, next_attempt_at = ?, updated_at = ? WHERE id = ?")
-                    ->execute([$o['retry'], $attempts, date('Y-m-d H:i:s', $this->ts() + 60 * $wait), $this->now(), $deliveryId]);
+                    ->execute([self::safeReason($o['retry']), $attempts, date('Y-m-d H:i:s', $this->ts() + 60 * $wait), $this->now(), $deliveryId]);
                 $results[] = ['status' => 'queued', 'reason' => $o['retry']];
             } else {
                 $results[] = $this->finish($deliveryId, 'failed', $o['retry'] ?? ($o['errors'][0] ?? 'push_error'), $attempts);
@@ -655,7 +713,7 @@ final class NotificationService
                 }
                 $report['checked']++;
                 $this->db->prepare('UPDATE notification_push_tickets SET status = ?, error = ?, checked_at = ? WHERE id = ?')
-                    ->execute([$r['status'], $r['error'], $now, (int)$t['id']]);
+                    ->execute([$r['status'], self::safeReason($r['error']), $now, (int)$t['id']]);
                 $report[$r['status']]++;
                 if ($r['error'] === 'device_not_registered') {
                     $tokens->deactivate((int)$t['token_id'], 'device_not_registered');
@@ -707,11 +765,36 @@ final class NotificationService
         return $out;
     }
 
+    /**
+     * Motivo gravado em entregas e logs: só códigos curtos (preference_off, mail_error...). Qualquer outra coisa
+     * (texto de exceção, resposta do provedor) vira "error", para nunca guardar corpo de mensagem ou dado clínico.
+     */
+    public static function safeReason(?string $reason): ?string
+    {
+        if ($reason === null) {
+            return null;
+        }
+        return preg_match('/^[a-z][a-z0-9_]{0,59}$/', $reason) ? $reason : 'error';
+    }
+
+    /** Lembrete de check-in que perdeu o sentido: ela já fez o check-in do dia, ou o dia já passou. */
+    private function staleReason(array $d): ?string
+    {
+        if (($d['event_type'] ?? '') !== 'checkin.reminder') {
+            return null;
+        }
+        $day = substr((string)($d['created_at'] ?? ''), 0, 10);
+        if ($day !== date('Y-m-d', $this->ts())) {
+            return 'expired';
+        }
+        return CheckinNotificationScheduler::checkinDone($this->db, (int)$d['clinic_id'], (int)$d['recipient_id'], $day) ? 'checkin_done' : null;
+    }
+
     private function finish(int $deliveryId, string $status, ?string $reason, int $attempts): array
     {
         $now = $this->now();
         $this->db->prepare('UPDATE notification_deliveries SET status = ?, reason = ?, attempts = ?, sent_at = ?, next_attempt_at = NULL, updated_at = ? WHERE id = ?')
-            ->execute([$status, $reason, $attempts, in_array($status, ['sent', 'logged'], true) ? $now : null, $now, $deliveryId]);
+            ->execute([$status, $reason = self::safeReason($reason), $attempts, in_array($status, ['sent', 'logged'], true) ? $now : null, $now, $deliveryId]);
         return ['status' => $status, 'reason' => $reason];
     }
 

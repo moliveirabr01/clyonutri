@@ -122,13 +122,14 @@
 </div>
 <?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar regras do chat</button><?php endif; ?>
 </form>
-<?php if(!empty($notificationPrefs)): $np=$notificationPrefs; $npChat=array_values(array_filter($np['categories'],static fn($c)=>$c['category']==='chat'))[0]??['email_enabled'=>true]; ?>
+<?php if(!empty($notificationPrefs)): $np=$notificationPrefs; $npChat=array_values(array_filter($np['categories'],static fn($c)=>$c['category']==='chat'))[0]??['email_enabled'=>true];$npCheckin=array_values(array_filter($np['categories'],static fn($c)=>$c['category']==='checkin'))[0]??['email_enabled'=>true]; ?>
 <form class="card" method="POST" action="/configuracoes" id="notification-settings" data-testid="notification-settings">
 <h2>Seus avisos</h2>
-<p>Quando chega mensagem de paciente, ela aparece no chat na hora. Aqui você escolhe se também quer um e-mail (sem o conteúdo da mensagem) e em que horário não quer ser incomodado.</p>
+<p>Mensagens de paciente aparecem no chat na hora, e cada check-in diário novo aparece em <a href="/avisos">Avisos</a>. Aqui você escolhe se também quer e-mail (sem o conteúdo da mensagem nem as respostas do check-in) e em que horário não quer ser incomodado.</p>
 <input type="hidden" name="section" value="notifications">
 <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
 <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_chat_email" value="1" <?= !empty($npChat['email_enabled'])?'checked':'' ?>> Receber e-mail quando chegar mensagem nova</label>
+<label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_checkin_email" value="1" <?= !empty($npCheckin['email_enabled'])?'checked':'' ?>> Receber e-mail quando uma paciente enviar check-in (no máximo um por dia)</label>
 <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;"><input type="checkbox" name="quiet_enabled" value="1" <?= !empty($np['quiet_hours']['enabled'])?'checked':'' ?>> Não mandar e-mail no horário de silêncio</label>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
 <div class="form-group"><label class="form-label" for="quiet-start">Silêncio a partir de</label><input class="form-control" type="time" id="quiet-start" name="quiet_start" value="<?= htmlspecialchars((string)$np['quiet_hours']['start'],ENT_QUOTES) ?>"></div>

@@ -85,7 +85,7 @@ class HostGatorCronScheduler
 
     /**
      * NI2-95: fila real de avisos. Antes este passo só contava `notifications` não lidas e dizia DRAINED.
-     * Agora cria os lembretes de consulta (antecedência da clínica/profissional), entrega o que venceu em
+     * Agora cria os lembretes de consulta (antecedência da clínica/profissional) e os avisos do check-in diário, entrega o que venceu em
      * notification_deliveries (push em lotes de até 100 pelo Expo) e confere os recibos do push.
      */
     private function drainDatabaseQueue(): void
@@ -94,9 +94,10 @@ class HostGatorCronScheduler
             $db = Connection::getInstance();
             $service = new \ClyoNutri\Domain\Notification\NotificationService($db);
             $reminders = (new \ClyoNutri\Domain\Notification\AppointmentReminderScheduler($db, $service))->schedule();
+            $checkins = (new \ClyoNutri\Domain\Notification\CheckinNotificationScheduler($db, $service))->schedule();
             $queue = $service->drain(200);
             $receipts = $service->checkPushReceipts();
-            $this->executionLog['queue'] = ['driver' => 'database', 'appointment_reminders' => $reminders, 'push_receipts' => $receipts] + $queue;
+            $this->executionLog['queue'] = ['driver' => 'database', 'appointment_reminders' => $reminders, 'checkin_notifications' => $checkins, 'push_receipts' => $receipts] + $queue;
         } catch (\Throwable $e) {
             $this->executionLog['queue'] = ['status' => 'WARNING', 'error' => get_class($e)];
         }
@@ -199,6 +200,8 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     echo " Fila      : " . ($q['status'] ?? 'OK') . (isset($q['processed']) ? " (entregas {$q['processed']}, enviadas " . ($q['sent'] + $q['logged']) . ", falhas {$q['failed']}, na fila {$q['pending']})" : '') . "\n";
     $ar = $q['appointment_reminders'] ?? null;
     if (is_array($ar) && isset($ar['created'])) echo " Consultas : {$ar['created']} lembrete(s) de consulta novo(s)\n";
+    $ck = $q['checkin_notifications'] ?? null;
+    if (is_array($ck) && isset($ck['reminders'])) echo " Check-in  : {$ck['reminders']['created']} lembrete(s) para paciente, {$ck['submitted']['created']} aviso(s) de check-in recebido\n";
     $pr = $q['push_receipts'] ?? null;
     if (is_array($pr) && isset($pr['checked'])) echo " Push      : {$pr['checked']} recibo(s) conferido(s), {$pr['error']} com erro, {$pr['deactivated']} aparelho(s) desativado(s)\n";
     $tele = $report['teleconsultation_reminders'] ?? 'n/d';

@@ -39,11 +39,11 @@ final class SettingsController
                     (new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->update(TenantContext::getClinicId(),is_string($_POST['chat_response_time']??null)?$_POST['chat_response_time']:null,$_POST['chat_retention_years']??'',(int)TenantContext::getUserId());
                 }
                 elseif($section==='notifications'){
-                    // NI2-95: avisos do próprio profissional (e-mail de nova mensagem do chat e horário de silêncio).
+                    // NI2-95: avisos do próprio profissional (e-mail de nova mensagem do chat, de check-in recebido e horário de silêncio).
                     $profId=self::professionalId();
                     if($profId<=0)throw new \DomainException('Somente profissionais com cadastro completo recebem avisos.');
                     $res=(new \ClyoNutri\Domain\Notification\NotificationService(Connection::getInstance()))->savePreferences(TenantContext::getClinicId(),'professional',$profId,[
-                        'categories'=>['chat'=>['email_enabled'=>!empty($_POST['notify_chat_email'])]],
+                        'categories'=>['chat'=>['email_enabled'=>!empty($_POST['notify_chat_email'])],'checkin'=>['email_enabled'=>!empty($_POST['notify_checkin_email'])]],
                         'quiet_hours'=>['enabled'=>!empty($_POST['quiet_enabled']),'start'=>is_string($_POST['quiet_start']??null)&&$_POST['quiet_start']!==''?$_POST['quiet_start']:'22:00','end'=>is_string($_POST['quiet_end']??null)&&$_POST['quiet_end']!==''?$_POST['quiet_end']:'07:00'],
                     ]);
                     (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('NOTIFICATION_PREFERENCES_UPDATED','professionals',(string)$profId,['before'=>$res['before'],'after'=>$res['after']]);

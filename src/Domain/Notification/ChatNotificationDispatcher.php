@@ -57,7 +57,8 @@ final class ChatNotificationDispatcher
                 : $this->record($clinicId, $conversationId, $messageId, $recipientType, $recipientId, 'push', 'skipped', 'preference_off');
         } catch (\Throwable $e) {
             // A notificação nunca derruba o envio da mensagem.
-            error_log('NI2-138 notificação do chat falhou: ' . $e->getMessage());
+            // Só a classe do erro: a mensagem de exceção do PDO/mailer pode trazer trecho de SQL, endereço ou texto.
+            error_log('NI2-138 notificação do chat falhou: ' . get_class($e));
         }
         return $result;
     }
@@ -173,6 +174,7 @@ final class ChatNotificationDispatcher
 
     private function record(int $clinicId, int $conversationId, int $messageId, string $type, int $id, string $channel, string $status, ?string $reason): array
     {
+        $reason = NotificationService::safeReason($reason);
         $hasReason = SchemaInfo::hasColumn($this->db, 'chat_notifications_log', 'failure_reason');
         $this->db->prepare('INSERT INTO chat_notifications_log (clinic_id, conversation_id, message_id, recipient_type, recipient_id, channel, title, body_preview,
                 contains_clinical_data, status, sent_at' . ($hasReason ? ', failure_reason' : '') . ')

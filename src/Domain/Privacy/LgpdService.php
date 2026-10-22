@@ -204,6 +204,15 @@ class LgpdService
                     $this->db->prepare("DELETE FROM {$nt} WHERE clinic_id = :clinic_id AND recipient_type = 'patient' AND recipient_id = :id")
                         ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
                 }
+                // Avisos de check-in recebido que apontam para esta paciente, na caixa dos profissionais.
+                $this->db->prepare("DELETE FROM notification_deliveries WHERE event_id IN (SELECT id FROM notification_events WHERE clinic_id = :clinic_id AND recipient_type = 'professional' AND event_type = 'checkin.submitted' AND link = :link)")
+                    ->execute(['clinic_id' => $clinicId, 'link' => '/pacientes/' . $patientId]);
+                $this->db->prepare("DELETE FROM notification_events WHERE clinic_id = :clinic_id AND recipient_type = 'professional' AND event_type = 'checkin.submitted' AND link = :link")
+                    ->execute(['clinic_id' => $clinicId, 'link' => '/pacientes/' . $patientId]);
+                if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'notification_checkin_settings')) {
+                    $this->db->prepare('DELETE FROM notification_checkin_settings WHERE clinic_id = :clinic_id AND patient_id = :id')
+                        ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+                }
             }
 
             // Registrar revogação de consentimentos
