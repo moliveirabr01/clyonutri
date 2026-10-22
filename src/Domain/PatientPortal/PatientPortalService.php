@@ -493,7 +493,7 @@ class PatientPortalService
      * - Fonte única da verdade: anamnese clínica mais recente do paciente no tenant.
      * - "Ausência é ausência": se nenhuma anamnese existe ou o campo não foi preenchido,
      *   retorna estritamente null (sem valores fictícios como 2500ml).
-     * - Prioriza anamneses finalizadas sobre rascunhos.
+     * - Só anamneses finalizadas: rascunho nunca vira meta da paciente (NI2-92).
      * - Isolamento multi-tenant estrito via TenantGuard.
      *
      * @param int $patientId
@@ -508,7 +508,8 @@ class PatientPortalService
             SELECT water_intake_ml
             FROM anamneses
             WHERE clinic_id = :clinic_id AND patient_id = :patient_id
-            ORDER BY COALESCE(is_draft, 0) ASC, version DESC, id DESC
+              AND COALESCE(is_draft, 0) = 0
+            ORDER BY version DESC, id DESC
             LIMIT 1
         ");
         $stmt->execute([
