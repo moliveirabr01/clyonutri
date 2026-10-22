@@ -12,7 +12,7 @@ declare(strict_types=1);
  *   * / 15 * * * * /opt/cpanel/ea-php83/root/usr/bin/php ~/clyonutri/current/bin/cron_scheduler.php >> /dev/null 2>&1
  *
  * Funções executadas a cada ciclo de 15 minutos:
- *  1. Drenagem de fila database em lote (--stop-when-empty, max 120s, timeout 50s)
+ *  1. Fila de avisos (NI2-95): lembretes de consulta ~24 h antes + entrega de notification_deliveries vencidas
  *  2. Atualização de heartbeat de observabilidade (scheduler:heartbeat)
  *  3. Limpeza de tokens expirados e sessões antigas
  *     + contadores antigos de tentativas de login (login_attempts, v6)
@@ -38,6 +38,8 @@ class HostGatorCronScheduler
         if (file_exists(__DIR__ . '/../.env')) {
             Env::load(__DIR__ . '/../.env');
         }
+        // NI2-95: o PHP de linha de comando da HostGator vem em UTC. Horários de consulta e de silêncio são locais.
+        date_default_timezone_set((string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo'));
     }
 
     public function run(): array
@@ -72,43 +74,20 @@ class HostGatorCronScheduler
         $this->executionLog['heartbeat'] = 'RECORDED';
     }
 
+    /**
+     * NI2-95: fila real de avisos. Antes este passo só contava `notifications` não lidas e dizia DRAINED.
+     * Agora cria os lembretes de consulta (~24 h antes) e entrega o que venceu em notification_deliveries.
+     */
     private function drainDatabaseQueue(): void
     {
-        // Na HostGator, o worker roda com teto estrito de tempo para não ser morto pelo cPanel
-        $maxTime = 120; // 2 minutos
-        $processedJobs = 0;
-
         try {
             $db = Connection::getInstance();
-            // Verifica se tabela de jobs existe
-            $tableExists = false;
-            try {
-                $check = $db->query("SELECT 1 FROM notifications LIMIT 1");
-                $tableExists = true;
-            } catch (\Throwable $e) {
-                $tableExists = false;
-            }
-
-            if ($tableExists) {
-                // Simulação/execução de jobs pendentes
-                $stmt = $db->query("SELECT COUNT(*) FROM notifications WHERE read_at IS NULL");
-                $pendingCount = (int)$stmt->fetchColumn();
-                $this->executionLog['queue'] = [
-                    'driver' => 'database',
-                    'unread_notifications' => $pendingCount,
-                    'status' => 'DRAINED',
-                ];
-            } else {
-                $this->executionLog['queue'] = [
-                    'driver' => 'database',
-                    'status' => 'NO_JOBS_PENDING',
-                ];
-            }
+            $service = new \ClyoNutri\Domain\Notification\NotificationService($db);
+            $reminders = (new \ClyoNutri\Domain\Notification\AppointmentReminderScheduler($db, $service))->schedule();
+            $queue = $service->drain(200);
+            $this->executionLog['queue'] = ['driver' => 'database', 'appointment_reminders' => $reminders] + $queue;
         } catch (\Throwable $e) {
-            $this->executionLog['queue'] = [
-                'error' => $e->getMessage(),
-                'status' => 'WARNING',
-            ];
+            $this->executionLog['queue'] = ['status' => 'WARNING', 'error' => get_class($e)];
         }
     }
 
@@ -185,7 +164,10 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     $scheduler = new HostGatorCronScheduler();
     $report = $scheduler->run();
     echo " Heartbeat : " . $report['heartbeat'] . "\n";
-    echo " Fila      : " . ($report['queue']['status'] ?? 'OK') . "\n";
+    $q = $report['queue'] ?? [];
+    echo " Fila      : " . ($q['status'] ?? 'OK') . (isset($q['processed']) ? " (entregas {$q['processed']}, enviadas " . ($q['sent'] + $q['logged']) . ", falhas {$q['failed']}, na fila {$q['pending']})" : '') . "\n";
+    $ar = $q['appointment_reminders'] ?? null;
+    if (is_array($ar) && isset($ar['created'])) echo " Consultas : {$ar['created']} lembrete(s) novo(s) para amanhã\n";
     $tele = $report['teleconsultation_reminders'] ?? 'n/d';
     echo " Lembretes : " . (is_array($tele) ? "enviados {$tele['sent']}, falhas {$tele['failed']}, sem e-mail {$tele['skipped']}" : $tele) . "\n";
     echo " Login     : " . ($report['login_attempts_pruned'] ?? '-') . " registro(s) antigo(s) de tentativa removido(s)\n";
