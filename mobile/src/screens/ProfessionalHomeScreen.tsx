@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,6 +15,7 @@ import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
   ApiService,
+  newChatKey,
   ApiError,
   ProfessionalAuthData,
   ProfessionalDashboardData,
@@ -58,6 +59,12 @@ export default function ProfessionalHomeScreen({
   const [activeConvMessages, setActiveConvMessages] = useState<ChatMessage[]>([]);
   const [profChatText, setProfChatText] = useState<string>('');
   const [profChatSending, setProfChatSending] = useState<boolean>(false);
+  // NI2-138: erro dentro da tela, conversa só para leitura e chave estável por mensagem (reenvio não duplica).
+  const [profChatError, setProfChatError] = useState<string | null>(null);
+  const [profChatAccess, setProfChatAccess] = useState<{ can_send: boolean; reason: string | null } | null>(null);
+  const profKeyRef = useRef<string | null>(null);
+  const lastMsgIdRef = useRef(0);
+  useEffect(() => { lastMsgIdRef.current = activeConvMessages.length ? activeConvMessages[activeConvMessages.length - 1].id : 0; }, [activeConvMessages]);
 
   const [loggingOut, setLoggingOut] = useState<boolean>(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -133,6 +140,7 @@ export default function ProfessionalHomeScreen({
   const fetchActiveMessages = useCallback(async (convId: number, afterId?: number) => {
     try {
       const res = await ApiService.getProfessionalChatMessages(convId, afterId);
+      if (res.access) setProfChatAccess({ can_send: res.access.can_send, reason: res.access.reason });
       if (afterId && afterId > 0) {
         if (res.messages && res.messages.length > 0) {
           setActiveConvMessages(prev => {
@@ -159,12 +167,9 @@ export default function ProfessionalHomeScreen({
     if (activeConvId) {
       fetchActiveMessages(activeConvId);
       const interval = setInterval(() => {
-        setActiveConvMessages(current => {
-          const lastId = current.length > 0 ? current[current.length - 1].id : 0;
-          fetchActiveMessages(activeConvId, lastId);
-          return current;
-        });
-      }, 3000);
+        const lastId = lastMsgIdRef.current;
+        fetchActiveMessages(activeConvId, lastId);
+      }, 5000);
       return () => clearInterval(interval);
     } else {
       const interval = setInterval(fetchConversations, 5000);
@@ -175,14 +180,17 @@ export default function ProfessionalHomeScreen({
   const handleSendProfMessage = async () => {
     if (!activeConvId || !profChatText.trim() || profChatSending) return;
     setProfChatSending(true);
+    setProfChatError(null);
+    profKeyRef.current = profKeyRef.current ?? newChatKey('prof');
     try {
-      const res = await ApiService.sendProfessionalChatMessage(activeConvId, profChatText.trim());
+      const res = await ApiService.sendProfessionalChatMessage(activeConvId, profChatText.trim(), profKeyRef.current);
       if (res.success && res.message) {
-        setActiveConvMessages(prev => [...prev, res.message]);
+        setActiveConvMessages(prev => (prev.some(m => m.id === res.message.id) ? prev : [...prev, res.message]));
         setProfChatText('');
+        profKeyRef.current = null;
       }
     } catch (err) {
-      Alert.alert('Erro ao enviar', err instanceof Error ? err.message : 'Não foi possível enviar.');
+      setProfChatError(err instanceof ApiError ? err.message : 'Sem conexão. A mensagem não foi enviada; tente de novo (não duplica).');
     } finally {
       setProfChatSending(false);
     }
@@ -583,7 +591,7 @@ export default function ProfessionalHomeScreen({
                 {/* Header da conversa ativa */}
                 <View style={styles.card}>
                   <Text style={styles.patientName}>Paciente: {activeConvPatientName}</Text>
-                  <Text style={{ fontSize: 12, color: '#64748B' }}>Canal Criptografado & Auditado</Text>
+                  <Text style={{ fontSize: 12, color: '#475569' }}>Mensagens com a paciente. Não é canal de urgência.</Text>
                 </View>
 
                 {/* Lista de mensagens */}
@@ -623,6 +631,10 @@ export default function ProfessionalHomeScreen({
                 </View>
 
                 {/* Input de envio do profissional (MOB-UX-017, MOB-UX-018: Acessibilidade WCAG AA) */}
+                {profChatError ? <Text style={{ color: t.error, marginBottom: 8 }} accessibilityRole="alert">{profChatError}</Text> : null}
+                {profChatAccess && !profChatAccess.can_send ? (
+                  <Text style={{ color: '#7C2D12', backgroundColor: '#FFF7ED', padding: 12, borderRadius: 10, marginBottom: 80 }}>{profChatAccess.reason}</Text>
+                ) : (
                 <View style={{ flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'flex-end', marginBottom: 80 }}>
                   <TextInput
                     style={{ flex: 1, fontSize: 14, color: '#0F2747', paddingHorizontal: 8, paddingVertical: 6, minHeight: 38, maxHeight: 100 }}
@@ -656,6 +668,7 @@ export default function ProfessionalHomeScreen({
                     )}
                   </TouchableOpacity>
                 </View>
+                )}
               </View>
             ) : (
               <View>
@@ -663,7 +676,7 @@ export default function ProfessionalHomeScreen({
                   <View style={styles.emptyContainer}>
                     <Text style={styles.emptyTitle}>Nenhuma conversa ativa</Text>
                     <Text style={styles.emptyDescription}>
-                      As conversas dos seus pacientes vinculados aparecerão aqui em tempo real.
+                      As conversas com pacientes que têm o chat liberado aparecem aqui.
                     </Text>
                   </View>
                 ) : (

@@ -1,0 +1,97 @@
+{
+ "checks": [
+  {
+   "n": "Cabeçalho com o profissional vinculado (Nutri Equipe), sem \"Online\"",
+   "ok": true
+  },
+  {
+   "n": "Aviso acima do campo: \"costuma responder em até 2 dias úteis\", sem prazo garantido, e urgência 192",
+   "ok": true
+  },
+  {
+   "n": "Mensagem enviada aparece com \"Enviada\"",
+   "ok": true
+  },
+  {
+   "n": "Falha de rede: mensagem fica como \"Não enviada\" com \"Tentar de novo\", dentro da tela",
+   "ok": true
+  },
+  {
+   "n": "Tentar de novo usa a mesma chave: uma única mensagem no banco",
+   "ok": true
+  },
+  {
+   "n": "Paciente anexa foto pelo app: gravada como dela e mostrada na conversa",
+   "ok": true
+  },
+  {
+   "n": "Abrir anexo: nova aba com o link curto mostra a imagem enviada",
+   "ok": true
+  },
+  {
+   "n": "App mostra HTML do profissional como texto (sem executar)",
+   "ok": true
+  },
+  {
+   "n": "Mensagens da paciente lidas pelo profissional aparecem como \"Lida\"",
+   "ok": true
+  },
+  {
+   "n": "Chat da paciente sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Sem rolagem horizontal a 390 px",
+   "ok": true
+  },
+  {
+   "n": "Vínculo encerrado: campo some, histórico fica e o motivo aparece",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (Ana)",
+   "ok": true
+  },
+  {
+   "n": "Conversa antiga sem vínculo (criada pela regra anterior): histórico só para leitura",
+   "ok": true
+  },
+  {
+   "n": "Sem vínculo: \"Seu consultório ainda não liberou o chat\" e nenhum campo de envio",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (Bruno)",
+   "ok": true
+  },
+  {
+   "n": "Tela do profissional (render do servidor, CSP off): HTML como texto, nenhum <img>, nada executado",
+   "ok": true
+  },
+  {
+   "n": "Mensagem nova chega pelo polling e continua como texto (sem innerHTML)",
+   "ok": true
+  },
+  {
+   "n": "Link do anexo na web usa o id do anexo",
+   "ok": true
+  },
+  {
+   "n": "Sem \"Online\" nem \"criptografado\"; aviso do que a paciente vê",
+   "ok": true
+  },
+  {
+   "n": "Chat do profissional sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Perfil da paciente mostra o vínculo do chat, histórico e botão de encerrar",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script (profissional)",
+   "ok": true
+  }
+ ],
+ "axe_profissional": []
+}

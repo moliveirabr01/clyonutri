@@ -80,22 +80,24 @@ export interface ProfessionalFoodDiaryItem {
   reviewed_at?: string;
 }
 
+/** Mensagem do chat (NI2-138): lista fechada de campos; datas em ISO 8601 com o fuso do consultório. */
 export interface ChatMessage {
   id: number;
   conversation_id: number;
-  clinic_id: number;
   sender_type: 'patient' | 'professional';
-  sender_id: number;
   message: string;
-  attachment_path?: string | null;
-  attachment_name?: string | null;
-  attachment_mime?: string | null;
-  attachment_size?: number | null;
   status: 'sent' | 'delivered' | 'read';
-  created_at: string;
-  read_at?: string | null;
+  created_at: string | null;
   delivered_at?: string | null;
+  read_at?: string | null;
+  has_attachment?: boolean;
+  attachment?: { id: number; name: string; mime_type: string; size_bytes: number } | null;
+  replayed?: boolean;
 }
+
+export interface ChatAccess { can_send: boolean; code: string | null; reason: string | null }
+export interface ChatNotice { response_time: string | null; response_time_text: string; emergency_text: string }
+export interface ChatChannel { professional_id: number; professional_name: string; unread_count: number; can_start: boolean }
 
 export interface ChatPollResponse {
   conversation_id: number | null;
@@ -104,6 +106,11 @@ export interface ChatPollResponse {
     name: string;
     crn?: string | null;
   } | null;
+  channels?: ChatChannel[];
+  /** Status atual das últimas mensagens de quem lê (Enviada → Entregue → Lida). */
+  receipts?: Array<{ id: number; status: ChatMessage['status'] }>;
+  access?: ChatAccess | null;
+  notice?: ChatNotice;
   messages: ChatMessage[];
   cursor: {
     after_id: number;
@@ -115,6 +122,9 @@ export interface ChatPollResponse {
     background_window_ms: number;
   };
 }
+
+/** Arquivo escolhido para anexar (app: uri; web: File). */
+export interface ChatAttachmentInput { uri: string; name: string; mimeType: string; file?: Blob | null }
 
 export interface ProfessionalChatConversation {
   id: number;
@@ -318,9 +328,11 @@ export function getAuthToken(): string | null {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const isLogin = endpoint === '/api/v1/auth/patient-login' || endpoint === '/api/v1/auth/professional-login';
+  // Envio de arquivo (FormData): o navegador/RN define o Content-Type com o boundary.
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
     'Accept': 'application/json',
-    'Content-Type': 'application/json',
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(typeof window !== 'undefined' ? { 'X-ClyoNutri-Web': '1' } : {}),
     ...(options.headers as Record<string, string> || {}),
   };
@@ -366,6 +378,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError('O servidor retornou uma resposta inválida. Tente novamente.', response.status, 'invalid');
   }
   return payload as T;
+}
+
+/** Chave de idempotência de uma mensagem (gerada uma vez, quando a mensagem é criada). */
+export function newChatKey(prefix = 'mob'): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 12)}`;
 }
 
 export const ApiService = {
@@ -574,22 +591,42 @@ export const ApiService = {
   },
 
   // --- Métodos de Chat e Mensageria Segura (NI2-189) ---
-  async getChatMessages(afterId?: number): Promise<ChatPollResponse> {
-    const url = afterId && afterId > 0
-      ? `/api/v1/patient/chat/messages?after_id=${afterId}`
-      : '/api/v1/patient/chat/messages';
-    return request<ChatPollResponse>(url);
+  async getChatMessages(afterId?: number, professionalId?: number): Promise<ChatPollResponse> {
+    const q = [afterId && afterId > 0 ? `after_id=${afterId}` : '', professionalId ? `professional_id=${professionalId}` : ''].filter(Boolean).join('&');
+    const data = await request<ChatPollResponse>('/api/v1/patient/chat/messages' + (q ? `?${q}` : ''));
+    if (!Array.isArray(data.messages)) throw new ApiError('Resposta do chat inválida. Tente novamente.', 200, 'invalid');
+    return data;
   },
 
-  async sendChatMessage(message: string, conversationId?: number): Promise<{ success: boolean; message: ChatMessage }> {
-    return request<{ success: boolean; message: ChatMessage }>('/api/v1/patient/chat/send', {
-      method: 'POST',
-      body: JSON.stringify({
-        message,
-        conversation_id: conversationId,
-        idempotency_key: `mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      }),
-    });
+  /**
+   * NI2-138 (A6): a chave de idempotência vem de quem criou a mensagem e é a mesma em toda tentativa,
+   * então reenviar depois de um erro de rede nunca duplica. Com anexo, o envio é multipart.
+   */
+  async sendChatMessage(message: string, conversationId?: number, idempotencyKey?: string, attachment?: ChatAttachmentInput | null, professionalId?: number): Promise<{ success: boolean; message: ChatMessage }> {
+    const key = idempotencyKey || newChatKey();
+    let body: string | FormData;
+    if (attachment) {
+      const form = new FormData();
+      form.append('message', message);
+      form.append('idempotency_key', key);
+      if (conversationId) form.append('conversation_id', String(conversationId));
+      if (professionalId) form.append('professional_id', String(professionalId));
+      if (attachment.file) form.append('attachment', attachment.file as Blob, attachment.name);
+      else form.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.mimeType } as unknown as Blob);
+      body = form;
+    } else {
+      body = JSON.stringify({ message, conversation_id: conversationId, professional_id: professionalId, idempotency_key: key });
+    }
+    const data = await request<{ success: boolean; message: ChatMessage }>('/api/v1/patient/chat/send', { method: 'POST', body });
+    if (data.success !== true || !data.message) throw new ApiError('Não foi possível enviar. Tente de novo.', 200, 'invalid');
+    return data;
+  },
+
+  /** Link curto (2 min) para abrir o anexo no navegador ou no sistema, sem levar o token da sessão. */
+  async getChatAttachmentUrl(attachmentId: number): Promise<string> {
+    const data = await request<{ url: string; expires_in: number }>(`/api/v1/patient/chat/attachment/${attachmentId}/link`, { method: 'POST', body: '{}' });
+    if (typeof data.url !== 'string' || !data.url.startsWith('/api/v1/chat/anexo/')) throw new ApiError('Não foi possível abrir o anexo.', 200, 'invalid');
+    return `${currentApiBaseUrl}${data.url}`;
   },
 
   async markChatAsRead(conversationId: number): Promise<{ success: boolean }> {
@@ -610,12 +647,12 @@ export const ApiService = {
     return request<ChatPollResponse>(url);
   },
 
-  async sendProfessionalChatMessage(conversationId: number, message: string): Promise<{ success: boolean; message: ChatMessage }> {
+  async sendProfessionalChatMessage(conversationId: number, message: string, idempotencyKey?: string): Promise<{ success: boolean; message: ChatMessage }> {
     return request<{ success: boolean; message: ChatMessage }>(`/api/v1/professional/chat/${conversationId}/send`, {
       method: 'POST',
       body: JSON.stringify({
         message,
-        idempotency_key: `prof_mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        idempotency_key: idempotencyKey || newChatKey('prof'),
       }),
     });
   },

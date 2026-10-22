@@ -187,6 +187,15 @@ try {
     $convCheckBefore = $db->query("SELECT count(*) FROM chat_conversations WHERE clinic_id = $clinicIdA")->fetchColumn();
     assertTest((int)$convCheckBefore === 0, "Nenhuma conversa existente antes do primeiro acesso do aluno");
 
+    // NI2-138 (A1): sem vínculo ativo, o app não abre conversa nem escolhe profissional pela paciente.
+    $noLinkRes = callHttp('GET', '/api/v1/patient/chat/messages', [], $alunoToken);
+    assertTest(array_key_exists('conversation_id', $noLinkRes['json'] ?? []) && $noLinkRes['json']['conversation_id'] === null
+        && ($noLinkRes['json']['access']['code'] ?? '') === 'NO_ACTIVE_LINK', "Sem vínculo ativo: nenhuma conversa e aviso NO_ACTIVE_LINK");
+    assertTest((int)$db->query("SELECT count(*) FROM chat_conversations WHERE clinic_id = $clinicIdA")->fetchColumn() === 0, "Nenhuma conversa criada sem vínculo");
+    // A equipe libera o chat no perfil da paciente (vínculo de acompanhamento).
+    \ClyoNutri\Core\Auth\TenantContext::set($clinicIdA, ['id' => $nutriIdA, 'role' => 'nutritionist']);
+    (new \ClyoNutri\Domain\Chat\PatientLinkService($db))->activate($patientIdA, $nutriIdA, $nutriIdA, 'test');
+
     $initChatRes = callHttp('GET', '/api/v1/patient/chat/messages', [], $alunoToken);
     assertTest(isset($initChatRes['json']['conversation_id']), "Endpoint /api/v1/patient/chat/messages respondeu com sucesso");
     $convId = (int)($initChatRes['json']['conversation_id'] ?? 0);
@@ -350,8 +359,12 @@ try {
     $patientScreenContent = file_get_contents(__DIR__ . '/../mobile/src/screens/PatientHomeScreen.tsx');
     assertTest(strpos($patientScreenContent, "'Chat'") !== false, "PatientHomeScreen inclui aba 'Chat'");
     assertTest(strpos($patientScreenContent, "currentTab === 'Chat'") !== false, "PatientHomeScreen renderiza tela de Chat quando aba selecionada");
-    assertTest(strpos($patientScreenContent, "chatOnlineDot") !== false, "PatientHomeScreen renderiza status de presença Online com indicador visual");
-    assertTest(strpos($patientScreenContent, "3000") !== false, "PatientHomeScreen executa delta polling a cada 3 segundos");
+    // NI2-138 (M4/B3): sem "Online"/"tempo real" (não há atendimento imediato); o intervalo vem do servidor (polling_policy).
+    $chatComponent = file_get_contents(__DIR__ . '/../mobile/src/components/PatientChat.tsx');
+    assertTest(strpos($patientScreenContent, '<PatientChat') !== false, "PatientHomeScreen renderiza o componente PatientChat");
+    assertTest(strpos($chatComponent, 'polling_policy') !== false && strpos($chatComponent, 'AppState') !== false, "PatientChat usa o intervalo do servidor e pausa em segundo plano");
+    assertTest(!preg_match('/tempo real|Online|Conectado ao consultório/u', $patientScreenContent . $chatComponent), "Nenhuma promessa de atendimento imediato no app");
+    assertTest(strpos($chatComponent, 'emergency_text') !== false, "PatientChat mostra o aviso de urgência acima do campo de mensagem");
 
     // Verifica que ProfessionalHomeScreen.tsx possui suporte à aba Chat
     $profScreenContent = file_get_contents(__DIR__ . '/../mobile/src/screens/ProfessionalHomeScreen.tsx');

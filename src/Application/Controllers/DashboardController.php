@@ -236,6 +236,12 @@ class DashboardController
         $appEvolution = (new \ClyoNutri\Domain\Evolution\PatientEvolutionService())->professionalPanel($id);
         $canEditAppEvolution = $this->canEditPlanItems(Connection::getInstance());
         $appEvolutionFlash = $_SESSION['app_evolution_flash'] ?? null; unset($_SESSION['app_evolution_flash']);
+        // NI2-138: vínculo que libera o chat com a paciente.
+        $chatLinkSvc = new \ClyoNutri\Domain\Chat\PatientLinkService();
+        $chatLinks = $chatLinkSvc->linksForPatient($id);
+        $chatProfessionals = $chatLinkSvc->clinicProfessionals();
+        $chatActor = ChatLinkController::actor();
+        $chatLinkFlash = $_SESSION['chat_link_flash'] ?? null; unset($_SESSION['chat_link_flash']);
 
         ob_start();
         ?>
@@ -594,6 +600,7 @@ class DashboardController
 
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
         <?php $pid = (int)$p['id']; require __DIR__ . '/../../../views/patients/app-evolution.php'; ?>
+        <?php if ($chatLinkSvc->available()) require __DIR__ . '/../../../views/patients/chat-link.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">

@@ -49,6 +49,7 @@ class HostGatorCronScheduler
         $this->pruneLoginAttempts();
         $this->pruneOldLogs();
         $this->sendTeleconsultationReminders();
+        $this->purgeChatRetention();
 
         $elapsed = round(microtime(true) - $startTime, 3);
         $this->executionLog['duration_seconds'] = $elapsed;
@@ -122,6 +123,23 @@ class HostGatorCronScheduler
             $this->executionLog['teleconsultation_reminders'] = (new \ClyoNutri\Domain\Telehealth\TeleconsultationNotifier())->sendDueReminders(60);
         } catch (\Throwable $e) {
             $this->executionLog['teleconsultation_reminders'] = 'error: ' . get_class($e);
+        }
+    }
+
+    /** NI2-138: guarda do chat (prazo por clínica, padrão 20 anos). Uma vez por dia. */
+    private function purgeChatRetention(): void
+    {
+        $marker = $this->storageDir . '/chat_retention_last_run';
+        if (is_file($marker) && time() - (int)@file_get_contents($marker) < 86400) {
+            $this->executionLog['chat_retention'] = 'already_ran_today';
+            return;
+        }
+        try {
+            $report = (new \ClyoNutri\Domain\Chat\ChatRetentionService())->run();
+            @file_put_contents($marker, (string)time());
+            $this->executionLog['chat_retention'] = ['clinics' => count($report['clinics']), 'orphan_files' => $report['orphan_files']];
+        } catch (\Throwable $e) {
+            $this->executionLog['chat_retention'] = 'error: ' . get_class($e);
         }
     }
 

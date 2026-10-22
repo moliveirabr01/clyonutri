@@ -1,0 +1,106 @@
+# SQL manual da migração 48 (NI2-138) no MySQL 8.0.46-0ubuntu0.24.04.4
+## 1) Banco da instalação até a migração 47 (chaves INT)
+dados: 4 pacientes (1 inativa), 2 profissionais (1 inativa na clínica), consulta cancelada, plano, conversa só com mensagem da paciente, chave de envio k1 repetida 3x, 1 anexo
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_47_aplicada	conversas	mensagens	chaves_de_envio_repetidas	anexos	vinculos_que_serao_criados	conversas_que_ficarao_somente_leitura	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	2	5	1	1	2	1	int
+### migração
+resultado	vinculos_ativos
+OK — migração 48 aplicada (vínculo do chat, guarda das mensagens e notificações)	2
+### migração de novo (idempotente)
+resultado	vinculos_ativos
+OK — migração 48 aplicada (vínculo do chat, guarda das mensagens e notificações)	2
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_47_aplicada	conversas	mensagens	chaves_de_envio_repetidas	anexos	vinculos_que_serao_criados	conversas_que_ficarao_somente_leitura	tipo_das_chaves
+OK — migração 48 já aplicada	1	1	1	2	5	0	1	2	1	int
+### vínculos
+clinic_id	patient_id	professional_id	status	source
+1	1	1	active	migration_care_history
+1	2	1	active	migration_care_history
+### chaves de envio e anexo
+id	conversation_id	idempotency_key	attachment_id
+1	1	k1	7
+2	1	k1-dup-2	NULL
+3	1	k1-dup-3	NULL
+4	1	k2	NULL
+5	2	NULL	NULL
+### índices de chat_messages
+INDEX_NAME	NON_UNIQUE
+clinic_id	1
+idx_chat_messages_created	1
+idx_chat_messages_sender_time	1
+PRIMARY	0
+uq_chat_messages_idemp	0
+### tipos
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE
+chat_clinic_settings	clinic_id	int
+chat_clinic_settings	id	int
+chat_clinic_settings	updated_by_user_id	int
+chat_messages	attachment_id	int
+patient_professional_links	clinic_id	int
+patient_professional_links	created_by_user_id	int
+patient_professional_links	ended_by_user_id	int
+patient_professional_links	id	int
+patient_professional_links	patient_id	int
+patient_professional_links	professional_id	int
+### chaves estrangeiras novas
+fks
+4
+### chave repetida agora é recusada
+ERROR 1062 Duplicate entry (esperado)
+### migrations
+migration
+2026_10_22_000048_create_chat_links_and_retention
+
+## 2) Banco no formato da produção (chaves BIGINT UNSIGNED)
+dados: 4 pacientes (1 inativa), 2 profissionais (1 inativa na clínica), consulta cancelada, plano, conversa só com mensagem da paciente, chave de envio k1 repetida 3x, 1 anexo
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_47_aplicada	conversas	mensagens	chaves_de_envio_repetidas	anexos	vinculos_que_serao_criados	conversas_que_ficarao_somente_leitura	tipo_das_chaves
+OK — PRONTO PARA MIGRAR	1	0	1	2	5	1	1	2	1	bigint unsigned
+### migração
+resultado	vinculos_ativos
+OK — migração 48 aplicada (vínculo do chat, guarda das mensagens e notificações)	2
+### migração de novo (idempotente)
+resultado	vinculos_ativos
+OK — migração 48 aplicada (vínculo do chat, guarda das mensagens e notificações)	2
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_47_aplicada	conversas	mensagens	chaves_de_envio_repetidas	anexos	vinculos_que_serao_criados	conversas_que_ficarao_somente_leitura	tipo_das_chaves
+OK — migração 48 já aplicada	1	1	1	2	5	0	1	2	1	bigint unsigned
+### vínculos
+clinic_id	patient_id	professional_id	status	source
+1	1	1	active	migration_care_history
+1	2	1	active	migration_care_history
+### chaves de envio e anexo
+id	conversation_id	idempotency_key	attachment_id
+1	1	k1	7
+2	1	k1-dup-2	NULL
+3	1	k1-dup-3	NULL
+4	1	k2	NULL
+5	2	NULL	NULL
+### índices de chat_messages
+INDEX_NAME	NON_UNIQUE
+clinic_id	1
+idx_chat_messages_created	1
+idx_chat_messages_sender_time	1
+PRIMARY	0
+uq_chat_messages_idemp	0
+### tipos
+TABLE_NAME	COLUMN_NAME	COLUMN_TYPE
+chat_clinic_settings	clinic_id	bigint unsigned
+chat_clinic_settings	id	bigint unsigned
+chat_clinic_settings	updated_by_user_id	int
+chat_messages	attachment_id	bigint unsigned
+patient_professional_links	clinic_id	bigint unsigned
+patient_professional_links	created_by_user_id	int
+patient_professional_links	ended_by_user_id	int
+patient_professional_links	id	bigint unsigned
+patient_professional_links	patient_id	bigint unsigned
+patient_professional_links	professional_id	bigint unsigned
+### chaves estrangeiras novas
+fks
+4
+### chave repetida agora é recusada
+ERROR 1062 Duplicate entry (esperado)
+### migrations
+migration
+2026_10_22_000048_create_chat_links_and_retention

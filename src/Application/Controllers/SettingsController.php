@@ -33,6 +33,11 @@ final class SettingsController
                     ]);
                     (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('BOOKING_SETTINGS_UPDATED','booking_settings',(string)TenantContext::getClinicId(),['before'=>$before,'after'=>$after]);
                 }
+                elseif($section==='chat'){
+                    // NI2-138: tempo de resposta informado à paciente e prazo de guarda do chat. Só a gestão altera.
+                    if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar as regras do chat.');
+                    (new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->update(TenantContext::getClinicId(),is_string($_POST['chat_response_time']??null)?$_POST['chat_response_time']:null,$_POST['chat_retention_years']??'',(int)TenantContext::getUserId());
+                }
                 elseif($section==='patient_actions'){
                     // NI2-137: o que a paciente pode fazer com a consulta pelo app. Regra da clínica: só a gestão altera.
                     if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o que a paciente faz pelo app.');
@@ -79,9 +84,10 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $lastSec=$_POST['section']??'';
-            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':'Configurações atualizadas com sucesso.')));
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':($lastSec==='chat'?'Regras do chat atualizadas.':'Configurações atualizadas com sucesso.'))));
         }
         $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
+        $chatSettings=(new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->get(TenantContext::getClinicId());
         $pidStmt=Connection::getInstance()->prepare('SELECT id FROM professionals WHERE user_id=?');$pidStmt->execute([TenantContext::getUserId()]);
         $bookingProfessionalId=(int)$pidStmt->fetchColumn();
         $bookingBase=rtrim((string)(getenv('APP_URL')?:($_ENV['APP_URL']??'')),'/');

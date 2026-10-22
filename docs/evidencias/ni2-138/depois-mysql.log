@@ -1,0 +1,73 @@
+PASS [A1] Sem vínculo: nenhuma conversa, aviso NO_ACTIVE_LINK e nenhum profissional escolhido pela paciente
+PASS [A1] Sem vínculo: enviar → 403 NO_ACTIVE_LINK e nada gravado
+PASS [A1] Busca de "Nova conversa" marca a paciente sem vínculo
+PASS [A1] Web: nutricionista sem vínculo não abre conversa com a paciente
+PASS [A1] Nutricionista não libera vínculo em nome de outro profissional
+PASS [A1] Recepção não libera o chat (403)
+PASS [A1] Nutricionista libera o próprio vínculo no perfil da paciente (auditado)
+PASS [A1] Com vínculo: conversa com o profissional vinculado (Nutri Equipe), pode enviar
+PASS [M6] Abertura da conversa auditada
+PASS [M4] Sem configuração: "responde quando possível, sem prazo garantido" + aviso 192
+PASS [M4] Prazo de guarda abaixo de 5 anos é recusado
+PASS [M4] Dona configura "em até 2 dias úteis": a paciente vê como estimativa, não prazo
+PASS [M4] Recepção não altera as regras do chat
+PASS [M4] Tela do profissional sem "Online" nem "criptografado"; mostra o aviso que a paciente vê
+PASS [envio] Paciente envia → 201 com a mensagem
+PASS [M5] Mensagem com lista fechada de campos (sem caminho, ids internos nem chave)
+PASS [B5] Hora em ISO com o fuso do consultório (-03:00)
+PASS [A6] Retentativa com a mesma chave → 200, mesma mensagem (replayed), sem duplicar
+PASS [A6] Retentativa não gera nova notificação
+PASS [A6] 8 envios simultâneos com a mesma chave → 1 mensagem gravada (índice único)
+PASS [A6] Chave de idempotência inválida → 422
+PASS [M2] Mensagem de 2.001 caracteres → 422 MESSAGE_TOO_LONG
+PASS [M2] Mensagem de 300 KB → 422
+PASS [A4] Texto com HTML é guardado como texto (a tela é que escapa)
+PASS [A4] Render do servidor escapa a mensagem (nenhum <img onerror> no HTML)
+PASS [A4] Script da tela não usa innerHTML para mensagens
+PASS [A3] Paciente envia foto (multipart) → 201 com anexo
+PASS [A3] Anexo gravado como da paciente e ligado à mensagem
+PASS [A3] PHP disfarçado de PNG → 422 ATTACHMENT_INVALID e nenhum arquivo fica no disco
+PASS [A3] Arquivo de 11 MB → 422
+PASS [A3] PDF aceito
+PASS [A3] Web do profissional: link do anexo usa o id do anexo
+PASS [A3] Profissional baixa a foto da paciente (bytes iguais)
+PASS [A3] Link pelo id da mensagem (bug antigo) não abre outro arquivo
+PASS [A3] Profissional que não participa da conversa → 404
+PASS [B1] PDF sai como arquivo (attachment) e isolado (CSP sandbox, nosniff)
+PASS [A3] App pede link curto do anexo (2 min)
+PASS [A3] Link abre o anexo sem token de sessão
+PASS [A3] Link adulterado → 404
+PASS [A3] Link vencido → 404 "expirou"
+PASS [A3] Outra paciente não pede link do anexo da Ana → 404
+PASS [A3] Download com o token da sessão também funciona para a dona
+PASS [M6] Downloads auditados (sem conteúdo)
+PASS [M5] Polling sem caminho de arquivo, sender_id, clinic_id nem chave
+PASS [M5] Conversa de outra paciente → 404 sem ids nem texto interno
+PASS [isolamento] Paciente de outra clínica não vê nada da Ana
+PASS [M1] Nova mensagem: no app (sent), e-mail (driver de log: logged), push bloqueado sem provedor
+PASS [M1] E-mail vai para o profissional, sem conteúdo, nome da paciente nem dado clínico
+PASS [M1] Texto neutro (sem "Seu nutricionista"/"Seu paciente")
+PASS [M1] Segundo e-mail em menos de 30 min para a mesma conversa é pulado (recent_email)
+PASS [M1] Preferências da paciente (e-mail e push desligados) são respeitadas
+PASS [status] Resposta do profissional: entregue ao abrir o app e lida depois do recibo
+PASS [M6] Leitura auditada com contagem, sem conteúdo
+PASS [M6] Envio auditado com remetente e conversa, sem o texto
+PASS [A2] Vínculo encerrado: histórico visível, envio bloqueado com motivo
+PASS [A2] Paciente envia com vínculo encerrado → 403 LINK_INACTIVE e nada gravado
+PASS [A2] Profissional também fica só com leitura (tela sem campo; envio 403)
+PASS [M6] Encerramento do vínculo auditado
+PASS [A2] Conversa arquivada → 403 LINK_INACTIVE
+PASS [A2] Profissional inativado na clínica → 403 com "não atende mais"
+PASS [A2] Vínculo, conversa e profissional ativos de novo → envio volta a funcionar
+PASS [M3] Chat desligado pela administração: API da paciente e do profissional → 503 CHAT_DISABLED
+PASS [API profissional] Lista de conversas com can_send e sem e-mail/telefone da paciente
+PASS [API profissional] Profissional envia pelo app → 201 com lista fechada
+PASS [API profissional] Conversa de outro profissional → 404 sem ids
+PASS [M2] 21ª mensagem em 1 minuto → 429 RATE_LIMITED com Retry-After
+PASS [A5] Simulação (--dry-run) conta o que passou de 20 anos sem apagar nada
+PASS [A5] Rotina apaga mensagens, anexos (linha e arquivo) e notificações vencidos
+PASS [A5] Conversa do Bruno (recente) fica intacta
+PASS [A5] Arquivo órfão com mais de 24 h é apagado
+PASS [A5] Expurgo auditado com contagens
+
+NI2-138 (MySQL): 71 PASS, 0 FAIL

@@ -1,0 +1,433 @@
+{
+ "driver": "mysql",
+ "pass": 71,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "A1",
+   "name": "Sem vínculo: nenhuma conversa, aviso NO_ACTIVE_LINK e nenhum profissional escolhido pela paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Sem vínculo: enviar → 403 NO_ACTIVE_LINK e nada gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Busca de \"Nova conversa\" marca a paciente sem vínculo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Web: nutricionista sem vínculo não abre conversa com a paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Nutricionista não libera vínculo em nome de outro profissional",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Recepção não libera o chat (403)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Nutricionista libera o próprio vínculo no perfil da paciente (auditado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A1",
+   "name": "Com vínculo: conversa com o profissional vinculado (Nutri Equipe), pode enviar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M6",
+   "name": "Abertura da conversa auditada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Sem configuração: \"responde quando possível, sem prazo garantido\" + aviso 192",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Prazo de guarda abaixo de 5 anos é recusado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Dona configura \"em até 2 dias úteis\": a paciente vê como estimativa, não prazo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Recepção não altera as regras do chat",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M4",
+   "name": "Tela do profissional sem \"Online\" nem \"criptografado\"; mostra o aviso que a paciente vê",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "envio",
+   "name": "Paciente envia → 201 com a mensagem",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M5",
+   "name": "Mensagem com lista fechada de campos (sem caminho, ids internos nem chave)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B5",
+   "name": "Hora em ISO com o fuso do consultório (-03:00)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A6",
+   "name": "Retentativa com a mesma chave → 200, mesma mensagem (replayed), sem duplicar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A6",
+   "name": "Retentativa não gera nova notificação",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A6",
+   "name": "8 envios simultâneos com a mesma chave → 1 mensagem gravada (índice único)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A6",
+   "name": "Chave de idempotência inválida → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M2",
+   "name": "Mensagem de 2.001 caracteres → 422 MESSAGE_TOO_LONG",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M2",
+   "name": "Mensagem de 300 KB → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Texto com HTML é guardado como texto (a tela é que escapa)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Render do servidor escapa a mensagem (nenhum <img onerror> no HTML)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A4",
+   "name": "Script da tela não usa innerHTML para mensagens",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Paciente envia foto (multipart) → 201 com anexo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Anexo gravado como da paciente e ligado à mensagem",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "PHP disfarçado de PNG → 422 ATTACHMENT_INVALID e nenhum arquivo fica no disco",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Arquivo de 11 MB → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "PDF aceito",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Web do profissional: link do anexo usa o id do anexo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Profissional baixa a foto da paciente (bytes iguais)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Link pelo id da mensagem (bug antigo) não abre outro arquivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Profissional que não participa da conversa → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "B1",
+   "name": "PDF sai como arquivo (attachment) e isolado (CSP sandbox, nosniff)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "App pede link curto do anexo (2 min)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Link abre o anexo sem token de sessão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Link adulterado → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Link vencido → 404 \"expirou\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Outra paciente não pede link do anexo da Ana → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A3",
+   "name": "Download com o token da sessão também funciona para a dona",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M6",
+   "name": "Downloads auditados (sem conteúdo)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M5",
+   "name": "Polling sem caminho de arquivo, sender_id, clinic_id nem chave",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M5",
+   "name": "Conversa de outra paciente → 404 sem ids nem texto interno",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "isolamento",
+   "name": "Paciente de outra clínica não vê nada da Ana",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M1",
+   "name": "Nova mensagem: no app (sent), e-mail (driver de log: logged), push bloqueado sem provedor",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M1",
+   "name": "E-mail vai para o profissional, sem conteúdo, nome da paciente nem dado clínico",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M1",
+   "name": "Texto neutro (sem \"Seu nutricionista\"/\"Seu paciente\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M1",
+   "name": "Segundo e-mail em menos de 30 min para a mesma conversa é pulado (recent_email)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M1",
+   "name": "Preferências da paciente (e-mail e push desligados) são respeitadas",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "status",
+   "name": "Resposta do profissional: entregue ao abrir o app e lida depois do recibo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M6",
+   "name": "Leitura auditada com contagem, sem conteúdo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M6",
+   "name": "Envio auditado com remetente e conversa, sem o texto",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Vínculo encerrado: histórico visível, envio bloqueado com motivo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Paciente envia com vínculo encerrado → 403 LINK_INACTIVE e nada gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Profissional também fica só com leitura (tela sem campo; envio 403)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M6",
+   "name": "Encerramento do vínculo auditado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Conversa arquivada → 403 LINK_INACTIVE",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Profissional inativado na clínica → 403 com \"não atende mais\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A2",
+   "name": "Vínculo, conversa e profissional ativos de novo → envio volta a funcionar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M3",
+   "name": "Chat desligado pela administração: API da paciente e do profissional → 503 CHAT_DISABLED",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "API profissional",
+   "name": "Lista de conversas com can_send e sem e-mail/telefone da paciente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "API profissional",
+   "name": "Profissional envia pelo app → 201 com lista fechada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "API profissional",
+   "name": "Conversa de outro profissional → 404 sem ids",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "M2",
+   "name": "21ª mensagem em 1 minuto → 429 RATE_LIMITED com Retry-After",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A5",
+   "name": "Simulação (--dry-run) conta o que passou de 20 anos sem apagar nada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A5",
+   "name": "Rotina apaga mensagens, anexos (linha e arquivo) e notificações vencidos",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A5",
+   "name": "Conversa do Bruno (recente) fica intacta",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A5",
+   "name": "Arquivo órfão com mais de 24 h é apagado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "A5",
+   "name": "Expurgo auditado com contagens",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

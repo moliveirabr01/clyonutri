@@ -1,0 +1,95 @@
+{
+    "mode": "all",
+    "mysql_version": "8.0.46-0ubuntu0.24.04.4",
+    "fresh": {
+        "ok": true,
+        "migrations_total": 48,
+        "migrations_applied": 48,
+        "rerun_pending": 0,
+        "schema": {
+            "version": "2026_10_22_000048_create_chat_links_and_retention",
+            "migrations_recorded": 48,
+            "tables": 91,
+            "columns": 1008,
+            "indexes": 301,
+            "foreign_keys": 166,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea"
+        },
+        "detail": "Todas as migrations aplicadas; reexecução sem pendências."
+    },
+    "upgrade": {
+        "ok": true,
+        "base_version": "2026_10_16_000042_create_booking_holds_and_self_service_tables",
+        "target_version": "2026_10_22_000048_create_chat_links_and_retention",
+        "migrations_upgraded": 6,
+        "rows_before": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "rows_after": {
+            "clinics": 2,
+            "users": 1,
+            "clinic_members": 1,
+            "patients": 3
+        },
+        "data_preserved": true,
+        "schema": {
+            "version": "2026_10_22_000048_create_chat_links_and_retention",
+            "migrations_recorded": 48,
+            "tables": 91,
+            "columns": 1008,
+            "indexes": 301,
+            "foreign_keys": 166,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea"
+        },
+        "detail": "Upgrade de 6 migrations com dados preservados."
+    },
+    "install_sql": {
+        "ok": true,
+        "pending_after_import": [],
+        "schema": {
+            "version": "2026_10_22_000048_create_chat_links_and_retention",
+            "migrations_recorded": 48,
+            "tables": 91,
+            "columns": 1008,
+            "indexes": 301,
+            "foreign_keys": 166,
+            "collations": [
+                "ascii_bin",
+                "utf8mb4_unicode_ci"
+            ],
+            "fingerprint": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea"
+        },
+        "detail": "SQL de instalação importado; nenhuma migration pendente."
+    },
+    "fingerprints_identical": true,
+    "fingerprints": {
+        "fresh": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea",
+        "upgrade": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea",
+        "install_sql": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea"
+    },
+    "schema": {
+        "version": "2026_10_22_000048_create_chat_links_and_retention",
+        "migrations_recorded": 48,
+        "tables": 91,
+        "columns": 1008,
+        "indexes": 301,
+        "foreign_keys": 166,
+        "collations": [
+            "ascii_bin",
+            "utf8mb4_unicode_ci"
+        ],
+        "fingerprint": "4a4f4285fe094983102cfc4c868da8fe8eee71f1350d1d471a5038905fac83ea"
+    },
+    "ok": true
+}

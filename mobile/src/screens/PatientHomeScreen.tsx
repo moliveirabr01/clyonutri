@@ -16,6 +16,7 @@ import {
 import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
 import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
+import PatientChat from '../components/PatientChat';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -27,7 +28,6 @@ import {
   EvolutionData,
   PatientRecipePrescription,
   PatientRecipeDetails,
-  ChatMessage,
   PatientPrivacyData,
 } from '../services/api';
 
@@ -110,87 +110,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [mealError, setMealError] = useState<string | null>(null);
   const [recipeDetailState, setRecipeDetailState] = useState<ResourceState>(initialResource);
 
-  // Estado e métodos do Chat Seguro com Nutricionista
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatConvId, setChatConvId] = useState<number | null>(null);
-  const [chatProfessional, setChatProfessional] = useState<{ id: number; name: string; crn?: string | null } | null>(null);
+  // Chat (NI2-138): o componente PatientChat cuida de vínculo, envio sem duplicar, anexos e atualização.
+  // O rascunho fica aqui para outras abas poderem abrir o chat com um texto pronto.
   const [chatInputText, setChatInputText] = useState<string>('');
-  const [chatSending, setChatSending] = useState<boolean>(false);
-  const [chatState, setChatState] = useState<ResourceState>(initialResource);
-  const [chatConnected, setChatConnected] = useState<boolean>(true);
-  const chatScrollRef = useRef<ScrollView>(null);
-
-  const loadChat = useCallback(async (afterId?: number) => {
-    try {
-      const data = await ApiService.getChatMessages(afterId);
-      if (data.conversation_id) setChatConvId(data.conversation_id);
-      if (data.professional) setChatProfessional(data.professional);
-
-      setChatConnected(true);
-
-      if (afterId && afterId > 0) {
-        if (data.messages && data.messages.length > 0) {
-          setChatMessages(prev => {
-            const existingIds = new Set(prev.map(m => m.id));
-            const newMsgs = data.messages.filter(m => !existingIds.has(m.id));
-            if (newMsgs.length === 0) return prev;
-            return [...prev, ...newMsgs];
-          });
-          if (data.conversation_id) {
-            ApiService.markChatAsRead(data.conversation_id).catch(() => {});
-          }
-        }
-      } else {
-        setChatMessages(data.messages || []);
-        setChatState({ loading: false, error: null, updatedAt: new Date().toLocaleTimeString('pt-BR') });
-        if (data.conversation_id && data.messages && data.messages.length > 0) {
-          ApiService.markChatAsRead(data.conversation_id).catch(() => {});
-        }
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.kind === 'auth') return;
-      setChatConnected(false);
-      setChatState(prev => ({ ...prev, loading: false, error: resourceError(err) }));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentTab !== 'Chat') return;
-    setChatState(prev => ({ ...prev, loading: true }));
-    loadChat();
-
-    const interval = setInterval(() => {
-      setChatMessages(current => {
-        const lastId = current.length > 0 ? current[current.length - 1].id : 0;
-        loadChat(lastId);
-        return current;
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [currentTab, loadChat]);
-
-  const handleSendMessage = async () => {
-    const text = chatInputText.trim();
-    if (!text || chatSending) return;
-
-    setChatSending(true);
-    try {
-      const res = await ApiService.sendChatMessage(text, chatConvId ?? undefined);
-      if (res.success && res.message) {
-        setChatMessages(prev => [...prev, res.message]);
-        if (res.message.conversation_id && !chatConvId) {
-          setChatConvId(res.message.conversation_id);
-        }
-        setChatInputText('');
-        setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
-      }
-    } catch (err) {
-      Alert.alert('Erro ao enviar', err instanceof Error ? err.message : 'Não foi possível enviar a mensagem.');
-    } finally {
-      setChatSending(false);
-    }
-  };
   const refreshRecipes = useCallback(async () => {
     setRecipesState(prev => ({ ...prev, loading: true }));
     try {
@@ -452,13 +374,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               style={[styles.card, { borderColor: '#10B981', backgroundColor: '#F0FDF4' }]}
               accessibilityRole="button"
               onPress={() => setCurrentTab('Chat')}
-              accessibilityLabel="Falar com nutricionista no chat seguro"
+              accessibilityLabel="Abrir mensagens com o nutricionista"
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, { color: '#065F46' }]}>💬 Chat com Nutricionista</Text>
+                  <Text style={[styles.cardTitle, { color: '#065F46' }]}>Mensagens com o nutricionista</Text>
                   <Text style={[styles.helperText, { color: '#047857' }]}>
-                    Fale online com seu nutricionista, tire dúvidas sobre o plano e envie mensagens →
+                    Tire dúvidas sobre o plano. Não é canal de urgência →
                   </Text>
                 </View>
                 <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 8 }} />
@@ -751,134 +673,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
         {currentTab === 'Chat' && (
           <View style={styles.tabContent}>
-            {/* Header com profissional e status online */}
-            <View style={styles.chatHeaderCard}>
-              <View style={styles.chatHeaderInfo}>
-                <View style={styles.chatAvatar}>
-                  <Text style={styles.chatAvatarText}>
-                    {chatProfessional?.name ? chatProfessional.name.charAt(0).toUpperCase() : 'N'}
-                  </Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.chatNutriName} accessibilityRole="header">
-                    {chatProfessional?.name || 'Seu Nutricionista'}
-                  </Text>
-                  <View style={styles.chatOnlineRow}>
-                    <View style={[styles.chatOnlineDot, !chatConnected && { backgroundColor: '#94A3B8' }]} />
-                    <Text style={styles.chatOnlineText}>
-                      {chatConnected ? 'Conectado ao consultório' : 'Desconectado'} • {chatProfessional?.crn || 'Atendimento Clínico'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <Text style={styles.chatSecurityBadge}>🔒 Canal Clínico Protegido (HTTPS/TLS) • Não substitui urgência</Text>
-            </View>
-
-            {chatState.error ? (
-              <View style={styles.chatErrorBanner} accessible={true} accessibilityRole="alert">
-                <Text style={styles.chatErrorText}>Erro de conexão: {chatState.error}</Text>
-                <TouchableOpacity
-                  style={styles.chatRetryButton}
-                  onPress={() => { setChatState(prev => ({ ...prev, loading: true, error: null })); loadChat(); }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Tentar reconectar ao chat"
-                >
-                  <Text style={styles.chatRetryButtonText}>Reconectar</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {chatState.loading && chatMessages.length === 0 ? (
-              <ActivityIndicator size="large" color="#0F2747" style={{ marginVertical: 32 }} />
-            ) : null}
-
-            {/* Mensagens do Chat */}
-            <View style={styles.chatMessagesCard}>
-              {chatMessages.length === 0 && !chatState.loading ? (
-                <View style={styles.chatEmptyState}>
-                  <Text style={styles.chatEmptyIcon}>💬</Text>
-                  <Text style={styles.chatEmptyTitle}>Converse com seu nutricionista</Text>
-                  <Text style={styles.chatEmptyDescription}>
-                    Tire dúvidas sobre o plano alimentar, relate sintomas ou compartilhe sua evolução em tempo real.
-                  </Text>
-                </View>
-              ) : (
-                chatMessages.map((m) => {
-                  const isPatient = m.sender_type === 'patient';
-                  return (
-                    <View
-                      key={m.id}
-                      style={[
-                        styles.chatBubble,
-                        isPatient ? styles.chatBubblePatient : styles.chatBubbleProfessional,
-                      ]}
-                      accessible={true}
-                      accessibilityLabel={`${isPatient ? 'Você' : 'Nutricionista'}: ${m.message}`}
-                    >
-                      {!isPatient && (
-                        <Text style={styles.chatSenderLabel}>
-                          {chatProfessional?.name || 'Nutricionista'}
-                        </Text>
-                      )}
-                      <Text
-                        style={[
-                          styles.chatBubbleText,
-                          isPatient ? styles.chatBubbleTextPatient : styles.chatBubbleTextProfessional,
-                        ]}
-                      >
-                        {m.message}
-                      </Text>
-                      <View style={styles.chatBubbleFooter}>
-                        <Text
-                          style={[
-                            styles.chatTimeText,
-                            isPatient ? styles.chatTimePatient : styles.chatTimeProfessional,
-                          ]}
-                        >
-                          {m.created_at ? m.created_at.substring(11, 16) : ''}
-                        </Text>
-                        {isPatient && (
-                          <Text style={styles.chatStatusCheck}>
-                            {m.status === 'read' ? '✓✓' : '✓'}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-
-            {/* Barra de Entrada de Mensagem */}
-            <View style={styles.chatInputCard}>
-              <TextInput
-                style={styles.chatTextInput}
-                placeholder="Digite sua mensagem para o nutricionista..."
-                placeholderTextColor="#94A3B8"
-                value={chatInputText}
-                onChangeText={setChatInputText}
-                multiline
-                maxLength={1000}
-                editable={!chatSending}
-                accessibilityLabel="Campo de texto para mensagem ao nutricionista"
-              />
-              <TouchableOpacity
-                style={[
-                  styles.chatSendBtn,
-                  (!chatInputText.trim() || chatSending) && styles.chatSendBtnDisabled,
-                ]}
-                onPress={handleSendMessage}
-                disabled={!chatInputText.trim() || chatSending}
-                accessibilityRole="button"
-                accessibilityLabel="Enviar mensagem para o nutricionista"
-              >
-                {chatSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.chatSendBtnText}>Enviar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <PatientChat active={currentTab === 'Chat'} draft={chatInputText} setDraft={setChatInputText} />
           </View>
         )}
 
@@ -1473,149 +1268,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  chatHeaderInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  chatAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#0F2747',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chatAvatarText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  chatNutriName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F2747',
-  },
-  chatOnlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  chatOnlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-  },
-  chatOnlineText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: t.success,
-  },
-  chatSecurityBadge: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  chatMessagesCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    minHeight: 280,
-  },
-  chatEmptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  chatEmptyIcon: {
-    fontSize: 36,
-    marginBottom: 12,
-  },
-  chatEmptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F2747',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  chatEmptyDescription: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  chatBubble: {
-    maxWidth: '82%',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-  },
-  chatBubblePatient: {
-    alignSelf: 'flex-end',
-    backgroundColor: t.success,
-    borderBottomRightRadius: 4,
-  },
-  chatBubbleProfessional: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  chatSenderLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0F2747',
-    marginBottom: 4,
-  },
-  chatBubbleText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  chatBubbleTextPatient: {
-    color: '#FFFFFF',
-  },
-  chatBubbleTextProfessional: {
-    color: '#0F172A',
-  },
-  chatBubbleFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  chatTimeText: {
-    fontSize: 10,
-  },
-  chatTimePatient: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  chatTimeProfessional: {
-    color: '#64748B',
-  },
-  chatStatusCheck: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  chatInputCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    padding: 8,
-    alignItems: 'flex-end',
-    marginBottom: 80,
-  },
   chatTextInput: {
     flex: 1,
     fontSize: 14,
@@ -1624,52 +1276,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     maxHeight: 100,
     minHeight: 40,
-  },
-  chatSendBtn: {
-    backgroundColor: t.success,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 40,
-  },
-  chatSendBtnDisabled: {
-    backgroundColor: '#94A3B8',
-  },
-  chatSendBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  chatErrorBanner: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#F87171',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  chatErrorText: {
-    fontSize: 12,
-    color: '#991B1B',
-    flex: 1,
-  },
-  chatRetryButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginLeft: 8,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chatRetryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

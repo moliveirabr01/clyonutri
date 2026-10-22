@@ -69,7 +69,10 @@ echo "  ✓ Histórico longitudinal recuperado com sucesso para visualização c
 // 3. NI2-118: Chat Seguro Profissional-Paciente
 echo "[3/3] Testando NI2-118: Chat Seguro Profissional-Paciente...\n";
 $chatService = new ChatService($db);
-$convId = $chatService->getOrCreateConversation($patient['id'], $nutri['user_id']);
+// NI2-138: o chat exige vínculo ativo paciente–profissional.
+$profId = (int)$db->query('SELECT id FROM professionals WHERE user_id = ' . (int)$nutri['user_id'])->fetchColumn();
+(new \ClyoNutri\Domain\Chat\PatientLinkService($db))->activate((int)$patient['id'], $profId, (int)$nutri['user_id'], 'test');
+$convId = $chatService->getOrCreateConversation($patient['id'], $profId);
 assert($convId > 0, "Conversa segura deve ser criada ou recuperada");
 
 // Paciente envia dúvida

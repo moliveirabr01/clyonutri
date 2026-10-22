@@ -35,6 +35,8 @@ class LgpdService
         'data_subject_requests' => [],
         'patient_goals' => [],
         'patient_self_metric_permissions' => [],
+        'appointment_change_requests' => [],
+        'patient_professional_links' => [],
     ];
 
     /** Tabelas com patient_id que NÃO entram no pacote, e por quê (revisar com o jurídico). */
@@ -96,6 +98,9 @@ class LgpdService
         $related = [];
         // NI2-91: inventário explícito. Toda tabela com patient_id está em EXPORTED_TABLES ou em NOT_EXPORTED_TABLES (com motivo).
         foreach (self::EXPORTED_TABLES as $table => $omit) {
+            if (!\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, $table)) {
+                continue; // migração ainda não aplicada neste servidor
+            }
             $stmt = $this->db->prepare("SELECT * FROM $table WHERE clinic_id = ? AND patient_id = ? ORDER BY id");
             $stmt->execute([$clinicId, $patientId]);
             $related[$table] = array_map(fn(array $row) => array_diff_key($row, array_flip($omit)), $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -162,6 +167,15 @@ class LgpdService
             $this->db->prepare("UPDATE booking_holds SET patient_name = NULL, patient_email = NULL, patient_phone = NULL, patient_cpf = NULL, patient_notes = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
             $this->db->prepare("UPDATE preconsultation_questionnaires SET revoked_at = CURRENT_TIMESTAMP WHERE patient_id = :id AND clinic_id = :clinic_id AND submitted_at IS NULL AND revoked_at IS NULL")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+
+            // NI2-138: o chat fica só para leitura sob guarda legal (vínculos encerrados, conversas arquivadas);
+            // mensagens e anexos seguem a política de guarda do chat (ChatRetentionService).
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'patient_professional_links')) {
+                $this->db->prepare("UPDATE patient_professional_links SET status = 'inactive', ended_at = :now, ended_reason = 'LGPD: cadastro anonimizado', updated_at = :now2 WHERE patient_id = :id AND clinic_id = :clinic_id AND status = 'active'")
+                    ->execute(['now' => date('Y-m-d H:i:s'), 'now2' => date('Y-m-d H:i:s'), 'id' => $patientId, 'clinic_id' => $clinicId]);
+            }
+            $this->db->prepare("UPDATE chat_conversations SET status = 'archived' WHERE patient_id = :id AND clinic_id = :clinic_id")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
 
             // Registrar revogação de consentimentos

@@ -42,7 +42,13 @@ final class ApiErrorBoundary
                     $status = 500;
                 }
             }
-            if ($failed || $status >= 500) {
+            // 503 intencional (recurso desligado, com código estável no corpo) segue com a mensagem própria (NI2-138).
+            $intentional503 = false;
+            if (!$failed && $status === 503) {
+                $d503 = json_decode($body, true);
+                $intentional503 = is_array($d503) && is_string($d503['code'] ?? null) && is_string($d503['error'] ?? null);
+            }
+            if ($failed || ($status >= 500 && !$intentional503)) {
                 if (!$failed) error_log(json_encode(['request_id' => $requestId, 'status' => $status, 'event' => 'API_ERROR_RESPONSE']));
                 header('Content-Type: application/json; charset=utf-8');
                 return json_encode(['error' => 'Não foi possível concluir a solicitação. Tente novamente.',

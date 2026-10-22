@@ -482,12 +482,15 @@ echo "✓ GATE 6 PASS: Paginação e busca suportam com sucesso carteiras com ma
 // GATE 7: MOB-UX-005 & MOB-UX-006 — Chat Seguro e Error Handling
 // =========================================================================
 echo "\n--- GATE 7: MOB-UX-005 / MOB-UX-006 (CHAT SEGURO E ERROR HANDLING) ---\n";
+// NI2-138: o chat só abre com vínculo ativo entre a paciente e o profissional (liberado pela equipe).
+\ClyoNutri\Core\Auth\TenantContext::set($clinicId, ['id' => $profUserId, 'role' => 'nutritionist']);
+(new \ClyoNutri\Domain\Chat\PatientLinkService($db))->activate($patientId, $profId, $profUserId, 'test');
 // Enviar mensagem do paciente
 $sendMsg = apiRequest('POST', '/api/v1/patient/chat/send', [
     'message' => 'Olá nutricionista, estou seguindo a versão prescrita!',
     'idempotency_key' => 'chat_test_' . $testRunId,
 ], $patientToken);
-assert($sendMsg['status'] === 200, "Falha no envio de chat: {$sendMsg['raw']}");
+assert($sendMsg['status'] === 201, "Falha no envio de chat: {$sendMsg['raw']}");
 assert($sendMsg['json']['success'] === true, "Sucesso não confirmado no envio de chat");
 
 // Polling do paciente

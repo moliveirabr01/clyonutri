@@ -198,6 +198,10 @@ if ($chat['status'] === 200) {
     check(($srB['data'] ?? null) === [], 'Busca não lista paciente de outra clínica');
     check($http('GET', '/chat/pacientes?page=0')['status'] === 422, 'Página inválida → 422');
     $tk = $token($chat['body']);
+    // NI2-138: o chat só abre com vínculo ativo entre a paciente e a profissional logada.
+    $demoProf = (int)$db->query("SELECT p.id FROM professionals p JOIN users u ON u.id = p.user_id WHERE u.email = 'demo.local@clyonutri.local' LIMIT 1")->fetchColumn();
+    $db->prepare("INSERT INTO patient_professional_links (clinic_id, patient_id, professional_id, status, source, started_at, created_at, updated_at) VALUES (?, ?, ?, 'active', 'test', ?, ?, ?)")
+        ->execute([$demoClinic, $own, $demoProf, date('Y-m-d H:i:s'), date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]);
     $r1 = $http('POST', '/chat/nova', ['_csrf_token' => $tk, 'patient_id' => (string)$own]);
     $r2 = $http('POST', '/chat/nova', ['_csrf_token' => $tk, 'patient_id' => (string)$own]);
     $nConv = (int)$db->query("SELECT COUNT(*) FROM chat_conversations WHERE patient_id = {$own}")->fetchColumn();
@@ -207,7 +211,7 @@ if ($chat['status'] === 200) {
     check($rf['status'] === 404 && (int)$db->query("SELECT COUNT(*) FROM chat_conversations WHERE patient_id = {$pB}")->fetchColumn() === 0, 'Paciente de outra clínica → 404, nada criado');
     check($http('POST', '/chat/nova', ['patient_id' => (string)$own])['status'] === 403, 'Sem CSRF → 403');
     check($http('GET', '/chat?patient_id=' . $pB)['status'] === 404, 'Atalho GET /chat?patient_id estrangeiro → 404 (antes: exceção)');
-    $db->exec("DELETE FROM chat_conversations WHERE patient_id = {$own}"); $db->exec("DELETE FROM patients WHERE id = {$own}");
+    $db->exec("DELETE FROM patient_professional_links WHERE patient_id = {$own}"); $db->exec("DELETE FROM chat_conversations WHERE patient_id = {$own}"); $db->exec("DELETE FROM patients WHERE id = {$own}");
 } else {
     check(false, 'Usuário demo sem acesso ao chat no banco de testes (status ' . $chat['status'] . ')');
 }

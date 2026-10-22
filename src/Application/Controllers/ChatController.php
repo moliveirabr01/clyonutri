@@ -80,6 +80,9 @@ class ChatController
                 $activeConvId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
             } catch (TenantSecurityException $e) {
                 http_response_code(404); echo 'Paciente não encontrado.'; return;
+            } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+                $_SESSION['chat_flash'] = $e->getMessage();
+                header('Location: /chat'); exit;
             }
             $conversations = $this->chatService->listConversationsForProfessional($auth['profId']);
         } else {
@@ -105,12 +108,16 @@ class ChatController
         }
         $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower(trim($term))) . '%';
         $offset = ((int)$page - 1) * 20;
-        $stmt = $this->db->prepare("SELECT p.id, p.name, (SELECT c.id FROM chat_conversations c WHERE c.clinic_id = p.clinic_id AND c.patient_id = p.id AND c.professional_id = :prof LIMIT 1) AS conversation_id
+        // NI2-138 (A1): o chat só abre com vínculo ativo entre a paciente e este profissional.
+        $hasLinks = \ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'patient_professional_links');
+        $linkSql = $hasLinks ? "(SELECT l.id FROM patient_professional_links l WHERE l.clinic_id = p.clinic_id AND l.patient_id = p.id AND l.professional_id = :prof2 AND l.status = 'active' LIMIT 1)" : '1';
+        $stmt = $this->db->prepare("SELECT p.id, p.name, (SELECT c.id FROM chat_conversations c WHERE c.clinic_id = p.clinic_id AND c.patient_id = p.id AND c.professional_id = :prof LIMIT 1) AS conversation_id,
+            {$linkSql} AS link_id
             FROM patients p WHERE p.clinic_id = :cid AND p.status = 'active' AND LOWER(p.name) LIKE :q ESCAPE '!' ORDER BY p.name, p.id LIMIT 21 OFFSET {$offset}");
-        $stmt->execute(['cid' => $auth['clinicId'], 'prof' => $auth['profId'], 'q' => $like]);
+        $stmt->execute(['cid' => $auth['clinicId'], 'prof' => $auth['profId'], 'q' => $like] + ($hasLinks ? ['prof2' => $auth['profId']] : []));
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $more = count($rows) > 20;
-        echo json_encode(['data' => array_map(static fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'has_conversation' => $r['conversation_id'] !== null], array_slice($rows, 0, 20)), 'has_more' => $more, 'page' => (int)$page], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['data' => array_map(static fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'has_conversation' => $r['conversation_id'] !== null, 'has_link' => $r['link_id'] !== null], array_slice($rows, 0, 20)), 'has_more' => $more, 'page' => (int)$page], JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -130,6 +137,9 @@ class ChatController
             $convId = $this->chatService->getOrCreateConversation($patientId, $auth['profId']);
         } catch (TenantSecurityException $e) {
             http_response_code(404); echo 'Paciente não encontrado.'; return;
+        } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+            $_SESSION['chat_flash'] = $e->getMessage();
+            header('Location: /chat'); exit;
         }
         header('Location: /chat/' . $convId);
         exit;
@@ -186,15 +196,19 @@ class ChatController
 
             if ($this->wantsJson()) {
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['success' => true, 'message' => $msg]);
+                echo json_encode(['success' => true, 'message' => $msg], JSON_UNESCAPED_UNICODE);
                 return;
             }
 
             header("Location: /chat/{$convId}");
             exit;
-        } catch (\Throwable $e) {
-            $status = ($e instanceof TenantSecurityException) ? 403 : 400;
-            $this->respondError($e->getMessage(), $status);
+        } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+            if ($e->errorCode === 'RATE_LIMITED') {
+                header('Retry-After: ' . (int)($e->extra['retry_after'] ?? 60));
+            }
+            $this->respondError($e->getMessage(), $e->httpStatus, $e->errorCode);
+        } catch (TenantSecurityException | \ClyoNutri\Core\Security\AuthorizationException $e) {
+            $this->respondError('Conversa não encontrada.', 404, 'CONVERSATION_NOT_FOUND');
         }
     }
 
@@ -229,11 +243,13 @@ class ChatController
                 ];
             }, $allConvs);
 
-            echo json_encode($data);
-        } catch (\Throwable $e) {
-            $status = ($e instanceof TenantSecurityException) ? 403 : 400;
-            http_response_code($status);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode($data, JSON_UNESCAPED_UNICODE);
+        } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+            http_response_code($e->httpStatus);
+            echo json_encode($e->toArray(), JSON_UNESCAPED_UNICODE);
+        } catch (TenantSecurityException | \ClyoNutri\Core\Security\AuthorizationException $e) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Conversa não encontrada.', 'code' => 'CONVERSATION_NOT_FOUND'], JSON_UNESCAPED_UNICODE);
         }
     }
 
@@ -252,18 +268,12 @@ class ChatController
                 $auth['profId']
             );
 
-            header('Content-Type: ' . $fileData['mime_type']);
-            header('Content-Length: ' . $fileData['size_bytes']);
-            header('Content-Disposition: inline; filename="' . addslashes($fileData['file_name']) . '"');
-            header('X-Content-Type-Options: nosniff');
-            header('Cache-Control: private, no-cache, must-revalidate');
-
+            ChatAttachmentService::sendDownloadHeaders($fileData);
             readfile($fileData['file_path']);
             exit;
-        } catch (\Throwable $e) {
-            $status = ($e instanceof TenantSecurityException) ? 403 : 404;
-            http_response_code($status);
-            echo "<h1>Acesso negado ou anexo não encontrado</h1><p>" . htmlspecialchars($e->getMessage()) . "</p>";
+        } catch (\ClyoNutri\Domain\Chat\ChatException | TenantSecurityException $e) {
+            http_response_code(404);
+            echo '<h1>Anexo não encontrado</h1><p>O anexo não existe ou não pertence às suas conversas.</p>';
             exit;
         }
     }
@@ -287,12 +297,18 @@ class ChatController
                     $auth['profId']
                 );
                 $messages = $pollResult['messages'];
-                $this->chatService->markAsRead($activeConvId, 'professional');
+                $access = $pollResult['access'] ?? ['can_send' => true, 'reason' => null];
+                $this->chatService->markAsRead($activeConvId, 'professional', $auth['profId']);
             } catch (\Throwable $e) {
                 $activeConv = null;
             }
         }
 
+        $access ??= ['can_send' => false, 'reason' => null];
+        $chatNotice = (new \ClyoNutri\Domain\Chat\ChatSettingsService($this->db))->notice($auth['clinicId']);
+        $chatFlash = $_SESSION['chat_flash'] ?? null; unset($_SESSION['chat_flash']);
+        $statusLabel = static fn(string $st) => ['sent' => 'Enviada', 'delivered' => 'Entregue', 'read' => 'Lida'][$st] ?? 'Enviada';
+        $hhmm = static fn(?string $iso) => $iso ? substr($iso, 11, 5) : '';
         $totalUnread = array_reduce($conversations, fn($acc, $c) => $acc + (int)($c['unread_count'] ?? 0), 0);
 
         $title = 'Chat & Mensagens Seguras';
@@ -305,7 +321,7 @@ class ChatController
     <style>
         :root {
             --patient-bubble: #f1f5f9;
-            --nutri-bubble: #059669;
+            --nutri-bubble: #047857; /* NI2-138: contraste AA com texto branco */
             --nutri-bubble-text: #ffffff;
         }
 
@@ -388,7 +404,7 @@ class ChatController
             align-items: center;
         }
         .badge-unread {
-            background: #059669;
+            background: #047857;
             color: white;
             font-size: 0.7rem;
             font-weight: 700;
@@ -466,9 +482,8 @@ class ChatController
             border-bottom-right-radius: 4px;
         }
         .bubble-meta {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             margin-top: 6px;
-            opacity: 0.85;
             display: flex;
             gap: 8px;
             justify-content: flex-end;
@@ -569,6 +584,7 @@ class ChatController
         }
     </style>
 
+    <?php if ($chatFlash): ?><p role="alert" class="card" data-testid="chat-flash" style="border-left: 4px solid #B45309;"><?= htmlspecialchars($chatFlash) ?></p><?php endif; ?>
     <!-- Layout de Comunicação Segura -->
     <div class="chat-layout">
         <!-- Lista de Conversas -->
@@ -614,16 +630,12 @@ class ChatController
                 <header class="chat-topbar">
                     <div class="chat-topbar-info">
                         <h3><?= htmlspecialchars($activeConv['patient_name']) ?></h3>
-                        <p>Paciente vinculado • Consulta e acompanhamento</p>
+                        <p><?= $access['can_send'] ? 'Mensagens assíncronas com a paciente. Não é canal de urgência.' : 'Só leitura' ?></p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #047857; font-weight: 600; background: #ecfdf5; padding: 4px 10px; border-radius: 6px; border: 1px solid #a7f3d0;">
-                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
-                            Online
-                        </span>
-                        <div class="chat-security-tag">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            Canal Criptografado & Isolado
+                        <div class="chat-security-tag" title="Mensagens visíveis só para você e a paciente, dentro do consultório">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Acesso restrito ao consultório
                         </div>
                     </div>
                 </header>
@@ -636,20 +648,18 @@ class ChatController
                         </div>
                     <?php else: ?>
                         <?php foreach ($messages as $m): ?>
-                            <div class="chat-bubble <?= htmlspecialchars($m['sender_type']) ?>" data-msg-id="<?= $m['id'] ?>">
+                            <div class="chat-bubble <?= $m['sender_type'] === 'professional' ? 'professional' : 'patient' ?>" data-msg-id="<?= (int)$m['id'] ?>">
                                 <div><?= nl2br(htmlspecialchars($m['message'])) ?></div>
-                                <?php if (!empty($m['attachment_path'])): ?>
+                                <?php if (!empty($m['attachment'])): ?>
                                     <div class="chat-attachment-box">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                                        <a href="/chat/anexo/<?= $m['id'] ?>" target="_blank">
-                                            <?= htmlspecialchars($m['attachment_name'] ?? 'Anexo Privado') ?>
-                                        </a>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                        <a href="/chat/anexo/<?= (int)$m['attachment']['id'] ?>" target="_blank" rel="noopener"><?= htmlspecialchars($m['attachment']['name']) ?></a>
                                     </div>
                                 <?php endif; ?>
                                 <div class="bubble-meta">
-                                    <span><?= date('H:i', strtotime($m['created_at'])) ?></span>
+                                    <span><?= htmlspecialchars($hhmm($m['created_at'])) ?></span>
                                     <?php if ($m['sender_type'] === 'professional'): ?>
-                                        <span><?= ($m['status'] === 'read') ? '✓✓' : '✓' ?></span>
+                                        <span><?= $statusLabel($m['status']) ?></span>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -657,6 +667,13 @@ class ChatController
                     <?php endif; ?>
                 </div>
 
+                <?php if (!$access['can_send']): ?>
+                <div class="chat-input-bar" role="note" data-testid="chat-read-only"><p style="margin: 0; color: #92400E;"><?= htmlspecialchars((string)$access['reason']) ?></p></div>
+                <?php else: ?>
+                <p class="chat-notice" data-testid="chat-notice" style="margin: 0; padding: 8px 16px; font-size: 0.8rem; color: #475569; border-top: 1px solid #e2e8f0;">
+                    A paciente vê: “<?= htmlspecialchars($chatNotice['response_time_text']) ?>” e “<?= htmlspecialchars($chatNotice['emergency_text']) ?>” <a href="/configuracoes#chat-settings">Alterar o tempo de resposta</a>
+                </p>
+                <p id="chatSendError" role="alert" data-testid="chat-send-error" style="margin: 0 16px; color: #B42318; font-size: 0.85rem;"></p>
                 <div class="chat-input-bar">
                     <form method="POST" action="/chat/<?= $activeConvId ?>/enviar" enctype="multipart/form-data" class="chat-input-form" id="chatSendForm">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
@@ -668,18 +685,19 @@ class ChatController
                         </label>
                         <span id="selectedFileName" style="font-size: 0.8rem; color: #64748b; display: none;"></span>
 
-                        <textarea name="message" class="chat-textarea" id="chatMessageTextarea" aria-label="Mensagem para <?= htmlspecialchars($activeConv['patient_name']) ?>" placeholder="Digite uma mensagem segura para seu paciente..." required></textarea>
+                        <textarea name="message" class="chat-textarea" id="chatMessageTextarea" maxlength="<?= \ClyoNutri\Domain\Chat\ChatService::MAX_MESSAGE_CHARS ?>" aria-label="Mensagem para <?= htmlspecialchars($activeConv['patient_name']) ?>" placeholder="Escreva uma mensagem para a paciente"></textarea>
                         <button type="submit" class="btn-send" id="btnSend">Enviar</button>
                     </form>
                 </div>
+                <?php endif; ?>
 
-                <!-- Script de Polling com Cursor Delta e Envio Assíncrono Instantâneo -->
+                <!-- Polling com cursor e envio assíncrono. NI2-138 (A4): todo texto vindo da API entra por textContent. -->
                 <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
                     (function() {
-                        const convId = <?= $activeConvId ?>;
+                        const convId = <?= (int)$activeConvId ?>;
                         let lastId = <?= !empty($messages) ? (int)end($messages)['id'] : 0 ?>;
                         let isPolling = false;
-                        let pollIntervalMs = 3000;
+                        let pollIntervalMs = 5000;
                         const container = document.getElementById('chatMessagesContainer');
                         const fileInput = document.getElementById('attachmentInput');
                         const fileNameSpan = document.getElementById('selectedFileName');
@@ -687,9 +705,48 @@ class ChatController
                         const textarea = document.getElementById('chatMessageTextarea');
                         const btnSend = document.getElementById('btnSend');
                         const idempotencyInput = document.getElementById('idempotencyKeyInput');
+                        const sendError = document.getElementById('chatSendError');
+                        const STATUS = { sent: 'Enviada', delivered: 'Entregue', read: 'Lida' };
+                        const newKey = () => 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
 
-                        if (container) {
-                            container.scrollTop = container.scrollHeight;
+                        if (container) container.scrollTop = container.scrollHeight;
+
+                        // Balão montado só com createElement/textContent: HTML enviado pela paciente aparece como texto.
+                        function renderBubble(m) {
+                            if (!container || document.querySelector('[data-msg-id="' + Number(m.id) + '"]')) return;
+                            const notice = document.getElementById('emptyStateNotice');
+                            if (notice) notice.remove();
+                            const bubble = document.createElement('div');
+                            bubble.className = 'chat-bubble ' + (m.sender_type === 'professional' ? 'professional' : 'patient');
+                            bubble.setAttribute('data-msg-id', String(Number(m.id)));
+                            const body = document.createElement('div');
+                            body.style.whiteSpace = 'pre-wrap';
+                            body.textContent = m.message || '';
+                            bubble.appendChild(body);
+                            if (m.attachment && m.attachment.id) {
+                                const box = document.createElement('div');
+                                box.className = 'chat-attachment-box';
+                                const link = document.createElement('a');
+                                link.href = '/chat/anexo/' + Number(m.attachment.id);
+                                link.target = '_blank';
+                                link.rel = 'noopener';
+                                link.textContent = m.attachment.name || 'Anexo';
+                                box.appendChild(link);
+                                bubble.appendChild(box);
+                            }
+                            const meta = document.createElement('div');
+                            meta.className = 'bubble-meta';
+                            const time = document.createElement('span');
+                            time.textContent = m.created_at ? String(m.created_at).substring(11, 16) : '';
+                            meta.appendChild(time);
+                            if (m.sender_type === 'professional') {
+                                const st = document.createElement('span');
+                                st.textContent = STATUS[m.status] || 'Enviada';
+                                meta.appendChild(st);
+                            }
+                            bubble.appendChild(meta);
+                            container.appendChild(bubble);
+                            lastId = Math.max(lastId, Number(m.id) || 0);
                         }
 
                         if (fileInput && fileNameSpan) {
@@ -703,106 +760,54 @@ class ChatController
                             });
                         }
 
-                        // Envio assíncrono para visualização instantânea sem recarregar a tela
                         if (sendForm) {
                             sendForm.addEventListener('submit', function(e) {
                                 e.preventDefault();
                                 const text = textarea.value.trim();
                                 if (!text && (!fileInput || !fileInput.files.length)) return;
-
-                                const formData = new FormData(sendForm);
+                                if (sendError) sendError.textContent = '';
                                 btnSend.disabled = true;
-                                btnSend.textContent = 'Enviando...';
-
-                                fetch(sendForm.action, {
-                                    method: 'POST',
-                                    headers: { 'Accept': 'application/json' },
-                                    body: formData
-                                })
-                                .then(res => res.json())
-                                .then(data => {
-                                    if (data && data.success && data.message) {
-                                        const m = data.message;
-                                        const notice = document.getElementById('emptyStateNotice');
-                                        if (notice) notice.remove();
-
-                                        if (!document.querySelector('[data-msg-id="' + m.id + '"]')) {
-                                            const bubble = document.createElement('div');
-                                            bubble.className = 'chat-bubble professional';
-                                            bubble.setAttribute('data-msg-id', m.id);
-
-                                            let content = '<div>' + (m.message || '').replace(/\n/g, '<br>') + '</div>';
-                                            if (m.has_attachment || m.attachment_path) {
-                                                content += '<div class="chat-attachment-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> <a href="/chat/anexo/' + m.id + '" target="_blank">' + (m.attachment_name || 'Anexo Privado') + '</a></div>';
-                                            }
-                                            const timeStr = m.created_at ? m.created_at.substring(11, 16) : new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                                            content += '<div class="bubble-meta"><span>' + timeStr + '</span><span>✓</span></div>';
-                                            bubble.innerHTML = content;
-                                            container.appendChild(bubble);
+                                btnSend.textContent = 'Enviando…';
+                                // A chave só muda depois de um envio confirmado: tentar de novo não duplica.
+                                fetch(sendForm.action, { method: 'POST', headers: { 'Accept': 'application/json' }, body: new FormData(sendForm) })
+                                    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+                                    .then(({ ok, data }) => {
+                                        if (ok && data && data.success && data.message) {
+                                            renderBubble(data.message);
                                             container.scrollTop = container.scrollHeight;
-                                            lastId = Math.max(lastId, parseInt(m.id, 10));
+                                            textarea.value = '';
+                                            if (fileInput) fileInput.value = '';
+                                            if (fileNameSpan) fileNameSpan.style.display = 'none';
+                                            if (idempotencyInput) idempotencyInput.value = newKey();
+                                        } else if (sendError) {
+                                            sendError.textContent = (data && data.error) ? data.error : 'Não foi possível enviar. Tente de novo.';
                                         }
-
-                                        textarea.value = '';
-                                        if (fileInput) fileInput.value = '';
-                                        if (fileNameSpan) fileNameSpan.style.display = 'none';
-                                        if (idempotencyInput) idempotencyInput.value = 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-                                    } else if (data && data.error) {
-                                        alert(data.error);
-                                    }
-                                })
-                                .catch(() => {
-                                    // Fallback para envio padrão se fetch falhar
-                                    sendForm.submit();
-                                })
-                                .finally(() => {
-                                    btnSend.disabled = false;
-                                    btnSend.textContent = 'Enviar';
-                                });
+                                    })
+                                    .catch(() => { if (sendError) sendError.textContent = 'Sem conexão. A mensagem não foi enviada; tente de novo (não duplica).'; })
+                                    .finally(() => { btnSend.disabled = false; btnSend.textContent = 'Enviar'; });
                             });
                         }
 
-                        // Polling com cursor delta e atualização da lista lateral
                         function pollDelta() {
                             if (isPolling) return;
                             isPolling = true;
-
-                            fetch('/chat/' + convId + '/poll?after_id=' + lastId, {
-                                headers: { 'Accept': 'application/json' }
-                            })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data && data.messages && data.messages.length > 0) {
-                                    const notice = document.getElementById('emptyStateNotice');
-                                    if (notice) notice.remove();
-
-                                    data.messages.forEach(m => {
-                                        if (document.querySelector('[data-msg-id="' + m.id + '"]')) return;
-
-                                        const bubble = document.createElement('div');
-                                        bubble.className = 'chat-bubble ' + m.sender_type;
-                                        bubble.setAttribute('data-msg-id', m.id);
-
-                                        let content = '<div>' + (m.message || '').replace(/\n/g, '<br>') + '</div>';
-                                        if (m.has_attachment || m.attachment_path) {
-                                            content += '<div class="chat-attachment-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> <a href="/chat/anexo/' + m.id + '" target="_blank">' + (m.attachment_name || 'Anexo Privado') + '</a></div>';
-                                        }
-                                        const timeStr = m.created_at ? m.created_at.substring(11, 16) : '';
-                                        const checkmark = (m.sender_type === 'professional') ? ((m.status === 'read') ? '✓✓' : '✓') : '';
-                                        content += '<div class="bubble-meta"><span>' + timeStr + '</span><span>' + checkmark + '</span></div>';
-
-                                        bubble.innerHTML = content;
-                                        container.appendChild(bubble);
-                                        lastId = Math.max(lastId, parseInt(m.id, 10));
-                                    });
-                                    container.scrollTop = container.scrollHeight;
-                                }
-
-                                // Atualizar resumo de conversas no painel esquerdo
-                                if (data && Array.isArray(data.conversations_summary)) {
-                                    data.conversations_summary.forEach(cs => {
-                                        const cardLink = document.querySelector('a[href="/chat/' + cs.id + '"]');
-                                        if (cardLink) {
+                            fetch('/chat/' + convId + '/poll?after_id=' + lastId, { headers: { 'Accept': 'application/json' } })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data && Array.isArray(data.messages) && data.messages.length > 0) {
+                                        data.messages.forEach(renderBubble);
+                                        container.scrollTop = container.scrollHeight;
+                                    }
+                                    if (data && Array.isArray(data.receipts)) {
+                                        data.receipts.forEach(rc => {
+                                            const el = document.querySelector('[data-msg-id="' + Number(rc.id) + '"] .bubble-meta span:last-child');
+                                            if (el && STATUS[rc.status]) el.textContent = STATUS[rc.status];
+                                        });
+                                    }
+                                    if (data && Array.isArray(data.conversations_summary)) {
+                                        data.conversations_summary.forEach(cs => {
+                                            const cardLink = document.querySelector('a[href="/chat/' + Number(cs.id) + '"]');
+                                            if (!cardLink) return;
                                             const timeEl = cardLink.querySelector('.conv-card-time');
                                             if (timeEl && cs.last_message_at) timeEl.textContent = cs.last_message_at;
                                             const prevSpan = cardLink.querySelector('.conv-card-preview span:first-child');
@@ -814,28 +819,19 @@ class ChatController
                                                     badge.className = 'badge-unread';
                                                     cardLink.querySelector('.conv-card-preview').appendChild(badge);
                                                 }
-                                                badge.textContent = cs.unread_count;
+                                                badge.textContent = String(Number(cs.unread_count));
                                             } else if (badge && cs.id === convId) {
                                                 badge.remove();
                                             }
-                                        }
-                                    });
-                                }
-
-                                if (data && data.polling_policy) {
-                                    pollIntervalMs = document.hidden ? 
-                                        data.polling_policy.background_window_ms : 
-                                        data.polling_policy.active_window_ms;
-                                }
-                            })
-                            .catch(() => {})
-                            .finally(() => {
-                                isPolling = false;
-                                setTimeout(pollDelta, pollIntervalMs);
-                            });
+                                        });
+                                    }
+                                    if (data && data.polling_policy) {
+                                        pollIntervalMs = document.hidden ? data.polling_policy.background_window_ms : data.polling_policy.active_window_ms;
+                                    }
+                                })
+                                .catch(() => {})
+                                .finally(() => { isPolling = false; setTimeout(pollDelta, pollIntervalMs); });
                         }
-
-                        // Disparar polling contínuo
                         setTimeout(pollDelta, pollIntervalMs);
                     })();
                 </script>
@@ -885,8 +881,9 @@ class ChatController
           if (!append) box.replaceChildren();
           data.data.forEach(p => {
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-secondary'; b.style.justifyContent = 'space-between';
-            b.textContent = p.name + (p.has_conversation ? ' — já tem conversa' : '');
+            b.textContent = p.name + (p.has_conversation ? ' — já tem conversa' : '') + (p.has_link === false && !p.has_conversation ? ' — chat não liberado' : '');
             b.setAttribute('aria-pressed', 'false');
+            if (p.has_link === false && !p.has_conversation) { b.disabled = true; b.title = 'Libere o chat no perfil da paciente (vínculo de acompanhamento).'; }
             b.addEventListener('click', () => {
               box.querySelectorAll('[aria-pressed]').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true');
               hid.value = String(p.id); submit.disabled = false;
@@ -918,12 +915,12 @@ class ChatController
         return str_contains($accept, 'application/json') || strtolower($xReq) === 'xmlhttprequest';
     }
 
-    private function respondError(string $message, int $code = 400): void
+    private function respondError(string $message, int $code = 400, ?string $errorCode = null): void
     {
         http_response_code($code);
         if ($this->wantsJson()) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['error' => $message]);
+            echo json_encode(['error' => $message] + ($errorCode !== null ? ['code' => $errorCode] : []), JSON_UNESCAPED_UNICODE);
             return;
         }
 

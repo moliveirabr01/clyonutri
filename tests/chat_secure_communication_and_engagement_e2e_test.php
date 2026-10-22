@@ -135,6 +135,15 @@ try {
     echo "--> [2/8] Validando Vínculo Autorizado e Abertura de Conversa...\n";
 
     $chatService = new ChatService($db);
+    // NI2-138 (A1): sem vínculo ativo a conversa não abre; o vínculo é liberado no perfil da paciente.
+    $noLinkBlocked = false;
+    try {
+        $chatService->getOrCreateConversation($patientIdAlfa, $profIdAlfa);
+    } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+        $noLinkBlocked = $e->errorCode === 'NO_ACTIVE_LINK';
+    }
+    assertChat($noLinkBlocked, "Sem vínculo ativo, a conversa NÃO pode ser aberta (NO_ACTIVE_LINK)");
+    (new \ClyoNutri\Domain\Chat\PatientLinkService($db))->activate($patientIdAlfa, $profIdAlfa, $nutriIdAlfa, 'test');
     $convIdAlfa = $chatService->getOrCreateConversation($patientIdAlfa, $profIdAlfa);
     assertChat($convIdAlfa > 0, "Conversa entre Paciente Alfa e Nutri Alfa deve ser criada");
 
@@ -196,10 +205,10 @@ try {
     $emptyFailed = false;
     try {
         $chatService->sendMessage($convIdAlfa, 'patient', $patientIdAlfa, '   ');
-    } catch (InvalidArgumentException $e) {
-        $emptyFailed = true;
+    } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+        $emptyFailed = $e->errorCode === 'VALIDATION_ERROR' && $e->httpStatus === 422;
     }
-    assertChat($emptyFailed, "Envio de mensagem vazia sem anexo DEVE lançar InvalidArgumentException");
+    assertChat($emptyFailed, "Envio de mensagem vazia sem anexo DEVE ser recusado (422 VALIDATION_ERROR)");
 
     logChatPass('IDEMPOTENCY', 'Idempotência anti-duplicação e ordenação estrita comprovadas no banco relacional');
 
@@ -233,10 +242,12 @@ try {
         'idemp-att-' . bin2hex(random_bytes(6)),
         $fileUploadMock
     );
-    assertChat(!empty($msgWithAtt['attachment_path']), "Caminho do anexo deve ser preenchido");
-    assertChat(file_exists($msgWithAtt['attachment_path']), "Arquivo físico do anexo deve existir em disco");
-    assertChat(!str_contains($msgWithAtt['attachment_path'], '/public/'), "Anexo NUNCA deve ser salvo dentro do webroot público");
-    assertChat($msgWithAtt['attachment_mime'] === 'image/png', "MIME detectado via libmagic deve ser image/png");
+    // NI2-138 (M5): a resposta não expõe o caminho do arquivo; ele fica só no banco.
+    assertChat(!array_key_exists('attachment_path', $msgWithAtt) && !empty($msgWithAtt['attachment']['id']), "Resposta traz o anexo por id, sem caminho do servidor");
+    $attPath = (string)$db->query("SELECT storage_path FROM chat_attachments WHERE id = " . (int)$msgWithAtt['attachment']['id'])->fetchColumn();
+    assertChat(file_exists($attPath), "Arquivo físico do anexo deve existir em disco");
+    assertChat(!str_contains($attPath, '/public/'), "Anexo NUNCA deve ser salvo dentro do webroot público");
+    assertChat($msgWithAtt['attachment']['mime_type'] === 'image/png', "MIME detectado via libmagic deve ser image/png");
 
     // Teste de download autorizado pelo nutricionista
     $downloadProf = $attService->getAttachmentForDownload((int)$db->query("SELECT id FROM chat_attachments WHERE message_id = {$msgWithAtt['id']}")->fetchColumn(), 'professional', $profIdAlfa);
@@ -265,8 +276,8 @@ try {
             null,
             $maliciousUpload
         );
-    } catch (InvalidArgumentException $e) {
-        $maliciousBlocked = true;
+    } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+        $maliciousBlocked = $e->errorCode === 'ATTACHMENT_INVALID';
     }
     assertChat($maliciousBlocked, "Upload de executável/script PHP DEVE ser categoricamente bloqueado");
 
@@ -398,8 +409,9 @@ try {
     try {
         $attIdAlfa = (int)$db->query("SELECT id FROM chat_attachments WHERE conversation_id = {$convIdAlfa} LIMIT 1")->fetchColumn();
         $attService->getAttachmentForDownload($attIdAlfa, 'professional', $profIdBeta);
-    } catch (TenantSecurityException $e) {
-        $attackCrossTenantAttBlocked = true;
+    } catch (\ClyoNutri\Domain\Chat\ChatException $e) {
+        // NI2-138 (M5): 404 "Anexo não encontrado", sem dizer de quem é.
+        $attackCrossTenantAttBlocked = $e->errorCode === 'ATTACHMENT_NOT_FOUND';
     }
     assertChat($attackCrossTenantAttBlocked, "Download de anexo cross-tenant DEVE ser barrado com 403 Forbidden");
 

@@ -51,17 +51,17 @@ class ChatAttachmentService
         // Validar vínculo do uploader na conversa
         $this->assertUploaderIsParticipant($conversationId, $uploaderType, $uploaderId);
 
-        if (empty($fileInfo['tmp_name']) || !file_exists($fileInfo['tmp_name'])) {
-            throw new InvalidArgumentException('Arquivo anexado ausente ou corrompido.');
-        }
-
         if (($fileInfo['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Falha no upload do arquivo (código: ' . ($fileInfo['error'] ?? 0) . ').');
+            $tooBig = in_array((int)$fileInfo['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true);
+            throw new ChatException($tooBig ? 'O arquivo passa de 10 MB.' : 'O arquivo não chegou inteiro. Tente de novo.', 'ATTACHMENT_INVALID', 422);
+        }
+        if (empty($fileInfo['tmp_name']) || !file_exists($fileInfo['tmp_name'])) {
+            throw new ChatException('O arquivo não chegou inteiro. Tente de novo.', 'ATTACHMENT_INVALID', 422);
         }
 
         $size = (int)($fileInfo['size'] ?? 0);
         if ($size <= 0 || $size > self::MAX_FILE_SIZE) {
-            throw new InvalidArgumentException('Tamanho de anexo inválido. Limite máximo permitido: 10 MB.');
+            throw new ChatException('O arquivo precisa ter até 10 MB.', 'ATTACHMENT_INVALID', 422);
         }
 
         // Detectar MIME real via libmagic (finfo)
@@ -72,13 +72,11 @@ class ChatAttachmentService
         }
 
         if (!isset(self::ALLOWED_MIME_TYPES[$detectedMime])) {
-            throw new InvalidArgumentException(
-                "Tipo de anexo '{$detectedMime}' não permitido por segurança. Formatos aceitos: PNG, JPG e PDF."
-            );
+            throw new ChatException('Formato não aceito. Envie PNG, JPG ou PDF.', 'ATTACHMENT_INVALID', 422);
         }
 
-        $origName = basename((string)($fileInfo['name'] ?? 'anexo'));
-        $sanitizedOrigName = preg_replace('/[^\w\.\-\(\) ]+/u', '_', $origName);
+        $origName = basename(str_replace('\\', '/', (string)($fileInfo['name'] ?? 'anexo')));
+        $sanitizedOrigName = mb_substr((string)preg_replace('/[^\w\.\-\(\) ]+/u', '_', $origName), 0, 120) ?: 'anexo';
         $ext = self::ALLOWED_MIME_TYPES[$detectedMime];
         $storedFilename = sprintf('chat_%d_%s_%s.%s', $conversationId, time(), bin2hex(random_bytes(8)), $ext);
         $destinationPath = $this->storageDir . DIRECTORY_SEPARATOR . $storedFilename;
@@ -95,6 +93,7 @@ class ChatAttachmentService
         if (!$moved) {
             throw new RuntimeException('Falha interna ao persistir o arquivo no armazenamento seguro.');
         }
+        @chmod($destinationPath, 0640);
 
         $stmt = $this->db->prepare("
             INSERT INTO chat_attachments (
@@ -151,15 +150,23 @@ class ChatAttachmentService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            throw new TenantSecurityException("Anexo não encontrado ou acesso não autorizado (403 Forbidden).", 403);
+            throw ChatException::attachmentNotFound();
         }
 
-        // Validar se o solicitante é participante legítimo da conversa
-        $this->assertUploaderIsParticipant((int)$row['conversation_id'], $requestorType, $requestorId);
-
-        if (!file_exists($row['storage_path'])) {
-            throw new RuntimeException("Arquivo físico não encontrado no repositório de armazenamento.");
+        // Só os participantes da conversa (sem dizer a quem pertence).
+        if (($requestorType === 'patient' && (int)$row['patient_id'] !== $requestorId)
+            || ($requestorType === 'professional' && (int)$row['professional_id'] !== $requestorId)
+            || !in_array($requestorType, ['patient', 'professional'], true)) {
+            throw ChatException::attachmentNotFound();
         }
+
+        if (!is_file($row['storage_path'])) {
+            throw ChatException::attachmentNotFound();
+        }
+
+        (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('CHAT_ATTACHMENT_DOWNLOADED', 'chat_attachment', (string)$attachmentId, [
+            'conversation_id' => (int)$row['conversation_id'], 'actor_type' => $requestorType, 'actor_id' => $requestorId,
+        ]);
 
         return [
             'file_path' => $row['storage_path'],
@@ -168,6 +175,61 @@ class ChatAttachmentService
             'size_bytes' => (int)$row['size_bytes'],
             'sha256_hash' => $row['sha256_hash'],
         ];
+    }
+
+    /**
+     * NI2-138 (A3): link de download curto e assinado para o app da paciente (o Bearer não vai num link aberto pelo
+     * navegador ou pelo sistema). Vale 2 minutos, só para esta paciente, este anexo e esta clínica.
+     */
+    public function issuePatientDownloadToken(int $attachmentId, int $patientId): string
+    {
+        $clinicId = TenantContext::getClinicId();
+        $st = $this->db->prepare('SELECT a.id FROM chat_attachments a JOIN chat_conversations c ON c.id = a.conversation_id
+            WHERE a.id = ? AND a.clinic_id = ? AND c.patient_id = ?');
+        $st->execute([$attachmentId, $clinicId, $patientId]);
+        if (!$st->fetchColumn()) {
+            throw ChatException::attachmentNotFound();
+        }
+        $key = self::tokenKey();
+        if ($key === null) {
+            throw new ChatException('Download indisponível no momento (configuração do servidor).', 'DOWNLOAD_UNAVAILABLE', 503);
+        }
+        // Sem pontos no link: servidores que tratam "x.y" como arquivo estático (php -S, alguns proxies) não o confundem.
+        $body = 'a-' . $attachmentId . '-' . $patientId . '-' . $clinicId . '-' . (time() + 120);
+        return $body . '-' . rtrim(strtr(base64_encode(hash_hmac('sha256', $body, $key, true)), '+/', '-_'), '=');
+    }
+
+    /** @return array{attachment_id: int, patient_id: int, clinic_id: int} */
+    public static function verifyPatientDownloadToken(string $token): array
+    {
+        if (!preg_match('/^(a-(\d{1,10})-(\d{1,10})-(\d{1,10})-(\d{1,12}))-([A-Za-z0-9_-]{43})$/D', $token, $m)) {
+            throw ChatException::attachmentNotFound();
+        }
+        $key = self::tokenKey();
+        $expected = $key !== null ? rtrim(strtr(base64_encode(hash_hmac('sha256', $m[1], $key, true)), '+/', '-_'), '=') : '';
+        if ($key === null || !hash_equals($expected, $m[6]) || (int)$m[5] < time()) {
+            throw new ChatException('Este link de anexo expirou. Toque no anexo de novo.', 'ATTACHMENT_NOT_FOUND', 404);
+        }
+        return ['attachment_id' => (int)$m[2], 'patient_id' => (int)$m[3], 'clinic_id' => (int)$m[4]];
+    }
+
+    private static function tokenKey(): ?string
+    {
+        $appKey = getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? '');
+        return strlen((string)$appKey) < 16 ? null : hash_hmac('sha256', 'clyonutri-chat-anexo-v1', (string)$appKey, true);
+    }
+
+    /** Cabeçalhos de download: PDF sempre como arquivo (não abre no navegador), imagens inline, tudo isolado. */
+    public static function sendDownloadHeaders(array $fileData): void
+    {
+        $name = preg_replace('/["\\\r\n]+/', '_', (string)$fileData['file_name']);
+        $disposition = $fileData['mime_type'] === 'application/pdf' ? 'attachment' : 'inline';
+        header('Content-Type: ' . $fileData['mime_type']);
+        header('Content-Length: ' . $fileData['size_bytes']);
+        header('Content-Disposition: ' . $disposition . '; filename="' . $name . '"; filename*=UTF-8\'\'' . rawurlencode((string)$fileData['file_name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: sandbox; default-src 'none'");
+        header('Cache-Control: private, no-store');
     }
 
     /**
@@ -183,20 +245,12 @@ class ChatAttachmentService
         $stmt->execute(['id' => $conversationId]);
         $conv = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$conv) {
-            throw new TenantSecurityException("Conversa #{$conversationId} não encontrada.", 404);
-        }
-
-        if ($type === 'patient') {
-            if ((int)$conv['patient_id'] !== $id) {
-                throw new TenantSecurityException("Acesso negado: o paciente #{$id} não participa desta conversa (403).", 403);
-            }
-        } elseif ($type === 'professional') {
-            if ((int)$conv['professional_id'] !== $id) {
-                throw new TenantSecurityException("Acesso negado: o profissional #{$id} não participa desta conversa (403).", 403);
-            }
-        } else {
-            throw new TenantSecurityException("Tipo de participante '{$type}' inválido.", 403);
+        // NI2-138 (M5): mensagem sem ids; a API responde 404 "Conversa não encontrada".
+        if (!$conv
+            || ($type === 'patient' && (int)$conv['patient_id'] !== $id)
+            || ($type === 'professional' && (int)$conv['professional_id'] !== $id)
+            || !in_array($type, ['patient', 'professional'], true)) {
+            throw new TenantSecurityException('Conversa não encontrada.', 404);
         }
     }
 }

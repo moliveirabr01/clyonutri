@@ -1,0 +1,44 @@
+{
+ "driver": "sqlite",
+ "pass": 0,
+ "fail": 5,
+ "results": [
+  {
+   "crit": "A1",
+   "name": "Sem vínculo: nenhuma conversa, aviso NO_ACTIVE_LINK e nenhum profissional escolhido pela paciente",
+   "ok": false,
+   "detail": "{\"conversation_id\":34,\"messages\":[],\"cursor\":{\"after_id\":0,\"count\":0,\"has_more\":false},\"polling_policy\":{\"active_window_ms\":3000,\"background_window_ms\":15000,\"idle_window_ms\":60000,\"max_requests_per_minute\":60,\"transport\":\"cursor_delta_polling\",\"zero_websockets\":true},\"professional\":{\"id\":1,\"name\":\""
+  },
+  {
+   "crit": "A1",
+   "name": "Sem vínculo: enviar → 403 NO_ACTIVE_LINK e nada gravado",
+   "ok": false,
+   "detail": "{\"success\":true,\"message\":{\"id\":44,\"conversation_id\":34,\"sender_type\":\"patient\",\"sender_id\":1,\"message\":\"Oi\",\"attachment_path\":null,\"attachment_name\":null,\"attachment_mime\":null,\"attachment_size\":null,\"status\":\"sent\",\"idempotency_key\":\"d8c40fded11505ccc69fea617f16b95c\",\"is_duplicate\":false,\"created_at\":\"2026-10-22T00:52:43-03:00\"}}"
+  },
+  {
+   "crit": "A1",
+   "name": "Busca de \"Nova conversa\" marca a paciente sem vínculo",
+   "ok": false,
+   "detail": {
+    "id": 1,
+    "name": "Ana Fictícia",
+    "has_conversation": false
+   }
+  },
+  {
+   "crit": "A1",
+   "name": "Web: nutricionista sem vínculo não abre conversa com a paciente",
+   "ok": false,
+   "detail": [
+    "/chat/35",
+    null
+   ]
+  },
+  {
+   "crit": "erro",
+   "name": "Execução sem exceção",
+   "ok": false,
+   "detail": "Error: Command failed: php <arvore-58f074b>/tests/support/ni2_138_fixture.php sql SELECT COUNT(*) FROM patient_professional_links WHERE patient_id = 1 AND status = 'active'\nPHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_professional_links in <arvore-58f074b>/tests/support/ni2_138_fixture.php:85\nStack trace:\n#0 <arvore-58f074b>/tests/support/ni2_138_fixture.php(85): PDO->query()\n#1 {main}\n  thrown in <arvore-58f074b>/tests/support/ni2_138_fixture.php on line 85\n\n    at genericNodeError (node:internal/errors:983:15)\n    at wrappedFn (node:internal/errors:537:14)\n    at checkExecSyncError (node:child_process:916:11)\n    at execFileSync (node:child_process:952:15)\n    at fx (<arvore-58f074b>/tests/ni2_138_secure_chat_real_test.cjs:30:25)\n    at sql (<arvore-58f074b>/tests/ni2_138_secure_chat_real_test.cjs:31:31)\n    at one (<arvore-58f074b>/tests/ni2_138_secure_chat_real_test.cjs:32:32)\n    at <arvore-58f074b>/tests/ni2_138_secure_chat_real_test.cjs:99:90\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  }
+ ]
+}

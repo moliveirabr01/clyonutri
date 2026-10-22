@@ -725,6 +725,8 @@ class BookingService
                 INSERT INTO appointment_status_history (clinic_id, appointment_id, from_status, to_status, notes, created_at)
                 VALUES (:clinic_id, :appt_id, NULL, 'scheduled', 'Autoagendamento self-service pelo paciente (portal/web)', CURRENT_TIMESTAMP)
             ")->execute(['clinic_id' => $clinicId, 'appt_id' => $appointmentId]);
+            // NI2-138: consulta marcada pela paciente com o profissional também abre o vínculo do chat.
+            (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, (int)$patientId, (int)$professionalId, 'self_booking');
 
             $teleSessionId = null;
             if ($modality === 'telehealth') {

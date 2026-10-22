@@ -107,7 +107,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|#\d+ \/|Uncau
     r = seen('chat send 32', await call('POST', '/api/v1/patient/chat/send', { token: ana, body: { conversation_id: 32, message: 'Injetada pela Ana' } }));
     check('idor', 'Enviar mensagem na conversa de outra clínica: recusado', r.status >= 400 && Number(one("SELECT COUNT(*) FROM chat_messages WHERE message = 'Injetada pela Ana'")) === 0, { status: r.status });
     r = seen('chat read 31', await call('POST', '/api/v1/patient/chat/read', { token: ana, body: { conversation_id: 31 } }));
-    check('idor', 'Marcar como lida a conversa de outro paciente → 403 e nada muda', r.status === 403 && one('SELECT read_at FROM chat_messages WHERE id = 41') === null, r.status);
+    check('idor', 'Marcar como lida a conversa de outro paciente → 404 sem ids (NI2-138) e nada muda', r.status === 404 && r.json && r.json.code === 'CONVERSATION_NOT_FOUND' && one('SELECT read_at FROM chat_messages WHERE id = 41') === null, r.status);
     r = seen('attachment 51', await call('GET', '/api/v1/patient/chat/attachment/51', { token: ana }));
     check('idor', 'Baixar anexo de outro paciente: recusado sem vazar conteúdo', r.status >= 400 && !r.text.includes('conteudo privado'), { status: r.status });
     r = await call('GET', '/api/v1/patient/chat/attachment/51', { token: bruno });

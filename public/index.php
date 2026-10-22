@@ -340,6 +340,10 @@ $router->post('/pacientes/{id}/privacidade', $requireAuth([$dashCtrl, 'patientPr
 // Evolução no app da paciente: medidas liberadas e metas (NI2-135)
 $router->post('/pacientes/{id}/autorrelatos/permissoes', $requireAuth([$evolutionCtrl, 'permissions']));
 $router->post('/pacientes/{id}/metas', $requireAuth([$evolutionCtrl, 'createGoal']));
+// NI2-138: vínculo que libera o chat da paciente com o profissional.
+$chatLinkCtrl = new \ClyoNutri\Application\Controllers\ChatLinkController();
+$router->post('/pacientes/{id}/chat/vinculo', $requireAuth([$chatLinkCtrl, 'activate']));
+$router->post('/pacientes/{id}/chat/vinculo/{linkId}/encerrar', $requireAuth([$chatLinkCtrl, 'end']));
 $router->post('/pacientes/{id}/metas/{goalId}/encerrar', $requireAuth([$evolutionCtrl, 'closeGoal']));
 $router->get('/privacidade/pedidos', $requireAuth([$privacyCtrl, 'index']));
 $router->post('/privacidade/pedidos/{id}/exportar', $requireAuth([$privacyCtrl, 'export']));
@@ -1046,186 +1050,51 @@ $router->post('/api/v1/patient/self-metrics', function() use ($authenticatePatie
     }
 });
 
-// 4.1 Chat Seguro do Paciente (NI2-189)
-$getOrCreatePatientConversation = function(int $patientId, int $clinicId, \ClyoNutri\Domain\Chat\ChatService $chatService, PDO $db): ?array {
-    $convs = $chatService->listConversationsForPatient($patientId);
-    if (!empty($convs)) {
-        return $convs[0];
-    }
-    // Buscar nutricionista por consulta agendada, plano alimentar ou profissional ativo na clínica
-    $profStmt = $db->prepare("
-        SELECT professional_id FROM appointments WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1
-    ");
-    $profStmt->execute(['pid' => $patientId, 'cid' => $clinicId]);
-    $profId = (int)$profStmt->fetchColumn();
-    if ($profId <= 0) {
-        $profStmt = $db->prepare("
-            SELECT professional_id FROM meal_plans WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1
-        ");
-        $profStmt->execute(['pid' => $patientId, 'cid' => $clinicId]);
-        $profId = (int)$profStmt->fetchColumn();
-    }
-    if ($profId <= 0) {
-        $profStmt = $db->prepare("
-            SELECT p.id FROM professionals p 
-            JOIN clinic_members cm ON cm.user_id = p.user_id 
-            WHERE cm.clinic_id = :cid AND cm.status = 'active'
-            ORDER BY p.id ASC LIMIT 1
-        ");
-        $profStmt->execute(['cid' => $clinicId]);
-        $profId = (int)$profStmt->fetchColumn();
-    }
-    if ($profId > 0) {
-        $chatService->getOrCreateConversation($patientId, $profId);
-        $convs = $chatService->listConversationsForPatient($patientId);
-        if (!empty($convs)) {
-            return $convs[0];
-        }
-    }
-    return null;
-};
-
-$router->get('/api/v1/patient/chat/messages', function() use ($authenticatePatientApi, $db, $getOrCreatePatientConversation) {
+// 4.1 Chat seguro da paciente (NI2-189, revisto na NI2-138): vínculo ativo, limites, anexos, chave de desligar.
+$chatApi = static fn() => new \ClyoNutri\Application\Api\ChatApiController($db);
+$router->get('/api/v1/patient/chat/messages', function() use ($authenticatePatientApi, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-    $clinicId = (int)$auth['clinic_id'];
-    $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : null;
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    $activeConv = $getOrCreatePatientConversation($patientId, $clinicId, $chatService, $db);
-    if (!$activeConv) {
-        echo json_encode([
-            'conversation_id' => null,
-            'professional' => null,
-            'messages' => [],
-            'cursor' => ['after_id' => 0, 'count' => 0, 'has_more' => false]
-        ]);
-        return;
-    }
-
-    $convId = (int)$activeConv['id'];
-    $data = $chatService->getMessagesWithCursor($convId, $afterId, 50, 'patient', $patientId);
-    $data['professional'] = [
-        'id' => (int)$activeConv['professional_id'],
-        'name' => $activeConv['professional_name'] ?? 'Nutricionista',
-        'crn' => $activeConv['professional_crn'] ?? null,
-    ];
-    echo json_encode($data);
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $after = isset($_GET['after_id']) && ctype_digit((string)$_GET['after_id']) ? (int)$_GET['after_id'] : null;
+    $prof = isset($_GET['professional_id']) && ctype_digit((string)$_GET['professional_id']) ? (int)$_GET['professional_id'] : null;
+    $api->patientMessages((int)$auth['patient_id'], $after, $prof);
 });
-
-$router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientApi, $db, $getJsonInput, $getOrCreatePatientConversation) {
+$router->post('/api/v1/patient/chat/send', function() use ($authenticatePatientApi, $getJsonInput, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-    $clinicId = (int)$auth['clinic_id'];
-    $input = $getJsonInput();
-
-    $message = trim((string)($input['message'] ?? ''));
-    if ($message === '') {
-        http_response_code(400);
-        echo json_encode(['error' => 'A mensagem não pode ser vazia.']);
-        return;
-    }
-
-    $idempotencyKey = trim((string)($input['idempotency_key'] ?? ''));
-    if ($idempotencyKey === '') {
-        $idempotencyKey = bin2hex(random_bytes(16));
-    }
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    $convId = (int)($input['conversation_id'] ?? 0);
-
-    if ($convId <= 0) {
-        $activeConv = $getOrCreatePatientConversation($patientId, $clinicId, $chatService, $db);
-        if ($activeConv) {
-            $convId = (int)$activeConv['id'];
-        }
-    }
-
-    if ($convId <= 0) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Nenhuma conversa ativa encontrada para o paciente.']);
-        return;
-    }
-
-    try {
-        $msg = $chatService->sendMessage(
-            $convId,
-            'patient',
-            $patientId,
-            $message,
-            null,
-            $idempotencyKey
-        );
-        echo json_encode(['success' => true, 'message' => $msg]);
-    } catch (\Throwable $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    // JSON (só texto) ou multipart (texto + arquivo "attachment").
+    $file = !empty($_FILES['attachment']) && ($_FILES['attachment']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE ? $_FILES['attachment'] : null;
+    $api->patientSend((int)$auth['patient_id'], $getJsonInput(), $file);
 });
-
-$router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientApi, $db, $getJsonInput) {
+$router->post('/api/v1/patient/chat/read', function() use ($authenticatePatientApi, $getJsonInput, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-    $clinicId = (int)$auth['clinic_id'];
-    $input = $getJsonInput();
-    $convId = (int)($input['conversation_id'] ?? 0);
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    if ($convId <= 0) {
-        $convs = $chatService->listConversationsForPatient($patientId);
-        if (!empty($convs)) {
-            $convId = (int)$convs[0]['id'];
-        }
-    }
-
-    if ($convId <= 0) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Identificador da conversa inválido ou ausente.']);
-        return;
-    }
-
-    // Validação estrita de participante contra falsificação de recibos (PX-25 / NI2-318)
-    $chk = $db->prepare("SELECT id FROM chat_conversations WHERE id = ? AND clinic_id = ? AND patient_id = ?");
-    $chk->execute([$convId, $clinicId, $patientId]);
-    if (!$chk->fetchColumn()) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Acesso não autorizado: conversa não pertence ao paciente autenticado.']);
-        return;
-    }
-
-    try {
-        $chatService->markAsRead($convId, 'patient', $patientId);
-        echo json_encode(['success' => true]);
-    } catch (\ClyoNutri\Core\Security\AuthorizationException $e) {
-        http_response_code(403);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->patientRead((int)$auth['patient_id'], $getJsonInput());
 });
-
-$router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use ($authenticatePatientApi, $db) {
+$router->get('/api/v1/patient/chat/attachment/{id}', function($params = []) use ($authenticatePatientApi, $chatApi) {
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-    $attId = (int)($params['id'] ?? 0);
-
-    $attService = new \ClyoNutri\Domain\Chat\ChatAttachmentService($db);
-    try {
-        $fileData = $attService->getAttachmentForDownload($attId, 'patient', $patientId);
-        header('Content-Type: ' . $fileData['mime_type']);
-        header('Content-Length: ' . $fileData['size_bytes']);
-        header('Content-Disposition: inline; filename="' . addslashes($fileData['file_name']) . '"');
-        header('X-Content-Type-Options: nosniff');
-        header('Cache-Control: private, no-cache, must-revalidate');
-        readfile($fileData['file_path']);
-        exit;
-    } catch (\Throwable $e) {
-        http_response_code(403);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => $e->getMessage()]);
-        exit;
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->patientDownload((int)$auth['patient_id'], (int)($params['id'] ?? 0));
+});
+$router->post('/api/v1/patient/chat/attachment/{id}/link', function($params = []) use ($authenticatePatientApi, $chatApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->patientAttachmentLink((int)$auth['patient_id'], (int)($params['id'] ?? 0));
+});
+// Link assinado e curto (2 min) para abrir o anexo no navegador/sistema do aparelho, sem levar o token de sessão.
+$router->get('/api/v1/chat/anexo/{token}', function($params = []) use ($chatApi) {
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->downloadByToken((string)($params['token'] ?? ''));
 });
 
 // 4.4 Privacidade da paciente: consentimentos e pedidos LGPD (code review NI2-91, C1)
@@ -1671,84 +1540,35 @@ $router->post('/api/v1/professional/food-diary/{id}/feedback', function($params 
     }
 });
 
-// 5.2 Chat do Profissional no Aplicativo Móvel (NI2-292 / NI2-189)
-$router->get('/api/v1/professional/chat/conversations', function() use ($authenticateProfessionalApi, $db) {
+// 5.2 Chat do profissional no app (NI2-292 / NI2-189, revisto na NI2-138)
+$router->get('/api/v1/professional/chat/conversations', function() use ($authenticateProfessionalApi, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticateProfessionalApi();
-    $profId = (int)$auth['professional_id'];
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    $convs = $chatService->listConversationsForProfessional($profId);
-    echo json_encode(['conversations' => $convs]);
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->professionalConversations((int)$auth['professional_id']);
 });
-
-$router->get('/api/v1/professional/chat/{id}/messages', function(array $params) use ($authenticateProfessionalApi, $db) {
+$router->get('/api/v1/professional/chat/{id}/messages', function(array $params) use ($authenticateProfessionalApi, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticateProfessionalApi();
-    $profId = (int)$auth['professional_id'];
-    $convId = (int)($params['id'] ?? 0);
-    $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : null;
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    try {
-        $data = $chatService->getMessagesWithCursor($convId, $afterId, 50, 'professional', $profId);
-        echo json_encode($data);
-    } catch (\Throwable $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $after = isset($_GET['after_id']) && ctype_digit((string)$_GET['after_id']) ? (int)$_GET['after_id'] : null;
+    $api->professionalMessages((int)$auth['professional_id'], (int)($params['id'] ?? 0), $after);
 });
-
-$router->post('/api/v1/professional/chat/{id}/send', function(array $params) use ($authenticateProfessionalApi, $db, $getJsonInput) {
+$router->post('/api/v1/professional/chat/{id}/send', function(array $params) use ($authenticateProfessionalApi, $getJsonInput, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticateProfessionalApi();
-    $profId = (int)$auth['professional_id'];
-    $convId = (int)($params['id'] ?? 0);
-    $input = $getJsonInput();
-
-    $message = trim((string)($input['message'] ?? ''));
-    if ($message === '') {
-        http_response_code(400);
-        echo json_encode(['error' => 'A mensagem não pode ser vazia.']);
-        return;
-    }
-
-    $idempotencyKey = trim((string)($input['idempotency_key'] ?? ''));
-    if ($idempotencyKey === '') {
-        $idempotencyKey = bin2hex(random_bytes(16));
-    }
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    try {
-        $msg = $chatService->sendMessage(
-            $convId,
-            'professional',
-            $profId,
-            $message,
-            null,
-            $idempotencyKey
-        );
-        echo json_encode(['success' => true, 'message' => $msg]);
-    } catch (\Throwable $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->professionalSend((int)$auth['professional_id'], (int)($params['id'] ?? 0), $getJsonInput());
 });
-
-$router->post('/api/v1/professional/chat/{id}/read', function(array $params) use ($authenticateProfessionalApi, $db) {
+$router->post('/api/v1/professional/chat/{id}/read', function(array $params) use ($authenticateProfessionalApi, $chatApi) {
     header('Content-Type: application/json; charset=utf-8');
     $auth = $authenticateProfessionalApi();
-    $profId = (int)$auth['professional_id'];
-    $convId = (int)($params['id'] ?? 0);
-
-    $chatService = new \ClyoNutri\Domain\Chat\ChatService($db);
-    try {
-        $chatService->markAsRead($convId, 'professional', $profId);
-        echo json_encode(['success' => true]);
-    } catch (\Throwable $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
+    $api = $chatApi();
+    if (!$api->enabled()) return;
+    $api->professionalRead((int)$auth['professional_id'], (int)($params['id'] ?? 0));
 });
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

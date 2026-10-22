@@ -103,6 +103,25 @@
 <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="patient_show_address" value="1" <?= !empty($bs['patient_show_address'])?'checked':'' ?> <?= $dis ?>> Mostrar o endereço do consultório na consulta presencial</label>
 <?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar regras do app</button><?php endif; ?>
 </form>
+<form class="card" method="POST" action="/configuracoes" id="chat-settings" data-testid="chat-settings">
+<h2>Chat com pacientes</h2>
+<p>O app mostra à paciente o tempo de resposta que você escolher, sempre como estimativa (não é prazo garantido), e avisa que o chat não é canal de urgência.</p>
+<input type="hidden" name="section" value="chat">
+<input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+<?php if(!$canManageBooking): ?><p role="note"><strong>Somente a gestão do consultório altera estas regras.</strong></p><?php endif; ?>
+<?php $cs=$chatSettings??['response_time_label'=>null,'retention_years'=>20]; ?>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+<div class="form-group"><label class="form-label" for="chat-response-time">O consultório costuma responder</label>
+<select class="form-control" id="chat-response-time" name="chat_response_time" <?= $dis ?>>
+<option value="">Não informar (a paciente vê “sem prazo garantido”)</option>
+<?php foreach(\ClyoNutri\Domain\Chat\ChatSettingsService::RESPONSE_TIMES as $rt): ?><option value="<?= htmlspecialchars($rt,ENT_QUOTES) ?>" <?= $cs['response_time_label']===$rt?'selected':'' ?>><?= htmlspecialchars($rt) ?></option><?php endforeach; ?>
+</select></div>
+<div class="form-group"><label class="form-label" for="chat-retention">Guardar mensagens e anexos por (anos)</label>
+<input class="form-control" type="number" id="chat-retention" name="chat_retention_years" min="<?= \ClyoNutri\Domain\Chat\ChatSettingsService::MIN_RETENTION_YEARS ?>" max="<?= \ClyoNutri\Domain\Chat\ChatSettingsService::MAX_RETENTION_YEARS ?>" required value="<?= (int)$cs['retention_years'] ?>" <?= $dis ?> aria-describedby="chat-retention-help">
+<small id="chat-retention-help">Padrão: 20 anos, o mesmo prazo do prontuário. Depois disso, a rotina diária apaga mensagens e arquivos.</small></div>
+</div>
+<?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar regras do chat</button><?php endif; ?>
+</form>
 <form class="card" method="POST" action="/configuracoes">
 <h2>Alterar senha</h2>
 <input type="hidden" name="section" value="password">

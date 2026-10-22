@@ -145,6 +145,8 @@ class AppointmentService
             $userId ?? TenantContext::getUserId(),
             'Agendamento inicial criado'
         );
+        // NI2-138: consulta marcada com o profissional = acompanhamento ativo; o vínculo libera o chat.
+        (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, $patientId, $professionalId, 'appointment');
 
         return [
             'id' => $id,
