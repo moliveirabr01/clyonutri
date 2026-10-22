@@ -35,6 +35,10 @@
     },
     {
       "name": "Privacidade"
+    },
+    {
+      "name": "Avisos",
+      "description": "Caixa de avisos e preferências de notificação (NI2-95)"
     }
   ],
   "paths": {
@@ -2034,6 +2038,240 @@
           }
         }
       }
+    },
+    "/patient/notifications": {
+      "get": {
+        "summary": "Lista os avisos da paciente (mais novos primeiro)",
+        "operationId": "patientNotifications",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInbox"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/notifications/read-all": {
+      "post": {
+        "summary": "Marca todos os avisos como lidos",
+        "operationId": "patientNotificationsReadAll",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "marked": {
+                      "type": "integer"
+                    },
+                    "unread_count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/patient/notifications/{id}/read": {
+      "post": {
+        "summary": "Marca um aviso como lido",
+        "operationId": "patientNotificationRead",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "read": {
+                      "type": "boolean"
+                    },
+                    "unread_count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "description": "NOT_FOUND: aviso de outra paciente, de outra clínica ou inexistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/notification-preferences": {
+      "get": {
+        "summary": "Preferências de aviso por tipo e canal, e horário de silêncio",
+        "operationId": "patientNotificationPreferences",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Altera preferências de aviso (parcial)",
+        "operationId": "patientNotificationPreferencesUpdate",
+        "tags": [
+          "Avisos"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "webSessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preferências já salvas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3383,6 +3621,218 @@
             }
           }
         ]
+      },
+      "NotificationItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "category",
+          "title",
+          "body",
+          "created_at",
+          "read"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "chat.message_created",
+              "appointment.reminder",
+              "meal_plan.published"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "appointments",
+              "plan"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "Texto neutro, sem dado clínico"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Caminho relativo dentro do app"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "read": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationInbox": {
+        "type": "object",
+        "required": [
+          "items",
+          "unread_count",
+          "next_before_id"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            }
+          },
+          "unread_count": {
+            "type": "integer"
+          },
+          "next_before_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Use em before_id para a próxima página; null quando acabou"
+          }
+        }
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "required": [
+          "categories",
+          "quiet_hours",
+          "timezone",
+          "push_available"
+        ],
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "category",
+                "label",
+                "email_enabled",
+                "push_enabled"
+              ],
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "chat",
+                    "appointments",
+                    "plan"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "email_enabled": {
+                  "type": "boolean"
+                },
+                "push_enabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "quiet_hours": {
+            "type": "object",
+            "required": [
+              "enabled",
+              "start",
+              "end"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "end": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              }
+            }
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "push_available": {
+            "type": "boolean",
+            "description": "false enquanto não houver provedor de push"
+          }
+        }
+      },
+      "NotificationPreferencesUpdate": {
+        "type": "object",
+        "description": "Atualização parcial: envie só o que mudou.",
+        "properties": {
+          "categories": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "chat": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email_enabled": {
+                    "type": "boolean"
+                  },
+                  "push_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "appointments": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email_enabled": {
+                    "type": "boolean"
+                  },
+                  "push_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "plan": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email_enabled": {
+                    "type": "boolean"
+                  },
+                  "push_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "quiet_hours": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "start": {
+                "type": "string"
+              },
+              "end": {
+                "type": "string"
+              }
+            }
+          }
+        }
       }
     }
   }

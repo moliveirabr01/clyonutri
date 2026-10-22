@@ -38,6 +38,16 @@ final class SettingsController
                     if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar as regras do chat.');
                     (new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->update(TenantContext::getClinicId(),is_string($_POST['chat_response_time']??null)?$_POST['chat_response_time']:null,$_POST['chat_retention_years']??'',(int)TenantContext::getUserId());
                 }
+                elseif($section==='notifications'){
+                    // NI2-95: avisos do próprio profissional (e-mail de nova mensagem do chat e horário de silêncio).
+                    $profId=self::professionalId();
+                    if($profId<=0)throw new \DomainException('Somente profissionais com cadastro completo recebem avisos.');
+                    $res=(new \ClyoNutri\Domain\Notification\NotificationService(Connection::getInstance()))->savePreferences(TenantContext::getClinicId(),'professional',$profId,[
+                        'categories'=>['chat'=>['email_enabled'=>!empty($_POST['notify_chat_email'])]],
+                        'quiet_hours'=>['enabled'=>!empty($_POST['quiet_enabled']),'start'=>is_string($_POST['quiet_start']??null)&&$_POST['quiet_start']!==''?$_POST['quiet_start']:'22:00','end'=>is_string($_POST['quiet_end']??null)&&$_POST['quiet_end']!==''?$_POST['quiet_end']:'07:00'],
+                    ]);
+                    (new \ClyoNutri\Core\Audit\AuditLogger(Connection::getInstance()))->log('NOTIFICATION_PREFERENCES_UPDATED','professionals',(string)$profId,['before'=>$res['before'],'after'=>$res['after']]);
+                }
                 elseif($section==='patient_actions'){
                     // NI2-137: o que a paciente pode fazer com a consulta pelo app. Regra da clínica: só a gestão altera.
                     if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o que a paciente faz pelo app.');
@@ -84,17 +94,24 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $lastSec=$_POST['section']??'';
-            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':($lastSec==='chat'?'Regras do chat atualizadas.':'Configurações atualizadas com sucesso.'))));
+            $successMessage=$lastSec==='availability'?'Disponibilidade de atendimento atualizada com sucesso.':($lastSec==='profile'?'Dados cadastrais e profissionais atualizados com sucesso.':($lastSec==='booking'?'Agendamento online atualizado.':($lastSec==='patient_actions'?'Ações da paciente no app atualizadas.':($lastSec==='chat'?'Regras do chat atualizadas.':($lastSec==='notifications'?'Avisos atualizados.':'Configurações atualizadas com sucesso.')))));
         }
         $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
         $chatSettings=(new \ClyoNutri\Domain\Chat\ChatSettingsService(Connection::getInstance()))->get(TenantContext::getClinicId());
-        $pidStmt=Connection::getInstance()->prepare('SELECT id FROM professionals WHERE user_id=?');$pidStmt->execute([TenantContext::getUserId()]);
-        $bookingProfessionalId=(int)$pidStmt->fetchColumn();
+        $bookingProfessionalId=self::professionalId();
+        $notificationPrefs=null;
+        try{if($bookingProfessionalId>0)$notificationPrefs=(new \ClyoNutri\Domain\Notification\NotificationService(Connection::getInstance()))->preferences(TenantContext::getClinicId(),'professional',$bookingProfessionalId);}catch(\Throwable $e){$notificationPrefs=null;}
         $bookingBase=rtrim((string)(getenv('APP_URL')?:($_ENV['APP_URL']??'')),'/');
         $bookingLink=$bookingProfessionalId>0?$bookingBase.'/agendar/'.$bookingProfessionalId:null;
         $bookingHasAvailability=!empty($weekly)&&count(array_filter($weekly,static fn($r)=>is_array($r)&&!empty($r['enabled'])))>0;
         $canManageBooking=in_array($profile['member_role'],['owner','admin'],true);
         $revision=ProfessionalProfile::revision($profile);$title='Configurações';$activeNav='configuracoes';$clinicName=$_SESSION['clinic_name']??'';$userName=$_SESSION['user_name']??'';
         ob_start();require __DIR__.'/../../../views/settings/profile.php';$content=ob_get_clean();require __DIR__.'/../../../views/layouts/professional-shell.php';
+    }
+
+    private static function professionalId(): int
+    {
+        $st=Connection::getInstance()->prepare('SELECT id FROM professionals WHERE user_id=?');$st->execute([TenantContext::getUserId()]);
+        return (int)$st->fetchColumn();
     }
 }

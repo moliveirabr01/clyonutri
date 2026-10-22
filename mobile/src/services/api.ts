@@ -235,6 +235,16 @@ export interface PatientRecipeDetails {
 export interface PatientConsent { purpose: string; term_title: string | null; term_version: string | null; granted: boolean; granted_at: string | null; revoked_at: string | null; revocation_reason: string | null; }
 export interface PrivacyRequest { id: number; request_type: string; status: string; deadline_at: string; completed_at?: string | null; response_notes?: string | null; created_at: string; already_open?: boolean; }
 export interface PatientPrivacyData { consents: PatientConsent[]; requests: PrivacyRequest[]; }
+// NI2-95: avisos e preferências de aviso.
+export type NotificationCategory = 'chat' | 'appointments' | 'plan';
+export interface PatientNotification { id: number; event_type: string; category: NotificationCategory; title: string; body: string; link: string | null; created_at: string; read: boolean; }
+export interface NotificationInbox { items: PatientNotification[]; unread_count: number; next_before_id: number | null; }
+export interface NotificationCategoryPref { category: NotificationCategory; label: string; email_enabled: boolean; push_enabled: boolean; }
+export interface NotificationPreferences { categories: NotificationCategoryPref[]; quiet_hours: { enabled: boolean; start: string; end: string }; timezone: string; push_available: boolean; }
+export interface NotificationPreferencesUpdate {
+  categories?: Partial<Record<NotificationCategory, { email_enabled?: boolean; push_enabled?: boolean }>>;
+  quiet_hours?: { enabled?: boolean; start?: string; end?: string };
+}
 
 export interface PatientHomeData {
   patient_name: string;
@@ -430,6 +440,25 @@ export const ApiService = {
     const data = await request<{ request: PrivacyRequest }>('/api/v1/patient/privacy-requests', { method: 'POST', body: JSON.stringify({ request_type, details }) });
     if (!data.request?.id) throw new ApiError('Resposta do pedido inválida.', 200, 'invalid');
     return data.request;
+  },
+  async getNotifications(beforeId?: number | null): Promise<NotificationInbox> {
+    const data = await request<NotificationInbox>('/api/v1/patient/notifications' + (beforeId ? `?before_id=${beforeId}` : ''));
+    if (!Array.isArray(data.items)) throw new ApiError('Resposta de avisos inválida.', 200, 'invalid');
+    return data;
+  },
+  async markNotificationRead(id: number): Promise<{ unread_count: number }> {
+    return request<{ unread_count: number }>(`/api/v1/patient/notifications/${id}/read`, { method: 'POST', body: '{}' });
+  },
+  async markAllNotificationsRead(): Promise<{ unread_count: number }> {
+    return request<{ unread_count: number }>('/api/v1/patient/notifications/read-all', { method: 'POST', body: '{}' });
+  },
+  async getNotificationPreferences(): Promise<NotificationPreferences> {
+    const data = await request<NotificationPreferences>('/api/v1/patient/notification-preferences');
+    if (!Array.isArray(data.categories) || !data.quiet_hours) throw new ApiError('Resposta de preferências inválida.', 200, 'invalid');
+    return data;
+  },
+  async saveNotificationPreferences(update: NotificationPreferencesUpdate): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/api/v1/patient/notification-preferences', { method: 'POST', body: JSON.stringify(update) });
   },
   /** Encerra a sessão só neste aparelho, sem depender da rede (code review NI2-91, M3). */
   forgetLocalSession(): void {

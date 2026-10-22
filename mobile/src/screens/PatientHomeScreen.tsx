@@ -17,6 +17,7 @@ import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/prese
 import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
 import PatientChat from '../components/PatientChat';
+import PatientNotifications from '../components/PatientNotifications';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
 import {
@@ -798,6 +799,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar Sessão (Logout)'}</Text>
               </TouchableOpacity>
             </View>
+
+            <PatientNotifications active={currentTab === 'Perfil'} />
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>🔒 Seus Dados e Privacidade (LGPD)</Text>

@@ -122,6 +122,22 @@
 </div>
 <?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar regras do chat</button><?php endif; ?>
 </form>
+<?php if(!empty($notificationPrefs)): $np=$notificationPrefs; $npChat=array_values(array_filter($np['categories'],static fn($c)=>$c['category']==='chat'))[0]??['email_enabled'=>true]; ?>
+<form class="card" method="POST" action="/configuracoes" id="notification-settings" data-testid="notification-settings">
+<h2>Seus avisos</h2>
+<p>Quando chega mensagem de paciente, ela aparece no chat na hora. Aqui você escolhe se também quer um e-mail (sem o conteúdo da mensagem) e em que horário não quer ser incomodado.</p>
+<input type="hidden" name="section" value="notifications">
+<input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+<label style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;"><input type="checkbox" name="notify_chat_email" value="1" <?= !empty($npChat['email_enabled'])?'checked':'' ?>> Receber e-mail quando chegar mensagem nova</label>
+<label style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;"><input type="checkbox" name="quiet_enabled" value="1" <?= !empty($np['quiet_hours']['enabled'])?'checked':'' ?>> Não mandar e-mail no horário de silêncio</label>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
+<div class="form-group"><label class="form-label" for="quiet-start">Silêncio a partir de</label><input class="form-control" type="time" id="quiet-start" name="quiet_start" value="<?= htmlspecialchars((string)$np['quiet_hours']['start'],ENT_QUOTES) ?>"></div>
+<div class="form-group"><label class="form-label" for="quiet-end">Até</label><input class="form-control" type="time" id="quiet-end" name="quiet_end" value="<?= htmlspecialchars((string)$np['quiet_hours']['end'],ENT_QUOTES) ?>"></div>
+</div>
+<small>Horário de Brasília. Avisos no celular (push) ainda não estão disponíveis.</small>
+<div style="margin-top: 12px;"><button type="submit" class="btn btn-primary">Salvar avisos</button></div>
+</form>
+<?php endif; ?>
 <form class="card" method="POST" action="/configuracoes">
 <h2>Alterar senha</h2>
 <input type="hidden" name="section" value="password">
