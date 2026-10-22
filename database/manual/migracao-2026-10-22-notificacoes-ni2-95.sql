@@ -1,10 +1,12 @@
 -- ============================================================================
--- ClyoNutri — Migração Manual 51 (NI2-95 · Notificações: avisos, preferências, fila, push e lembrete)
--- Equivale a database/migrations/2026_10_22_000051_create_notification_domain.php.
--- Ordem: 48 (chat NI2-138) → 49 (adesão NI2-96) → 50 (hidratação NI2-92) → esta 51.
+-- ClyoNutri — Migrações Manuais 51 e 52 (NI2-95 · Notificações: avisos, preferências, fila, push, lembretes e check-in)
+-- Equivale a database/migrations/2026_10_22_000051_create_notification_domain.php
+--        e a database/migrations/2026_10_22_000052_create_notification_checkin_settings.php.
+-- Ordem: 48 (chat NI2-138) → 49 (adesão NI2-96) → 50 (hidratação NI2-92) → esta (51 e depois 52).
 -- Rodar no phpMyAdmin DEPOIS do backup e do preflight (preflight-2026-10-22-notificacoes-ni2-95.sql).
 -- Idempotente: pode rodar de novo sem efeito.
--- Efeito nos dados: só cria 7 tabelas vazias e índices nelas. Nada existente é alterado.
+-- Efeito nos dados: só cria 8 tabelas vazias e índices nelas. Nada existente é alterado.
+--  * O lembrete de check-in da paciente (tabela 9) vem desligado; só liga se ela escolher no app.
 --  * Preferências antigas do chat (chat_preferences) continuam valendo até a pessoa salvar as novas.
 --  * A tabela antiga `notifications` não é tocada (nunca foi usada pelo sistema).
 --  * Depois de aplicar, o cron passa a criar lembretes de consulta (24 h antes, ou o que a clínica escolher
@@ -13,6 +15,7 @@
 SET NAMES utf8mb4;
 SET @db = DATABASE();
 SET @t_clinics = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'clinics' AND COLUMN_NAME = 'id');
+SET @t_patients = (SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'patients' AND COLUMN_NAME = 'id');
 SET @ok_base = ((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db
   AND TABLE_NAME IN ('clinics','patients','professionals','users','appointments','chat_notifications_log','migrations')
   AND UPPER(ENGINE) = 'INNODB') = 7);
@@ -203,5 +206,31 @@ SET @q = IF(@ok, CONCAT('INSERT INTO `migrations` (`migration`, `executed_at`) S
   'WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = ''2026_10_22_000051_create_notification_domain'')'), 'DO 0');
 PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
 
-SELECT IF(@ok, 'OK — migração 51 aplicada (avisos, preferências, fila, push e lembrete de consulta)', 'FALHA — ver preflight') AS resultado,
-  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_22_000051_create_notification_domain') AS registrada_em_migrations;
+-- 9. Migração 52: lembrete do check-in diário escolhido pela paciente (opt-in, enabled = 0 por padrão).
+SET @q = IF(@ok_base = 1, 'CREATE TABLE IF NOT EXISTS `notification_checkin_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` {T_CLINICS} NOT NULL,
+  `patient_id` {T_PATIENTS} NOT NULL,
+  `enabled` TINYINT NOT NULL DEFAULT 0,
+  `remind_time` VARCHAR(5) NOT NULL DEFAULT ''20:00'',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  UNIQUE KEY `uq_notification_checkin_settings` (`clinic_id`, `patient_id`),
+  CONSTRAINT `fk_notification_checkin_settings_clinic` FOREIGN KEY (`clinic_id`) REFERENCES `clinics`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notification_checkin_settings_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci', 'DO 0');
+SET @q = REPLACE(REPLACE(@q, '{T_CLINICS}', IFNULL(@t_clinics, 'INT')), '{T_PATIENTS}', IFNULL(@t_patients, 'INT'));
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @q = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_checkin_settings') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_checkin_settings' AND INDEX_NAME = 'uq_notification_checkin_settings') = 0,
+  'CREATE UNIQUE INDEX `uq_notification_checkin_settings` ON `notification_checkin_settings` (`clinic_id`, `patient_id`)', 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ok52 = @ok AND (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_checkin_settings') = 1
+  AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'notification_checkin_settings' AND INDEX_NAME = 'uq_notification_checkin_settings') > 0;
+SET @q = IF(@ok52, CONCAT('INSERT INTO `migrations` (`migration`, `executed_at`) SELECT ''2026_10_22_000052_create_notification_checkin_settings'', CURRENT_TIMESTAMP FROM DUAL ',
+  'WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = ''2026_10_22_000052_create_notification_checkin_settings'')'), 'DO 0');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SELECT IF(@ok AND @ok52, 'OK — migrações 51 e 52 aplicadas (avisos, preferências, fila, push, lembrete de consulta e de check-in)', 'FALHA — ver preflight') AS resultado,
+  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_22_000051_create_notification_domain') AS registrada_51,
+  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_22_000052_create_notification_checkin_settings') AS registrada_52;
