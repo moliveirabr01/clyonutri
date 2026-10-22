@@ -56,7 +56,8 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     check('caixa', 'Aviso sem nome, sem plano e sem calorias', r.json.items.every((i) => !/Ana|kcal|Plano TESTE|Arroz/.test(i.title + i.body)));
     check('fila', 'E-mail do plano ainda está na fila (só o cron entrega)', one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE status = 'queued'") >= 4);
     const out = execFileSync('php', ['bin/cron_scheduler.php'], { cwd: root, env, encoding: 'utf8' });
-    check('cron', 'Cron real roda e mostra entregas e lembretes', /Fila\s+: OK \(entregas \d+/.test(out) && /Consultas : 4 lembrete/.test(out), out);
+    check('cron', 'Cron real roda e mostra entregas e lembretes', /Fila\s+: OK \(entregas \d+/.test(out) && /Consultas : 4 lembrete/.test(out)
+      && /Check-in\s+: 0 lembrete\(s\) para paciente, 0 aviso\(s\) de check-in recebido/.test(out), out);
     check('cron', 'Depois do cron: e-mails logged (driver de log), push bloqueado, nada na fila', Number(one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE status = 'queued'")) === 0
       && Number(one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE channel = 'email' AND status = 'logged'")) === 6
       && Number(one("SELECT COUNT(*) AS n FROM notification_deliveries WHERE channel = 'push' AND status <> 'blocked'")) === 0, sql('SELECT channel, status, reason FROM notification_deliveries'));
@@ -116,6 +117,11 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     check('pref', 'JSON quebrado → 422', r.status === 422, r);
     r = await call('GET', '/api/v1/patient/notification-preferences', { token: carla });
     check('pref', 'Preferência da Ana não vaza para a Carla', r.json.quiet_hours.enabled === false && r.json.categories.every((c) => c.email_enabled), r.json);
+    check('checkin', 'Sem o check-in diário (NI2-96) o lembrete vem indisponível e desligado', r.json.checkin_reminder && r.json.checkin_reminder.available === false
+      && r.json.checkin_reminder.enabled === false && !r.json.categories.some((c) => c.category === 'checkin'), r.json);
+    r = await call('POST', '/api/v1/patient/notification-preferences', { token: ana, body: { checkin_reminder: { enabled: true, time: '20:00' } } });
+    check('checkin', 'Ligar o lembrete sem check-in diário → 422 com texto claro e nada gravado', r.status === 422 && r.json.code === 'VALIDATION_ERROR'
+      && /ainda não está disponível/.test(r.json.error) && Number(one('SELECT COUNT(*) AS n FROM notification_checkin_settings')) === 0, r);
 
     // ------------------------------------------------------------ web: avisos do profissional em Configurações
     let cookie = '';
@@ -130,10 +136,13 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     w = await web('GET', '/configuracoes');
     check('web', 'Configurações mostram "Seus avisos" com e-mail do chat ligado por padrão', w.status === 200 && /data-testid="notification-settings"/.test(w.text)
       && /name="notify_chat_email" value="1" checked/.test(w.text), w.status + ' ' + w.location);
+    check('web', 'Configurações mostram o e-mail de check-in recebido ligado por padrão (no máximo um por dia)', /name="notify_checkin_email" value="1" checked/.test(w.text) && /no máximo um por dia/.test(w.text));
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'notifications', quiet_enabled: '1', quiet_start: '20:00', quiet_end: '08:00' });
     check('web', 'Desligar e-mail do chat e ligar silêncio 20:00–08:00', w.status === 200 && /Avisos atualizados/.test(w.text)
       && Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'chat'")) === 0
       && one("SELECT start_time || '-' || end_time || '-' || enabled AS q FROM notification_quiet_hours WHERE recipient_type = 'professional' AND recipient_id = 1") === '20:00-08:00-1', w.status);
+    check('web', 'Desmarcar o check-in desliga só o e-mail de check-in recebido (opt-out)', Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'checkin'")) === 0
+      && !/name="notify_checkin_email" value="1" checked/.test(w.text), w.status);
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'notifications', notify_chat_email: '1', quiet_enabled: '1', quiet_start: '25:00', quiet_end: '08:00' });
     check('web', 'Hora inválida: 422 com mensagem e nada muda', w.status === 422 && /HH:MM/.test(w.text)
       && Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'chat'")) === 0, w.status);
