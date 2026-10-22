@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
-  Alert,
   Linking,
   Platform,
 } from 'react-native';
@@ -20,6 +19,7 @@ import DailyCheckinCard from '../components/DailyCheckinCard';
 import PatientChat from '../components/PatientChat';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
+import { announce, useAnnounce } from '../utils/a11y';
 import {
   ApiService,
   ApiError,
@@ -98,6 +98,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     } finally { setPrivacyBusy(false); }
   };
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  // NI2-140 (A4): resultado do registro de água aparece no próprio card, em vez do diálogo nativo (que não aparece no web).
+  const [waterFeedback, setWaterFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [recipes, setRecipes] = useState<PatientRecipePrescription[]>([]);
   const [recipesState, setRecipesState] = useState<ResourceState>(initialResource);
@@ -213,9 +215,18 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         water_ml_today: res.total_water_today ?? (prev.water_ml_today + amountMl),
       } : null);
       setIsOffline(false);
+      const total = res.total_water_today ?? ((homeData.water_ml_today ?? 0) + amountMl);
+      const okText = `${amountMl} ml registrados. Total de hoje: ${total.toLocaleString('pt-BR')} ml.`;
+      setWaterFeedback({ ok: true, text: okText });
+      announce(okText);
     } catch (err: any) {
-      Alert.alert('Erro ao registrar', 'Não foi possível salvar o registro de água no servidor.');
-      setIsOffline(err instanceof ApiError && err.kind === 'offline');
+      const offline = err instanceof ApiError && err.kind === 'offline';
+      const errText = offline
+        ? 'Sem conexão: a água não foi registrada. Tente de novo quando a internet voltar.'
+        : 'Não foi possível registrar a água agora. Tente de novo.';
+      setWaterFeedback({ ok: false, text: errText });
+      announce(errText);
+      setIsOffline(offline);
     } finally {
       setActionLoading(false);
     }
@@ -289,11 +300,19 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     }
   };
 
+  // NI2-140 (A4): no celular, o leitor de tela também ouve o resultado das ações (na web, as regiões vivas já avisam).
+  useAnnounce(mealFeedback);
+  useAnnounce(mealError);
+  useAnnounce(metricFeedback);
+  useAnnounce(metricError);
+  useAnnounce(privacyFeedback);
+  useAnnounce(logoutError);
+
   // Tela de Carregamento inicial
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0F2747" accessibilityLabel="Carregando dados do paciente" />
+        <ActivityIndicator size="large" color={t.navy} accessibilityLabel="Carregando dados do paciente" />
         <Text style={styles.loadingText}>Conectando ao seu consultório nutricional...</Text>
       </SafeAreaView>
     );
@@ -301,8 +320,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
   if (!homeData) return <SafeAreaView style={styles.centerContainer}>
     <Text accessibilityRole="alert" style={styles.errorAlertText}>{errorMessage || 'Não foi possível carregar seus dados.'}</Text>
-    <TouchableOpacity onPress={fetchAllData} accessibilityRole="button" accessibilityLabel="Tentar novamente"><Text>Tentar novamente</Text></TouchableOpacity>
-    <TouchableOpacity onPress={async () => { try { await ApiService.logout(); onLogout(); } catch (_) { setErrorMessage('Falha ao encerrar sessão. Tente novamente.'); } }} accessibilityRole="button"><Text>Encerrar sessão</Text></TouchableOpacity>
+    <TouchableOpacity style={[styles.navyButton, { marginTop: 16, alignSelf: 'stretch' }]} onPress={fetchAllData} accessibilityRole="button"><Text style={styles.navyButtonText}>Tentar novamente</Text></TouchableOpacity>
+    <TouchableOpacity onPress={async () => { try { await ApiService.logout(); onLogout(); } catch (_) { setErrorMessage('Falha ao encerrar sessão. Tente novamente.'); } }} accessibilityRole="button" style={{ minHeight: t.touch, justifyContent: 'center', marginTop: 8 }}><Text style={{ color: t.navy, fontWeight: '600' }}>Encerrar sessão</Text></TouchableOpacity>
   </SafeAreaView>;
 
   const patientName = homeData.patient_name;
@@ -316,22 +335,17 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       {/* Banner de Sincronização e Conectividade Real (Critério 4) */}
       <View
         style={[styles.syncBanner, isOffline && styles.syncBannerOffline]}
-        accessible={true}
         accessibilityRole="summary"
-        accessibilityLabel={
-          isOffline
-            ? 'Atenção: Modo offline ou falha de conexão com o servidor'
-            : errorMessage || diaryState.error || evolutionState.error ? 'Atualização parcial. Alguns dados não foram atualizados.' : 'Resumo atualizado com seu consultório'
-        }
+        accessibilityLiveRegion="polite"
       >
         <Text style={[styles.syncText, isOffline && styles.syncTextOffline]}>
           {isOffline
-            ? '⚠️ Conexão indisponível — dados podem estar desatualizados'
-            : errorMessage || diaryState.error || evolutionState.error ? '⚠️ Atualização parcial — confira os avisos em cada aba' : '✓ Resumo atualizado com seu consultório'}
+            ? 'Sem conexão. Os dados podem estar desatualizados.'
+            : errorMessage || diaryState.error || evolutionState.error ? 'Atualização parcial. Confira os avisos em cada aba.' : 'Resumo atualizado com seu consultório'}
         </Text>
       </View>
 
-      {homeUpdatedAt && <Text accessibilityLiveRegion="polite">{errorMessage ? 'Resumo desatualizado. ' : ''}Última atualização do resumo: {homeUpdatedAt}</Text>}
+      {homeUpdatedAt && <Text style={styles.updatedText}>{errorMessage ? 'Resumo desatualizado. ' : ''}Última atualização: {homeUpdatedAt}</Text>}
       {errorMessage && (
         <View style={styles.errorAlert}>
           <Text style={styles.errorAlertText}>{errorMessage}</Text>
@@ -341,15 +355,16 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             accessibilityRole="button"
             accessibilityLabel="Tentar reconectar ao servidor"
           >
-            <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <ScrollView
+        role="main"
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0F2747']} tintColor="#0F2747" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[t.navy]} tintColor={t.navy} />
         }
       >
         {currentTab === 'Hoje' && (
@@ -361,31 +376,26 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 style={styles.greeting}
                 accessibilityRole="header"
               >
-                Olá, {patientName} 👋
+                Olá, {patientName}
               </Text>
               <Text style={styles.subGreeting}>Acompanhamento nutricional dedicado</Text>
             </View>
 
-            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')}>
+            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')} accessibilityLabel="Minhas receitas. Ver as receitas e orientações do seu nutricionista">
               <Text style={styles.cardTitle}>Minhas receitas</Text>
-              <Text style={styles.helperText}>Veja as receitas e orientações prescritas pelo seu nutricionista →</Text>
+              <Text style={styles.helperText}>Veja as receitas e orientações prescritas pelo seu nutricionista</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.card, { borderColor: '#10B981', backgroundColor: '#F0FDF4' }]}
+              style={[styles.card, { borderColor: t.success, backgroundColor: t.successBg }]}
               accessibilityRole="button"
               onPress={() => setCurrentTab('Chat')}
-              accessibilityLabel="Abrir mensagens com o nutricionista"
+              accessibilityLabel="Mensagens com o nutricionista. Tire dúvidas sobre o plano. Não é canal de urgência"
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, { color: '#065F46' }]}>Mensagens com o nutricionista</Text>
-                  <Text style={[styles.helperText, { color: '#047857' }]}>
-                    Tire dúvidas sobre o plano. Não é canal de urgência →
-                  </Text>
-                </View>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981', marginLeft: 8 }} />
-              </View>
+              <Text style={[styles.cardTitle, { color: t.success }]}>Mensagens com o nutricionista</Text>
+              <Text style={[styles.helperText, { color: t.success }]}>
+                Tire dúvidas sobre o plano. Não é canal de urgência.
+              </Text>
             </TouchableOpacity>
 
             {/* Card da próxima consulta (NI2-137): data com fuso, modalidade, local e ações liberadas pelo consultório */}
@@ -396,20 +406,17 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             <DailyCheckinCard checkin={homeData?.checkin_today ?? null} />
 
             {/* Card de Hidratação Diária com persistência no servidor (Critério 3 e PX-20 / NI2-313) */}
-            <View
-              style={styles.card}
-              accessible={true}
-              accessibilityLabel={
-                waterGoal !== null && waterGoal > 0
-                  ? `Meta de hidratação: ${waterMl} ml de ${waterGoal} ml`
-                  : `Hidratação registrada: ${waterMl} ml. Nenhuma meta hídrica prescrita.`
-              }
-            >
-              <Text style={styles.cardTitle}>💧 Hidratação Diária</Text>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle} accessibilityRole="header">Hidratação</Text>
               {waterGoal !== null && waterGoal > 0 ? (
                 <>
-                  <Text style={styles.waterValue}>{waterMl} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
-                  <View style={styles.progressBarBackground}>
+                  <Text style={styles.waterValue} accessibilityLabel={`Água hoje: ${waterMl} ml de ${waterGoal} ml da meta`}>{waterMl} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
+                  <View
+                    style={styles.progressBarBackground}
+                    accessibilityRole="progressbar"
+                    accessibilityLabel="Progresso da meta de água"
+                    accessibilityValue={{ min: 0, max: waterGoal, now: Math.min(waterMl, waterGoal) }}
+                  >
                     <View
                       style={[
                         styles.progressBarFill,
@@ -420,8 +427,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </>
               ) : (
                 <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.waterValue}>{waterMl} ml</Text>
-                  <Text style={styles.metaLabel}>Meta hídrica não definida pelo nutricionista</Text>
+                  <Text style={styles.waterValue} accessibilityLabel={`Água hoje: ${waterMl} ml`}>{waterMl} ml</Text>
+                  <Text style={styles.metaLabel}>Seu nutricionista ainda não definiu uma meta de água.</Text>
                 </View>
               )}
 
@@ -430,8 +437,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   style={styles.navyButton}
                   onPress={() => handleAddWater(250)}
                   disabled={actionLoading}
+                  accessibilityState={{ disabled: actionLoading, busy: actionLoading }}
                   accessibilityRole="button"
-                  accessibilityLabel="Adicionar 250 mililitros de água"
+                  accessibilityLabel="Adicionar 250 ml de água"
                 >
                   <Text style={styles.navyButtonText}>+ 250 ml</Text>
                 </TouchableOpacity>
@@ -439,17 +447,28 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   style={styles.navyButton}
                   onPress={() => handleAddWater(500)}
                   disabled={actionLoading}
+                  accessibilityState={{ disabled: actionLoading, busy: actionLoading }}
                   accessibilityRole="button"
-                  accessibilityLabel="Adicionar 500 mililitros de água"
+                  accessibilityLabel="Adicionar 500 ml de água"
                 >
                   <Text style={styles.navyButtonText}>+ 500 ml</Text>
                 </TouchableOpacity>
               </View>
+              {waterFeedback && (
+                <Text
+                  testID="water-feedback"
+                  accessibilityRole={waterFeedback.ok ? undefined : 'alert'}
+                  accessibilityLiveRegion={waterFeedback.ok ? 'polite' : 'assertive'}
+                  style={[styles.inlineFeedback, waterFeedback.ok ? styles.inlineFeedbackOk : styles.inlineFeedbackError]}
+                >
+                  {waterFeedback.text}
+                </Text>
+              )}
             </View>
 
             {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
             {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
-            <Text style={styles.sectionTitle} accessibilityRole="header">Prescrição do Dia</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Prescrição do dia</Text>
 
             {activePlan && activePlan.meals && activePlan.meals.length > 0 ? (
               activePlan.meals.map((meal) => (
@@ -471,14 +490,14 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                             <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
                             {item.substitutions.map((s) => (
                               <Text key={s.id} style={styles.substitutionText}>
-                                ↳ {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
                               </Text>
                             ))}
                           </View>
                         )}
                         {item.notes ? (
                           <Text style={styles.itemNotesText}>
-                            ℹ️ Orientação: {item.notes}
+                            Orientação: {item.notes}
                           </Text>
                         ) : null}
                       </View>
@@ -487,7 +506,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                     <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
                   )}
 
-                  {diaryEntries.filter(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>✓ Consumo registrado em {displayDateTime(entry.consumed_at)}</Text>)}
+                  {diaryEntries.filter(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayDateTime(entry.consumed_at)}</Text>)}
             {mealDraft?.name === meal.name && <View style={styles.card}>
               <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
               <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
@@ -498,7 +517,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               </View>
               {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
                 <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
-                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, minHeight: 88, marginTop: 8 }]} />
+                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" placeholderTextColor={t.muted} style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 88, marginTop: 8 }]} />
               </>}
               {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
               <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
@@ -521,7 +540,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                       accessibilityLabel={`Registrar consumo da refeição ${meal.name}`}
                     >
                       <Text style={styles.registerMealText}>
-                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()) ? 'Registrar outro consumo' : 'Registrar Consumo'}
+                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()) ? 'Registrar outro consumo' : 'Registrar consumo'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -529,7 +548,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               ))
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>📋 Nenhum Plano Publicado</Text>
+                <Text style={styles.emptyTitle}>Nenhum plano publicado</Text>
                 <Text style={styles.emptyDescription}>
                   Seu nutricionista ainda não publicou um plano alimentar ativo. Assim que a prescrição for disponibilizada, você verá suas refeições aqui.
                 </Text>
@@ -540,7 +559,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
         {currentTab === 'Plano' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">Plano Alimentar Completo</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Plano alimentar completo</Text>
             {activePlan ? (
               <>
                 <Text style={styles.helperText}>
@@ -550,7 +569,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </Text>
                 {activePlan.notes && (
                   <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Orientações Gerais</Text>
+                    <Text style={styles.cardTitle}>Orientações gerais</Text>
                     <Text style={styles.mealItem}>{activePlan.notes}</Text>
                     <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { setChatInputText('Olá! Pode esclarecer as orientações do meu plano alimentar?'); setCurrentTab('Chat'); }}><Text style={{ color: t.navy }}>Esclarecer uma orientação com o nutricionista</Text></TouchableOpacity>
                   </View>
@@ -569,14 +588,14 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                             <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
                             {it.substitutions.map((s) => (
                               <Text key={s.id} style={styles.substitutionText}>
-                                ↳ {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
                               </Text>
                             ))}
                           </View>
                         )}
                         {it.notes ? (
                           <Text style={styles.itemNotesText}>
-                            ℹ️ Orientação: {it.notes}
+                            Orientação: {it.notes}
                           </Text>
                         ) : null}
                       </View>
@@ -642,8 +661,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
         {currentTab === 'Diario' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">Diário Alimentar</Text>
-            <Text style={styles.helperText}>Histórico com distinção clara entre planejado e realizado</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Diário alimentar</Text>
+            <Text style={styles.helperText}>O que você registrou, com data e hora. O que veio do plano aparece como “Conforme o plano”.</Text>
 
             {<ResourceNotice state={diaryState} retry={refreshDiary} name="diário" />}
             {diaryEntries.length > 0 ? (
@@ -657,18 +676,18 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   )}
                   {entry.feedback_from_professional && (
                     <View style={styles.feedbackBox}>
-                      <Text style={styles.feedbackTitle}>Feedback do Nutricionista:</Text>
+                      <Text style={styles.feedbackTitle}>Retorno do nutricionista:</Text>
                       <Text style={styles.feedbackText}>{entry.feedback_from_professional}</Text>
                     </View>
                   )}
-                  <Text style={styles.diaryStatus}>✓ Registrado pelo paciente</Text>
+                  <Text style={styles.diaryStatus}>Registrado por você</Text>
                 </View>
               ))
             ) : !diaryState.error && !diaryState.loading ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyTitle}>Nenhum registro ainda hoje</Text>
                 <Text style={styles.emptyDescription}>
-                  Clique em &ldquo;Registrar Consumo&rdquo; na aba Hoje para anotar suas refeições realizadas.
+                  Toque em &ldquo;Registrar consumo&rdquo; na aba Hoje para anotar o que você comeu.
                 </Text>
               </View>
             ) : null}
@@ -688,7 +707,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }} accessibilityRole="radiogroup" accessibilityLabel="Período">
               {([['30', '30 dias'], ['90', '3 meses'], ['365', '12 meses'], ['all', 'Tudo']] as const).map(([key, label]) => (
                 <TouchableOpacity key={key} onPress={() => setEvolutionPeriod(key)} accessibilityRole="radio" accessibilityState={{ checked: evolutionPeriod === key }} aria-checked={evolutionPeriod === key}
-                  style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.navy, backgroundColor: evolutionPeriod === key ? t.navy : t.white, minHeight: 36 }}>
+                  style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.navy, backgroundColor: evolutionPeriod === key ? t.navy : t.white, minHeight: t.touch, justifyContent: 'center' }}>
                   <Text style={{ color: evolutionPeriod === key ? t.white : t.navy, fontWeight: '600' }}>{label}</Text>
                 </TouchableOpacity>
               ))}
@@ -722,16 +741,16 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8 }} accessibilityRole="radiogroup" accessibilityLabel="Medida">
                   {(evolutionData.enabled_metrics ?? []).map((m) => (
                     <TouchableOpacity key={m.type} onPress={() => { setMetricType(m.type); setMetricError(null); }} accessibilityRole="radio" accessibilityState={{ checked: metricType === m.type }} aria-checked={metricType === m.type}
-                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.copper, backgroundColor: metricType === m.type ? t.copper : t.white, minHeight: 36 }}>
+                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: t.copper, backgroundColor: metricType === m.type ? t.copper : t.white, minHeight: t.touch, justifyContent: 'center' }}>
                       <Text style={{ color: metricType === m.type ? t.white : t.copper, fontWeight: '600' }}>{m.label} ({m.unit})</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
                 <TextInput value={metricValue} onChangeText={setMetricValue} keyboardType="decimal-pad" accessibilityLabel="Valor da medida"
-                  placeholder={metricType ? `Valor em ${evolutionData.enabled_metrics?.find((m) => m.type === metricType)?.unit}` : 'Escolha a medida acima'}
-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, marginTop: 4 }]} />
-                <TextInput value={metricNotes} onChangeText={setMetricNotes} maxLength={500} accessibilityLabel="Observação (opcional)" placeholder="Observação (opcional)"
-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.border, borderRadius: 8, marginTop: 8 }]} />
+                  placeholder={metricType ? `Valor em ${evolutionData.enabled_metrics?.find((m) => m.type === metricType)?.unit}` : 'Escolha a medida acima'} placeholderTextColor={t.muted}
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 4 }]} />
+                <TextInput value={metricNotes} onChangeText={setMetricNotes} maxLength={500} accessibilityLabel="Observação (opcional)" placeholder="Observação (opcional)" placeholderTextColor={t.muted}
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 8 }]} />
                 {metricError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{metricError}</Text>}
                 {metricFeedback && <Text accessibilityRole="alert" style={styles.mealItem}>{metricFeedback}</Text>}
                 <TouchableOpacity accessibilityRole="button" style={[styles.navyButton, { marginTop: 12 }]} disabled={metricSaving} onPress={submitSelfMetric}>
@@ -755,6 +774,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             ) : !evolutionState.error && !evolutionState.loading && evolutionData ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyTitle}>Nenhuma avaliação do nutricionista neste período</Text>
+                <Text style={styles.emptyDescription}>
+                  {evolutionPeriod !== 'all' ? 'Escolha “Tudo” acima para ver registros mais antigos. ' : ''}
+                  As medidas da consulta aparecem aqui depois que seu nutricionista registrar a avaliação.
+                  {(evolutionData.enabled_metrics ?? []).length > 0 ? ' Você também pode registrar uma medida sua no formulário acima.' : ''}
+                </Text>
               </View>
             ) : null}
 
@@ -773,13 +797,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 
         {currentTab === 'Perfil' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">Perfil & Privacidade</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Perfil e privacidade</Text>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{patientName}</Text>
-              <Text style={styles.mealItem}>Paciente: {session.patient.email}</Text>
+              <Text style={styles.mealItem}>E-mail: {session.patient.email}</Text>
               {logoutError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{logoutError}</Text>}
               {logoutError && Platform.OS !== 'web' && (
-                <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8 }} onPress={() => { ApiService.forgetLocalSession(); onLogout(); }}>
+                <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8, minHeight: t.touch, justifyContent: 'center' }} onPress={() => { ApiService.forgetLocalSession(); onLogout(); }}>
                   <Text style={styles.mealItem}>Sair só deste aparelho (o acesso no servidor expira sozinho em até 30 dias)</Text>
                 </TouchableOpacity>
               )}
@@ -797,22 +821,21 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 }}
                 accessibilityRole="button"
                 disabled={loggingOut}
-                accessibilityLabel="Encerrar sessão e revogar token"
               >
-                <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar Sessão (Logout)'}</Text>
+                <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar sessão'}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>🔒 Seus Dados e Privacidade (LGPD)</Text>
+              <Text style={styles.cardTitle}>Seus dados e privacidade (LGPD)</Text>
               <Text style={styles.helperText}>
                 Seus dados cadastrais, clínicos e registros nutricionais são classificados como dados de saúde (Art. 5º, II e Art. 11º da LGPD) sob custódia e sigilo do seu consultório.
               </Text>
               <Text style={[styles.mealItem, { marginTop: 6 }]}>
-                • Finalidade: Prestação de assistência e acompanhamento nutricional personalizado.
+                • Finalidade: prestação de assistência e acompanhamento nutricional personalizado.
               </Text>
               <Text style={styles.mealItem}>
-                • Prontuário Clínico: Armazenado em infraestrutura protegida com histórico auditável.
+                • Prontuário clínico: armazenado em infraestrutura protegida com histórico auditável.
               </Text>
               <Text style={styles.mealItem}>
                 • Seus direitos: peça abaixo uma cópia dos seus dados ou a exclusão do cadastro. Cada pedido fica registrado com prazo de resposta de 15 dias. Correções podem ser pedidas ao seu nutricionista pelo chat.
@@ -848,7 +871,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                       : 'Seu cadastro será anonimizado e o acesso ao app, encerrado. O prontuário clínico é guardado por exigência legal (20 anos). O prazo de resposta é de 15 dias.'}
                   </Text>
                   <TouchableOpacity accessibilityRole="button" style={styles.navyButton} disabled={privacyBusy} onPress={() => submitPrivacyRequest(privacyConfirm)}><Text style={styles.navyButtonText}>{privacyBusy ? 'Enviando…' : 'Confirmar pedido'}</Text></TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8 }} disabled={privacyBusy} onPress={() => setPrivacyConfirm(null)}><Text style={styles.mealItem}>Cancelar</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" style={{ marginTop: 8, minHeight: t.touch, justifyContent: 'center' }} disabled={privacyBusy} onPress={() => setPrivacyConfirm(null)}><Text style={styles.mealItem}>Cancelar</Text></TouchableOpacity>
                 </View>
               )}
             </View>
@@ -857,7 +880,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       </ScrollView>
 
       {/* Barra de Navegação Inferior WCAG AA (NI2-140) */}
-      <View style={styles.navBar} accessibilityRole="tablist">
+      {/* NI2-140 (A3): a barra fica no fluxo da tela (não cobre o conteúdo) e rola na horizontal se a fonte estiver grande. */}
+      <View style={styles.navBar}>
+        <ScrollView horizontal accessibilityRole="tablist" accessibilityLabel="Seções do app" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navBarContent}>
         {(['Hoje', 'Plano', 'Diario', 'Chat', 'Evolucao', 'Perfil'] as NavigationTab[]).map(tab => (
           <TouchableOpacity
             key={tab}
@@ -866,13 +891,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             accessibilityRole="tab"
             aria-selected={currentTab === tab}
             accessibilityState={{ selected: currentTab === tab }}
-            accessibilityLabel={`Aba ${tabLabels[tab]}`}
           >
-            <Text style={[styles.navText, currentTab === tab && styles.navTextActive]}>
+            <Text style={[styles.navText, currentTab === tab && styles.navTextActive]} maxFontSizeMultiplier={t.maxNavFontScale} numberOfLines={1}>
               {tabLabels[tab]}
             </Text>
           </TouchableOpacity>
         ))}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -881,11 +906,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAF7F2', // Sand Premium
+    backgroundColor: t.background, // Sand Premium
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: '#FAF7F2',
+    backgroundColor: t.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -893,7 +918,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 14,
     fontSize: 15,
-    color: '#0F2747',
+    color: t.navy,
     fontWeight: '600',
   },
   syncBanner: {
@@ -905,19 +930,19 @@ const styles = StyleSheet.create({
     borderBottomColor: '#D0E1F2',
   },
   syncBannerOffline: {
-    backgroundColor: '#FEF3F2',
+    backgroundColor: t.errorBg,
     borderBottomColor: '#FECDCA',
   },
   syncText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0F2747',
+    color: t.navy,
   },
   syncTextOffline: {
-    color: '#B42318',
+    color: t.error,
   },
   errorAlert: {
-    backgroundColor: '#FEF3F2',
+    backgroundColor: t.errorBg,
     padding: 12,
     marginHorizontal: 16,
     marginTop: 10,
@@ -930,12 +955,12 @@ const styles = StyleSheet.create({
   },
   errorAlertText: {
     fontSize: 13,
-    color: '#B42318',
+    color: t.error,
     flex: 1,
     fontWeight: '500',
   },
   retryButton: {
-    backgroundColor: '#B42318',
+    backgroundColor: t.error,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
@@ -944,13 +969,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryButtonText: {
-    color: '#FFFFFF',
+    color: t.white,
     fontSize: 12,
     fontWeight: '700',
   },
+  updatedText: {
+    fontSize: 12,
+    color: t.muted,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+  },
+  inlineFeedback: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 14,
+    borderWidth: 1,
+  },
+  inlineFeedbackOk: {
+    color: t.success,
+    backgroundColor: t.successBg,
+    borderColor: t.success,
+  },
+  inlineFeedbackError: {
+    color: t.error,
+    backgroundColor: t.errorBg,
+    borderColor: t.error,
+  },
   scroll: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 32,
   },
   header: {
     marginBottom: 20,
@@ -958,7 +1006,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#0F2747', // Navy Premium
+    color: t.navy, // Navy Premium
   },
   subGreeting: {
     fontSize: 14,
@@ -966,23 +1014,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.white,
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: t.divider,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F2747',
+    color: t.navy,
     marginBottom: 8,
   },
   appointmentDate: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0F2747',
+    color: t.navy,
   },
   appointmentDoctor: {
     fontSize: 13,
@@ -991,12 +1039,12 @@ const styles = StyleSheet.create({
   },
   telehealthLink: {
     fontSize: 13,
-    color: '#027A48',
+    color: t.success,
     fontWeight: '600',
     marginBottom: 10,
   },
   telehealthButton: {
-    backgroundColor: '#027A48',
+    backgroundColor: t.success,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -1006,33 +1054,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   telehealthButtonText: {
-    color: '#FFFFFF',
+    color: t.white,
     fontSize: 13,
     fontWeight: '700',
   },
   waterValue: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#0F2747',
+    color: t.navy,
     marginBottom: 8,
   },
   progressBarBackground: {
     height: 8,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: t.divider,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 12,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#0F2747',
+    backgroundColor: t.navy,
   },
   buttonRow: {
     flexDirection: 'row',
     gap: 10,
   },
   navyButton: {
-    backgroundColor: '#0F2747',
+    backgroundColor: t.navy,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -1040,12 +1088,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navyButtonText: {
-    color: '#FFFFFF',
+    color: t.white,
     fontWeight: '600',
     fontSize: 14,
   },
   copperButton: {
-    backgroundColor: '#E67A3F', // Copper Premium
+    backgroundColor: t.copper, // copper-600: texto branco 5,0:1 (o #E67A3F dava 2,9:1)
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -1054,24 +1102,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   copperButtonText: {
-    color: '#FFFFFF',
+    color: t.white,
     fontWeight: '700',
     fontSize: 14,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F2747',
+    color: t.navy,
     marginBottom: 12,
     marginTop: 8,
   },
   mealCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.white,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: t.divider,
   },
   mealHeader: {
     flexDirection: 'row',
@@ -1081,19 +1129,19 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F2747',
+    color: t.navy,
   },
   mealTime: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#E67A3F',
+    color: t.copper,
   },
   mealItemRow: {
     marginBottom: 6,
   },
   mealItem: {
     fontSize: 14,
-    color: '#1F2937',
+    color: t.ink,
     lineHeight: 20,
   },
   substitutionContainer: {
@@ -1125,7 +1173,7 @@ const styles = StyleSheet.create({
   },
   emptyItemsText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: t.muted,
     fontStyle: 'italic',
     marginBottom: 8,
   },
@@ -1139,7 +1187,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   registerMealButton: {
-    backgroundColor: '#0F2747',
+    backgroundColor: t.navy,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 6,
@@ -1147,10 +1195,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   registerMealButtonDisabled: {
-    backgroundColor: '#94A3B8',
+    backgroundColor: t.muted,
   },
   registerMealText: {
-    color: '#FFFFFF',
+    color: t.white,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1163,24 +1211,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.white,
     borderRadius: 14,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: t.divider,
     marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F2747',
+    color: t.navy,
     marginBottom: 6,
     textAlign: 'center',
   },
   emptyDescription: {
     fontSize: 13,
-    color: '#667085',
+    color: t.muted,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -1189,13 +1237,13 @@ const styles = StyleSheet.create({
   },
   emptyCardText: {
     fontSize: 13,
-    color: '#667085',
+    color: t.muted,
     fontStyle: 'italic',
   },
   diaryStatus: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#027A48',
+    color: t.success,
     marginTop: 6,
   },
   feedbackBox: {
@@ -1214,53 +1262,53 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontSize: 13,
-    color: '#0F2747',
+    color: t.navy,
   },
   metaLabel: {
     fontSize: 12,
-    color: '#667085',
+    color: t.muted,
     marginTop: 4,
     fontStyle: 'italic',
   },
+  // NI2-140 (A3): no fluxo, sem altura fixa; com fonte grande as abas rolam na horizontal.
   navBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 70,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.white,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: t.divider,
+  },
+  navBarContent: {
+    flexGrow: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 10,
+    alignItems: 'stretch',
+    paddingHorizontal: 4,
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 6,
-    minWidth: 44,
-    minHeight: 44,
+    paddingHorizontal: 10,
+    minWidth: t.touch,
+    minHeight: 48,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   navItemActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#E67A3F',
+    borderBottomColor: t.copper,
   },
   navText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#667085',
+    color: t.muted,
   },
   navTextActive: {
-    color: '#0F2747',
+    color: t.navy,
     fontWeight: '700',
   },
 
   // Chat Styles
   chatHeaderCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: t.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1275,7 +1323,7 @@ const styles = StyleSheet.create({
   chatTextInput: {
     flex: 1,
     fontSize: 14,
-    color: '#0F2747',
+    color: t.navy,
     paddingHorizontal: 10,
     paddingVertical: 8,
     maxHeight: 100,

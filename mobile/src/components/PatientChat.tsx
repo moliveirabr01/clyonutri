@@ -175,8 +175,8 @@ export default function PatientChat({ active, draft, setDraft }: { active: boole
       )}
 
       {loadError && (
-        <View style={s.errorBox} accessibilityRole="alert">
-          <Text style={s.errorText}>{loadError}</Text>
+        <View style={s.errorBox}>
+          <Text style={s.errorText} accessibilityRole="alert">{loadError}</Text>
           <TouchableOpacity onPress={() => { setLoading(true); load(false); }} accessibilityRole="button" style={s.linkBtn}><Text style={s.link}>Tentar de novo</Text></TouchableOpacity>
         </View>
       )}
@@ -193,7 +193,7 @@ export default function PatientChat({ active, draft, setDraft }: { active: boole
         {messages.map((m) => {
           const mine = m.sender_type === 'patient';
           return (
-            <View key={m.id} style={[s.bubble, mine ? s.mine : s.theirs]} accessible
+            <View key={m.id} style={[s.bubble, mine ? s.mine : s.theirs]} accessible={!m.attachment}
               accessibilityLabel={`${mine ? 'Você' : professional?.name || 'Nutricionista'}: ${m.message}${m.attachment ? `, anexo ${m.attachment.name}` : ''}. ${when(m.created_at)}${mine ? `, ${STATUS_LABEL[m.status] || 'Enviada'}` : ''}`}>
               {!!m.message && <Text style={mine ? s.textMine : s.text}>{m.message}</Text>}
               {m.attachment && (
@@ -242,7 +242,7 @@ export default function PatientChat({ active, draft, setDraft }: { active: boole
             </View>
           )}
           <TextInput value={draft} onChangeText={setDraft} multiline maxLength={MAX_CHARS + 1} style={s.input}
-            placeholder="Escreva sua mensagem" placeholderTextColor="#6B7280" accessibilityLabel="Mensagem para o nutricionista" />
+            placeholder="Escreva sua mensagem" placeholderTextColor={t.muted} accessibilityLabel="Mensagem para o nutricionista" />
           {tooLong && <Text style={s.errorText} accessibilityRole="alert">A mensagem pode ter até 2.000 caracteres.</Text>}
           <View style={s.row}>
             <TouchableOpacity onPress={pickFile} accessibilityRole="button" accessibilityLabel="Anexar arquivo (PNG, JPG ou PDF, até 10 MB)" style={s.secondaryBtn}>
@@ -288,12 +288,12 @@ const s = StyleSheet.create({
   noticeText: { color: t.ink, fontSize: 13 },
   noticeStrong: { color: '#7C2D12', fontSize: 13, fontWeight: '700', marginTop: 4 },
   readOnly: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: '#FFF7ED', color: '#7C2D12' },
-  input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, padding: 10, minHeight: 64, backgroundColor: t.white, color: t.ink, fontSize: 15 },
+  input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 10, minHeight: 64, backgroundColor: t.white, color: t.ink, fontSize: 15 },
   primaryBtn: { backgroundColor: t.copper, borderRadius: t.buttonRadius, minHeight: 44, paddingHorizontal: 20, justifyContent: 'center', marginLeft: 8 },
   primaryText: { color: t.white, fontWeight: '700' },
-  secondaryBtn: { borderWidth: 1, borderColor: t.border, borderRadius: t.buttonRadius, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center' },
+  secondaryBtn: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.buttonRadius, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center' },
   secondaryText: { color: t.navy, fontWeight: '600' },
-  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: 8, minHeight: 36, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
+  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: 8, minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
   smallBtnText: { color: t.white, fontWeight: '600' },
   disabled: { opacity: 0.5 },
   errorBox: { backgroundColor: '#FEF3F2', padding: 10, borderRadius: 10, marginBottom: 8 },

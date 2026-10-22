@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!-- NI2-140 (M3): idioma e título da versão web do app. O Expo usa este arquivo no lugar do modelo padrão (lang="en"). -->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="theme-color" content="#0F2747" />
+    <title>ClyoNutri · Paciente</title>
+    <!-- Reset recomendado pelo react-native-web: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+      /* NI2-140 (B5): foco visível de teclado em qualquer elemento interativo (WCAG 2.4.7). */
+      :focus-visible {
+        outline: 3px solid #B94F1F;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>
+      Para usar o ClyoNutri no navegador, ative o JavaScript.
+    </noscript>
+    <div id="root"></div>
+  </body>
+</html>

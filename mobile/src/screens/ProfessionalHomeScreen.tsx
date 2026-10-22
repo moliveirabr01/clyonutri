@@ -325,9 +325,12 @@ export default function ProfessionalHomeScreen({
 
             {/* Lista de Atendimentos (MOB-UX-007: distinção entre erro e agenda vazia) */}
             {dashboardError ? (
-              <View style={styles.emptyContainer} accessible={true} accessibilityRole="alert">
-                <Text style={[styles.emptyTitle, { color: '#B42318' }]}>⚠️ Falha ao carregar atendimentos</Text>
-                <Text style={styles.emptyDescription}>{dashboardError}</Text>
+              <View style={styles.emptyContainer}>
+                {/* NI2-140 (A2): só a mensagem é alerta; o botão fica fora do grupo para o leitor de tela alcançá-lo. */}
+                <View accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                  <Text style={[styles.emptyTitle, { color: t.error }]}>Falha ao carregar atendimentos</Text>
+                  <Text style={styles.emptyDescription}>{dashboardError}</Text>
+                </View>
                 <TouchableOpacity
                   style={[styles.retryBtn, { marginTop: 12, minHeight: 44, justifyContent: 'center' }]}
                   onPress={fetchDashboard}
@@ -833,7 +836,7 @@ const styles = StyleSheet.create({
   openFeedbackBtn: { backgroundColor: t.navy, paddingVertical: 10, borderRadius: 8, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
   openFeedbackText: { color: t.white, fontSize: 13, fontWeight: '700' },
   feedbackForm: { marginTop: 8 },
-  feedbackInput: { borderWidth: 1, borderColor: t.border, borderRadius: 8, padding: 10, fontSize: 13, color: t.ink, minHeight: 70, textAlignVertical: 'top', backgroundColor: '#FAFAFA' },
+  feedbackInput: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, padding: 10, fontSize: 13, color: t.ink, minHeight: 70, textAlignVertical: 'top', backgroundColor: '#FAFAFA' },
   formBtnRow: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 8 },
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, minHeight: 44, justifyContent: 'center' },
   cancelBtnText: { color: t.muted, fontSize: 13, fontWeight: '600' },
@@ -843,7 +846,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 6 },
   emptyDescription: { fontSize: 13, color: t.muted, textAlign: 'center', lineHeight: 18 },
   searchContainer: { marginBottom: 12 },
-  searchInput: { backgroundColor: t.white, borderWidth: 1, borderColor: t.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: t.navy },
+  searchInput: { backgroundColor: t.white, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: t.navy },
   paginationRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 14 },
   pageButton: { backgroundColor: t.navy, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   pageButtonText: { color: t.white, fontSize: 13, fontWeight: '700' },
