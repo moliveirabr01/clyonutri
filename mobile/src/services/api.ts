@@ -244,6 +244,38 @@ export interface PatientHomeData {
   active_plan: ActiveMealPlan | null;
 }
 
+/** NI2-92: um registro de água. logged_at em ISO com offset de America/Sao_Paulo. */
+export interface HydrationEntry {
+  id: number;
+  amount_ml: number;
+  logged_at: string;
+  source: 'app' | 'import';
+  editable: boolean;
+  editable_until: string | null;
+  updated_at: string | null;
+}
+export interface HydrationResult extends HydrationEntry {
+  day: string;
+  day_total_ml: number;
+  total_water_today: number;
+  idempotent_replay: boolean;
+  deleted: boolean;
+  already_deleted?: boolean;
+  previous_day?: string;
+}
+export interface HydrationHistoryDay { date: string; total_ml: number; entries_count: number; goal_ml: number | null; goal_reached: boolean | null; entries: HydrationEntry[]; }
+export interface HydrationHistory {
+  timezone: string;
+  today: string;
+  today_total_ml: number;
+  goal_ml: number | null;
+  daily_max_ml: number;
+  edit_window_hours: number;
+  backdate_days: number;
+  days: HydrationHistoryDay[];
+  next_before: string | null;
+}
+
 export interface FoodDiaryEntry {
   id: number;
   patient_id: number;
@@ -459,11 +491,33 @@ export const ApiService = {
     return data;
   },
 
-  async logHydration(amountMl: number): Promise<{ id: number; amount_ml: number; total_water_today: number }> {
-    return request<{ id: number; amount_ml: number; total_water_today: number }>('/api/v1/patient/hydration', {
+  /**
+   * NI2-92: registra água. Passe a MESMA idempotencyKey em todas as tentativas do mesmo toque
+   * (fila offline): o servidor devolve o registro já gravado em vez de duplicar.
+   * loggedAt = quando a paciente bebeu (ISO); sem ele, vale o horário do servidor.
+   */
+  async logHydration(amountMl: number, opts: { idempotencyKey?: string; loggedAt?: string } = {}): Promise<HydrationResult> {
+    const body: Record<string, unknown> = { amount_ml: amountMl };
+    if (opts.loggedAt) body.logged_at = opts.loggedAt;
+    const data = await request<HydrationResult>('/api/v1/patient/hydration', {
       method: 'POST',
-      body: JSON.stringify({ amount_ml: amountMl }),
+      headers: opts.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : undefined,
+      body: JSON.stringify(body),
     });
+    if (typeof data.id !== 'number' || typeof data.total_water_today !== 'number') throw new ApiError('Resposta do registro de água inválida. Tente novamente.', 200, 'invalid');
+    return data;
+  },
+  async getHydrationHistory(before?: string | null, days = 7): Promise<HydrationHistory> {
+    const qs = '?days=' + days + (before ? '&before=' + encodeURIComponent(before) : '');
+    const data = await request<HydrationHistory>('/api/v1/patient/hydration/history' + qs);
+    if (!Array.isArray(data.days)) throw new ApiError('Resposta do histórico de água inválida. Tente novamente.', 200, 'invalid');
+    return data;
+  },
+  async updateHydration(entryId: number, changes: { amount_ml?: number; logged_at?: string }): Promise<HydrationResult> {
+    return request<HydrationResult>(`/api/v1/patient/hydration/${entryId}/update`, { method: 'POST', body: JSON.stringify(changes) });
+  },
+  async deleteHydration(entryId: number): Promise<HydrationResult> {
+    return request<HydrationResult>(`/api/v1/patient/hydration/${entryId}/delete`, { method: 'POST', body: '{}' });
   },
 
   /** NI2-137: o servidor responde 2xx só quando a consulta mudou de fato; qualquer recusa vem como erro com código. */
