@@ -1,0 +1,278 @@
+{
+ "engine": "sqlite",
+ "foods": [
+  {
+   "id": 2,
+   "name": "Arroz, integral, cozido",
+   "energy_kcal": 124,
+   "fiber_g": 2.7,
+   "nutrient_flags": null
+  },
+  {
+   "id": 273,
+   "name": "Óleo, de soja",
+   "energy_kcal": 884,
+   "fiber_g": 0,
+   "nutrient_flags": "protein_g=NA;carbohydrate_g=NA;fiber_g=NA"
+  },
+  {
+   "id": 453,
+   "name": "Leite, condensado",
+   "energy_kcal": 313,
+   "fiber_g": 0,
+   "nutrient_flags": "fiber_g=NA"
+  },
+  {
+   "id": 505,
+   "name": "Mel, de abelha",
+   "energy_kcal": 309,
+   "fiber_g": 0,
+   "nutrient_flags": "fiber_g=NA"
+  },
+  {
+   "id": 595,
+   "name": "Pão de queijo da casa",
+   "energy_kcal": 335,
+   "fiber_g": 0,
+   "nutrient_flags": null
+  }
+ ],
+ "items": [
+  {
+   "input": "0.5 xícara",
+   "error": null,
+   "last_row": {
+    "amount": 0.5,
+    "measure_unit": "xícara",
+    "weight_grams": 75,
+    "weight_is_estimated": 1,
+    "energy_kcal": 93,
+    "protein_g": 1.95,
+    "fiber_g": 2.03
+   }
+  },
+  {
+   "input": "1.5 colher de sopa",
+   "error": null,
+   "last_row": {
+    "amount": 1.5,
+    "measure_unit": "colher de sopa",
+    "weight_grams": 22.5,
+    "weight_is_estimated": 1,
+    "energy_kcal": 27.9,
+    "protein_g": 0.59,
+    "fiber_g": 0.61
+   }
+  },
+  {
+   "input": "15 ml",
+   "error": null,
+   "last_row": {
+    "amount": 15,
+    "measure_unit": "ml",
+    "weight_grams": 15,
+    "weight_is_estimated": 0,
+    "energy_kcal": 132.6,
+    "protein_g": 0,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "15 ml",
+   "error": null,
+   "last_row": {
+    "amount": 15,
+    "measure_unit": "ml",
+    "weight_grams": 15,
+    "weight_is_estimated": 0,
+    "energy_kcal": 46.35,
+    "protein_g": 0,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "2 unidade média",
+   "error": null,
+   "last_row": {
+    "amount": 2,
+    "measure_unit": "unidade média",
+    "weight_grams": 200,
+    "weight_is_estimated": 1,
+    "energy_kcal": 248,
+    "protein_g": 5.2,
+    "fiber_g": 5.4
+   }
+  },
+  {
+   "input": "100 ml",
+   "error": null,
+   "last_row": {
+    "amount": 100,
+    "measure_unit": "ml",
+    "weight_grams": 100,
+    "weight_is_estimated": 0,
+    "energy_kcal": 124,
+    "protein_g": 2.6,
+    "fiber_g": 2.7
+   }
+  },
+  {
+   "input": "1 unidade média",
+   "error": null,
+   "last_row": {
+    "amount": 1,
+    "measure_unit": "unidade média",
+    "weight_grams": 40,
+    "weight_is_estimated": 0,
+    "energy_kcal": 134,
+    "protein_g": 2.04,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "1 unidade",
+   "error": null,
+   "last_row": {
+    "amount": 1,
+    "measure_unit": "unidade",
+    "weight_grams": 100,
+    "weight_is_estimated": 1,
+    "energy_kcal": 335,
+    "protein_g": 5.1,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "2 unidade pequena",
+   "error": null,
+   "last_row": {
+    "amount": 2,
+    "measure_unit": "unidade pequena",
+    "weight_grams": 40,
+    "weight_is_estimated": 0,
+    "energy_kcal": 134,
+    "protein_g": 2.04,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "30 g",
+   "error": null,
+   "last_row": {
+    "amount": 30,
+    "measure_unit": "g",
+    "weight_grams": 30,
+    "weight_is_estimated": 0,
+    "energy_kcal": 93.9,
+    "protein_g": 2.31,
+    "fiber_g": 0
+   }
+  },
+  {
+   "input": "1 pitada",
+   "error": "Erro ao adicionar alimento: Unidade de medida não reconhecida ou inválida: &#039;pitada&#039;. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.          ",
+   "last_row": null
+  },
+  {
+   "input": "2 colheres de sopa",
+   "error": "Erro ao adicionar alimento: Unidade de medida não reconhecida ou inválida: &#039;colheres de sopa&#039;. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.          ",
+   "last_row": null
+  },
+  {
+   "input": "0 g",
+   "error": "Erro ao adicionar alimento: A quantidade prescrita deve ser estritamente maior que zero.          ",
+   "last_row": null
+  },
+  {
+   "input": "-5 g",
+   "error": "Erro ao adicionar alimento: A quantidade prescrita deve ser estritamente maior que zero.          ",
+   "last_row": null
+  },
+  {
+   "input": "abc g",
+   "error": "Erro ao adicionar alimento: A quantidade prescrita deve ser estritamente maior que zero.          ",
+   "last_row": null
+  },
+  {
+   "input": "33.333 g",
+   "error": null,
+   "last_row": {
+    "amount": 33.333,
+    "measure_unit": "g",
+    "weight_grams": 33.33,
+    "weight_is_estimated": 0,
+    "energy_kcal": 41.33,
+    "protein_g": 0.87,
+    "fiber_g": 0.9
+   }
+  }
+ ],
+ "display": [
+  "1 xícara (~75g, peso estimado)",
+  "2 colher de sopa (~23g, peso estimado)",
+  "15 ml (~15g)",
+  "15 ml (~15g)",
+  "2 unidade média (~200g, peso estimado)",
+  "100 ml (~100g)",
+  "1 unidade média (~40g)",
+  "1 unidade (~100g, peso estimado)",
+  "2 unidade pequena (~40g)",
+  "30 g",
+  "33 g"
+ ],
+ "plan_totals": {
+  "daily_energy_kcal": 1410.08,
+  "protein_g": 22.7,
+  "carbohydrate_g": 202.42,
+  "lipid_g": 56.6,
+  "fiber_g": 11.64
+ },
+ "items_sum": {
+  "kcal": 1410.08,
+  "fib": 11.64
+ },
+ "fiber_warning_on_page": false,
+ "recipe": {
+  "post": 302,
+  "id": 23,
+  "row": {
+   "energy_kcal_per_serving": 252.3,
+   "sodium_mg_per_serving": 0,
+   "fiber_g_per_serving": 4.05
+  },
+  "sodium_text": "0,0 mg",
+  "mentions_estimated": false
+ },
+ "unit": {
+  "round_100g": {
+   "amount_input": 100,
+   "unit_input": "g",
+   "weight_grams": 100,
+   "weight_is_estimated": false,
+   "energy_kcal": 0.03,
+   "protein_g": 1.01,
+   "carbohydrate_g": 2.68,
+   "lipid_g": 0,
+   "fiber_g": 0
+  },
+  "three_items_0_005kcal_each": {
+   "total_weight_grams": 3,
+   "energy_kcal": 0.03,
+   "protein_g": 0,
+   "carbohydrate_g": 0,
+   "lipid_g": 0,
+   "fiber_g": 0
+  },
+  "same_input_3x_equal": true,
+  "units": {
+   "pitada": "ERRO: Unidade de medida não reconhecida ou inválida: 'pitada'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.",
+   "colheres de sopa": "ERRO: Unidade de medida não reconhecida ou inválida: 'colheres de sopa'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.",
+   "Xícara de Chá": "150g (estimado)",
+   "XÍCARA": "150g (estimado)",
+   "xicara de chá": "ERRO: Unidade de medida não reconhecida ou inválida: 'xicara de chá'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.",
+   "ml": "1g (exato)",
+   "NaN": "ERRO: Unidade de medida não reconhecida ou inválida: 'NaN'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.",
+   "INF": "ERRO"
+  }
+ }
+}
