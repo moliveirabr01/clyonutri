@@ -1,0 +1,122 @@
+PASS [setup] Login de 3 pacientes e 2 profissionais (clínicas 1 e 2)
+PASS [validação] Corpo vazio → 422 (antes: 500)
+PASS [validação] Requisição sem corpo → 422
+PASS [validação] JSON malformado → 4xx em JSON, sem vazar detalhe
+PASS [validação] meal_name em lista → 422 (antes: 500)
+PASS [validação] meal_name em objeto → 422
+PASS [validação] meal_name vazio → 422
+PASS [validação] meal_name só espaços → 422
+PASS [validação] meal_name 101 caracteres → 422
+PASS [validação] meal_name com caractere de controle → 422
+PASS [validação] meal_name número → 422
+PASS [validação] Nos limites exatos (100/2000/1000, fome 5, saciedade 1) → 201
+PASS [validação] descrição com 2001 → 422
+PASS [validação] sintomas com 1001 → 422
+PASS [validação] descrição em lista → 422
+PASS [validação] fome 0 → 422
+PASS [validação] fome 6 → 422
+PASS [validação] fome "abc" → 422
+PASS [validação] fome 2.5 → 422
+PASS [validação] saciedade 9 → 422
+PASS [validação] Chave de idempotência com 65 caracteres → 422
+PASS [validação] Chave de idempotência que não é texto → 422
+PASS [validação] Nada foi gravado pelas requisições recusadas (só o caso dos limites exatos)
+PASS [horário] consumed_at texto livre → 422
+PASS [horário] consumed_at data inexistente → 422
+PASS [horário] consumed_at antes de 2000 → 422
+PASS [horário] consumed_at ano 0001 → 422
+PASS [horário] consumed_at 10 minutos no futuro → 422
+PASS [horário] consumed_at no ano 2999 → 422
+PASS [horário] consumed_at lista → 422
+PASS [horário] consumed_at número → 422
+PASS [horário] Nenhum horário absurdo foi gravado
+PASS [horário] Até 5 minutos no futuro é tolerado (relógio do celular) → 201
+PASS [horário] timezone que não é IANA → 422
+PASS [horário] Horário local de Manaus (UTC-4) é convertido para o horário da clínica (+1 h) e o fuso fica registrado
+PASS [horário] Horário com Z (UTC) 15:30 vira 12:30 no horário da clínica — o app mostra 12:30, não 15:30
+PASS [horário] Offset na própria data (-04:00) é respeitado e guardado em consumed_tz
+PASS [horário] Horário sem fuso é tratado como horário da clínica (comportamento anterior preservado)
+PASS [horário] Sem consumed_at usa o agora da clínica (±2 min)
+PASS [foto] photo_path vindo do cliente é ignorado: /etc/passwd nunca chega ao banco
+PASS [foto] photo_path com ../ também não é gravado
+PASS [foto] Serviço recusa caminho absoluto, ../, esquema, barra invertida e byte nulo; aceita caminho relativo seguro e /uploads/diary/
+PASS [idempotência] Criação → 201 com os campos públicos e idempotent_replay=false
+PASS [idempotência] Resposta não expõe clinic_id, idempotency_key, request_hash nem photo_path
+PASS [idempotência] Cache-Control: no-store
+PASS [idempotência] Mesma chave e mesmo conteúdo → 200, mesmo id, idempotent_replay=true, sem linha nova
+PASS [idempotência] Chave no corpo também é respeitada (mesmo conteúdo → 200)
+PASS [idempotência] Mesma chave com outra refeição → 409 IDEMPOTENCY_KEY_REUSED
+PASS [idempotência] Mesma chave com outra descrição → 409
+PASS [idempotência] Mesma chave com outro horário → 409
+PASS [idempotência] Mesma chave com outra fome → 409
+PASS [idempotência] Depois dos 409 o registro original continua igual e único
+PASS [idempotência] A mesma chave em outro paciente é independente (201) e não vaza o registro da Ana
+PASS [idempotência] Reenvio sem consumed_at (o "agora" muda) continua sendo o mesmo conteúdo → 200
+PASS [idempotência] Sem chave, duas requisições iguais geram dois registros (comportamento esperado)
+PASS [idempotência] 4 requisições iguais em paralelo → 1 linha, todas 200/201 com o mesmo id
+PASS [idempotência] Em paralelo com conteúdos diferentes: 1 linha, os demais recebem 409 (nunca 500)
+PASS [idempotência] Registro anterior à migração (sem hash): mesmo conteúdo → 200 (comparação campo a campo)
+PASS [idempotência] Registro anterior à migração: conteúdo diferente → 409
+PASS [migração] Sem a migração 53: criação continua funcionando (201)
+PASS [migração] Sem a migração 53: reenvio igual → 200 e diferente → 409
+PASS [migração] Sem a migração 53: GET do paciente e do profissional respondem 200
+PASS [migração] Migração 53 aplicada depois pelo Migrator (idempotente)
+PASS [migração] Registro criado sem a migração continua reconhecido depois dela (hash vazio → comparação por campos)
+PASS [leitura] GET do paciente: 200, no-store, formato {entries,next_cursor,has_more}
+PASS [leitura] Entradas só com campos públicos (sem clinic_id, idempotency_key, photo_path, request_hash) e com consumed_tz
+PASS [leitura] A paciente só vê as próprias entradas
+PASS [leitura] Paciente de outra clínica não vê nada da clínica 1
+PASS [paginação] Sem limit: 30 por página, has_more e next_cursor
+PASS [paginação] limit=1000 é limitado a 100
+PASS [paginação] limit=10 → 10 entradas
+PASS [paginação] Percorrendo o cursor com limit=7: todas as entradas, sem repetir nem pular (inclui horários empatados), em ordem decrescente
+PASS [paginação] limit=0 → 422
+PASS [paginação] limit=abc → 422
+PASS [paginação] cursor inválido → 422
+PASS [paginação] from inválido → 422
+PASS [paginação] to inválido → 422
+PASS [paginação] Filtro from/to por dia (inclusive)
+PASS [profissional] Sem token → 401
+PASS [profissional] Token de paciente na rota do profissional → 401/403
+PASS [profissional] Lista: {diaries,next_cursor,has_more,pending_total} sem patient_email, clinic_id, idempotency_key, photo_path
+PASS [profissional] Itens trazem patient_id e patient_name
+PASS [profissional] Profissional da clínica 1 não vê pacientes da clínica 2
+PASS [profissional] ?patient_id=1 devolve só as entradas da Ana
+PASS [profissional] ?patient_id=2 devolve só as entradas do Bruno (100 por página)
+PASS [profissional] ?patient_id de paciente de outra clínica → 404 (sem revelar que existe)
+PASS [profissional] ?patient_id inexistente → 404
+PASS [profissional] ?patient_id=abc → 422
+PASS [profissional] A clínica 2 vê a Carla
+PASS [profissional] Paginação do profissional percorre todas as entradas da clínica, sem repetir
+PASS [profissional] Contagem de pendentes do dashboard = pending_total da lista = contagem no banco
+PASS [profissional] ?pending=1 devolve só entradas sem feedback
+PASS [auditoria] Leitura do diário pelo profissional gera FOOD_DIARY_VIEWED com usuário e clínica
+PASS [auditoria] O registro da leitura de um paciente identifica o paciente (patient_id) e não copia o conteúdo das refeições
+PASS [feedback] Feedback sem texto → 422 VALIDATION_ERROR
+PASS [feedback] Feedback só com espaços → 422
+PASS [feedback] Feedback em lista → 422
+PASS [feedback] Feedback com 2001 caracteres → 422
+PASS [feedback] O limite conta caracteres, não bytes (2001 "á" → 422)
+PASS [feedback] Nenhuma das recusas gravou feedback
+PASS [feedback] Entrada de outra clínica → 404 e nada gravado
+PASS [feedback] Entrada inexistente → 404
+PASS [feedback] Paciente não pode dar feedback (401/403)
+PASS [feedback] Feedback com exatamente 2000 caracteres → 200 com success, entry_id, feedback, reviewed_at
+PASS [feedback] reviewed_at é gravado no horário da clínica (±2 min do agora local) e igual ao devolvido
+PASS [feedback] Novo feedback na mesma entrada substitui o anterior
+PASS [feedback] A paciente enxerga o comentário do nutricionista
+PASS [auditoria] FOOD_DIARY_FEEDBACK_GIVEN gravado nas duas respostas, com patient_id, tamanho e se substituiu o anterior — sem o texto
+PASS [profissional] Depois do feedback o pendente cai em 1 (dashboard e lista)
+PASS [LGPD] Exportação dos dados da paciente não inclui photo_path, idempotency_key nem request_hash
+PASS [LGPD] Anonimização apaga descrição, sintomas, feedback e foto do diário (mantém nome da refeição, horário e fome/saciedade)
+PASS [LGPD] O diário de outro paciente não é afetado
+PASS [LGPD] Paciente anonimizada some da lista do profissional e da contagem de pendentes
+PASS [LGPD] Dashboard e lista continuam coerentes depois da anonimização
+PASS [LGPD] Token da paciente anonimizada deixa de funcionar
+PASS [limite] 30 registros por minuto passam; o 31º → 429 RATE_LIMITED com Retry-After
+PASS [limite] O registro recusado pelo limite não foi gravado
+PASS [limite] O limite é por paciente: outra paciente não é afetada
+PASS [limite] Leitura (GET) não é limitada
+PASS [limite] Mesmo bloqueado, um erro de limite não vaza detalhe interno
+
+NI2-132 (SQLite): 120 PASS, 0 FAIL

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ClyoNutri — API do paciente",
-    "version": "1.6.0",
-    "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), ainda sem contrato publicado."
+    "version": "1.7.0",
+    "description": "Contrato da API usada pelo app e pelo portal do paciente, conferido contra public/index.php e pelo teste real tests/ni2_89_patient_api_real_test.cjs (NI2-89). Toda rota protegida exige token (Authorization: Bearer <token>) ou, no portal web, o cookie HttpOnly clyonutri_mobile; com cookie, métodos que alteram dados exigem Origin permitida e o cabeçalho X-ClyoNutri-Web: 1 (senão 403). Erros seguem sempre o schema Error. Fora deste documento: agendamento público (docs/contracts/self_service_booking_openapi.yaml) e a API do profissional (/api/v1/professional/*, /api/v1/auth/professional-*), publicada aqui só nas rotas do diário alimentar e do chat (NI2-132, NI2-138); o restante ainda não tem contrato publicado."
   },
   "servers": [
     {
@@ -35,6 +35,9 @@
     },
     {
       "name": "Privacidade"
+    },
+    {
+      "name": "Diário (profissional)"
     }
   ],
   "paths": {
@@ -569,7 +572,7 @@
     },
     "/patient/food-diary": {
       "get": {
-        "summary": "Lista o diário alimentar da paciente",
+        "summary": "Lista o diário alimentar da paciente (paginado, mais recentes primeiro)",
         "operationId": "patientFoodDiary",
         "tags": [
           "Diário"
@@ -582,32 +585,65 @@
             "webSessionCookie": []
           }
         ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "next_cursor da página anterior"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Primeiro dia (inclusive), AAAA-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Último dia (inclusive), AAAA-MM-DD"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "entries": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/FoodDiaryPage"
                 }
               }
             }
           },
           "401": {
             "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
           }
         }
       },
       "post": {
-        "summary": "Registra uma refeição no diário",
+        "summary": "Registra uma refeição no diário (idempotente)",
         "operationId": "patientLogMeal",
         "tags": [
           "Diário"
@@ -621,8 +657,18 @@
           }
         ],
         "responses": {
+          "201": {
+            "description": "Registro criado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDiaryEntry"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK",
+            "description": "Reenvio da mesma chave com o mesmo conteúdo: devolve o registro existente (idempotent_replay=true)",
             "content": {
               "application/json": {
                 "schema": {
@@ -637,8 +683,14 @@
           "403": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/DiaryConflict"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/DiaryRateLimited"
           }
         },
         "requestBody": {
@@ -650,7 +702,18 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ]
       }
     },
     "/patient/evolution": {
@@ -2169,6 +2232,154 @@
           }
         }
       }
+    },
+    "/professional/food-diaries": {
+      "get": {
+        "summary": "Diários dos pacientes da clínica (app do profissional)",
+        "operationId": "professionalFoodDiaries",
+        "tags": [
+          "Diário (profissional)"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filtra um paciente da clínica; paciente de outra clínica ou inexistente → 404"
+          },
+          {
+            "name": "pending",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            },
+            "description": "1 = só entradas sem feedback"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "next_cursor da página anterior"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Primeiro dia (inclusive), AAAA-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Último dia (inclusive), AAAA-MM-DD"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. Cada leitura fica registrada na auditoria (FOOD_DIARY_VIEWED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionalFoodDiaryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/professional/food-diary/{id}/feedback": {
+      "post": {
+        "summary": "Comentário do profissional sobre uma entrada do diário",
+        "operationId": "professionalFoodDiaryFeedback",
+        "tags": [
+          "Diário (profissional)"
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodDiaryFeedbackInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feedback gravado (substitui o anterior, se houver); auditado em FOOD_DIARY_FEEDBACK_GIVEN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDiaryFeedbackResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2281,6 +2492,26 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/ChatError"
+            }
+          }
+        }
+      },
+      "DiaryConflict": {
+        "description": "IDEMPOTENCY_KEY_REUSED: a chave já foi usada com conteúdo diferente",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "DiaryRateLimited": {
+        "description": "RATE_LIMITED: mais de 30 registros por minuto (cabeçalho Retry-After: 60)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
             }
           }
         }
@@ -2565,7 +2796,9 @@
         "properties": {
           "meal_name": {
             "type": "string",
-            "maxLength": 100
+            "maxLength": 100,
+            "minLength": 1,
+            "description": "Texto de 1 a 100 caracteres, sem caracteres de controle."
           },
           "description": {
             "type": "string",
@@ -2573,7 +2806,7 @@
           },
           "consumed_at": {
             "type": "string",
-            "description": "Data/hora; não pode estar mais de 1 dia no futuro. Padrão: agora"
+            "description": "Data/hora da refeição. Aceita ISO 8601 com fuso (2026-10-20T08:10:00-03:00, ...Z) ou sem fuso (tratado como horário da clínica). Rejeitada se anterior a 2000-01-01 ou mais de 5 minutos no futuro. Padrão: agora."
           },
           "hunger_level": {
             "type": "integer",
@@ -2592,13 +2825,18 @@
           "idempotency_key": {
             "type": "string",
             "maxLength": 64,
-            "description": "Repetir a mesma chave devolve o registro já criado"
+            "description": "Também aceita o cabeçalho Idempotency-Key (que prevalece). Mesma chave e mesmo conteúdo devolvem o registro já criado (200); mesma chave com conteúdo diferente devolve 409."
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Fuso IANA do aparelho (ex.: America/Manaus). Se consumed_at vier sem fuso, é interpretado neste fuso; o valor fica em consumed_tz."
           }
         },
         "required": [
           "meal_name"
         ],
-        "description": "photo_path enviado pelo cliente é ignorado nesta rota."
+        "description": "photo_path enviado pelo cliente é ignorado nesta rota. Limite: 30 registros por minuto por paciente (429 com Retry-After)."
       },
       "FoodDiaryEntry": {
         "type": "object",
@@ -2606,14 +2844,22 @@
           "id": {
             "type": "integer"
           },
-          "meal_name": {
-            "type": "string"
-          },
           "patient_id": {
             "type": "integer"
           },
-          "consumed_at": {
+          "meal_name": {
             "type": "string"
+          },
+          "consumed_at": {
+            "type": "string",
+            "description": "AAAA-MM-DD HH:MM:SS no horário da clínica (sem fuso no texto). O app mostra como está, sem converter."
+          },
+          "consumed_tz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fuso informado pelo aparelho (IANA ou deslocamento), se houver."
           },
           "description": {
             "type": [
@@ -2621,10 +2867,43 @@
               "null"
             ]
           },
+          "hunger_level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "satiety_level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symptoms": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "feedback_from_professional": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Horário da clínica nos registros novos; registros antigos foram gravados em UTC."
+          },
           "idempotent_replay": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "true quando a resposta é um reenvio da mesma chave."
           }
-        }
+        },
+        "description": "Não inclui clinic_id, idempotency_key, request_hash nem photo_path."
       },
       "ChatMessages": {
         "type": "object",
@@ -3631,6 +3910,144 @@
           "meal_adherence_pct"
         ],
         "description": "O dia é sempre o do servidor; qualquer outro campo é ignorado."
+      },
+      "FoodDiaryPage": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoodDiaryEntry"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Opaco; enviar em ?cursor= para a próxima página."
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProfessionalFoodDiaryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "patient_id": {
+            "type": "integer"
+          },
+          "patient_name": {
+            "type": "string"
+          },
+          "meal_name": {
+            "type": "string"
+          },
+          "consumed_at": {
+            "type": "string"
+          },
+          "consumed_tz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hunger_level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "satiety_level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "symptoms": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "feedback_from_professional": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Sem patient_email, clinic_id, idempotency_key nem photo_path."
+      },
+      "ProfessionalFoodDiaryPage": {
+        "type": "object",
+        "properties": {
+          "diaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfessionalFoodDiaryItem"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "pending_total": {
+            "type": "integer",
+            "description": "Entradas sem feedback da clínica (ou do paciente filtrado); é o mesmo número do dashboard."
+          }
+        }
+      },
+      "FoodDiaryFeedbackInput": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "feedback"
+        ]
+      },
+      "FoodDiaryFeedbackResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "entry_id": {
+            "type": "integer"
+          },
+          "feedback": {
+            "type": "string"
+          },
+          "reviewed_at": {
+            "type": "string"
+          }
+        }
       }
     }
   }

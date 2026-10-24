@@ -1,0 +1,727 @@
+{
+ "driver": "mysql",
+ "pass": 120,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "setup",
+   "name": "Login de 3 pacientes e 2 profissionais (clínicas 1 e 2)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Corpo vazio → 422 (antes: 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Requisição sem corpo → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "JSON malformado → 4xx em JSON, sem vazar detalhe",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name em lista → 422 (antes: 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name em objeto → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name vazio → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name só espaços → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name 101 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name com caractere de controle → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name número → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Nos limites exatos (100/2000/1000, fome 5, saciedade 1) → 201",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "descrição com 2001 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "sintomas com 1001 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "descrição em lista → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 0 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 6 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome \"abc\" → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 2.5 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "saciedade 9 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Chave de idempotência com 65 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Chave de idempotência que não é texto → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Nada foi gravado pelas requisições recusadas (só o caso dos limites exatos)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at texto livre → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at data inexistente → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at antes de 2000 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at ano 0001 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at 10 minutos no futuro → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at no ano 2999 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at lista → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at número → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Nenhum horário absurdo foi gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Até 5 minutos no futuro é tolerado (relógio do celular) → 201",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "timezone que não é IANA → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Horário local de Manaus (UTC-4) é convertido para o horário da clínica (+1 h) e o fuso fica registrado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Horário com Z (UTC) 15:30 vira 12:30 no horário da clínica — o app mostra 12:30, não 15:30",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Offset na própria data (-04:00) é respeitado e guardado em consumed_tz",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Horário sem fuso é tratado como horário da clínica (comportamento anterior preservado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Sem consumed_at usa o agora da clínica (±2 min)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "foto",
+   "name": "photo_path vindo do cliente é ignorado: /etc/passwd nunca chega ao banco",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "foto",
+   "name": "photo_path com ../ também não é gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "foto",
+   "name": "Serviço recusa caminho absoluto, ../, esquema, barra invertida e byte nulo; aceita caminho relativo seguro e /uploads/diary/",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Criação → 201 com os campos públicos e idempotent_replay=false",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Resposta não expõe clinic_id, idempotency_key, request_hash nem photo_path",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Cache-Control: no-store",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave e mesmo conteúdo → 200, mesmo id, idempotent_replay=true, sem linha nova",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Chave no corpo também é respeitada (mesmo conteúdo → 200)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra refeição → 409 IDEMPOTENCY_KEY_REUSED",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra descrição → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outro horário → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra fome → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Depois dos 409 o registro original continua igual e único",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "A mesma chave em outro paciente é independente (201) e não vaza o registro da Ana",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Reenvio sem consumed_at (o \"agora\" muda) continua sendo o mesmo conteúdo → 200",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Sem chave, duas requisições iguais geram dois registros (comportamento esperado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "4 requisições iguais em paralelo → 1 linha, todas 200/201 com o mesmo id",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Em paralelo com conteúdos diferentes: 1 linha, os demais recebem 409 (nunca 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Registro anterior à migração (sem hash): mesmo conteúdo → 200 (comparação campo a campo)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Registro anterior à migração: conteúdo diferente → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "migração",
+   "name": "Sem a migração 53: criação continua funcionando (201)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "migração",
+   "name": "Sem a migração 53: reenvio igual → 200 e diferente → 409",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "migração",
+   "name": "Sem a migração 53: GET do paciente e do profissional respondem 200",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "migração",
+   "name": "Migração 53 aplicada depois pelo Migrator (idempotente)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "migração",
+   "name": "Registro criado sem a migração continua reconhecido depois dela (hash vazio → comparação por campos)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "GET do paciente: 200, no-store, formato {entries,next_cursor,has_more}",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "Entradas só com campos públicos (sem clinic_id, idempotency_key, photo_path, request_hash) e com consumed_tz",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "A paciente só vê as próprias entradas",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "Paciente de outra clínica não vê nada da clínica 1",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Sem limit: 30 por página, has_more e next_cursor",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "limit=1000 é limitado a 100",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "limit=10 → 10 entradas",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Percorrendo o cursor com limit=7: todas as entradas, sem repetir nem pular (inclui horários empatados), em ordem decrescente",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "limit=0 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "limit=abc → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "cursor inválido → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "from inválido → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "to inválido → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Filtro from/to por dia (inclusive)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Sem token → 401",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Token de paciente na rota do profissional → 401/403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Lista: {diaries,next_cursor,has_more,pending_total} sem patient_email, clinic_id, idempotency_key, photo_path",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Itens trazem patient_id e patient_name",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Profissional da clínica 1 não vê pacientes da clínica 2",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?patient_id=1 devolve só as entradas da Ana",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?patient_id=2 devolve só as entradas do Bruno (100 por página)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?patient_id de paciente de outra clínica → 404 (sem revelar que existe)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?patient_id inexistente → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?patient_id=abc → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "A clínica 2 vê a Carla",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Paginação do profissional percorre todas as entradas da clínica, sem repetir",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Contagem de pendentes do dashboard = pending_total da lista = contagem no banco",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "?pending=1 devolve só entradas sem feedback",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "Leitura do diário pelo profissional gera FOOD_DIARY_VIEWED com usuário e clínica",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "O registro da leitura de um paciente identifica o paciente (patient_id) e não copia o conteúdo das refeições",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Feedback sem texto → 422 VALIDATION_ERROR",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Feedback só com espaços → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Feedback em lista → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Feedback com 2001 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "O limite conta caracteres, não bytes (2001 \"á\" → 422)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Nenhuma das recusas gravou feedback",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Entrada de outra clínica → 404 e nada gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Entrada inexistente → 404",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Paciente não pode dar feedback (401/403)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Feedback com exatamente 2000 caracteres → 200 com success, entry_id, feedback, reviewed_at",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "reviewed_at é gravado no horário da clínica (±2 min do agora local) e igual ao devolvido",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "Novo feedback na mesma entrada substitui o anterior",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "feedback",
+   "name": "A paciente enxerga o comentário do nutricionista",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "FOOD_DIARY_FEEDBACK_GIVEN gravado nas duas respostas, com patient_id, tamanho e se substituiu o anterior — sem o texto",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "profissional",
+   "name": "Depois do feedback o pendente cai em 1 (dashboard e lista)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "Exportação dos dados da paciente não inclui photo_path, idempotency_key nem request_hash",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "Anonimização apaga descrição, sintomas, feedback e foto do diário (mantém nome da refeição, horário e fome/saciedade)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "O diário de outro paciente não é afetado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "Paciente anonimizada some da lista do profissional e da contagem de pendentes",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "Dashboard e lista continuam coerentes depois da anonimização",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "LGPD",
+   "name": "Token da paciente anonimizada deixa de funcionar",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "limite",
+   "name": "30 registros por minuto passam; o 31º → 429 RATE_LIMITED com Retry-After",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "limite",
+   "name": "O registro recusado pelo limite não foi gravado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "limite",
+   "name": "O limite é por paciente: outra paciente não é afetada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "limite",
+   "name": "Leitura (GET) não é limitada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "limite",
+   "name": "Mesmo bloqueado, um erro de limite não vaza detalhe interno",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}
