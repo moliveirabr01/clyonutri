@@ -209,7 +209,8 @@ $mailer->sent = [];
 $svc->drain();
 $e = ev($db, $cA, 'checkin.reminder', $ana)[0];
 $push = $calls[0]['payload'][0] ?? [];
-$mail = $mailer->sent[0] ?? null;
+// O banco de teste é compartilhado na suíte: o drain também entrega avisos pendentes de outros testes; procura o e-mail desta fixture.
+$mail = array_values(array_filter($mailer->sent, fn($m) => $m->subject === 'Lembrete de check-in'))[0] ?? null;
 $all = json_encode([$e, $push, $mail ? [$mail->subject, $mail->textBody, $mail->htmlBody] : null], JSON_UNESCAPED_UNICODE);
 check('C5', 'Lembrete com texto neutro', $e['title'] === 'Lembrete de check-in' && $e['body'] === 'Quando puder, registre seu check-in de hoje no app ClyoNutri. Leva menos de um minuto.' && $e['link'] === '/');
 check('C5', 'Push sai com texto curto e categoria checkin (o app abre em Hoje)', ($push['body'] ?? '') === 'Quando puder, registre seu check-in de hoje no app.' && ($push['data']['category'] ?? '') === 'checkin'
