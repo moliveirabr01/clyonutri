@@ -11,6 +11,8 @@ final class PatientAppController
 {
     public function index(array $params = []): void
     {
+        // O formulário carrega um token CSRF ligado à sessão: página em cache traria token vencido.
+        header('Cache-Control: no-store');
         $db = Connection::getInstance();
         $code = trim((string)($_GET['code'] ?? ''));
         $preview = null;
