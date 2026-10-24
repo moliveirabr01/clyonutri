@@ -100,7 +100,7 @@ class MealPlanService
                         $itemOrder = 1;
                         foreach ($m['items'] as $item) {
                             $foodId = (int)$item['food_id'];
-                            $amount = (float)$item['amount'];
+                            $amount = self::normalizeAmount($item['amount']);
                             $unit = $item['measure_unit'] ?? 'g';
                             $itemNotes = $item['notes'] ?? null;
 
@@ -110,7 +110,7 @@ class MealPlanService
                             $food = $fStmt->fetch();
                             if (!$food) throw new InvalidArgumentException('Alimento não disponível neste catálogo.');
 
-                            $calc = $this->portionNutrition($food, $amount, $unit, $foodId);
+                            $calc = $this->portionNutrition($food, $amount, $unit, $foodId, !empty($item['confirm_estimated']));
 
                             $iStmt = $this->db->prepare("
                                 INSERT INTO meal_plan_items (
@@ -136,7 +136,7 @@ class MealPlanService
                             if (!empty($item['substitutions'])) {
                                 foreach ($item['substitutions'] as $sub) {
                                     $subFoodId = (int)$sub['food_id'];
-                                    $subAmount = (float)$sub['amount'];
+                                    $subAmount = self::normalizeAmount($sub['amount']);
                                     $subUnit = $sub['measure_unit'] ?? 'g';
                                     $subNotes = $sub['notes'] ?? null;
 
@@ -145,7 +145,7 @@ class MealPlanService
                                     $subFood = $sfStmt->fetch();
                                     if (!$subFood) throw new InvalidArgumentException('Substituição não disponível neste catálogo.');
 
-                                    $sCalc = $this->portionNutrition($subFood, $subAmount, $subUnit, $subFoodId);
+                                    $sCalc = $this->portionNutrition($subFood, $subAmount, $subUnit, $subFoodId, !empty($sub['confirm_estimated']));
 
                                     $sStmt = $this->db->prepare("
                                         INSERT INTO meal_plan_substitutions (
@@ -309,23 +309,25 @@ class MealPlanService
         int $foodId,
         float $amount,
         string $measureUnit = 'g',
-        ?string $notes = null
+        ?string $notes = null,
+        bool $confirmEstimated = false
     ): int {
-        if (!is_finite($amount) || $amount <= 0) {
+        $amount = self::normalizeAmount($amount);
+        if ($amount <= 0) {
             throw new InvalidArgumentException("A quantidade prescrita deve ser estritamente maior que zero.");
         }
 
         $meal = $this->findMealWithTenantCheck($mealId);
         $planId = (int)$meal['meal_plan_id'];
 
-        return $this->inDraftTransaction($planId, function () use ($mealId, $planId, $foodId, $amount, $measureUnit, $notes): int {
+        return $this->inDraftTransaction($planId, function () use ($mealId, $planId, $foodId, $amount, $measureUnit, $notes, $confirmEstimated): int {
             $food = $this->findCatalogFood($foodId);
             if (!$food) {
                 throw new InvalidArgumentException("Alimento com ID {$foodId} não encontrado no catálogo.");
             }
 
             // Macronutrientes proporcionais (100g ou medida caseira) e peso em gramas persistido
-            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId);
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId, $confirmEstimated);
 
             $oStmt = $this->db->prepare("SELECT COALESCE(MAX(ordering), 0) + 1 FROM meal_plan_items WHERE meal_id = :meal_id");
             $oStmt->execute(['meal_id' => $mealId]);
@@ -368,9 +370,11 @@ class MealPlanService
         string $measureUnit = 'g',
         ?string $notes = null,
         ?string $expectedRevision = null,
-        ?int $expectedPlanId = null
+        ?int $expectedPlanId = null,
+        bool $confirmEstimated = false
     ): bool {
-        if (!is_finite($amount) || $amount <= 0) {
+        $amount = self::normalizeAmount($amount);
+        if ($amount <= 0) {
             throw new InvalidArgumentException("A quantidade prescrita deve ser maior que zero.");
         }
 
@@ -392,7 +396,7 @@ class MealPlanService
                 throw new InvalidArgumentException("Alimento associado não encontrado.");
             }
 
-            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, (int)$item['food_id']);
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, (int)$item['food_id'], $confirmEstimated);
 
             $stmt = $this->db->prepare("
                 UPDATE meal_plan_items
@@ -456,9 +460,11 @@ class MealPlanService
         int $foodId,
         float $amount,
         string $measureUnit = 'g',
-        ?string $notes = null
+        ?string $notes = null,
+        bool $confirmEstimated = false
     ): int {
-        if (!is_finite($amount) || $amount <= 0) {
+        $amount = self::normalizeAmount($amount);
+        if ($amount <= 0) {
             throw new InvalidArgumentException("A quantidade da substituição deve ser estritamente maior que zero.");
         }
 
@@ -466,14 +472,14 @@ class MealPlanService
         $meal = $this->findMealWithTenantCheck((int)$item['meal_id']);
         $planId = (int)$meal['meal_plan_id'];
 
-        return $this->inDraftTransaction($planId, function () use ($itemId, $foodId, $amount, $measureUnit, $notes): int {
+        return $this->inDraftTransaction($planId, function () use ($itemId, $foodId, $amount, $measureUnit, $notes, $confirmEstimated): int {
             $food = $this->findCatalogFood($foodId);
             if (!$food) {
                 throw new InvalidArgumentException("Alimento de substituição com ID {$foodId} não encontrado.");
             }
 
             // Macros da substituição para consulta e comparação de equivalência
-            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId);
+            $nutrition = $this->portionNutrition($food, $amount, $measureUnit, $foodId, $confirmEstimated);
 
             $stmt = $this->db->prepare("
                 INSERT INTO meal_plan_substitutions (
@@ -562,7 +568,7 @@ class MealPlanService
 
         foreach ($meals as &$meal) {
             $iStmt = $this->db->prepare("
-                SELECT i.*, f.name AS food_name, f.category AS food_category, f.allergens
+                SELECT i.*, f.name AS food_name, f.category AS food_category, f.allergens, f.nutrient_flags AS food_nutrient_flags
                 FROM meal_plan_items i
                 JOIN foods f ON f.id = i.food_id
                 WHERE i.meal_id = :meal_id
@@ -885,6 +891,7 @@ class MealPlanService
                         'amount' => (float)$s['amount'],
                         'measure_unit' => $s['measure_unit'],
                         'notes' => $s['notes'],
+                        'confirm_estimated' => true, // NI2-74: já aceito no plano de origem
                     ];
                 }
 
@@ -893,6 +900,7 @@ class MealPlanService
                     'amount' => (float)$it['amount'],
                     'measure_unit' => $it['measure_unit'],
                     'notes' => $it['notes'],
+                    'confirm_estimated' => true, // NI2-74: já aceito no plano de origem
                     'substitutions' => $clonedSubs,
                 ];
             }
@@ -1029,13 +1037,23 @@ class MealPlanService
     /**
      * Calcula energia/macros e o peso em gramas de uma porção, com validação de faixa.
      */
-    private function portionNutrition(array $food, float $amount, string $unit, int $foodId): array
+    private function portionNutrition(array $food, float $amount, string $unit, int $foodId, bool $confirmEstimated = false): array
     {
-        $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId);
+        $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId, $confirmEstimated);
         if (!is_finite((float)$calc['weight_grams']) || (float)$calc['weight_grams'] > self::MAX_PORTION_GRAMS) {
             throw new InvalidArgumentException('Quantidade acima do limite de 5 kg por alimento. Confira o valor digitado.');
         }
         return $calc;
+    }
+
+    /**
+     * NI2-74: quantidade com 2 casas antes de calcular e gravar (o MySQL guarda DECIMAL(…,2)); assim o valor gravado
+     * e o usado no cálculo são o mesmo e um recálculo futuro dá o mesmo resultado.
+     */
+    public static function normalizeAmount(mixed $amount): float
+    {
+        $v = is_numeric($amount) ? (float)$amount : NAN;
+        return is_finite($v) ? round($v, 2) : -1.0;
     }
 
     /** Colunas nutricionais + peso persistidos em meal_plan_items / meal_plan_substitutions. */

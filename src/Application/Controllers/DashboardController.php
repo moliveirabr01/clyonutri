@@ -3615,29 +3615,52 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Dashboard de Totais Nutricionais Consolidados -->
+        <?php
+          // NI2-74: nutrientes sem análise na TACO (NA, *, em branco) entram como zero; o total avisa quais alimentos faltam.
+          $unknownByNutrient = [];
+          foreach ($plan['meals'] ?? [] as $um) {
+              foreach ($um['items'] ?? [] as $ui) {
+                  foreach (\ClyoNutri\Domain\Nutrition\NutritionCalculator::unknownNutrients($ui['food_nutrient_flags'] ?? null) as $un) {
+                      $unknownByNutrient[$un][$ui['food_name']] = true;
+                  }
+              }
+          }
+          $unknownNote = static function (string $n) use ($unknownByNutrient): string {
+              if (empty($unknownByNutrient[$n])) return '';
+              $names = array_keys($unknownByNutrient[$n]);
+              return '<div data-testid="unknown-' . $n . '" style="font-size: 0.75rem; color: #92400e; margin-top: 4px;" title="' . htmlspecialchars(implode(', ', $names), ENT_QUOTES) . '">Incompleto: ' . count($names) . (count($names) === 1 ? ' alimento sem análise' : ' alimentos sem análise') . '</div>';
+          };
+        ?>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px;">
           <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #3b82f6;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Energia Diária</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">kcal</span></div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">kcal</span></div><?= $unknownNote('energy_kcal') ?>
           </div>
           <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #10b981;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Carboidratos</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('carbohydrate_g') ?>
           </div>
           <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #ef4444;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Proteínas</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('protein_g') ?>
           </div>
           <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #f59e0b;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Lipídeos</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('lipid_g') ?>
           </div>
           <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #8b5cf6;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Fibras</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['fiber_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['fiber_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('fiber_g') ?>
           </div>
         </div>
 
+        <?php if ($unknownByNutrient): ?>
+          <div role="note" data-testid="unknown-nutrients" style="background: #fffbeb; color: #78350f; padding: 10px 14px; border-radius: 8px; margin: -12px 0 20px; border: 1px solid #fde68a; font-size: 0.85rem;">
+            <strong>Totais incompletos:</strong> a TACO não traz análise de
+            <?= htmlspecialchars(implode('; ', array_map(static fn($n, $foods) => ['energy_kcal' => 'energia', 'protein_g' => 'proteína', 'carbohydrate_g' => 'carboidratos', 'lipid_g' => 'lipídios', 'fiber_g' => 'fibra'][$n] . ' para ' . implode(', ', array_keys($foods)), array_keys($unknownByNutrient), $unknownByNutrient))) ?>.
+            Esses valores entram como zero.
+          </div>
+        <?php endif; ?>
         <?php if (!empty($plan['notes'])): ?>
           <div class="card" style="padding: 16px; margin-bottom: 24px; background: #f8fafc;">
             <strong style="color: var(--brand-navy-900); font-size: 0.9rem;">Orientações Gerais do Plano:</strong>
@@ -3711,7 +3734,7 @@ class DashboardController
                             <?php endif; ?>
                           </td>
                           <td style="padding: 12px 20px; font-weight: 600; color: #334155; width: 20%;">
-                            <?= number_format((float)$it['amount'], 0, ',', '.') ?> <?= htmlspecialchars($it['measure_unit']) ?>
+                            <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($it['amount']) ?> <?= htmlspecialchars($it['measure_unit']) ?>
                             <?php
                               $itUnit = trim((string)$it['measure_unit']);
                               $itIsG = (bool)preg_match('/^(g|gramas?)$/i', $itUnit);
@@ -3751,14 +3774,15 @@ class DashboardController
                         <tr><td colspan="4" style="padding: var(--space-3) var(--space-4);">
                           <details data-testid="edit-plan-item-<?= (int)$it['id'] ?>">
                             <summary style="cursor: pointer; color: var(--brand-navy-900); font-weight: 600;">Editar porção e orientação</summary>
-                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" data-busy-text="Salvando…">
+                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" data-busy-text="Salvando…" data-unit-scope data-food-id="<?= (int)$it['food_id'] ?>">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
                               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);">
-                                <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="number" min="0.001" step="any" required value="<?= htmlspecialchars((string)$it['amount'], ENT_QUOTES) ?>"></div>
+                                <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="number" min="0.01" step="0.01" required value="<?= htmlspecialchars((string)(float)$it['amount'], ENT_QUOTES) ?>"></div>
                                 <div class="form-group"><label class="form-label" for="item-unit-<?= (int)$it['id'] ?>">Unidade ou medida caseira</label><input class="form-control" id="item-unit-<?= (int)$it['id'] ?>" name="measure_unit" required value="<?= htmlspecialchars($it['measure_unit'], ENT_QUOTES) ?>"></div>
                               </div>
                               <div class="form-group"><label class="form-label" for="item-notes-<?= (int)$it['id'] ?>">Orientação</label><textarea class="form-control" id="item-notes-<?= (int)$it['id'] ?>" name="notes"><?= htmlspecialchars($it['notes'] ?? '', ENT_QUOTES) ?></textarea></div>
+                              <?= UnitCheckView::block('item-confirm-' . (int)$it['id']) ?>
                               <button type="submit" class="btn btn-primary">Salvar alterações</button>
                               <button type="button" class="btn btn-secondary" data-reset-close-details>Cancelar</button>
                             </form>
@@ -3780,7 +3804,7 @@ class DashboardController
                                 <?php endif; ?>
                               </td>
                               <td style="padding: 8px 20px; font-size: 0.85rem; color: #44403c;">
-                                <?= number_format((float)$sub['amount'], 0, ',', '.') ?> <?= htmlspecialchars($sub['measure_unit']) ?>
+                                <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($sub['amount']) ?> <?= htmlspecialchars($sub['measure_unit']) ?>
                                 <?php
                                   $subUnit = trim((string)$sub['measure_unit']);
                                   $subIsG = (bool)preg_match('/^(g|gramas?)$/i', $subUnit);
@@ -3878,7 +3902,7 @@ class DashboardController
           <div class="cn-dialog__panel food-dialog-panel">
             <h2 id="modal-add-item-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar alimento</h2>
             <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
-            <form method="POST" action="/planos/<?= $planId ?>/itens">
+            <form method="POST" action="/planos/<?= $planId ?>/itens" data-unit-scope>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
               <div style="margin-bottom: 16px;">
@@ -3900,21 +3924,16 @@ class DashboardController
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
                   <label for="dc22-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade *</label>
-                  <input id="dc22-amount" type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <input id="dc22-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                 </div>
                 <div>
                   <label for="dc23-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
                   <select id="dc23-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                    <option value="g">g (gramas)</option>
-                    <option value="ml">ml (mililitros)</option>
-                    <option value="colher de sopa">colher de sopa</option>
-                    <option value="colher de sobremesa">colher de sobremesa</option>
-                    <option value="unidade média">unidade média</option>
-                    <option value="xícara">xícara</option>
-                    <option value="fatia">fatia</option>
+                    <?= UnitCheckView::unitOptions() ?>
                   </select>
                 </div>
               </div>
+              <?= UnitCheckView::block('item-confirm-estimated') ?>
               <div style="margin-bottom: 20px;">
                 <label for="dc24-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Observação / Orientação do Item</label>
                 <input id="dc24-notes" type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
@@ -3932,7 +3951,7 @@ class DashboardController
           <div class="cn-dialog__panel food-dialog-panel">
             <h2 id="modal-add-sub-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar substituição</h2>
             <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
-            <form method="POST" action="/planos/<?= $planId ?>/substituicoes">
+            <form method="POST" action="/planos/<?= $planId ?>/substituicoes" data-unit-scope>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="item_id" id="add-sub-item-id" value="">
               <div style="margin-bottom: 16px;">
@@ -3954,21 +3973,16 @@ class DashboardController
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                 <div>
                   <label for="dc25-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade Equivalente *</label>
-                  <input id="dc25-amount" type="number" step="0.1" min="0.1" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <input id="dc25-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
                 </div>
                 <div>
                   <label for="dc26-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
                   <select id="dc26-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                    <option value="g">g (gramas)</option>
-                    <option value="ml">ml (mililitros)</option>
-                    <option value="colher de sopa">colher de sopa</option>
-                    <option value="colher de sobremesa">colher de sobremesa</option>
-                    <option value="unidade média">unidade média</option>
-                    <option value="xícara">xícara</option>
-                    <option value="fatia">fatia</option>
+                    <?= UnitCheckView::unitOptions() ?>
                   </select>
                 </div>
               </div>
+              <?= UnitCheckView::block('sub-confirm-estimated') ?>
               <div style="margin-bottom: 20px;">
                 <label for="dc27-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientação da Substituição</label>
                 <input id="dc27-notes" type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
@@ -4025,6 +4039,7 @@ class DashboardController
         </div>
 
         <script src="/assets/js/food-picker.js" defer></script>
+        <script src="/assets/js/unit-check.js" defer></script>
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
@@ -4133,7 +4148,7 @@ class DashboardController
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $service->addItem($mealId, $foodId, $amount, $unit, $notes);
+            $service->addItem($mealId, $foodId, $amount, $unit, $notes, !empty($_POST['confirm_estimated']));
             $_SESSION['feedback_message'] = "Alimento adicionado e totais nutricionais recalculados!";
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $e->getMessage();
@@ -4188,7 +4203,7 @@ class DashboardController
             }
             if (!is_numeric($_POST['amount']) || $_POST['revision'] === '') throw new \InvalidArgumentException('Informe uma quantidade válida e recarregue o formulário.');
             (new MealPlanService($db))->updateItem((int)($params['itemId'] ?? 0),
-                (float)$_POST['amount'], trim($_POST['measure_unit']), trim($_POST['notes']), $_POST['revision'], $planId);
+                (float)$_POST['amount'], trim($_POST['measure_unit']), trim($_POST['notes']), $_POST['revision'], $planId, !empty($_POST['confirm_estimated']));
             $_SESSION['feedback_message'] = 'Item atualizado e totais nutricionais recalculados. As substituições foram preservadas.';
         } catch (\InvalidArgumentException | \DomainException $e) {
             $_SESSION['error_message'] = $e->getMessage();
@@ -4239,7 +4254,7 @@ class DashboardController
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $service->addSubstitution($itemId, $foodId, $amount, $unit, $notes);
+            $service->addSubstitution($itemId, $foodId, $amount, $unit, $notes, !empty($_POST['confirm_estimated']));
             $_SESSION['feedback_message'] = "Opção de substituição cadastrada com sucesso!";
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro ao cadastrar substituição: " . $e->getMessage();

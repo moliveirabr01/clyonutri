@@ -235,7 +235,7 @@ $planInseguro = $mealPlanService->createPlan($patientId, $profId, 'Plano com Ale
         'name' => 'Lanche da Tarde',
         'time_of_day' => '16:00',
         'items' => [
-            ['food_id' => (int)$leite['id'], 'amount' => 200, 'measure_unit' => 'ml'],
+            ['food_id' => (int)$leite['id'], 'amount' => 200, 'measure_unit' => 'ml', 'confirm_estimated' => true], // NI2-74: ml sem medida cadastrada exige confirmação
         ],
     ],
 ]);

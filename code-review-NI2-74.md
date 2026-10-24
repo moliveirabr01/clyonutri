@@ -102,3 +102,36 @@ aceite), mas o campo livre da edição convida a esse tipo de escrita.
 | Unidades e arredondamento documentados | **FAIL** (M3) |
 | Precisão/arredondamento testados | **FAIL** (M4) |
 | Produção HostGator | NOT TESTED |
+
+## Status das correções (24/10/2026)
+
+Decisão da usuária: medida sem peso cadastrado para o alimento **só é aceita se a nutricionista confirmar**.
+
+| Achado | Status | O que mudou |
+|---|---|---|
+| A1 quantidade arredondada | **Corrigido** | Plano mostra a quantidade como digitada (`QuantityFormatter`: "0,5 xícara"); receita idem. |
+| A2 porção do alimento | **Corrigido** | Nova regra 3 do conversor: `serving_unit`/`serving_size_g` do alimento (pão de queijo: 1 unidade = 40 g, exato). |
+| A3 unidade incompatível | **Corrigido** | Peso só da tabela padrão (inclusive ml) exige confirmação; sem ela, erro explícito (`UnitConfirmationRequiredException`) com alimento, peso padrão e medidas exatas. Na tela, `unit-check.js` mostra o peso e torna a caixa "Confirmo o peso estimado" obrigatória (plano: item, edição, substituição; receita: cada ingrediente). Seletor ganhou o grupo "Medidas deste alimento". |
+| M1 sódio / peso estimado na receita | **Corrigido** | Sódio "Não disponível no catálogo"; ingrediente e resumo avisam peso estimado. |
+| M2 nutrientes NA | **Corrigido** | `unknown_nutrients` no cálculo; plano e receita mostram "Totais/Valores incompletos" com os alimentos. |
+| M3 documentação | **Corrigido** | `docs/clinical/CONVERSAO_DE_PORCOES_NI2-74.md` (regras, tabela, precisão, erros); o teste falha se a tabela divergir do código. |
+| M4 testes | **Corrigido** | `ni2_74_portion_conversion_test.php` (38), `ni2_74_portion_real_test.cjs` (30, SQLite e MySQL), `ni2_74_unit_check_browser_test.cjs` (16). |
+| B1 seletor de unidade | **Corrigido** | + colher de chá e unidade; medidas do alimento entram no seletor. |
+| B2 precisão gravada | **Corrigido** | Quantidade arredondada em 2 casas antes de calcular e gravar (`MealPlanService::normalizeAmount`). |
+| B3 arredondamento duplo | Documentado | Regra mantida e descrita no documento. |
+| B4 plural/acento | **Corrigido** | Unidade comparada sem acento, sem maiúsculas e no singular. |
+
+Planos duplicados, modelos aplicados e receitas duplicadas/reeditadas sem trocar ingredientes herdam a confirmação da
+origem (o item continua marcado como estimado). O rascunho automático usa "1 unidade" de banana só se o alimento tiver a
+unidade cadastrada; senão 100 g. Nova rota `GET /catalogo/alimentos/{id}/conversao` (só nutricionista ativa; alimento de
+outra clínica → 404; coberta pelo teste de rotas da NI2-24 e pelo auditor de acesso cruzado).
+
+### Provas (`docs/evidencias/ni2-74/correcoes/`)
+- Antes (código 89bd009 com os testes novos): HTTP MySQL **5 PASS / 13 FAIL**; navegador **0 / 1**; teste de conversão
+  interrompido por erro ("Unidades Pequenas" não reconhecida).
+- Depois: conversão **38/38**; HTTP **30/30 SQLite** e **30/30 MySQL 8**; navegador **16/16** (axe sem violações,
+  390 px sem rolagem); NI2-24 **11/11** (112 ataques, rota nova coberta); NI2-73 43/43, receitas 16/16, seletor 9/9.
+- Testes antigos ajustados à regra nova (agora confirmam o peso estimado): `clinical_safety_and_precision_test.php`,
+  `meal_plan_and_prescription_lifecycle_test.php`, `ni2_9_code_review_regression_test.php` (o ovo "2 unidade" passa a
+  100 g pela porção do alimento, não 200 g), `ni2_310_real_http_test.cjs` (parte HTTP; a captura de tela desse teste usa
+  um Chrome com headless antigo e é BLOCKED neste ambiente, igual no código antigo).

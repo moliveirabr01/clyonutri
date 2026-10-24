@@ -40,6 +40,7 @@
       button.setAttribute('aria-label', food.name + ', ' + originOf(food) + ', ' + meta.textContent + ', ' + energy.textContent + ', ' + portion.textContent);
       button.addEventListener('click', () => {
         select.value = String(food.id); validate(); render();
+        select.dispatchEvent(new Event('change', { bubbles: true })); // NI2-74: unit-check.js confere a unidade do alimento
         chosen.textContent = 'Selecionado: ' + food.name + ' (' + refOf(food) + ')'; chosen.hidden = false;
       });
       return button;

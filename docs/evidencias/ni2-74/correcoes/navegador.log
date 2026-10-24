@@ -1,0 +1,18 @@
+PASS Arroz + xícara: aviso com o peso padrão (150 g) e caixa "Confirmo o peso estimado" visível e obrigatória
+PASS Sem marcar, o formulário não envia
+PASS Marcando a caixa: item salvo com 0,5 xícara = 75 g estimados
+PASS Plano mostra "0,5 xícara (~75g, peso estimado)"
+PASS Seletor ganha o grupo "Medidas deste alimento" com as medidas cadastradas
+PASS "2 unidade pequena" mostra "= 40 g (medida cadastrada para o alimento)" e não pede confirmação
+PASS Salvo com 40 g exatos
+PASS Editar item com xícara: aviso e confirmação aparecem já ao abrir
+PASS Trocando para "80 g" o aviso some e a confirmação deixa de ser exigida
+PASS Receita: ingrediente com xícara pede confirmação (aviso do servidor com o alimento e 150 g por xícara)
+PASS Receita: em gramas a confirmação some e deixa de ser exigida
+PASS Receita: sem marcar a confirmação o formulário não envia
+PASS Receita salva; a página avisa "Peso estimado" e mostra sódio "Não disponível no catálogo"
+PASS Diálogo com o aviso de peso estimado sem violações WCAG 2 A/AA (axe)
+PASS Plano no celular (390 px) sem rolagem horizontal
+PASS Sem erro de script
+
+NI2-74 conferência de unidade (navegador): 16 PASS, 0 FAIL

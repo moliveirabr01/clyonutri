@@ -1,0 +1,32 @@
+PASS [incompatível] Sem confirmação, "0,5 xícara" de arroz cozido não é salva e a tela explica (alimento, unidade, 150 g, medida cadastrada ou confirmar)
+PASS [incompatível] "100 ml" de arroz cozido não vira 100 g exatos: pede confirmação citando a densidade
+PASS [incompatível] Óleo em ml sem medida cadastrada também pede confirmação
+PASS [incompatível] Unidade desconhecida continua recusada mesmo com a caixa marcada
+PASS [confirmação] Com "Confirmo o peso estimado": 0,5 xícara salva como 75 g estimados, 93 kcal
+PASS [porção do alimento] "1 unidade" de pão de queijo usa a porção cadastrada (40 g, 134 kcal), sem pedir confirmação
+PASS [porção do alimento] "3 unidades pequenas" (plural) casa com a medida cadastrada "unidade pequena" = 60 g
+PASS [precisão] 33,333 g gravado como 33,33 e calculado com 33,33 (41,33 kcal) nos dois bancos
+PASS [exibição] Quantidade como prescrita: "0,5 xícara (~75g, peso estimado)" (antes: "1 xícara")
+PASS [exibição] "33,33 g" e "1 unidade (~40g)" sem arredondar para inteiro nem marcar estimado
+PASS [incompleto] Totais avisam fibra sem análise do leite condensado ("Totais incompletos")
+PASS [precisão] Total do plano = soma dos itens (2 casas)
+PASS [exibição] Impressão mostra "0,5 xícara (~75g, peso estimado)"
+PASS [edição] Editar item com medida genérica sem confirmar: nada muda e a tela explica
+PASS [edição] Com confirmação a edição grava 1 xícara = 150 g estimados
+PASS [substituição] Substituição com "colher de sopa" sem confirmação é recusada com explicação
+PASS [substituição] Com confirmação a substituição entra (30 g estimados)
+PASS [duplicação] Duplicar o plano copia os itens já confirmados, ainda marcados como estimados
+PASS [conferência] Conversão: arroz + xícara → precisa confirmar, 300 g, mensagem igual à do servidor
+PASS [conferência] Conversão: pão de queijo + unidade → 80 g exatos; lista as medidas do alimento
+PASS [conferência] Conversão: unidade desconhecida → ok=false com a mensagem; fibra sem análise informada
+PASS [conferência] Alimento de outra clínica → 404 sem dados
+PASS [conferência] Recepção → 403
+PASS [conferência] Sem login → 401
+PASS [conferência] Id inválido → 404/422 (sem 500)
+PASS [receita] Receita com "xícara" sem confirmação não é salva; erro cita o ingrediente 1 e o peso padrão
+PASS [receita] Com confirmação a receita é salva: (300 g arroz + 30 g leite condensado) ÷ 2 = 232,95 kcal por porção
+PASS [receita] Página da receita: "peso estimado" no ingrediente e no aviso; sódio "Não disponível no catálogo" (antes "0,0 mg")
+PASS [receita] Página da receita avisa fibra sem análise (leite condensado)
+PASS [receita] Quantidade do ingrediente como digitada ("2 xícara", "30 g")
+
+NI2-74 (MySQL): 30 PASS, 0 FAIL

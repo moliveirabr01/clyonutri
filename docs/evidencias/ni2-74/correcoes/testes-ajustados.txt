@@ -1,0 +1,4 @@
+clinical_safety_and_precision_test rc=0
+meal_plan_and_prescription_lifecycle_test rc=0
+ni2_9_code_review_regression_test rc=0
+ni2_310_real_http_test: 29 verificações HTTP sem falha antes da captura de tela; captura BLOCKED: Old Headless mode has been removed

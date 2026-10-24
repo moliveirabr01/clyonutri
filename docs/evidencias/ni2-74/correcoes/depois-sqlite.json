@@ -1,0 +1,187 @@
+{
+ "driver": "sqlite",
+ "pass": 30,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "incompatível",
+   "name": "Sem confirmação, \"0,5 xícara\" de arroz cozido não é salva e a tela explica (alimento, unidade, 150 g, medida cadastrada ou confirmar)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "incompatível",
+   "name": "\"100 ml\" de arroz cozido não vira 100 g exatos: pede confirmação citando a densidade",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "incompatível",
+   "name": "Óleo em ml sem medida cadastrada também pede confirmação",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "incompatível",
+   "name": "Unidade desconhecida continua recusada mesmo com a caixa marcada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "confirmação",
+   "name": "Com \"Confirmo o peso estimado\": 0,5 xícara salva como 75 g estimados, 93 kcal",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "porção do alimento",
+   "name": "\"1 unidade\" de pão de queijo usa a porção cadastrada (40 g, 134 kcal), sem pedir confirmação",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "porção do alimento",
+   "name": "\"3 unidades pequenas\" (plural) casa com a medida cadastrada \"unidade pequena\" = 60 g",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "precisão",
+   "name": "33,333 g gravado como 33,33 e calculado com 33,33 (41,33 kcal) nos dois bancos",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "exibição",
+   "name": "Quantidade como prescrita: \"0,5 xícara (~75g, peso estimado)\" (antes: \"1 xícara\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "exibição",
+   "name": "\"33,33 g\" e \"1 unidade (~40g)\" sem arredondar para inteiro nem marcar estimado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "incompleto",
+   "name": "Totais avisam fibra sem análise do leite condensado (\"Totais incompletos\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "precisão",
+   "name": "Total do plano = soma dos itens (2 casas)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "exibição",
+   "name": "Impressão mostra \"0,5 xícara (~75g, peso estimado)\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "edição",
+   "name": "Editar item com medida genérica sem confirmar: nada muda e a tela explica",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "edição",
+   "name": "Com confirmação a edição grava 1 xícara = 150 g estimados",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "substituição",
+   "name": "Substituição com \"colher de sopa\" sem confirmação é recusada com explicação",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "substituição",
+   "name": "Com confirmação a substituição entra (30 g estimados)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "duplicação",
+   "name": "Duplicar o plano copia os itens já confirmados, ainda marcados como estimados",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Conversão: arroz + xícara → precisa confirmar, 300 g, mensagem igual à do servidor",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Conversão: pão de queijo + unidade → 80 g exatos; lista as medidas do alimento",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Conversão: unidade desconhecida → ok=false com a mensagem; fibra sem análise informada",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Alimento de outra clínica → 404 sem dados",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Recepção → 403",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Sem login → 401",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "conferência",
+   "name": "Id inválido → 404/422 (sem 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "receita",
+   "name": "Receita com \"xícara\" sem confirmação não é salva; erro cita o ingrediente 1 e o peso padrão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "receita",
+   "name": "Com confirmação a receita é salva: (300 g arroz + 30 g leite condensado) ÷ 2 = 232,95 kcal por porção",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "receita",
+   "name": "Página da receita: \"peso estimado\" no ingrediente e no aviso; sódio \"Não disponível no catálogo\" (antes \"0,0 mg\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "receita",
+   "name": "Página da receita avisa fibra sem análise (leite condensado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "receita",
+   "name": "Quantidade do ingrediente como digitada (\"2 xícara\", \"30 g\")",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

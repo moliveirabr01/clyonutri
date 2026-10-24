@@ -79,7 +79,7 @@ const EXCLUDED = {
       ['GET', `/pacientes/${P}`], ['GET', `/pacientes/${P}/anamnese`], ['GET', `/pacientes/${P}/antropometria`], ['GET', `/pacientes/${MIX}/antropometria/comparar?a=${ids.assessment}&b=${ids.assessment}`],
       ['GET', `/pacientes/${P}/antropometria/dobras`], ['GET', `/pacientes/${P}/editar`], ['GET', `/pacientes/${P}/pre-consulta`], ['GET', `/pacientes/${MIX}/pre-consulta/${ids.questionnaire}`],
       ['GET', `/pacientes/${P}/prontuario`], ['GET', `/pacientes/${P}/prontuario/exportar`], ['GET', `/pacientes/${P}/prontuario/imprimir`], ['GET', `/pacientes/${P}/resumo-prescricao`],
-      ['GET', `/planos/${ids.plan}`], ['GET', `/planos/${ids.plan}/imprimir`], ['GET', `/receitas/${ids.recipe}`], ['GET', `/receitas/${ids.recipe}/editar`], ['GET', `/receitas/${ids.recipe}/prescrever`],
+      ['GET', `/planos/${ids.plan}`], ['GET', `/planos/${ids.plan}/imprimir`], ['GET', `/receitas/${ids.recipe}`], ['GET', `/catalogo/alimentos/${ids.food_custom}/conversao?amount=1&unit=g`], ['GET', `/receitas/${ids.recipe}/editar`], ['GET', `/receitas/${ids.recipe}/prescrever`],
       ['GET', `/chat/${ids.conversation}`], ['GET', `/chat/${ids.conversation}/poll`], ['GET', `/chat/anexo/${ids.attachment}`], ['GET', `/suporte/chamado/${ids.ticket}`], ['GET', '/ajuda/chamado/SUP-C1-9070'],
       ['GET', `/ajuda/anexo/${ids.ticket_attachment}`], ['GET', `/teleconsulta/${ids.tele_session}/atendimento`], ['GET', `/teleconsulta/${ids.tele_session}/estado`], ['GET', `/teleconsulta/${ids.tele_session}/rascunho`],
       ['GET', `/teleconsulta/sessao-agenda/${ids.appointment_tele}`],

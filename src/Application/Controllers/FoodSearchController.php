@@ -29,6 +29,53 @@ final class FoodSearchController
         } catch (\Throwable $e) { http_response_code(503); echo json_encode(['error'=>'Não foi possível carregar o catálogo. Tente novamente.']); }
     }
 
+    /**
+     * NI2-74: como a quantidade + unidade vira gramas para este alimento (a mesma regra do servidor ao salvar).
+     * GET /catalogo/alimentos/{id}/conversao?amount=1&unit=xícara → peso, origem, se precisa de confirmação e a
+     * mensagem; também lista as medidas exatas do alimento para o seletor de unidade.
+     */
+    public function conversion(array $params = []): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        $id = (string)($params['id'] ?? '');
+        $amountRaw = $_GET['amount'] ?? '1';
+        $unit = $_GET['unit'] ?? 'g';
+        if (!ctype_digit($id) || !is_string($amountRaw) || !is_string($unit) || mb_strlen($unit) > 60) {
+            http_response_code(422); echo json_encode(['error' => 'Informe alimento, quantidade e unidade válidos.']); return;
+        }
+        try {
+            $db = Connection::getInstance();
+            if (!self::hasCatalogAccess($db)) { http_response_code(403); echo json_encode(['error' => 'Acesso ao catálogo não autorizado.']); return; }
+            $st = $db->prepare('SELECT id, name, serving_unit, serving_size_g, nutrient_flags FROM foods WHERE id = :id AND (clinic_id IS NULL OR clinic_id = :cid)');
+            $st->execute(['id' => (int)$id, 'cid' => TenantContext::getClinicId()]);
+            $food = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$food) { http_response_code(404); echo json_encode(['error' => 'Alimento não encontrado.']); return; }
+            $conv = new \ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter($db);
+            $out = ['food_id' => (int)$food['id'], 'measures' => $conv->exactMeasuresForFood((int)$food['id'], $food),
+                'unknown_nutrients' => \ClyoNutri\Domain\Nutrition\NutritionCalculator::unknownNutrients($food['nutrient_flags'] ?? null)];
+            $amount = \ClyoNutri\Domain\MealPlan\MealPlanService::normalizeAmount($amountRaw);
+            try {
+                $c = $conv->convertDetailed($amount, $unit, (int)$food['id'], $food, false);
+                $out += ['ok' => true, 'needs_confirmation' => false, 'grams' => round($c['grams'], 2), 'source' => $c['source'], 'grams_per_unit' => $c['grams_per_unit'], 'message' => null];
+            } catch (\ClyoNutri\Domain\Nutrition\UnitConfirmationRequiredException $e) {
+                $out += ['ok' => true, 'needs_confirmation' => true, 'grams' => round($e->conversion['grams'], 2), 'source' => $e->conversion['source'], 'grams_per_unit' => $e->conversion['grams_per_unit'], 'message' => $e->getMessage()];
+            } catch (\InvalidArgumentException $e) {
+                $out += ['ok' => false, 'needs_confirmation' => false, 'grams' => null, 'source' => null, 'grams_per_unit' => null, 'message' => $e->getMessage()];
+            }
+            echo json_encode($out, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            http_response_code(503); echo json_encode(['error' => 'Não foi possível conferir a unidade. Tente novamente.']);
+        }
+    }
+
+    private static function hasCatalogAccess(\PDO $db): bool
+    {
+        $access = $db->prepare("SELECT 1 FROM users u JOIN clinic_members cm ON cm.user_id=u.id WHERE u.id=? AND cm.clinic_id=? AND u.role='nutritionist' AND u.status='active' AND cm.status='active' AND cm.role IN ('owner','admin','nutritionist')");
+        $access->execute([TenantContext::getUserId(), TenantContext::getClinicId()]);
+        return (bool)$access->fetchColumn();
+    }
+
     /** @return array<int, list<array{name:string, grams:float}>> medidas caseiras cadastradas (até 3 por alimento) */
     private static function measures(\PDO $db, array $ids): array
     {

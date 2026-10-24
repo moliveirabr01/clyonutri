@@ -127,7 +127,7 @@ const CHECKIN_KEYS = ['checkin_date', 'energy_level', 'hunger_level', 'id', 'mea
     const salt = sql('SELECT metric_date, salt FROM analytics_daily_salts');
     check('privacidade', 'Um sal aleatório por dia (64 hex), diferente da APP_KEY', salt.length === 1 && /^[0-9a-f]{64}$/.test(salt[0].salt) && salt[0].salt !== APP_KEY, salt.length);
     const dump = JSON.stringify(sql('SELECT * FROM analytics_daily_metrics')) + JSON.stringify(sql('SELECT * FROM analytics_daily_subjects'));
-    check('privacidade', 'Nenhum nome, e-mail, observação ou volume nas tabelas de métricas', !/Ana|Fict|example\.test|Jantar|250|300/.test(dump));
+    check('privacidade', 'Nenhum nome, e-mail, observação ou volume nas tabelas de métricas', !/Ana|Fict|example\.test|Jantar|[":](250|300)(\.0+)?["},]/.test(dump)); // volume como valor de campo (o hash hexadecimal pode conter "250" por acaso)
 
     // ------------------------------------------------------------------ Falha da coleta não quebra a paciente; chave de desligar
     fx('break-analytics');

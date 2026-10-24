@@ -386,6 +386,7 @@ $router->post('/pre-consulta/verificar', [$preconsCtrl, 'patientVerify']);
 $router->post('/pre-consulta/salvar', [$preconsCtrl, 'patientSave']);
 $router->get('/pre-consulta/{token}', [$preconsCtrl, 'patientLink']);
 $router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'search']));
+$router->get('/catalogo/alimentos/{id}/conversao', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'conversion']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
 $router->post('/agenda', $requireAuth([$dashCtrl, 'saveAppointment']));

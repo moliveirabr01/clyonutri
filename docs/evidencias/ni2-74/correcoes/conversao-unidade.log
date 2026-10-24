@@ -1,0 +1,45 @@
+== Regras de conversão (ordem documentada)
+PASS Massa é exata: 250 g = 250 g
+PASS kg e mg: 0,2 kg = 200 g; 500 mg = 0,5 g
+PASS Medida cadastrada do alimento vence a tabela: 2 colheres de sopa de arroz = 50 g (não 30 g), exata
+PASS Porção do próprio alimento: 1 unidade de pão de queijo = 40 g (antes: 100 g genéricos), exata
+PASS Escrita livre no plural/maiúsculas casa com a medida cadastrada: 3 "Unidades Pequenas" = 60 g
+PASS "Colheres de Sopa" é reconhecida (pede confirmação, não diz "não reconhecida")
+PASS "xicara de chá" é reconhecida (pede confirmação, não diz "não reconhecida")
+PASS "XÍCARA" é reconhecida (pede confirmação, não diz "não reconhecida")
+PASS "xícaras" é reconhecida (pede confirmação, não diz "não reconhecida")
+PASS "colher sopa" é reconhecida (pede confirmação, não diz "não reconhecida")
+== Incompatibilidade: peso genérico só com confirmação
+PASS Sem confirmação: erro explícito (UnitConfirmationRequiredException) com alimento, unidade, peso padrão e medidas exatas
+PASS A exceção diz o peso que seria usado (150 g)
+PASS Com confirmação: 1 xícara = 150 g, marcada como estimada, 186 kcal
+PASS ml deixa de ser "exato": óleo em ml sem medida cadastrada pede confirmação e cita a densidade
+PASS 100 ml de arroz cozido não vira 100 g sem confirmação
+PASS Unidade desconhecida continua erro mesmo com confirmação ("não reconhecida")
+PASS Quantidade inválida (0) → erro
+PASS Quantidade inválida (-1) → erro
+PASS Quantidade inválida (NAN) → erro
+PASS Quantidade inválida (INF) → erro
+PASS Unidade vazia → erro explícito
+== Precisão e arredondamento
+PASS Meio para cima nas bordas de ponto flutuante: 1,005 → 1,01; 2,675 → 2,68; 0,125 → 0,13; 1,0049 → 1,0
+PASS 33,33 g de arroz: 41,33 kcal; 0,87 g proteína; 0,9 g fibra (2 casas)
+PASS Determinístico: 5 execuções iguais
+PASS Total = soma dos itens arredondados (3 × 0,01 = 0,03; documentado)
+PASS Ordem dos itens não muda o total
+PASS Quantidade guardada com 2 casas antes do cálculo: 33,333 → 33,33; 0,125 → 0,13; "abc" → inválida
+PASS Tela mostra a quantidade como digitada: 0,5 · 1,5 · 2 · 33,33 · 0,13
+== Nutrientes sem análise (NA, *, em branco)
+PASS Leite condensado: fibra NA entra como 0 e vem em unknown_nutrients
+PASS Óleo: NA de proteína/carboidrato/fibra listados; "Tr" (traços) de lipídio não
+PASS Total do conjunto junta os nutrientes incompletos
+== Documentação igual ao código
+PASS Tabela de unidades do documento = tabela do código (15 unidades)
+PASS Documento explica: Precisão e arredondamento
+PASS Documento explica: meio para cima
+PASS Documento explica: Confirmo o peso estimado
+PASS Documento explica: densidade da água
+PASS Documento explica: Nutrientes sem análise
+PASS Documento explica: sódio
+
+NI2-74 (conversão): 38 PASS, 0 FAIL

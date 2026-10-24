@@ -335,7 +335,7 @@ assertTest($hasClonedSubs, "Substituições vinculadas clonadas com precisão");
 
 // 5.3 Modificar o novo rascunho sem alterar o plano publicado original
 $firstMealNewDraft = $newTree['meals'][0]['id'];
-$service->addItem($firstMealNewDraft, 8106, 200.0, 'ml', 'Leite desnatado adicionado ao novo rascunho');
+$service->addItem($firstMealNewDraft, 8106, 200.0, 'ml', 'Leite desnatado adicionado ao novo rascunho', true); // NI2-74: peso estimado confirmado
 
 $newTreeModified = $service->getPlanWithDetails($newDraftId);
 $origPlanPostCheck = $service->getPlanWithDetails($planId);

@@ -1,0 +1,19 @@
+ni2_89_patient_api_real_test rc=0 NI2-89: 50 PASS, 0 FAIL
+ni2_91_privacy_real_test rc=0 NI2-91 (SQLite): 34 PASS, 0 FAIL
+ni2_135_evolution_real_test rc=0 NI2-135 (SQLite): 52 PASS, 0 FAIL
+ni2_135_internal_notes_real_test rc=0 NI2-135 anotações internas: 9 PASS, 0 FAIL
+ni2_135_app_web_real_test rc=0 NI2-135 app (web): 14 PASS, 0 FAIL
+ni2_137_patient_next_appointment_actions_real_test rc=0 NI2-137 (SQLite): 85 PASS, 0 FAIL
+ni2_137_app_web_real_test rc=0 NI2-137 app (web): 31 PASS, 0 FAIL
+ni2_138_secure_chat_real_test rc=0 NI2-138 (SQLite): 71 PASS, 0 FAIL
+ni2_138_app_web_real_test rc=0 NI2-138 app (web): 23 PASS, 0 FAIL
+ni2_433_self_service_booking_real_test rc=0 NI2-433 (SQLite): 70 verificações PASS
+ni2_412_ux01_ux02_real_test rc=0 NI2-412 UX-01/UX-02 (atual): 36/36 PASS
+ni2_412_ux03_ux13_real_test rc=0 NI2-412 UX-03..UX-13: 124 PASS, 0 FAIL, 1 BLOCKED
+ni2_298_real_http_test rc=0 23/23 checks passed
+ni2_437_real_http_test rc=0 NI2-437 E2E: 48 verificações PASS
+ni2_96_adherence_analytics_real_test rc=1 NI2-96 (SQLite): 41 PASS, 1 FAIL
+ni2_96_app_web_real_test rc=0 NI2-96 app e painel (web): 15 PASS, 0 FAIL
+ni2_281_real_http_test rc=1 
+ni2_73_food_search_real_test rc=0 NI2-73 (SQLite): 43 PASS, 0 FAIL
+ni2_96_adherence_analytics_real_test: a falha acima vinha do próprio teste (procurava "250" dentro de hashes hexadecimais aleatórios). Teste corrigido; 3 execuções seguidas: 42 PASS, 0 FAIL. ni2_281 falha igual antes (pré-existente).

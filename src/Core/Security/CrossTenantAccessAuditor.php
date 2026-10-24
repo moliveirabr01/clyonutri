@@ -90,6 +90,7 @@ final class CrossTenantAccessAuditor
         ['#^/api/v1/patient/reschedule-requests/(\d+)/#', ['appointment_change_requests']],
         ['#^/api/v1/patient/chat/attachment/(\d+)#', ['chat_attachments']],
         ['#^/api/v1/patient/recipes/(\d+)#', ['recipes']],
+        ['#^/catalogo/alimentos/(\d+)/#', ['foods']],
     ];
 
     /** Campos de formulário/JSON/query com id de recurso clínico. */

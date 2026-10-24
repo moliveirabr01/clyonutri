@@ -75,6 +75,16 @@ class TemplateService
         }
 
         $structure = json_decode($tmpl['payload_json'], true) ?: [];
+        // NI2-74: medidas do modelo já foram aceitas por quem o criou; o peso estimado continua marcado no item
+        // (aparece no plano e no aviso antes de publicar).
+        foreach ($structure['meals'] ?? [] as $mi => $meal) {
+            foreach ($meal['items'] ?? [] as $ii => $item) {
+                $structure['meals'][$mi]['items'][$ii]['confirm_estimated'] = true;
+                foreach ($item['substitutions'] ?? [] as $si => $_) {
+                    $structure['meals'][$mi]['items'][$ii]['substitutions'][$si]['confirm_estimated'] = true;
+                }
+            }
+        }
         $mealPlanService = new MealPlanService($this->db);
 
         return $mealPlanService->createPlan(

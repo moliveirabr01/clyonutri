@@ -55,12 +55,19 @@ class MealPlanDraftAssistant
         $banana = $foodsByName['banana prata crua'] ?? next($filtered);
         $aveia = $foodsByName['aveia em flocos'] ?? next($filtered);
 
+        $bananaPortion = ['food_id' => $banana['id'], 'amount' => 100, 'measure_unit' => 'g'];
+        foreach ((new \ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter($this->db))->exactMeasuresForFood((int)$banana['id'], $banana) as $m) {
+            if (\ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter::normalizeUnit($m['name']) === 'unidade') {
+                $bananaPortion = ['food_id' => $banana['id'], 'amount' => 1, 'measure_unit' => $m['name']];
+            }
+        }
+
         $mealsStructure = [
             [
                 'name' => 'Café da Manhã',
                 'time_of_day' => '07:30',
                 'items' => [
-                    ['food_id' => $banana['id'], 'amount' => 1, 'measure_unit' => 'unidade'], // 1 banana (antes: 100 unidades = 10 kg)
+                    $bananaPortion, // 1 banana se o alimento tem a unidade cadastrada; senão 100 g (NI2-74: sem peso genérico)
                     ['food_id' => $aveia['id'], 'amount' => 30, 'measure_unit' => 'g'],
                 ],
             ],

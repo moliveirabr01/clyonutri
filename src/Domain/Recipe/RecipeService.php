@@ -330,7 +330,8 @@ class RecipeService
         if ($ingredients === null) {
             $iStmt = $this->db->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY ordering ASC, id ASC");
             $iStmt->execute([$recipeId]);
-            $ingredients = $iStmt->fetchAll();
+            // NI2-74: ingredientes já gravados foram aceitos na versão anterior
+            $ingredients = array_map(static fn($r) => $r + ['confirm_estimated' => true], $iStmt->fetchAll());
         }
 
         $nutritionTotals = $this->calculateIngredientsNutrition($ingredients, $clinicId ?? (TenantContext::hasClinic() ? TenantContext::getClinicId() : null));
@@ -528,7 +529,8 @@ class RecipeService
         // Ingredientes com informações do catálogo oficial foods
         $iStmt = $this->db->prepare("
             SELECT ri.*, f.name AS food_name, f.category AS food_category, f.source AS food_source,
-                   f.energy_kcal AS base_kcal, f.protein_g AS base_protein, f.carbohydrate_g AS base_carbs, f.lipid_g AS base_fat
+                   f.energy_kcal AS base_kcal, f.protein_g AS base_protein, f.carbohydrate_g AS base_carbs, f.lipid_g AS base_fat,
+                   f.serving_unit AS food_serving_unit, f.serving_size_g AS food_serving_size_g, f.nutrient_flags AS food_nutrient_flags
             FROM recipe_ingredients ri
             JOIN foods f ON f.id = ri.food_id
             WHERE ri.recipe_id = :id
@@ -536,6 +538,18 @@ class RecipeService
         ");
         $iStmt->execute(['id' => $recipeId]);
         $ingredients = $iStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        // NI2-74: peso estimado (medida sem peso cadastrado para o alimento) e nutrientes sem análise, para a tela avisar
+        $conv = $this->calculator->converter();
+        foreach ($ingredients as &$ingRow) {
+            try {
+                $ingRow['weight_is_estimated'] = $conv->convertDetailed((float)$ingRow['amount'], (string)$ingRow['measure_unit'], (int)$ingRow['food_id'],
+                    ['name' => $ingRow['food_name'], 'serving_unit' => $ingRow['food_serving_unit'], 'serving_size_g' => $ingRow['food_serving_size_g']], true)['estimated'];
+            } catch (\InvalidArgumentException) {
+                $ingRow['weight_is_estimated'] = true;
+            }
+            $ingRow['unknown_nutrients'] = \ClyoNutri\Domain\Nutrition\NutritionCalculator::unknownNutrients($ingRow['food_nutrient_flags'] ?? null);
+        }
+        unset($ingRow);
 
         // Passos ordenados
         $sStmt = $this->db->prepare("SELECT * FROM recipe_steps WHERE recipe_id = :id ORDER BY step_number ASC");
@@ -742,6 +756,7 @@ class RecipeService
                     'amount' => $ing['amount'],
                     'measure_unit' => $ing['measure_unit'],
                     'notes' => $ing['notes'],
+                    'confirm_estimated' => true, // NI2-74: já aceito na receita de origem
                 ];
             }
         }
@@ -1166,7 +1181,7 @@ class RecipeService
         $totalFib = 0.0;
         $totalSodium = 0.0;
 
-        foreach ($ingredients as &$ing) {
+        foreach ($ingredients as $idx => &$ing) {
             $foodId = (int)$ing['food_id'];
             $amount = (float)($ing['amount'] ?? $ing['quantity'] ?? 0);
             $unit = trim((string)($ing['measure_unit'] ?? $ing['unit'] ?? 'g'));
@@ -1179,7 +1194,12 @@ class RecipeService
                 throw new InvalidArgumentException("Alimento ID #{$foodId} não encontrado no catálogo nutricional oficial.");
             }
 
-            $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId);
+            // NI2-74: medida sem peso cadastrado para o alimento só com confirmação da nutricionista (por ingrediente)
+            try {
+                $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId, !empty($ing['confirm_estimated']));
+            } catch (\ClyoNutri\Domain\Nutrition\UnitConfirmationRequiredException $e) {
+                throw new \ClyoNutri\Domain\Nutrition\UnitConfirmationRequiredException('Ingrediente ' . ($idx + 1) . ': ' . $e->getMessage(), $e->conversion);
+            }
             $calc['food_name'] = $food['name'];
 
             $ing['_calc'] = $calc;

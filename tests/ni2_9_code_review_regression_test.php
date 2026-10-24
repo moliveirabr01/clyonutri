@@ -153,8 +153,12 @@ $pW = (int)$svc->createPlan($pid, 951, 'Plano pesos', null)['plan_id'];
 $mW = $svc->addMeal($pW, 'Café', '08:00');
 $iEgg = $svc->addItem($mW, $egg, 2, 'unidade');
 $iRice = $svc->addItem($mW, 9952, 120, 'g');
+// NI2-74: medida genérica só com confirmação; "unidade" do ovo usa a porção cadastrada do alimento (1 unidade = 50 g)
+check(throws(fn() => $svc->addItem($mW, 9952, 1, 'xícara')), 'NI2-74 xícara de arroz sem confirmação é recusada');
+$iCup = $svc->addItem($mW, 9952, 1, 'xícara', null, true);
 $row = fn(int $id) => $db->query("SELECT weight_grams, weight_is_estimated FROM meal_plan_items WHERE id = {$id}")->fetch(PDO::FETCH_ASSOC);
-check((float)$row($iEgg)['weight_grams'] === 200.0 && (int)$row($iEgg)['weight_is_estimated'] === 1, 'A3/M3 "2 unidade" de ovo grava 200 g e marca peso estimado');
+check((float)$row($iEgg)['weight_grams'] === 100.0 && (int)$row($iEgg)['weight_is_estimated'] === 0, 'A3 + NI2-74 "2 unidade" de ovo grava 100 g pela porção do alimento (1 unidade = 50 g), exato');
+check((float)$row($iCup)['weight_grams'] === 150.0 && (int)$row($iCup)['weight_is_estimated'] === 1, 'M3 + NI2-74 "1 xícara" confirmada grava 150 g e marca peso estimado');
 check((float)$row($iRice)['weight_grams'] === 120.0 && (int)$row($iRice)['weight_is_estimated'] === 0, 'A3 item em gramas grava o peso exato');
 $preview = $svc->getPlanPreview($pW);
 check(count($preview['estimated_weights']) === 1, 'M3 prévia lista os itens com peso estimado');
@@ -162,7 +166,8 @@ $src = (string)file_get_contents(__DIR__ . '/../src/Domain/MealPlan/MealPlanServ
 check(!str_contains($src, 'measure_grams_equivalent') && !str_contains($src, "'%' ||"), 'A3 subconsulta aproximada com || removida');
 $print = (new ClyoNutri\Domain\MealPlan\MealPlanPrintService($db))->build($pW, 951, true);
 $qty = $print['meals'][0]['items'][0]['quantity'] ?? '';
-check(str_contains($qty, '~200g, peso estimado'), "A3 impressão mostra o peso gravado: '{$qty}'");
+$qtyCup = $print['meals'][0]['items'][2]['quantity'] ?? '';
+check($qty === '2 unidade (~100g)' && str_contains($qtyCup, '~150g, peso estimado'), "A3 impressão mostra o peso gravado: '{$qty}' / '{$qtyCup}'");
 
 // ---------- B1: quantidade finita e ≤ 5 kg ----------
 check(throws(fn() => $svc->addItem($mW, 9952, INF, 'g')), 'B1 quantidade infinita recusada');

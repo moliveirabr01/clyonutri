@@ -1,0 +1,11 @@
+PASS Busca por termos no seletor: "arroz integral" traz "Arroz, integral, cozido" e "…cru"
+PASS Cada resultado mostra origem (Catálogo TACO e nº TACO) e a porção ("valores por 100 g" quando não há medida)
+PASS Alimento da clínica com medidas caseiras: "Porção: 1 unidade = 40 g · 1 unidade pequena = 20 g…"
+PASS Contagem honesta com paginação: "Mostrando 25 de N alimentos"
+PASS "Carregar mais" acrescenta a página 2 (50 de N)
+PASS Escolha por teclado (seta + Enter) seleciona o primeiro resultado
+PASS Sem resultado: orienta a tentar outro nome ou menos palavras
+PASS Diálogo de busca sem violações WCAG 2 A/AA (axe)
+PASS Sem erro de script
+
+NI2-73 seletor (navegador): 9 PASS, 0 FAIL

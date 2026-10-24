@@ -59,3 +59,5 @@
 | **NI2-159** | Calculadora por 100g e medidas caseiras | `NutritionCalculator` e `HouseholdMeasureConverter` | `NutritionCalculator.php`, `HouseholdMeasureConverter.php` |
 | **NI2-160** | Publicação transacional de planos | Snapshots imutáveis em `meal_plan_versions` | `MealPlanService.php` |
 | **NI2-161** | Prevenção de simulações e alergênicos | `AllergenSafetyValidator`, limpeza de IA mock | `AllergenSafetyValidator.php`, `ConsultationSummaryAssistant.php` |
+
+> **NI2-74:** regras completas de unidades, confirmação de peso estimado, precisão e arredondamento em [CONVERSAO_DE_PORCOES_NI2-74.md](CONVERSAO_DE_PORCOES_NI2-74.md).

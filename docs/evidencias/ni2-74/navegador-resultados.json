@@ -1,0 +1,68 @@
+{
+ "checks": [
+  {
+   "n": "Arroz + xícara: aviso com o peso padrão (150 g) e caixa \"Confirmo o peso estimado\" visível e obrigatória",
+   "ok": true
+  },
+  {
+   "n": "Sem marcar, o formulário não envia",
+   "ok": true
+  },
+  {
+   "n": "Marcando a caixa: item salvo com 0,5 xícara = 75 g estimados",
+   "ok": true
+  },
+  {
+   "n": "Plano mostra \"0,5 xícara (~75g, peso estimado)\"",
+   "ok": true
+  },
+  {
+   "n": "Seletor ganha o grupo \"Medidas deste alimento\" com as medidas cadastradas",
+   "ok": true
+  },
+  {
+   "n": "\"2 unidade pequena\" mostra \"= 40 g (medida cadastrada para o alimento)\" e não pede confirmação",
+   "ok": true
+  },
+  {
+   "n": "Salvo com 40 g exatos",
+   "ok": true
+  },
+  {
+   "n": "Editar item com xícara: aviso e confirmação aparecem já ao abrir",
+   "ok": true
+  },
+  {
+   "n": "Trocando para \"80 g\" o aviso some e a confirmação deixa de ser exigida",
+   "ok": true
+  },
+  {
+   "n": "Receita: ingrediente com xícara pede confirmação (aviso do servidor com o alimento e 150 g por xícara)",
+   "ok": true
+  },
+  {
+   "n": "Receita: em gramas a confirmação some e deixa de ser exigida",
+   "ok": true
+  },
+  {
+   "n": "Receita: sem marcar a confirmação o formulário não envia",
+   "ok": true
+  },
+  {
+   "n": "Receita salva; a página avisa \"Peso estimado\" e mostra sódio \"Não disponível no catálogo\"",
+   "ok": true
+  },
+  {
+   "n": "Diálogo com o aviso de peso estimado sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Plano no celular (390 px) sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script",
+   "ok": true
+  }
+ ]
+}

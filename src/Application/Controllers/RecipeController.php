@@ -342,8 +342,8 @@ class RecipeController
                   <?php foreach ($recipe['ingredients'] as $ing): ?>
                     <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
                       <td style="padding: 12px 8px; font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($ing['food_name']) ?></td>
-                      <td style="padding: 12px 8px; color: var(--neutral-ink-900);"><?= (float)$ing['amount'] ?> <?= htmlspecialchars($ing['measure_unit']) ?></td>
-                      <td style="padding: 12px 8px; color: var(--neutral-gray-500);"><?= round((float)$ing['net_weight_g'], 1) ?> g</td>
+                      <td style="padding: 12px 8px; color: var(--neutral-ink-900);"><?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($ing['amount']) ?> <?= htmlspecialchars($ing['measure_unit']) ?></td>
+                      <td style="padding: 12px 8px; color: var(--neutral-gray-500);"><?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($ing['net_weight_g']) ?> g<?php if (!empty($ing['weight_is_estimated'])): ?><span data-testid="recipe-estimated" style="display: block; font-size: 0.75rem; color: #92400e;">peso estimado (medida sem peso cadastrado para o alimento)</span><?php endif; ?></td>
                       <td style="padding: 12px 8px; color: var(--neutral-gray-500); font-size: 0.85rem;"><?= htmlspecialchars($ing['notes'] ?? '-') ?></td>
                     </tr>
                   <?php endforeach; ?>
@@ -413,8 +413,22 @@ class RecipeController
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem;">
                   <span>Sódio</span>
-                  <strong><?= number_format((float)$recipe['sodium_mg_per_serving'], 1, ',', '.') ?> mg</strong>
+                  <?php /* NI2-74: o catálogo (TACO importada) não traz sódio; mostrar 0 seria informação falsa. */ ?>
+                  <strong data-testid="recipe-sodium" style="font-weight: 500; color: var(--neutral-gray-500);">Não disponível no catálogo</strong>
                 </div>
+                <?php
+                  $rcUnknown = [];
+                  foreach ($recipe['ingredients'] ?? [] as $ri) {
+                      foreach ($ri['unknown_nutrients'] ?? [] as $un) { $rcUnknown[$un][$ri['food_name']] = true; }
+                  }
+                  $rcEstimated = array_filter($recipe['ingredients'] ?? [], static fn($ri) => !empty($ri['weight_is_estimated']));
+                ?>
+                <?php if ($rcUnknown || $rcEstimated): ?>
+                  <div role="note" data-testid="recipe-nutrition-caveats" style="margin-top: 8px; font-size: 0.8rem; color: #78350f; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 10px;">
+                    <?php if ($rcEstimated): ?><p style="margin: 0 0 4px;"><strong>Peso estimado</strong> em <?= count($rcEstimated) ?> ingrediente(s): a medida usada não tem peso cadastrado para o alimento.</p><?php endif; ?>
+                    <?php if ($rcUnknown): ?><p style="margin: 0;"><strong>Valores incompletos:</strong> sem análise na TACO de <?= htmlspecialchars(implode('; ', array_map(static fn($n, $f) => ['energy_kcal' => 'energia', 'protein_g' => 'proteína', 'carbohydrate_g' => 'carboidratos', 'lipid_g' => 'lipídios', 'fiber_g' => 'fibra'][$n] . ' (' . implode(', ', array_keys($f)) . ')', array_keys($rcUnknown), $rcUnknown))) ?>; entram como zero.</p><?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </div>
 
               <?php if (!empty($recipe['allergens'])): ?>
@@ -612,24 +626,19 @@ class RecipeController
                   </div>
                   <div>
                       <label class="form-label" for="rc-amount-${i}">Quantidade</label>
-                      <input id="rc-amount-${i}" type="number" step="0.1" min="0.1" name="ingredients[${i}][amount]" value="100" required class="form-control">
+                      <input id="rc-amount-${i}" type="number" step="0.01" min="0.01" name="ingredients[${i}][amount]" value="100" required class="form-control">
                   </div>
                   <div>
                       <label class="form-label" for="rc-unit-${i}">Medida</label>
-                      <select id="rc-unit-${i}" name="ingredients[${i}][measure_unit]" class="form-control">
-                          <option value="g">g (gramas)</option>
-                          <option value="colher de sopa">colher de sopa</option>
-                          <option value="colher de chá">colher de chá</option>
-                          <option value="xícara de chá">xícara de chá</option>
-                          <option value="unidade">unidade</option>
-                          <option value="fatia">fatia</option>
-                          <option value="ml">ml</option>
-                      </select>
+                      <select id="rc-unit-${i}" name="ingredients[${i}][measure_unit]" class="form-control"><?= UnitCheckView::unitOptions() ?></select>
                   </div>
                   <button type="button" class="btn recipe-ingredient-row__remove" aria-label="Remover ingrediente" data-remove-parent>✕</button>
+                  <div class="recipe-ingredient-row__check"><?= str_replace(['__ID__', '__NAME__'], ['rc-confirm-${i}', 'ingredients[${i}][confirm_estimated]'], UnitCheckView::block('__ID__', '__NAME__')) ?></div>
               `;
+              row.setAttribute('data-unit-scope', '');
               container.appendChild(row);
               if (window.ClyoFoodPicker) window.ClyoFoodPicker.init(row.querySelector('[data-food-picker]'));
+              if (window.ClyoUnitCheck) window.ClyoUnitCheck.init(row);
               return row;
           }
           addIngredientRow(); // o seletor (food-picker.js, carregado com defer) inicia esta primeira linha
@@ -647,6 +656,7 @@ class RecipeController
           }
         </script>
         <script src="/assets/js/food-picker.js" defer></script>
+        <script src="/assets/js/unit-check.js" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
@@ -677,6 +687,7 @@ class RecipeController
                         'food_id' => (int)$ing['food_id'],
                         'amount' => (float)$ing['amount'],
                         'measure_unit' => (string)($ing['measure_unit'] ?? 'g'),
+                        'confirm_estimated' => !empty($ing['confirm_estimated']), // NI2-74
                     ];
                 }
             }

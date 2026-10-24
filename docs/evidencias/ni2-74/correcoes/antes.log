@@ -1,0 +1,37 @@
+### php tests/ni2_74_portion_conversion_test.php (código antes, 89bd009)
+== Regras de conversão (ordem documentada)
+FAIL Massa é exata: 250 g = 250 g → {"grams":250,"estimated":false,"source":"exact"}
+PASS kg e mg: 0,2 kg = 200 g; 500 mg = 0,5 g
+PASS Medida cadastrada do alimento vence a tabela: 2 colheres de sopa de arroz = 50 g (não 30 g), exata
+FAIL Porção do próprio alimento: 1 unidade de pão de queijo = 40 g (antes: 100 g genéricos), exata → {"grams":100,"estimated":true,"source":"generic"}
+PHP Fatal error:  Uncaught InvalidArgumentException: Unidade de medida não reconhecida ou inválida: 'Unidades Pequenas'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas. in /tmp/b74old/src/Domain/Nutrition/HouseholdMeasureConverter.php:129
+Stack trace:
+#0 /tmp/b74old/tests/ni2_74_portion_conversion_test.php(51): ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter->convertDetailed()
+#1 {main}
+  thrown in /tmp/b74old/src/Domain/Nutrition/HouseholdMeasureConverter.php on line 129
+
+### MySQL: node tests/ni2_74_portion_real_test.cjs
+FAIL [incompatível] Sem confirmação, "0,5 xícara" de arroz cozido não é salva e a tela explica (alimento, unidade, 150 g, medida cadastrada ou confirmar) → ""
+FAIL [incompatível] "100 ml" de arroz cozido não vira 100 g exatos: pede confirmação citando a densidade → ""
+FAIL [incompatível] Óleo em ml sem medida cadastrada também pede confirmação → ""
+FAIL [incompatível] Unidade desconhecida continua recusada mesmo com a caixa marcada → "Erro ao adicionar alimento: Unidade de medida não reconhecida ou inválida: 'pitada'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas."
+PASS [confirmação] Com "Confirmo o peso estimado": 0,5 xícara salva como 75 g estimados, 93 kcal
+FAIL [porção do alimento] "1 unidade" de pão de queijo usa a porção cadastrada (40 g, 134 kcal), sem pedir confirmação → {"msg":"","row":{"id":7,"amount":"1.00","measure_unit":"unidade","weight_grams":"100.00","weight_is_estimated":1,"energy_kcal":"335.00","fiber_g":"0.00"}}
+FAIL [porção do alimento] "3 unidades pequenas" (plural) casa com a medida cadastrada "unidade pequena" = 60 g → {"msg":"Erro ao adicionar alimento: Unidade de medida não reconhecida ou inválida: 'unidades pequenas'. Use unidades do padrão TACO/IBGE ou medidas caseiras cadastradas.","row":{"id":7,"amount":"1.00","measure_unit":"unidade","weight_grams":"100.00","weight_is_estimated":1,"energy_kcal":"335.00","fiber_g":"0.00"}}
+PASS [precisão] 33,333 g gravado como 33,33 e calculado com 33,33 (41,33 kcal) nos dois bancos
+FAIL [exibição] Quantidade como prescrita: "0,5 xícara (~75g, peso estimado)" (antes: "1 xícara") → ["1 xícara (~75g, peso estimado)","100 ml (~100g)","15 ml (~15g)","1 xícara (~75g, peso estimado)","1 unidade (~100g, peso estimado)","33 g","30 g"]
+FAIL [exibição] "33,33 g" e "1 unidade (~40g)" sem arredondar para inteiro nem marcar estimado → ["1 xícara (~75g, peso estimado)","100 ml (~100g)","15 ml (~15g)","1 xícara (~75g, peso estimado)","1 unidade (~100g, peso estimado)","33 g","30 g"]
+FAIL [incompleto] Totais avisam fibra sem análise do leite condensado ("Totais incompletos") → ""
+PASS [precisão] Total do plano = soma dos itens (2 casas)
+PASS [exibição] Impressão mostra "0,5 xícara (~75g, peso estimado)"
+FAIL [edição] Editar item com medida genérica sem confirmar: nada muda e a tela explica → {"amount":"1.00","notes":"sem confirmar"}
+PASS [edição] Com confirmação a edição grava 1 xícara = 150 g estimados
+FAIL [substituição] Substituição com "colher de sopa" sem confirmação é recusada com explicação → ""
+FAIL [erro] Execução sem exceção → "TypeError: Cannot read properties of undefined (reading 'slice')\n    at check (/tmp/b74old/tests/ni2_74_portion_real_test.cjs:21:217)\n    at /tmp/b74old/tests/ni2_74_portion_real_test.cjs:109:5\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+
+NI2-74 (MySQL): 5 PASS, 13 FAIL
+
+### node tests/ni2_74_unit_check_browser_test.cjs
+FAIL Execução sem exceção → "locator.innerText: Timeout 30000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('#modal-add-item').locator('[data-unit-check]')\u001b[22m\n\n    at /tmp/b74old/tests/ni2_74_unit_check_browser_test.cjs:45:28"
+
+NI2-74 conferência de unidade (navegador): 0 PASS, 1 FAIL
