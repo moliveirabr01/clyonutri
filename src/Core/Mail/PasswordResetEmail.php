@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace ClyoNutri\Core\Mail;
 
 /**
- * E-mail de redefinição de senha (pt-BR), Design System Premium:
- * navy #0F2747 / cobre #E67A3F. Layout em tabelas + estilos inline para clientes de e-mail.
+ * E-mail de redefinição de senha (pt-BR), Design System (Clinical Botanical):
+ * Forest #0F3E17 / Clyo Green #39734A / cobre #B04A1B (Clinical Botanical). Layout em tabelas + estilos inline para clientes de e-mail.
  */
 final class PasswordResetEmail
 {
@@ -30,22 +30,22 @@ final class PasswordResetEmail
 
         $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $e($subject) . '</title></head>'
-            . '<body style="margin:0;padding:0;background:#F4F6FA;font-family:Arial,Helvetica,sans-serif;color:#0F2747;">'
-            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F6FA;padding:24px 12px;"><tr><td align="center">'
+            . '<body style="margin:0;padding:0;background:#FAF9F4;font-family:Arial,Helvetica,sans-serif;color:#0F3E17;">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF9F4;padding:24px 12px;"><tr><td align="center">'
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;">'
-            . '<tr><td style="background:#0F2747;padding:24px 32px;color:#FFFFFF;font-size:20px;font-weight:bold;">Clyo Nutri</td></tr>'
-            . '<tr><td style="padding:32px;font-size:16px;line-height:1.5;color:#0F2747;">'
+            . '<tr><td style="background:#0F3E17;padding:24px 32px;color:#FFFFFF;font-size:20px;font-weight:bold;">Clyo Nutri</td></tr>'
+            . '<tr><td style="padding:32px;font-size:16px;line-height:1.5;color:#0F3E17;">'
             . '<p style="margin:0 0 16px;">Olá, ' . $e($firstName) . '!</p>'
             . '<p style="margin:0 0 24px;">Recebemos uma solicitação para redefinir a senha da sua conta Clyo Nutri. Clique no botão abaixo para criar uma nova senha.</p>'
-            . '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#E67A3F;border-radius:8px;">'
+            . '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#39734A;border-radius:8px;">'
             . '<a href="' . $e($resetUrl) . '" style="display:inline-block;padding:14px 28px;color:#FFFFFF;font-weight:bold;text-decoration:none;font-size:16px;">Redefinir minha senha</a>'
             . '</td></tr></table>'
             . '<p style="margin:0 0 16px;font-size:14px;">O link é válido por <strong>' . $validityMinutes . ' minutos</strong> e só pode ser usado uma vez.</p>'
             . '<p style="margin:0 0 16px;font-size:14px;">Se o botão não funcionar, copie e cole este endereço no navegador:<br>'
-            . '<a href="' . $e($resetUrl) . '" style="color:#E67A3F;word-break:break-all;">' . $e($resetUrl) . '</a></p>'
+            . '<a href="' . $e($resetUrl) . '" style="color:#B04A1B;word-break:break-all;">' . $e($resetUrl) . '</a></p>'
             . '<p style="margin:24px 0 0;font-size:14px;color:#5A6B85;">Se você não pediu a redefinição, ignore este e-mail. Sua senha continua a mesma.</p>'
             . '</td></tr>'
-            . '<tr><td style="padding:16px 32px;background:#F4F6FA;font-size:12px;color:#5A6B85;">' . $footer . '</td></tr>'
+            . '<tr><td style="padding:16px 32px;background:#FAF9F4;font-size:12px;color:#5A6B85;">' . $footer . '</td></tr>'
             . '</table></td></tr></table></body></html>';
 
         return new MailMessage($toAddress, $toName, $subject, $html, $text, $replyTo);

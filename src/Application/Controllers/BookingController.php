@@ -230,7 +230,7 @@ final class BookingController
             http_response_code(404);
             header('Cache-Control: no-store');
             echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agendamento online indisponível - ClyoNutri</title></head>'
-                . '<body style="font-family: system-ui, sans-serif; max-width: 560px; margin: 48px auto; padding: 0 16px; color: #0f172a;">'
+                . '<body style="font-family: system-ui, sans-serif; max-width: 560px; margin: 48px auto; padding: 0 16px; color: #0F3E17;">'
                 . '<main><h1 style="font-size: 1.4rem;">Agendamento online indisponível</h1>'
                 . '<p>Este link de agendamento não está ativo. Peça ao seu nutricionista o link atualizado ou entre em contato com o consultório.</p></main></body></html>';
             return;

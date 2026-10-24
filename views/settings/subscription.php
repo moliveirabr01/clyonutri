@@ -20,7 +20,7 @@
   </div>
 
   <?php if (!empty($flashSuccess)): ?>
-    <div role="status" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 14px 18px; border-radius: 6px; margin-bottom: var(--space-6); color: #18794E; font-weight: 500;">
+    <div role="status" style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 14px 18px; border-radius: 6px; margin-bottom: var(--space-6); color: #0A7075; font-weight: 500;">
       <?= htmlspecialchars($flashSuccess) ?>
     </div>
   <?php endif; ?>
@@ -49,7 +49,7 @@
             ● Assinatura Cancelada
           </span>
         <?php else: ?>
-          <span style="display: inline-flex; align-items: center; gap: 6px; background: #DCFCE7; color: #166534; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+          <span style="display: inline-flex; align-items: center; gap: 6px; background: #E3F4F2; color: #0A5F63; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
             ● Assinatura Ativa
           </span>
         <?php endif; ?>
@@ -182,7 +182,7 @@
                 <td style="padding: 12px 8px;"><?= htmlspecialchars($inv['payment_method'] === 'credit_card' ? 'Cartão de Crédito' : $inv['payment_method']) ?></td>
                 <td style="padding: 12px 8px;">
                   <?php if ($inv['status'] === 'paid'): ?>
-                    <span style="background: #DCFCE7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Paga</span>
+                    <span style="background: #E3F4F2; color: #0A5F63; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Paga</span>
                   <?php else: ?>
                     <span style="background: #FEF3C7; color: #92400E; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;"><?= htmlspecialchars(ucfirst($inv['status'])) ?></span>
                   <?php endif; ?>

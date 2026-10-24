@@ -64,7 +64,7 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
           </div>
         </div>
         <div style="text-align: right;">
-          <span style="display: inline-block; padding: 4px 10px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 0.8rem; font-weight: 600;">
+          <span style="display: inline-block; padding: 4px 10px; border-radius: 9999px; background: #E3F4F2; color: #0A5F63; font-size: 0.8rem; font-weight: 600;">
             ✓ Convite Ativo (Válido por 48 horas)
           </span>
           <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
@@ -85,7 +85,7 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
             <label for="direct-link-input" style="font-weight: 600; font-size: 0.9rem; color: var(--brand-navy-900);">
               🔗 Link Direto de Ativação (Recomendado)
             </label>
-            <span style="font-size: 0.75rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: 600;">1 clique</span>
+            <span style="font-size: 0.75rem; background: #E5F0E5; color: #0F3E17; padding: 2px 8px; border-radius: 4px; font-weight: 600;">1 clique</span>
           </div>
           <p style="font-size: 0.825rem; color: #64748b; margin: 0 0 10px 0;">
             O paciente clica no link e vai direto para a tela de confirmação e cadastro de senha, com seus dados já carregados.
@@ -233,7 +233,7 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
   function showCopied(btn, originalText) {
     var originalBg = btn.style.background;
     btn.textContent = '✓ Copiado!';
-    btn.style.background = '#10b981';
+    btn.style.background = '#0A7075';
     btn.style.color = '#fff';
     setTimeout(function() {
       btn.textContent = originalText;

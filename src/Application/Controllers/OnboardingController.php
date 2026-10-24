@@ -94,7 +94,7 @@ class OnboardingController
           <!-- Cabeçalho do Onboarding -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 12px;">
             <div>
-              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #EAD8C7; padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 6px;">
+              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #D3E5D5; padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 6px;">
                 Ativação do Consultório
               </span>
               <h1 style="font-family: var(--font-editorial); font-size: 1.85rem; color: var(--brand-navy-900); margin-bottom: 4px;">
@@ -139,7 +139,7 @@ class OnboardingController
                 $isCurrent = ($step === $sNum);
                 ?>
                 <a href="<?= ($isCompleted || $sNum <= $progress['current_step']) ? '/onboarding?passo=' . $sNum : '#' ?>" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; cursor: <?= ($isCompleted || $sNum <= $progress['current_step']) ? 'pointer' : 'default' ?>;">
-                  <div style="width: 32px; height: 32px; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; <?= $isCurrent ? 'background: var(--brand-navy-900); color: #fff; box-shadow: 0 0 0 3px rgba(230, 122, 63, 0.4);' : ($isCompleted ? 'background: var(--semantic-success); color: #fff;' : 'background: var(--neutral-gray-200); color: var(--neutral-gray-500);') ?>">
+                  <div style="width: 32px; height: 32px; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; <?= $isCurrent ? 'background: var(--brand-navy-900); color: #fff; box-shadow: 0 0 0 3px rgba(239, 143, 79, 0.4);' : ($isCompleted ? 'background: var(--semantic-success); color: #fff;' : 'background: var(--neutral-gray-200); color: var(--neutral-gray-500);') ?>">
                     <?= $isCompleted ? '✓' : $sNum ?>
                   </div>
                   <strong style="font-size: 0.8rem; color: <?= $isCurrent ? 'var(--brand-navy-900)' : 'var(--neutral-gray-500)' ?>; display: block; line-height: 1.2;">
@@ -330,7 +330,7 @@ class OnboardingController
                 </div>
 
                 <?php if ($firstPatient): ?>
-                  <div style="background: var(--semantic-success-light); border: 1px solid #BBF7D0; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-5);">
+                  <div style="background: var(--semantic-success-light); border: 1px solid #B7DFDC; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-5);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                       <div>
                         <strong style="color: var(--semantic-success); font-size: 0.95rem; display: block;">✓ Paciente Cadastrado com Sucesso:</strong>
@@ -397,7 +397,7 @@ class OnboardingController
                   </p>
 
                   <?php if ($firstPatient): ?>
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4); margin: 0 auto var(--space-5); max-width: 620px; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4); margin: 0 auto var(--space-5); max-width: 620px; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                       <div>
                         <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--brand-copper-600);">Primeiro Paciente Vinculado</div>
                         <div style="font-size: 1.05rem; font-weight: 700; color: var(--brand-navy-900);"><?= htmlspecialchars($firstPatient['name']) ?></div>
@@ -411,21 +411,21 @@ class OnboardingController
 
                   <!-- Cards de Ações Recomendadas -->
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); text-align: left; margin-bottom: var(--space-6);">
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4);">
+                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
                       <div style="font-size: 1.5rem; margin-bottom: 8px;">📅</div>
                       <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Agendar Consulta</strong>
                       <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Abra a agenda clínica e marque o primeiro atendimento com detecção anti-conflito.</p>
                       <a href="/agenda" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Ir para Agenda →</a>
                     </div>
 
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4);">
+                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
                       <div style="font-size: 1.5rem; margin-bottom: 8px;">🥗</div>
                       <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Prescrever Plano Alimentar</strong>
                       <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Monte dietas com cálculos oficiais TACO, medidas caseiras e histórico de versões publicadas.</p>
                       <a href="/planos" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Criar Plano →</a>
                     </div>
 
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4);">
+                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
                       <div style="font-size: 1.5rem; margin-bottom: 8px;">🍳</div>
                       <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Biblioteca de Receitas</strong>
                       <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Explore o catálogo culinário, crie variantes e prescreva receitas personalizadas.</p>

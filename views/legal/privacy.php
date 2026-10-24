@@ -57,8 +57,8 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #E8F5E9;
-      color: #18794E;
+      background: #E3F4F2;
+      color: #0A7075;
       font-size: 0.8125rem;
       font-weight: 600;
       padding: 4px 10px;

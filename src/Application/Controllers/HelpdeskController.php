@@ -81,9 +81,9 @@ class HelpdeskController
         ?>
         <div style="max-width: 1040px; margin: 0 auto; padding-bottom: var(--space-8);">
           <!-- Header Hero da Central de Ajuda -->
-          <div style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: #fff; border-radius: 12px; padding: 36px 32px; margin-bottom: 28px; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
+          <div style="background: linear-gradient(135deg, #0F3E17 0%, #1B5226 100%); color: #fff; border-radius: 12px; padding: 36px 32px; margin-bottom: 28px; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
             <div style="max-width: 680px;">
-              <span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #93C5FD; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 12px;">
+              <span style="display: inline-block; background: rgba(191, 216, 194, 0.2); color: #D3E5D5; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 12px;">
                 CENTRAL DE AJUDA & SERVICE DESK CLYONUTRI II
               </span>
               <h1 style="color: #fff; font-size: 1.85rem; font-family: 'Playfair Display', serif; margin: 0 0 10px 0;">Como podemos ajudar você hoje?</h1>
@@ -95,7 +95,7 @@ class HelpdeskController
               <form action="/ajuda" method="GET" style="display: flex; gap: 8px;">
                 <div style="position: relative; flex: 1;">
                   <input type="text" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="Buscar por anamnese, tabela TACO, Pollock, convite..." 
-                         style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #fff; color: #0F172A; font-size: 0.95rem; box-sizing: border-box;" required>
+                         style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #fff; color: #0F3E17; font-size: 0.95rem; box-sizing: border-box;" required>
                 </div>
                 <button type="submit" class="btn btn-primary" style="padding: 0 22px; font-weight: 600;">
                   Buscar
@@ -142,7 +142,7 @@ class HelpdeskController
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                   <?php foreach ($searchResults as $art): ?>
                     <a href="/ajuda/artigo/<?= $art['slug'] ?>" style="text-decoration: none; color: inherit; display: block; padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #F8FAFC; transition: all 0.2s;" data-hover="borderColor:#94A3B8" data-unhover="borderColor:#E2E8F0">
-                      <strong style="color: #0F172A; font-size: 1rem; display: block; margin-bottom: 4px;"><?= htmlspecialchars($art['title']) ?></strong>
+                      <strong style="color: #0F3E17; font-size: 1rem; display: block; margin-bottom: 4px;"><?= htmlspecialchars($art['title']) ?></strong>
                       <p style="color: #475569; font-size: 0.85rem; margin: 0;"><?= htmlspecialchars($art['summary']) ?></p>
                       <span style="font-size: 0.75rem; color: #94A3B8; margin-top: 6px; display: inline-block;">👁️ <?= $art['view_count'] ?> visualizações</span>
                     </a>
@@ -153,18 +153,18 @@ class HelpdeskController
           <?php endif; ?>
 
           <!-- Seção de Categorias -->
-          <h2 style="font-size: 1.25rem; font-weight: 700; color: #0F172A; margin: 0 0 16px 0;">Categorias de Ajuda</h2>
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: #0F3E17; margin: 0 0 16px 0;">Categorias de Ajuda</h2>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 32px;">
             <?php foreach ($categories as $cat): ?>
               <a href="/ajuda/categoria/<?= $cat['slug'] ?>" style="text-decoration: none; color: inherit;" class="card" data-hover="transform:translateY(-2px)" data-unhover="transform:none">
                 <div style="display: flex; align-items: flex-start; gap: 12px;">
-                  <div style="background: #EFF6FF; color: #2563EB; width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
+                  <div style="background: #E5F0E5; color: #39734A; width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
                     📘
                   </div>
                   <div>
-                    <h4 style="margin: 0 0 4px 0; color: #0F172A; font-size: 0.95rem; font-weight: 600;"><?= htmlspecialchars($cat['name']) ?></h4>
+                    <h4 style="margin: 0 0 4px 0; color: #0F3E17; font-size: 0.95rem; font-weight: 600;"><?= htmlspecialchars($cat['name']) ?></h4>
                     <p style="margin: 0 0 8px 0; font-size: 0.8rem; color: #64748B;"><?= htmlspecialchars($cat['description']) ?></p>
-                    <span style="font-size: 0.75rem; font-weight: 600; color: #2563EB;"><?= $cat['count'] ?> <?= $cat['count'] === 1 ? 'artigo' : 'artigos' ?> ➔</span>
+                    <span style="font-size: 0.75rem; font-weight: 600; color: #39734A;"><?= $cat['count'] ?> <?= $cat['count'] === 1 ? 'artigo' : 'artigos' ?> ➔</span>
                   </div>
                 </div>
               </a>
@@ -178,11 +178,11 @@ class HelpdeskController
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
               <?php foreach ($featuredFaqs as $faq): ?>
-                <a href="/ajuda/artigo/<?= $faq['slug'] ?>" style="text-decoration: none; color: inherit; padding: 12px; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; display: block;" data-hover="borderColor:#2563EB" data-unhover="borderColor:#E2E8F0">
+                <a href="/ajuda/artigo/<?= $faq['slug'] ?>" style="text-decoration: none; color: inherit; padding: 12px; border-radius: 8px; border: 1px solid #E2E8F0; background: #fff; display: block;" data-hover="borderColor:#39734A" data-unhover="borderColor:#E2E8F0">
                   <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">
                     <?= htmlspecialchars(KnowledgeBaseService::CATEGORIES[$faq['category']]['name'] ?? $faq['category']) ?>
                   </div>
-                  <strong style="color: #0F172A; font-size: 0.9rem; display: block; margin-bottom: 4px;"><?= htmlspecialchars($faq['title']) ?></strong>
+                  <strong style="color: #0F3E17; font-size: 0.9rem; display: block; margin-bottom: 4px;"><?= htmlspecialchars($faq['title']) ?></strong>
                   <p style="color: #64748B; font-size: 0.8rem; margin: 0;"><?= htmlspecialchars($faq['summary']) ?></p>
                 </a>
               <?php endforeach; ?>
@@ -225,7 +225,7 @@ class HelpdeskController
           <div class="card" style="margin-bottom: 24px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
               <span style="font-size: 1.5rem;">📘</span>
-              <h1 style="margin: 0; font-size: 1.5rem; color: #0F172A;"><?= htmlspecialchars($catMeta['name']) ?></h1>
+              <h1 style="margin: 0; font-size: 1.5rem; color: #0F3E17;"><?= htmlspecialchars($catMeta['name']) ?></h1>
             </div>
             <p style="margin: 0; color: #64748B; font-size: 0.95rem;"><?= htmlspecialchars($catMeta['description']) ?></p>
           </div>
@@ -238,9 +238,9 @@ class HelpdeskController
               </div>
             <?php else: ?>
               <?php foreach ($articles as $art): ?>
-                <a href="/ajuda/artigo/<?= $art['slug'] ?>" class="card" style="text-decoration: none; color: inherit; transition: border-color 0.2s;" data-hover="borderColor:#2563EB" data-unhover="borderColor:#E2E8F0">
+                <a href="/ajuda/artigo/<?= $art['slug'] ?>" class="card" style="text-decoration: none; color: inherit; transition: border-color 0.2s;" data-hover="borderColor:#39734A" data-unhover="borderColor:#E2E8F0">
                   <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h3 style="margin: 0 0 6px 0; color: #0F172A; font-size: 1.05rem;"><?= htmlspecialchars($art['title']) ?></h3>
+                    <h3 style="margin: 0 0 6px 0; color: #0F3E17; font-size: 1.05rem;"><?= htmlspecialchars($art['title']) ?></h3>
                     <span style="font-size: 0.75rem; color: #94A3B8;">👁️ <?= $art['view_count'] ?></span>
                   </div>
                   <p style="margin: 0; color: #475569; font-size: 0.85rem;"><?= htmlspecialchars($art['summary']) ?></p>
@@ -289,10 +289,10 @@ class HelpdeskController
 
           <div class="card" style="margin-bottom: 24px;">
             <div style="border-bottom: 1px solid #E2E8F0; padding-bottom: 16px; margin-bottom: 20px;">
-              <span style="font-size: 0.8rem; font-weight: 700; color: #2563EB; text-transform: uppercase;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: #39734A; text-transform: uppercase;">
                 <?= htmlspecialchars($article['category_meta']['name']) ?>
               </span>
-              <h1 style="margin: 8px 0; font-size: 1.6rem; color: #0F172A; font-family: 'Playfair Display', serif;">
+              <h1 style="margin: 8px 0; font-size: 1.6rem; color: #0F3E17; font-family: 'Playfair Display', serif;">
                 <?= htmlspecialchars($article['title']) ?>
               </h1>
               <div style="font-size: 0.8rem; color: #64748B; display: flex; gap: 16px;">
@@ -310,7 +310,7 @@ class HelpdeskController
           <!-- Box de Ajuda Adicional -->
           <div class="card" style="background: #F8FAFC; border-color: #CBD5E1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div>
-              <strong style="color: #0F172A; font-size: 1rem; display: block;">Este artigo resolveu sua dúvida?</strong>
+              <strong style="color: #0F3E17; font-size: 1rem; display: block;">Este artigo resolveu sua dúvida?</strong>
               <p style="margin: 0; color: #64748B; font-size: 0.85rem;">Se ainda precisar de suporte especializado, nosso time está pronto para atender.</p>
             </div>
             <a href="/ajuda/abrir-chamado?categoria=<?= urlencode($article['category']) ?>" class="btn btn-primary">
@@ -346,8 +346,8 @@ class HelpdeskController
 
           <div class="card">
             <div class="card__header" style="border-bottom: 1px solid #E2E8F0; padding-bottom: 16px; margin-bottom: 20px;">
-              <span style="font-size: 0.8rem; font-weight: 700; color: #2563EB; text-transform: uppercase;">SERVICE DESK CLYONUTRI II</span>
-              <h1 style="margin: 4px 0 0 0; font-size: 1.5rem; color: #0F172A;">Abrir Novo Chamado de Suporte</h1>
+              <span style="font-size: 0.8rem; font-weight: 700; color: #39734A; text-transform: uppercase;">SERVICE DESK CLYONUTRI II</span>
+              <h1 style="margin: 4px 0 0 0; font-size: 1.5rem; color: #0F3E17;">Abrir Novo Chamado de Suporte</h1>
               <p style="margin: 4px 0 0 0; color: #64748B; font-size: 0.85rem;">
                 Descreva sua dúvida, sugestão ou incidente técnico. Um protocolo exclusivo será gerado imediatamente.
               </p>
@@ -517,7 +517,7 @@ class HelpdeskController
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
             <div>
               <a href="/ajuda" style="font-size: 0.85rem; color: #64748B; text-decoration: none;">← Central de Ajuda</a>
-              <h1 style="margin: 4px 0 0 0; font-size: 1.5rem; color: #0F172A;">Meus Chamados de Suporte</h1>
+              <h1 style="margin: 4px 0 0 0; font-size: 1.5rem; color: #0F3E17;">Meus Chamados de Suporte</h1>
             </div>
             <a href="/ajuda/abrir-chamado" class="btn btn-primary">
               + Abrir Novo Chamado
@@ -558,10 +558,10 @@ class HelpdeskController
                 <tbody>
                   <?php foreach ($tickets as $t): ?>
                     <tr>
-                      <td style="font-family: monospace; font-weight: 700; color: #2563EB;">
+                      <td style="font-family: monospace; font-weight: 700; color: #39734A;">
                         <?= htmlspecialchars($t['protocol']) ?>
                       </td>
-                      <td style="font-weight: 600; color: #0F172A;">
+                      <td style="font-weight: 600; color: #0F3E17;">
                         <a href="/ajuda/chamado/<?= $t['protocol'] ?>" style="color: inherit; text-decoration: none;">
                           <?= htmlspecialchars($t['subject']) ?>
                         </a>
@@ -635,17 +635,17 @@ class HelpdeskController
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
               <div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                  <span style="font-family: monospace; font-size: 1.15rem; font-weight: 700; color: #2563EB;">
+                  <span style="font-family: monospace; font-size: 1.15rem; font-weight: 700; color: #39734A;">
                     <?= htmlspecialchars($ticket['protocol']) ?>
                   </span>
-                  <span class="badge" style="background: #E2E8F0; color: #0F172A; font-size: 0.75rem;">
+                  <span class="badge" style="background: #E2E8F0; color: #0F3E17; font-size: 0.75rem;">
                     <?= htmlspecialchars($ticket['status_label']) ?>
                   </span>
                   <span class="badge" style="background: #F1F5F9; color: #475569; font-size: 0.75rem;">
                     <?= htmlspecialchars($ticket['type_label']) ?>
                   </span>
                 </div>
-                <h1 style="margin: 0 0 6px 0; font-size: 1.4rem; color: #0F172A;">
+                <h1 style="margin: 0 0 6px 0; font-size: 1.4rem; color: #0F3E17;">
                   <?= htmlspecialchars($ticket['subject']) ?>
                 </h1>
                 <div style="font-size: 0.85rem; color: #64748B;">
@@ -657,7 +657,7 @@ class HelpdeskController
               <?php if (in_array($ticket['status'], [HelpdeskTicketService::STATUS_OPEN, HelpdeskTicketService::STATUS_IN_PROGRESS, HelpdeskTicketService::STATUS_WAITING_CLIENT])): ?>
                 <form action="/ajuda/chamado/<?= $ticket['protocol'] ?>/resolver" method="POST" data-confirm="Confirma que o problema foi solucionado e deseja fechar o chamado?">
                   <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                  <button type="submit" class="btn btn-sm btn-secondary" style="color: #059669; border-color: #10B981;">
+                  <button type="submit" class="btn btn-sm btn-secondary" style="color: #0A7075; border-color: #0A7075;">
                     ✓ Marcar como Resolvido
                   </button>
                 </form>
@@ -667,26 +667,26 @@ class HelpdeskController
 
           <!-- Avaliação CSAT (NI2-207) se resolvido ou fechado -->
           <?php if (in_array($ticket['status'], [HelpdeskTicketService::STATUS_RESOLVED, HelpdeskTicketService::STATUS_CLOSED])): ?>
-            <div class="card" style="background: #F0FDF4; border: 1px solid #BBF7D0; margin-bottom: 24px;">
-              <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 1.1rem;">
+            <div class="card" style="background: #E3F4F2; border: 1px solid #B7DFDC; margin-bottom: 24px;">
+              <h3 style="margin: 0 0 8px 0; color: #0A5F63; font-size: 1.1rem;">
                 ⭐ Avaliação do Atendimento (CSAT)
               </h3>
               <?php if (!empty($ticket['feedback'])): ?>
-                <div style="font-size: 0.95rem; color: #15803D;">
+                <div style="font-size: 0.95rem; color: #0A5F63;">
                   Você avaliou este atendimento com <strong><?= str_repeat('★', (int)$ticket['feedback']['rating']) ?><?= str_repeat('☆', 5 - (int)$ticket['feedback']['rating']) ?> (<?= $ticket['feedback']['rating'] ?>/5)</strong>.
                   <?php if (!empty($ticket['feedback']['comment'])): ?>
-                    <p style="margin: 6px 0 0 0; color: #166534; font-style: italic;">"<?= htmlspecialchars($ticket['feedback']['comment']) ?>"</p>
+                    <p style="margin: 6px 0 0 0; color: #0A5F63; font-style: italic;">"<?= htmlspecialchars($ticket['feedback']['comment']) ?>"</p>
                   <?php endif; ?>
                 </div>
               <?php else: ?>
-                <p style="margin: 0 0 12px 0; font-size: 0.9rem; color: #166534;">
+                <p style="margin: 0 0 12px 0; font-size: 0.9rem; color: #0A5F63;">
                   Este chamado foi solucionado. Como você avalia a agilidade e qualidade do suporte prestado?
                 </p>
                 <form action="/ajuda/chamado/<?= $ticket['protocol'] ?>/csat" method="POST" style="display: flex; flex-direction: column; gap: 10px;">
                   <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                   <div style="display: flex; gap: 16px; align-items: center;">
                     <?php for ($i = 5; $i >= 1; $i--): ?>
-                      <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer; color: #166534;">
+                      <label style="display: flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer; color: #0A5F63;">
                         <input type="radio" name="rating" value="<?= $i ?>" <?= $i === 5 ? 'checked' : '' ?>>
                         <?= $i ?> <?= $i === 5 ? '⭐ (Excelente)' : '⭐' ?>
                       </label>
@@ -694,10 +694,10 @@ class HelpdeskController
                   </div>
                   <div>
                     <input type="text" name="comment" placeholder="Comentário opcional sobre o atendimento..." 
-                           style="width: 100%; padding: 8px 12px; border: 1px solid #86EFAC; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #B7DFDC; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
                   </div>
                   <div>
-                    <button type="submit" class="btn btn-primary" style="background: #16A34A; border-color: #16A34A;">
+                    <button type="submit" class="btn btn-primary" style="background: #0A7075; border-color: #0A7075;">
                       Enviar Avaliação
                     </button>
                   </div>
@@ -709,10 +709,10 @@ class HelpdeskController
           <!-- Anexos do Chamado (NI2-200) -->
           <?php if (!empty($ticket['attachments'])): ?>
             <div class="card" style="margin-bottom: 24px;">
-              <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #0F172A;">📎 Anexos Vinculados (<?= count($ticket['attachments']) ?>)</h4>
+              <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #0F3E17;">📎 Anexos Vinculados (<?= count($ticket['attachments']) ?>)</h4>
               <div style="display: flex; flex-wrap: wrap; gap: 10px;">
                 <?php foreach ($ticket['attachments'] as $att): ?>
-                  <a href="/ajuda/anexo/<?= $att['id'] ?>" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 0.85rem; color: #2563EB;">
+                  <a href="/ajuda/anexo/<?= $att['id'] ?>" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 0.85rem; color: #39734A;">
                     <span>📄</span>
                     <span style="font-weight: 500;"><?= htmlspecialchars($att['file_name']) ?></span>
                     <span style="color: #94A3B8; font-size: 0.75rem;">(<?= round($att['file_size'] / 1024, 1) ?> KB)</span>
@@ -723,17 +723,17 @@ class HelpdeskController
           <?php endif; ?>
 
           <!-- Timeline de Mensagens (NI2-202) -->
-          <h3 style="margin: 0 0 16px 0; font-size: 1.15rem; color: #0F172A;">Histórico de Mensagens</h3>
+          <h3 style="margin: 0 0 16px 0; font-size: 1.15rem; color: #0F3E17;">Histórico de Mensagens</h3>
           <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px;">
             <?php foreach ($ticket['messages'] as $idx => $msg): ?>
               <?php 
                 $isMe = ((int)$msg['user_id'] === $auth['userId']);
                 $isOperator = \ClyoNutri\Core\Security\RoleModel::isPlatformSupport($msg['author_role'] ?? ''); // u.role (plataforma)
               ?>
-              <div style="border-radius: 8px; padding: 16px; border: 1px solid <?= $isOperator ? '#BFDBFE' : '#E2E8F0' ?>; background: <?= $isOperator ? '#EFF6FF' : '#FFFFFF' ?>;">
+              <div style="border-radius: 8px; padding: 16px; border: 1px solid <?= $isOperator ? '#BFD8C2' : '#E2E8F0' ?>; background: <?= $isOperator ? '#E5F0E5' : '#FFFFFF' ?>;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <div>
-                    <strong style="color: <?= $isOperator ? '#1D4ED8' : '#0F172A' ?>; font-size: 0.95rem;">
+                    <strong style="color: <?= $isOperator ? '#2F6140' : '#0F3E17' ?>; font-size: 0.95rem;">
                       <?= $isOperator ? '🛡️ Suporte ClyoNutri (' . htmlspecialchars($msg['author_name']) . ')' : htmlspecialchars($msg['author_name']) ?>
                     </strong>
                     <span style="font-size: 0.75rem; color: #64748B; margin-left: 8px;">
@@ -754,7 +754,7 @@ class HelpdeskController
           <!-- Formulário para Nova Resposta se não estiver fechado -->
           <?php if ($ticket['status'] !== HelpdeskTicketService::STATUS_CLOSED): ?>
             <div class="card">
-              <h4 style="margin: 0 0 12px 0; font-size: 1rem; color: #0F172A;">Adicionar Resposta ao Chamado</h4>
+              <h4 style="margin: 0 0 12px 0; font-size: 1rem; color: #0F3E17;">Adicionar Resposta ao Chamado</h4>
               <form action="/ajuda/chamado/<?= $ticket['protocol'] ?>/responder" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                 <div style="margin-bottom: 12px;">
@@ -933,7 +933,7 @@ class HelpdeskController
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
             <div>
               <span style="font-size: 0.8rem; font-weight: 700; color: #7C3AED; text-transform: uppercase;">BACKOFFICE DE OPERAÇÃO</span>
-              <h1 style="margin: 4px 0 0 0; font-size: 1.6rem; color: #0F172A;">Fila de Atendimento do Service Desk</h1>
+              <h1 style="margin: 4px 0 0 0; font-size: 1.6rem; color: #0F3E17;">Fila de Atendimento do Service Desk</h1>
             </div>
             <a href="/ajuda" class="btn btn-secondary">
               Visão da Central de Ajuda ➔
@@ -942,28 +942,28 @@ class HelpdeskController
 
           <!-- Métricas e Indicadores Operacionais (NI2-206) -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px;">
-            <div class="card" style="padding: 16px; border-left: 4px solid #3B82F6;">
+            <div class="card" style="padding: 16px; border-left: 4px solid #39734A;">
               <span style="font-size: 0.8rem; color: #64748B; font-weight: 600;">TOTAL DE CHAMADOS</span>
-              <div style="font-size: 1.7rem; font-weight: 700; color: #0F172A; margin-top: 4px;"><?= $metrics['total_tickets'] ?></div>
+              <div style="font-size: 1.7rem; font-weight: 700; color: #0F3E17; margin-top: 4px;"><?= $metrics['total_tickets'] ?></div>
             </div>
 
-            <div class="card" style="padding: 16px; border-left: 4px solid #10B981;">
+            <div class="card" style="padding: 16px; border-left: 4px solid #0A7075;">
               <span style="font-size: 0.8rem; color: #64748B; font-weight: 600;">TEMPO 1ª RESPOSTA (SLA)</span>
-              <div style="font-size: 1.7rem; font-weight: 700; color: #0F172A; margin-top: 4px;">
+              <div style="font-size: 1.7rem; font-weight: 700; color: #0F3E17; margin-top: 4px;">
                 <?= $metrics['avg_first_response_minutes'] > 0 ? $metrics['avg_first_response_minutes'] . ' min' : 'Imediato' ?>
               </div>
             </div>
 
             <div class="card" style="padding: 16px; border-left: 4px solid #F59E0B;">
               <span style="font-size: 0.8rem; color: #64748B; font-weight: 600;">CHAMADOS ENVELHECIDOS (>48H)</span>
-              <div style="font-size: 1.7rem; font-weight: 700; color: <?= $metrics['aged_tickets_count'] > 0 ? '#DC2626' : '#10B981' ?>; margin-top: 4px;">
+              <div style="font-size: 1.7rem; font-weight: 700; color: <?= $metrics['aged_tickets_count'] > 0 ? '#DC2626' : '#0A7075' ?>; margin-top: 4px;">
                 <?= $metrics['aged_tickets_count'] ?>
               </div>
             </div>
 
             <div class="card" style="padding: 16px; border-left: 4px solid #8B5CF6;">
               <span style="font-size: 0.8rem; color: #64748B; font-weight: 600;">CSAT MÉDIO (1 A 5)</span>
-              <div style="font-size: 1.7rem; font-weight: 700; color: #0F172A; margin-top: 4px;">
+              <div style="font-size: 1.7rem; font-weight: 700; color: #0F3E17; margin-top: 4px;">
                 <?= $metrics['csat_average'] > 0 ? $metrics['csat_average'] . ' / 5.0 ⭐' : 'Sem notas' ?>
               </div>
             </div>
@@ -1025,12 +1025,12 @@ class HelpdeskController
                         </span>
                       </td>
                       <td style="font-family: monospace; font-weight: 700;">
-                        <a href="/suporte/chamado/<?= $item['id'] ?>" style="color: #2563EB; text-decoration: none;">
+                        <a href="/suporte/chamado/<?= $item['id'] ?>" style="color: #39734A; text-decoration: none;">
                           <?= htmlspecialchars($item['protocol']) ?>
                         </a>
                       </td>
                       <td>
-                        <strong style="color: #0F172A; display: block; font-size: 0.9rem;"><?= htmlspecialchars($item['clinic_name']) ?></strong>
+                        <strong style="color: #0F3E17; display: block; font-size: 0.9rem;"><?= htmlspecialchars($item['clinic_name']) ?></strong>
                         <span style="font-size: 0.75rem; color: #64748B;"><?= htmlspecialchars($item['author_name']) ?></span>
                       </td>
                       <td style="font-weight: 600; font-size: 0.9rem;">
@@ -1040,7 +1040,7 @@ class HelpdeskController
                         <?= htmlspecialchars($item['category_label']) ?>
                       </td>
                       <td>
-                        <span class="badge" style="background: #E2E8F0; color: #0F172A; font-size: 0.75rem;">
+                        <span class="badge" style="background: #E2E8F0; color: #0F3E17; font-size: 0.75rem;">
                           <?= htmlspecialchars($item['status_label']) ?>
                         </span>
                       </td>
@@ -1101,10 +1101,10 @@ class HelpdeskController
           <div class="card" style="margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
               <div>
-                <span style="font-family: monospace; font-size: 1.25rem; font-weight: 700; color: #2563EB;">
+                <span style="font-family: monospace; font-size: 1.25rem; font-weight: 700; color: #39734A;">
                   <?= htmlspecialchars($ticket['protocol']) ?>
                 </span>
-                <h1 style="margin: 4px 0 6px 0; font-size: 1.45rem; color: #0F172A;">
+                <h1 style="margin: 4px 0 6px 0; font-size: 1.45rem; color: #0F3E17;">
                   <?= htmlspecialchars($ticket['subject']) ?>
                 </h1>
                 <div style="font-size: 0.85rem; color: #64748B;">
@@ -1130,14 +1130,14 @@ class HelpdeskController
           </div>
 
           <!-- Timeline Completa com Notas Internas Destacadas (NI2-205) -->
-          <h3 style="margin: 0 0 16px 0; font-size: 1.15rem; color: #0F172A;">Timeline Completa do Chamado</h3>
+          <h3 style="margin: 0 0 16px 0; font-size: 1.15rem; color: #0F3E17;">Timeline Completa do Chamado</h3>
           <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px;">
             <?php foreach ($ticket['messages'] as $msg): ?>
               <?php 
                 $isInternal = ((int)$msg['is_internal_note'] === 1);
                 $isAuthor = ((int)$msg['user_id'] === (int)$ticket['user_id']);
               ?>
-              <div style="border-radius: 8px; padding: 16px; border: 1px solid <?= $isInternal ? '#FDE68A' : ($isAuthor ? '#E2E8F0' : '#BFDBFE') ?>; background: <?= $isInternal ? '#FFFBEB' : ($isAuthor ? '#FFFFFF' : '#EFF6FF') ?>;">
+              <div style="border-radius: 8px; padding: 16px; border: 1px solid <?= $isInternal ? '#FDE68A' : ($isAuthor ? '#E2E8F0' : '#BFD8C2') ?>; background: <?= $isInternal ? '#FFFBEB' : ($isAuthor ? '#FFFFFF' : '#E5F0E5') ?>;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <div>
                     <?php if ($isInternal): ?>
@@ -1145,7 +1145,7 @@ class HelpdeskController
                         🔒 NOTA INTERNA (OCULTA DO CLIENTE)
                       </span>
                     <?php endif; ?>
-                    <strong style="color: #0F172A; font-size: 0.95rem;">
+                    <strong style="color: #0F3E17; font-size: 0.95rem;">
                       <?= htmlspecialchars($msg['author_name']) ?> (<?= htmlspecialchars($msg['author_role']) ?>)
                     </strong>
                     <span style="font-size: 0.75rem; color: #64748B; margin-left: 8px;">
@@ -1162,7 +1162,7 @@ class HelpdeskController
 
           <!-- Box de Resposta do Backoffice -->
           <div class="card">
-            <h4 style="margin: 0 0 12px 0; font-size: 1rem; color: #0F172A;">Responder ou Adicionar Nota Interna</h4>
+            <h4 style="margin: 0 0 12px 0; font-size: 1rem; color: #0F3E17;">Responder ou Adicionar Nota Interna</h4>
             <form action="/suporte/chamado/<?= $ticket['id'] ?>/responder" method="POST">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
@@ -1273,7 +1273,7 @@ class HelpdeskController
             // Headings
             if (str_starts_with($trimmed, '### ')) {
                 if ($inList) { $html .= "</ul>\n"; $inList = false; }
-                $html .= "<h3 style='margin: 18px 0 8px 0; color: #0F172A;'>" . htmlspecialchars(substr($trimmed, 4)) . "</h3>\n";
+                $html .= "<h3 style='margin: 18px 0 8px 0; color: #0F3E17;'>" . htmlspecialchars(substr($trimmed, 4)) . "</h3>\n";
                 continue;
             }
             if (str_starts_with($trimmed, '#### ')) {
