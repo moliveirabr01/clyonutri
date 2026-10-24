@@ -192,6 +192,13 @@ $apLonge = $mkAppt($cA, $bia, $profA, $clockTs + 30 * 3600);
 $apCanc = $mkAppt($cA, $bia, $profA, $clockTs + 20 * 3600, 'cancelled');
 $apAgora = $mkAppt($cA, $bia, $profA, $clockTs + 10 * 60);
 $apB = $mkAppt($cB, $beto, $profB, $clockTs + 10 * 3600);
+// Isolamento: o banco de teste é compartilhado com outros testes da suíte, que deixam consultas futuras (ex.: NI2-292 às 14:30).
+// As que não são desta fixture ficam canceladas só durante o S5 e voltam ao status original depois.
+$mineIds = [$apOk, $apConf, $apLonge, $apCanc, $apAgora, $apB];
+$parked = rows($db, "SELECT id, status FROM appointments WHERE status IN ('scheduled', 'confirmed') AND id NOT IN (" . implode(',', $mineIds) . ')');
+foreach ($parked as $pk) {
+    $db->prepare("UPDATE appointments SET status = 'cancelled' WHERE id = ?")->execute([$pk['id']]);
+}
 $sched = new AppointmentReminderScheduler($db, $svc, $clock);
 $rep = $sched->schedule(24);
 $rem = rows($db, "SELECT clinic_id, recipient_id, body, dedupe_key FROM notification_events WHERE event_type = 'appointment.reminder' ORDER BY id");
@@ -213,6 +220,9 @@ check('S5', 'Paciente inativa não recebe lembrete', $sched->schedule(24)['creat
 $db->prepare("UPDATE patients SET status = 'active' WHERE id = ?")->execute([$beto]);
 $svc->savePreferences($cA, 'patient', $bia, ['categories' => ['appointments' => ['email_enabled' => false]]]);
 $svc->drain();
+foreach ($parked as $pk) {
+    $db->prepare('UPDATE appointments SET status = ? WHERE id = ?')->execute([$pk['status'], $pk['id']]);
+}
 $bReason = one($db, "SELECT d.reason FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE e.recipient_id = ? AND e.event_type = 'appointment.reminder' AND d.channel = 'email' ORDER BY d.id LIMIT 1", [$bia]);
 check('S5', 'Lembrete respeita a preferência de consultas da paciente', $bReason === 'preference_off', $bReason);
 
