@@ -29,6 +29,37 @@ class Router
         ];
     }
 
+    /** Formulário enviado por navegador (e não por fetch/API): vale mostrar uma página em vez de JSON. */
+    private static function wantsHtmlPage(): bool
+    {
+        $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+        $contentType = (string)($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '');
+        return str_contains($accept, 'text/html')
+            && !str_contains($contentType, 'json')
+            && strcasecmp((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') !== 0;
+    }
+
+    /** Token vencido ou ausente (sessão expirou, aba antiga, cookie bloqueado): explica e leva de volta à tela certa. */
+    private static function renderExpiredFormPage(string $path): void
+    {
+        $isPublicPatientPath = $path === '/paciente/app' || str_starts_with($path, '/paciente/app/');
+        $isPatient = $isPublicPatientPath || $path === '/app' || str_starts_with($path, '/app/');
+        $backUrl = $isPublicPatientPath ? '/paciente/app' : ($isPatient ? '/app' : '/dashboard');
+        $backLabel = $isPatient ? 'Voltar ao app do paciente' : 'Voltar ao painel';
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+            . '<title>Sessão expirada · ClyoNutri</title></head>'
+            . '<body style="font-family: Inter, Arial, sans-serif; background: #f8fafc; color: #1f2937; margin: 0; padding: 24px;">'
+            . '<main style="max-width: 460px; margin: 10vh auto 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px;">'
+            . '<h1 style="font-size: 1.3rem; margin: 0 0 12px;">Sua sessão expirou</h1>'
+            . '<p style="line-height: 1.5; margin: 0 0 20px;">Por segurança, não enviamos o formulário: a página ficou aberta por muito tempo ou a sessão foi encerrada. '
+            . 'Nada foi salvo. Volte, confira os dados e tente de novo.</p>'
+            . '<a href="' . htmlspecialchars($backUrl, ENT_QUOTES) . '" style="display: inline-block; background: #0f172a; color: #fff; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600;">'
+            . htmlspecialchars($backLabel) . '</a>'
+            . '</main></body></html>';
+    }
+
     public function dispatch(string $method, string $uri): void
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
@@ -39,6 +70,10 @@ class Router
             $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);
+                if (self::wantsHtmlPage()) {
+                    self::renderExpiredFormPage($path);
+                    return;
+                }
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['error' => 'CSRF token inválido ou ausente. Ação bloqueada por segurança.']);
                 return;
