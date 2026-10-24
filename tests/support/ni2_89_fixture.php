@@ -9,8 +9,8 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Database\Migrator;
 
-$isMysqlTestDb = getenv('DB_CONNECTION') === 'mysql' && preg_match('/^ni2_(24|73|89|91|96|137|138)_test_[a-z0-9]+$/', getenv('DB_DATABASE') ?: '');
-if (!$isMysqlTestDb && !preg_match('#^/tmp/ni2-(24|73|89|91|96|137|138)-#', getenv('DB_DATABASE') ?: '')) {
+$isMysqlTestDb = getenv('DB_CONNECTION') === 'mysql' && preg_match('/^ni2_(24|73|89|91|96|132|137|138)_test_[a-z0-9]+$/', getenv('DB_DATABASE') ?: '');
+if (!$isMysqlTestDb && !preg_match('#^/tmp/ni2-(24|73|89|91|96|132|137|138)-#', getenv('DB_DATABASE') ?: '')) {
     throw new RuntimeException('Isolated test database required');
 }
 $db = Connection::getInstance();

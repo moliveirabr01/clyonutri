@@ -33,7 +33,7 @@ let server;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
   const context = {
     Date: Clock, Math, useRef: current => ({ current }), setRegisteringMeal() {},
-    setDiaryEntries() {}, setMealError() {}, setMealFeedback() {}, setMealDraft() {}, displayDateTime: () => "data de teste", Alert: { alert() {} },
+    setDiaryEntries() {}, setMealError() {}, setMealFeedback() {}, setMealDraft() {}, displayDateTime: () => "data de teste", displayLocalDateTime: () => "data de teste", deviceTimezone: () => 'America/Sao_Paulo', ApiError: api.ApiError, Alert: { alert() {} },
     ApiService: { async logMeal(entry) { calls.push(entry); if (!succeed) throw Error('response lost'); return { id: calls.length }; } },
   };
   vm.createContext(context);
@@ -52,6 +52,19 @@ let server;
   await context.register('Jantar');
   assert.equal(calls.length, before);
   complete({ id: 20 }); await first;
+  // NI2-132: o app só reenvia a mesma chave quando faz sentido (erro de rede, 429, sessão); recusa do servidor descarta o pendente.
+  const failWith = (status, kind) => { context.ApiService.logMeal = entry => { calls.push(entry); return Promise.reject(new api.ApiError('Recusado pelo servidor.', status, kind)); }; };
+  failWith(422, 'server'); let n0 = calls.length;
+  await context.register('Lanche', 'Primeira tentativa'); await context.register('Lanche', 'Segunda tentativa');
+  assert.notEqual(calls[n0].idempotency_key, calls[n0 + 1].idempotency_key, '422: o app descarta a chave pendente e gera outra');
+  assert.equal(calls[n0 + 1].description, 'Segunda tentativa');
+  failWith(429, 'server'); n0 = calls.length;
+  await context.register('Ceia', 'Aguardando'); await context.register('Ceia', 'Aguardando');
+  assert.equal(calls[n0].idempotency_key, calls[n0 + 1].idempotency_key, '429: a mesma chave é reaproveitada');
+  failWith(401, 'auth'); n0 = calls.length;
+  await context.register('Brunch', 'Sessão'); await context.register('Brunch', 'Sessão');
+  assert.equal(calls[n0].idempotency_key, calls[n0 + 1].idempotency_key, '401: a mesma chave é reaproveitada depois do login');
+  assert.equal(calls[n0].timezone, 'America/Sao_Paulo');
   console.log('PASS timeout during body, stable retry across minutes, distinct new consumption, synchronous double-touch guard.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
   server?.closeAllConnections(); server?.close(); fs.rmSync(dir, { recursive: true, force: true });

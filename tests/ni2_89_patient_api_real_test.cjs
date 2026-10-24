@@ -81,7 +81,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|#\d+ \/|Uncau
     // Diário: Bruno registra; Ana não vê.
     r = await call('POST', '/api/v1/patient/food-diary', { token: bruno, body: { meal_name: 'Almoço', description: 'Almoço do Bruno' } });
     const brunoDiary = Number(one('SELECT COUNT(*) FROM food_diary_entries WHERE patient_id = 2'));
-    check('idor', 'Diário: o próprio paciente registra (pré-condição)', r.status === 200 && brunoDiary === 1, { status: r.status, body: r.text.slice(0, 160) });
+    check('idor', 'Diário: o próprio paciente registra (pré-condição)', r.status === 201 && brunoDiary === 1, { status: r.status, body: r.text.slice(0, 160) });
     r = await call('GET', '/api/v1/patient/food-diary', { token: ana });
     check('idor', 'Diário: a paciente só vê as próprias entradas', r.status === 200 && !(r.json && JSON.stringify(r.json).includes('Almoço do Bruno')), { brunoDiary, status: r.status });
     r = await call('GET', '/api/v1/patient/food-diary', { token: bruno });
@@ -144,7 +144,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|#\d+ \/|Uncau
     check('erros', 'Diário com refeição no futuro → 422', r.status === 422 && errorShapeOk(r), { status: r.status, body: r.text.slice(0, 160) });
     check('erros', 'Entradas inválidas não gravam nada no diário', Number(one('SELECT COUNT(*) FROM food_diary_entries')) === nDiary);
     r = await call('POST', '/api/v1/patient/food-diary', { token: ana, body: { meal_name: 'Lanche', description: 'Fruta', photo_path: '/etc/passwd' } });
-    check('idor', 'Diário: caminho de foto enviado pelo cliente é ignorado', r.status === 200 && one('SELECT photo_path FROM food_diary_entries WHERE patient_id = 1 ORDER BY id DESC LIMIT 1') === null, { status: r.status });
+    check('idor', 'Diário: caminho de foto enviado pelo cliente é ignorado', r.status === 201 && one('SELECT photo_path FROM food_diary_entries WHERE patient_id = 1 ORDER BY id DESC LIMIT 1') === null, { status: r.status });
     const bad = errors.filter((e) => !e.ok);
     check('erros', `Todas as ${errors.length} respostas de erro observadas são JSON {error} sem detalhe interno`, bad.length === 0, bad.slice(0, 6));
     const codes = errors.filter((e) => e.ok).length;

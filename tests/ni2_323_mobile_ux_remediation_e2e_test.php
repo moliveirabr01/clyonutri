@@ -334,13 +334,13 @@ $idempotencyKey = 'test_key_' . $testRunId . '_click1';
 $mealData = [
     'meal_name' => 'Café da Manhã Realizado',
     'description' => 'Consumi omelete de 2 ovos com café sem açúcar',
-    'consumed_at' => date('Y-m-d H:i:s'),
+    'consumed_at' => date('c'), // com fuso: este processo roda em UTC e a clínica em America/Sao_Paulo
     'idempotency_key' => $idempotencyKey,
 ];
 
 // Primeiro toque: registrar refeição
 $firstPost = apiRequest('POST', '/api/v1/patient/food-diary', $mealData, $patientToken);
-assert($firstPost['status'] === 200, "Erro no 1º envio do diário: {$firstPost['raw']}");
+assert($firstPost['status'] === 201, "Erro no 1º envio do diário: {$firstPost['raw']}");
 $firstEntryId = $firstPost['json']['id'];
 assert($firstEntryId > 0, "ID inválido no 1º envio");
 assert(($firstPost['json']['idempotent_replay'] ?? false) === false, "1º envio incorretamente marcado como replay");

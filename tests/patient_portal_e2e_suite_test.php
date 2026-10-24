@@ -119,15 +119,30 @@ $mealLog = $foodDiaryService->logMeal(1, [
     'hunger_level' => 3,
     'satiety_level' => 4,
 ]);
-assert($mealLog['id'] > 0, "Refeição deve ser persistida com ID válido.");
+// NI2-132: verificações explícitas (assert() não executa com zend.assertions=-1, o padrão de produção).
+if (!isset($mealLog['id']) || $mealLog['id'] <= 0) {
+    throw new Exception("Refeição deve ser persistida com ID válido.");
+}
 echo "  ✓ Registro de refeição salvo com identificação clara de autorrelato.\n";
+foreach ([['meal_name' => ['x']], ['meal_name' => ''], ['meal_name' => 'Almoço', 'consumed_at' => 'ontem'], ['meal_name' => 'Almoço', 'photo_path' => '/etc/passwd']] as $invalid) {
+    try {
+        $foodDiaryService->logMeal(1, $invalid);
+        throw new Exception("Registro inválido foi aceito: " . json_encode($invalid));
+    } catch (InvalidArgumentException $e) {
+        // esperado: entrada recusada com mensagem de validação
+    }
+}
+echo "  ✓ Entradas inválidas (lista, vazio, data ruim, caminho de foto) são recusadas pelo serviço.\n";
+// Cobertura HTTP completa: tests/ni2_132_food_diary_http_test.cjs.
 
 // -----------------------------------------------------------------------------
 // [3/11] NI2-133: Diário Alimentar e Linha do Tempo
 // -----------------------------------------------------------------------------
 echo "[3/11] Testando NI2-133: Diário Alimentar e Linha do Tempo...\n";
 $timeline = $foodDiaryService->getPatientTimeline(1);
-assert(count($timeline) >= 1, "Timeline do paciente deve conter pelo menos 1 refeição.");
+if (count($timeline) < 1) {
+    throw new Exception("Timeline do paciente deve conter pelo menos 1 refeição.");
+}
 assert($timeline[0]['meal_name'] === 'Almoço Prescrito', "Nome da refeição deve coincidir.");
 echo "  ✓ Diário alimentar ordenado cronologicamente consultado com sucesso.\n";
 
