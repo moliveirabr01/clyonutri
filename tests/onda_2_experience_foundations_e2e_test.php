@@ -158,9 +158,9 @@ class Onda2ExperienceFoundationsE2eTest
 
         $hasBtnOutline = str_contains($css, '.btn-outline');
         $hasBadgeDanger = str_contains($css, '.badge-danger');
-        $hasBrandNavy = str_contains($css, '--brand-navy-900: #0F2A44');
-        $hasBrandCopper = str_contains($css, '--brand-copper-500: #E67E3A');
-        $hasDocumentedAliases = str_contains($css, '--brand-navy-reference: #0F2747') && str_contains($css, '--brand-copper-reference: #E67A3F');
+        $hasBrandNavy = str_contains($css, '--brand-navy-900: var(--botanical-forest-900)') && str_contains($css, '--botanical-forest-900: #0F3E17');
+        $hasBrandCopper = str_contains($css, '--brand-copper-500: var(--botanical-copper-500)') && str_contains($css, '--botanical-copper-500: #EF8F4F');
+        $hasDocumentedAliases = str_contains($css, '--brand-navy-reference: var(--botanical-forest-900)') && str_contains($css, '--brand-copper-reference: var(--botanical-copper-500)');
 
         $allOk = $hasBtnOutline && $hasBadgeDanger && $hasBrandNavy && $hasBrandCopper && $hasDocumentedAliases;
 
