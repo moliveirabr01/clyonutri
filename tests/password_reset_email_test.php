@@ -83,7 +83,7 @@ try {
     ok(!str_contains($msg->htmlBody . $msg->textBody, 'evil.example.com'), 'Host header ignorado');
     ok(str_contains($msg->textBody, '30 minutos') && str_contains($msg->htmlBody, '30 minutos'), 'validade de 30 minutos informada');
     ok(str_contains($msg->textBody, 'ignore este e-mail'), 'nota "se não foi você, ignore"');
-    ok(str_contains($msg->htmlBody, '#0F2747') && str_contains($msg->htmlBody, '#E67A3F'), 'cores do Design System (navy/cobre)');
+    ok(str_contains($msg->htmlBody, '#0F3E17') && str_contains($msg->htmlBody, '#39734A'), 'cores do Design System (Forest/Clyo Green)');
     ok(!array_key_exists('token', $res) && !str_contains(json_encode($res), $token), 'resposta do serviço não contém o token');
     ok($res['email_sent'] === true, 'email_sent=true');
     $generic = $res['message'];

@@ -524,7 +524,7 @@ class TeleconsultationController
         $this->securityHeaders();
         echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:#1F2937">'
-            . '<h1 style="font-size:22px;color:#0F2747">Não foi possível abrir a teleconsulta</h1><p>'
+            . '<h1 style="font-size:22px;color:#0F3E17">Não foi possível abrir a teleconsulta</h1><p>'
             . htmlspecialchars($this->safeMessage($e)) . '</p><p><a href="' . htmlspecialchars($back) . '">Voltar</a></p></body></html>';
         exit;
     }
@@ -538,7 +538,7 @@ class TeleconsultationController
             : 'Este link de teleconsulta não está disponível. Ele pode ter expirado, sido substituído ou a consulta pode ter sido encerrada. Fale com seu nutricionista para receber um novo convite.';
         echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:#1F2937">'
-            . '<h1 style="font-size:22px;color:#0F2747">Teleconsulta indisponível</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
+            . '<h1 style="font-size:22px;color:#0F3E17">Teleconsulta indisponível</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
         exit;
     }
 

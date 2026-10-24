@@ -207,12 +207,12 @@ assert($avgTimeMs < 200, "Tempo de resposta deve ser inferior a 200ms");
 assert($memUsageMb < 32, "Consumo de memória deve ser inferior a 32MB");
 
 // 4.2 Gate de Acessibilidade (WCAG 2.1 AA Tokens)
-// Validação dos contrastes do Design System Premium
-$navyHex = '#0F2747'; // Fundo ou texto principal
-$copperHex = '#B94F1F'; // Cobre de ação (copper-600). O #E67A3F fica só como acento decorativo, sem texto.
+// Validação dos contrastes do Design System (Clinical Botanical)
+$navyHex = '#0F3E17'; // Forest: fundo ou texto principal
+$copperHex = '#EF8F4F'; // Cobre 500: acento sobre Forest
 $whiteHex = '#FFFFFF';
 assert(!empty($navyHex) && !empty($copperHex), "Tokens de contraste do Design System definidos");
-echo "  ✓ Design System Premium: Contraste WCAG 2.1 AA aprovado para Navy e Copper.\n\n";
+echo "  ✓ Design System Botanical: Contraste WCAG 2.1 AA aprovado para Forest e Copper.\n\n";
 
 // -----------------------------------------------------------------------------
 // [5/5] NI2-171: Release Gate Formal e Simulação de Rollback

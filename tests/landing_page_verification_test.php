@@ -197,9 +197,9 @@ $cssPath = $rootDir . '/public/assets/css/landing-premium.css';
 assertCheck("Arquivo landing-premium.css existe", file_exists($cssPath));
 
 $cssContent = (string)file_get_contents($cssPath);
-assertCheck("Token de cor Navy (#0F2747) configurado", str_contains($cssContent, '#0F2747'));
-assertCheck("Token de cor Copper (#E67A3F) configurado", str_contains($cssContent, '#E67A3F'));
-assertCheck("Token Warm Neutral (#FAF7F2) configurado", str_contains($cssContent, '#FAF7F2'));
+assertCheck("Token de cor Forest (#0F3E17) configurado", str_contains($cssContent, '#0F3E17'));
+assertCheck("Token de cor Copper (#EF8F4F) configurado", str_contains($cssContent, '#EF8F4F'));
+assertCheck("Token Cream (#FAF9F4) configurado", str_contains($cssContent, '#FAF9F4'));
 assertCheck("Tipografia Playfair Display e Inter declaradas", str_contains($cssContent, 'Playfair Display') && str_contains($cssContent, 'Inter'));
 assertCheck("Regra de foco visível (:focus-visible) para acessibilidade", str_contains($cssContent, ':focus-visible'));
 assertCheck("Breakpoints responsivos (1024px, 768px) definidos", str_contains($cssContent, '@media (max-width: 1024px)') && str_contains($cssContent, '@media (max-width: 768px)'));

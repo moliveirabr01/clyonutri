@@ -5,9 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cadastre-se — ClyoNutri</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css">
   <style>
     .auth-wrapper {
@@ -16,7 +15,7 @@
       align-items: center;
       justify-content: center;
       padding: var(--space-6);
-      background: linear-gradient(135deg, #F8F4ED 0%, #F8F4ED 100%);
+      background: linear-gradient(135deg, #FAF9F4 0%, #FAF9F4 100%);
     }
     .auth-card {
       width: 100%;
@@ -72,8 +71,8 @@
   
     .password-field { position: relative; }
     .password-field input { padding-right: 88px; }
-    .password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; min-width: 72px; border: 1px solid var(--neutral-gray-300, #CBD5E1); background: #fff; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--brand-navy-900, #0F2747); }
-    .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #A3532A); outline-offset: 2px; }
+    .password-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; min-width: 72px; border: 1px solid var(--neutral-gray-300, #CBD5E1); background: #fff; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--brand-navy-900, #0F3E17); }
+    .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #B04A1B); outline-offset: 2px; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
 </head>

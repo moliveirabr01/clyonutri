@@ -253,7 +253,7 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro gravado com sucesso no prontuário!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Operação realizada com sucesso!')) ?>
           </div>
         <?php endif; ?>
@@ -777,7 +777,7 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação registrada com sucesso!' : ($_GET['success'] === 'avaliacao_ja_registrada' ? 'Esta avaliação já estava registrada; o reenvio não criou duplicata.' : 'Permissão de compartilhamento atualizada com sucesso!') ?>
           </div>
         <?php endif; ?>
@@ -857,7 +857,7 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Alternativa Textual Acessível -->
-        <div class="card" style="border-left: 4px solid var(--brand-copper-500); background: #FAF7F2; margin-bottom: var(--space-6);">
+        <div class="card" style="border-left: 4px solid var(--brand-copper-500); background: #FAF9F4; margin-bottom: var(--space-6);">
           <div style="display: flex; gap: 12px; align-items: center;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             <div>
@@ -1305,7 +1305,7 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ <?= $_GET['success'] === 'registro_adicionado' ? 'Evolução clínica registrada no prontuário!' : ($_GET['success'] === 'registro_retificado' ? 'Retificação versionada gravada com justificativa formal!' : 'Operação realizada com sucesso!') ?>
           </div>
         <?php endif; ?>
@@ -1343,13 +1343,13 @@ class DashboardController
 
         <!-- Barra de Integridade e Autenticidade Clínica -->
         <?php if ((int)($integrity['total_records'] ?? 0) > 0 || !$integrity['is_valid']): ?>
-        <div style="background: <?= $integrity['is_valid'] ? '#F0FDF4' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#BBF7D0' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="background: <?= $integrity['is_valid'] ? '#E3F4F2' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#B7DFDC' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#22C55E' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#0A7075' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
               <?= $integrity['is_valid'] ? '✓' : '!' ?>
             </div>
             <div>
-              <strong style="color: <?= $integrity['is_valid'] ? '#166534' : '#991B1B' ?>; font-size: 0.95rem;">
+              <strong style="color: <?= $integrity['is_valid'] ? '#0A5F63' : '#991B1B' ?>; font-size: 0.95rem;">
                 <?= $integrity['is_valid'] ? 'Histórico Clínico Autêntico e Protegido Contra Adulteração' : 'Atenção: Integridade dos registros precisa de verificação' ?>
               </strong>
               <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
@@ -1815,7 +1815,7 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div role="status" aria-live="polite" style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div role="status" aria-live="polite" style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ <?= $_GET['success'] === 'rascunho_salvo' ? 'Rascunho da anamnese salvo com sucesso. Você pode continuar preenchendo a qualquer momento.' : ($_GET['success'] === 'anamnese_concluida' ? 'Anamnese concluída e assinada com sucesso! A versão foi arquivada no histórico do prontuário.' : 'Anamnese salva. As versões anteriores continuam disponíveis no histórico.') ?>
           </div>
         <?php endif; ?>
@@ -2636,7 +2636,7 @@ class DashboardController
               <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
 
               <?php if (!empty($app['notes'])): ?>
-                <div style="margin-top: var(--space-4); padding: var(--space-3); background: #FAF7F2; border-left: 3px solid var(--brand-copper-500); border-radius: 4px;">
+                <div style="margin-top: var(--space-4); padding: var(--space-3); background: #FAF9F4; border-left: 3px solid var(--brand-copper-500); border-radius: 4px;">
                   <strong style="font-size: 0.8125rem; color: var(--brand-navy-900);">Observações do Agendamento:</strong>
                   <p style="font-size: 0.875rem; color: var(--neutral-gray-700); margin-top: 4px;"><?= nl2br(htmlspecialchars($app['notes'])) ?></p>
                 </div>
@@ -3034,12 +3034,12 @@ class DashboardController
         ?>
         <!-- Alertas de Feedback -->
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ <?= $_GET['success'] === 'agendado' ? 'Consulta agendada com sucesso!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Consulta atualizada com sucesso!') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['status_updated'])): ?>
-          <div style="background: #E8F5E9; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #18794E; font-weight: 500;">
+          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
             ✓ Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
           </div>
         <?php endif; ?>
@@ -3269,7 +3269,7 @@ class DashboardController
                   $isToday = $dayDate === $todayDate;
                   $dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][date('w', strtotime($dayDate))];
                 ?>
-                <div style="background: <?= $isToday ? '#FFF4ED' : '#F8FAFC' ?>; border: 1px solid <?= $isToday ? 'var(--brand-copper-500)' : 'var(--neutral-gray-200)' ?>; border-radius: 8px; padding: 12px; min-height: 220px; display: flex; flex-direction: column;">
+                <div style="background: <?= $isToday ? '#FBEADF' : '#F8FAFC' ?>; border: 1px solid <?= $isToday ? 'var(--brand-copper-500)' : 'var(--neutral-gray-200)' ?>; border-radius: 8px; padding: 12px; min-height: 220px; display: flex; flex-direction: column;">
                   <div style="border-bottom: 1px solid var(--neutral-gray-200); padding-bottom: 8px; margin-bottom: 8px; text-align: center;">
                     <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: <?= $isToday ? 'var(--brand-copper-600)' : 'var(--brand-navy-900)' ?>;"><?= $dayName ?></span>
                     <strong style="display: block; font-size: 1rem; color: var(--brand-navy-900);"><?= date('d/m', strtotime($dayDate)) ?></strong>
@@ -3358,7 +3358,7 @@ class DashboardController
         </div>
 
         <?php if ($feedback): ?>
-          <div style="background: #e8f5e9; color: #2e7d32; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #c8e6c9;">
+          <div style="background: #E3F4F2; color: #0A5F63; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #E3F4F2;">
             <?= htmlspecialchars($feedback) ?>
           </div>
         <?php endif; ?>
@@ -3540,7 +3540,7 @@ class DashboardController
           <div>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
               <a href="/planos" style="text-decoration: none; color: #475569; font-size: 0.9rem;">← Voltar para lista</a>
-              <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#def7ec' ?>; color: <?= $isDraft ? '#854d0e' : '#03543f' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
+              <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#E3F4F2' ?>; color: <?= $isDraft ? '#854d0e' : '#0A5F63' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
                 <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (versão ' . (int)$plan['version'] . ', somente leitura)' ?>
               </span>
             </div>
@@ -3565,7 +3565,7 @@ class DashboardController
         </div>
 
         <?php if ($feedback): ?>
-          <div style="background: #e8f5e9; color: #2e7d32; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #c8e6c9;">
+          <div style="background: #E3F4F2; color: #0A5F63; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #E3F4F2;">
             <?= htmlspecialchars($feedback) ?>
           </div>
         <?php endif; ?>
@@ -3631,7 +3631,7 @@ class DashboardController
           </div>
         <?php endif; ?>
         <?php if (!empty($preview['allergen_safety']['unverified_foods']) || !empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
-          <div role="status" data-testid="allergen-unverified" style="background: #fff7ed; color: #7c2d12; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fed7aa;">
+          <div role="status" data-testid="allergen-unverified" style="background: #FBEADF; color: #8F3D14; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #FBEADF;">
             <strong style="display: block; margin-bottom: 6px;">Alergia registrada: confira os alimentos abaixo</strong>
             <?php if (!empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
               <p style="margin: 0 0 6px; font-size: 0.9rem;">A alergia descrita na anamnese não corresponde a um grupo alergênico conhecido, então nenhum alimento pôde ser conferido automaticamente.</p>
@@ -3675,7 +3675,7 @@ class DashboardController
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Energia Diária</div>
             <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">kcal</span></div><?= $unknownNote('energy_kcal') ?>
           </div>
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #10b981;">
+          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #0A7075;">
             <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Carboidratos</div>
             <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('carbohydrate_g') ?>
           </div>
@@ -4440,7 +4440,7 @@ class DashboardController
         </div>
 
         <?php if (!empty($feedbackMessage)): ?>
-          <div class="alert alert-success" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #ecfdf5; border: 1px solid #10b981; color: #065f46; display: flex; align-items: center; gap: 10px;">
+          <div class="alert alert-success" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #E3F4F2; border: 1px solid #0A7075; color: #0A5F63; display: flex; align-items: center; gap: 10px;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             <span><?= htmlspecialchars($feedbackMessage) ?></span>
           </div>
@@ -4463,15 +4463,15 @@ class DashboardController
             <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Aguardando baixa de pagamento</div>
           </div>
 
-          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-success, #10b981);">
+          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-success, #0A7075);">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Recebido (Quitado)</div>
-            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--semantic-success, #10b981);">
+            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--semantic-success, #0A7075);">
               R$ <?= number_format($summary['total_paid_cents'] / 100, 2, ',', '.') ?>
             </div>
             <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Baixas confirmadas no sistema</div>
           </div>
 
-          <div class="card" style="padding: 20px; border-left: 4px solid var(--brand-copper-500, #E67A3F);">
+          <div class="card" style="padding: 20px; border-left: 4px solid var(--brand-copper-500, #EF8F4F);">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total de Lançamentos</div>
             <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900);">
               <?= (int)$summary['total_count'] ?>
@@ -4483,7 +4483,7 @@ class DashboardController
         <?php if (empty($receivables)): ?>
           <!-- Estado Vazio Explicativo com Design System Ratificado e CTA Operacional Real (PX-12) -->
           <div class="card" style="padding: 48px 32px; text-align: center; border: 1.5px dashed var(--neutral-gray-300); background: #ffffff; border-radius: var(--radius-lg, 12px);">
-            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(230, 122, 63, 0.12); display: flex; align-items: center; justify-content: center; color: var(--brand-copper-600);">
+            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(239, 143, 79, 0.12); display: flex; align-items: center; justify-content: center; color: var(--brand-copper-600);">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect width="20" height="14" x="2" y="5" rx="2"></rect>
                 <line x1="2" x2="22" y1="10" y2="10"></line>
@@ -4686,7 +4686,7 @@ class DashboardController
 
               <div style="display: flex; justify-content: flex-end; gap: 12px;">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-dar-baixa">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #10b981); border-color: var(--semantic-success, #10b981);">Confirmar Recebimento</button>
+                <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #0A7075); border-color: var(--semantic-success, #0A7075);">Confirmar Recebimento</button>
               </div>
             </form>
           </div>
@@ -5186,7 +5186,7 @@ class DashboardController
         ob_start();
         ?>
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(24, 121, 78, 0.2);">
+          <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(10, 112, 117, 0.2);">
             ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado. Próximo passo: abra o perfil para agendar ou iniciar o atendimento.' ?>
             <?php if ($createdId): ?><a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a><?php endif; ?>
           </div>
@@ -5469,7 +5469,7 @@ class DashboardController
         </form>
 
         <!-- Banner Explicativo de Integridade Clínica (PX-16) -->
-        <div class="card" style="padding: 16px 20px; background: rgba(15, 39, 71, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
+        <div class="card" style="padding: 16px 20px; background: rgba(15, 62, 23, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem; margin-bottom: 4px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             Diferença entre Referência Padrão (100g) e Medida Caseira

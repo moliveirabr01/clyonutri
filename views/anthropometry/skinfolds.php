@@ -77,7 +77,7 @@ $formAction = $correcting
   <?php endif; ?>
 
   <?php if (!$p || !$eligibleNow): ?>
-    <p role="status" style="color: #7c2d12;">Nenhum protocolo elegível com os dados atuais. <?= $p ? $e(Catalog::ineligibilityReason($protocol, $sex, $age)) : '' ?></p>
+    <p role="status" style="color: #8F3D14;">Nenhum protocolo elegível com os dados atuais. <?= $p ? $e(Catalog::ineligibilityReason($protocol, $sex, $age)) : '' ?></p>
   <?php else: ?>
   <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.85rem; margin-bottom: 16px;" data-testid="protocol-provenance">
     <strong><?= $e($p['name']) ?></strong><br>
@@ -192,9 +192,9 @@ $formAction = $correcting
         <line x1="<?= $padL ?>" x2="<?= $w - $padR ?>" y1="<?= round($y($v), 1) ?>" y2="<?= round($y($v), 1) ?>" stroke="#e2e8f0" />
         <text x="<?= $padL - 6 ?>" y="<?= round($y($v), 1) + 4 ?>" font-size="11" text-anchor="end" fill="#64748b"><?= $num($v, 0) ?>%</text>
       <?php endfor; ?>
-      <path d="<?= $path ?>" fill="none" stroke="#B94F1F" stroke-width="2" />
+      <path d="<?= $path ?>" fill="none" stroke="#B04A1B" stroke-width="2" />
       <?php foreach ($pts as $i => $pt): ?>
-        <circle cx="<?= round($x($i), 1) ?>" cy="<?= round($y($pt['body_fat_pct']), 1) ?>" r="4" fill="#B94F1F"><title><?= $e(date('d/m/Y', strtotime($pt['date']))) ?>: <?= $num($pt['body_fat_pct']) ?>% (soma <?= $num($pt['sum_mm']) ?> mm, versão <?= (int)$pt['version'] ?>, catálogo <?= $e($pt['catalog_version']) ?>)</title></circle>
+        <circle cx="<?= round($x($i), 1) ?>" cy="<?= round($y($pt['body_fat_pct']), 1) ?>" r="4" fill="#B04A1B"><title><?= $e(date('d/m/Y', strtotime($pt['date']))) ?>: <?= $num($pt['body_fat_pct']) ?>% (soma <?= $num($pt['sum_mm']) ?> mm, versão <?= (int)$pt['version'] ?>, catálogo <?= $e($pt['catalog_version']) ?>)</title></circle>
         <text x="<?= round($x($i), 1) ?>" y="<?= $h - 10 ?>" font-size="11" text-anchor="<?= $i === $n - 1 ? 'end' : ($i === 0 ? 'start' : 'middle') ?>" fill="#64748b"><?= $e(date('d/m/y', strtotime($pt['date']))) ?></text>
       <?php endforeach; ?>
     </svg>
@@ -230,7 +230,7 @@ $formAction = $correcting
             <?php if ($m['fat_mass_kg'] !== null): ?><span style="color: #475569;"> · massa gorda <?= $num($m['fat_mass_kg']) ?> kg · massa magra <?= $num($m['lean_mass_kg']) ?> kg</span><?php endif; ?>
             <br><small style="color: #64748b;">Por <?= $e($m['professional_name']) ?> · <?= $e($sexLabel[$m['equation_sex']] ?? $m['equation_sex']) ?>, <?= (int)$m['age_years'] ?> anos na equação · versão <?= (int)$m['version'] ?></small>
             <?php if ($m['warnings']): ?>
-              <ul style="margin: 6px 0 0; padding-left: 20px; color: #7c2d12; font-size: 0.85rem;">
+              <ul style="margin: 6px 0 0; padding-left: 20px; color: #8F3D14; font-size: 0.85rem;">
                 <?php foreach ($m['warnings'] as $w): ?><li><?= $e($w['message']) ?></li><?php endforeach; ?>
               </ul>
             <?php endif; ?>

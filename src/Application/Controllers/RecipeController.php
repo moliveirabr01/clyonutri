@@ -176,7 +176,7 @@ class RecipeController
               <div class="card" style="display: flex; flex-direction: column; padding: 0; overflow: hidden; margin-bottom: 0;">
                 <div style="padding: var(--space-5); border-bottom: 1px solid var(--neutral-gray-200);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #EAD8C7; padding: 2px 8px; border-radius: var(--radius-pill);">
+                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #D3E5D5; padding: 2px 8px; border-radius: var(--radius-pill);">
                       <?= htmlspecialchars($r['meal_type'] ?: $r['category']) ?>
                     </span>
                     <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; color: var(--neutral-gray-500);">
@@ -283,7 +283,7 @@ class RecipeController
         <div class="card" style="margin-bottom: var(--space-6);">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-4);">
             <div>
-              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #EAD8C7; padding: 3px 10px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: var(--space-2);">
+              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #D3E5D5; padding: 3px 10px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: var(--space-2);">
                 <?= htmlspecialchars($recipe['meal_type'] ?: $recipe['category']) ?>
               </span>
               <h1 style="font-family: var(--font-editorial); font-size: 2rem; color: var(--brand-navy-900); margin-bottom: var(--space-2);"><?= htmlspecialchars($recipe['title']) ?></h1>
@@ -390,7 +390,7 @@ class RecipeController
                 Valores calculados <strong>por porção</strong> (<?= number_format((float)$recipe['serving_size_g'], 1, ',', '.') ?> g):
               </p>
 
-              <div style="background: var(--neutral-warm-50); border: 1px solid #EAD8C7; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-4);">
+              <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-4);">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); border-bottom: 2px solid var(--brand-navy-900); margin-bottom: var(--space-2);">
                   <strong style="color: var(--brand-navy-900); font-size: 1.1rem;">Valor Energético</strong>
                   <strong style="color: var(--brand-copper-600); font-size: 1.3rem;"><?= number_format((float)$recipe['energy_kcal_per_serving'], 1, ',', '.') ?> kcal</strong>

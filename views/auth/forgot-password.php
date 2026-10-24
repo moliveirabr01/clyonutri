@@ -5,9 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recuperar Acesso — ClyoNutri</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css">
   <style>
     .auth-wrapper {
@@ -16,7 +15,7 @@
       align-items: center;
       justify-content: center;
       padding: var(--space-6);
-      background: linear-gradient(135deg, #F8F4ED 0%, #F8F4ED 100%);
+      background: linear-gradient(135deg, #FAF9F4 0%, #FAF9F4 100%);
     }
     .auth-card {
       width: 100%;
@@ -54,13 +53,13 @@
       border: 1px solid rgba(180, 35, 24, 0.2);
     }
     .alert-success {
-      background-color: var(--semantic-success-light, #E8F5E9);
-      color: var(--semantic-success, #18794E);
+      background-color: var(--semantic-success-light, #E3F4F2);
+      color: var(--semantic-success, #0A7075);
       padding: var(--space-3) var(--space-4);
       border-radius: var(--radius-input);
       font-size: 0.9rem;
       margin-bottom: var(--space-5);
-      border: 1px solid rgba(24, 121, 78, 0.2);
+      border: 1px solid rgba(10, 112, 117, 0.2);
       line-height: 1.5;
     }
     .auth-footer {

@@ -321,7 +321,7 @@ class ChatController
     <style>
         :root {
             --patient-bubble: #f1f5f9;
-            --nutri-bubble: #047857; /* NI2-138: contraste AA com texto branco */
+            --nutri-bubble: #39734A; /* NI2-138: contraste AA com texto branco */
             --nutri-bubble-text: #ffffff;
         }
 
@@ -356,7 +356,7 @@ class ChatController
         .conv-list-header h2 {
             font-size: 1.1rem;
             font-weight: 600;
-            color: var(--brand-navy-900, #0f172a);
+            color: var(--brand-navy-900, #0F3E17);
             margin: 0;
         }
         .conv-list-items {
@@ -377,8 +377,8 @@ class ChatController
         }
         .conv-card:hover { background: #f8fafc; }
         .conv-card.active {
-            background: #ecfdf5;
-            border-left: 4px solid #059669;
+            background: #E5F0E5;
+            border-left: 4px solid #39734A;
         }
         .conv-card-title {
             display: flex;
@@ -386,7 +386,7 @@ class ChatController
             margin-bottom: 4px;
             font-weight: 600;
             font-size: 0.95rem;
-            color: var(--brand-navy-900, #0f172a);
+            color: var(--brand-navy-900, #0F3E17);
         }
         .conv-card-time {
             font-size: 0.75rem;
@@ -404,7 +404,7 @@ class ChatController
             align-items: center;
         }
         .badge-unread {
-            background: #047857;
+            background: #39734A;
             color: white;
             font-size: 0.7rem;
             font-weight: 700;
@@ -433,7 +433,7 @@ class ChatController
             font-size: 1.05rem;
             font-weight: 600;
             margin: 0;
-            color: var(--brand-navy-900, #0f172a);
+            color: var(--brand-navy-900, #0F3E17);
         }
         .chat-topbar-info p {
             font-size: 0.8rem;
@@ -441,8 +441,8 @@ class ChatController
             margin: 0;
         }
         .chat-security-tag {
-            background: #ecfdf5;
-            color: #047857;
+            background: #E5F0E5;
+            color: #39734A;
             padding: 4px 10px;
             border-radius: 6px;
             font-size: 0.75rem;
@@ -472,7 +472,7 @@ class ChatController
         .chat-bubble.patient {
             align-self: flex-start;
             background: var(--patient-bubble);
-            color: #0f172a;
+            color: #0F3E17;
             border-bottom-left-radius: 4px;
         }
         .chat-bubble.professional {
@@ -527,9 +527,9 @@ class ChatController
             height: 48px;
             transition: border-color 0.15s ease;
         }
-        .chat-textarea:focus { border-color: #059669; }
+        .chat-textarea:focus { border-color: #39734A; }
         .btn-send {
-            background: #047857;
+            background: #39734A;
             color: white;
             border: none;
             padding: 0 20px;
@@ -539,7 +539,7 @@ class ChatController
             cursor: pointer;
             transition: background 0.15s ease;
         }
-        .btn-send:hover { background: #065F46; }
+        .btn-send:hover { background: #2F6140; }
         .file-label {
             cursor: pointer;
             padding: 10px;
@@ -550,7 +550,7 @@ class ChatController
             align-items: center;
             justify-content: center;
         }
-        .file-label:hover { background: #f8fafc; color: #0f172a; }
+        .file-label:hover { background: #f8fafc; color: #0F3E17; }
         .file-input { display: none; }
 
         /* Empty State */
@@ -564,7 +564,7 @@ class ChatController
             padding: 40px;
             text-align: center;
         }
-        .empty-chat h3 { font-size: 1.2rem; color: #0f172a; margin-bottom: 8px; }
+        .empty-chat h3 { font-size: 1.2rem; color: #0F3E17; margin-bottom: 8px; }
 
         /* Responsividade */
         @media (max-width: 1024px) {

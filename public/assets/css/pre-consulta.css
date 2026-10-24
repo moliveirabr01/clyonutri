@@ -1,5 +1,14 @@
 /* Pré-consulta do paciente (NI2-437). Contraste AA, alvos de toque >= 44px, foco visível. */
-:root { --pc-navy: #0F2747; --pc-copper: #B94F1F; --pc-ink: #1F2937; --pc-muted: #4B5563; --pc-bg: #FAF7F2; --pc-line: #E2E8F0; --pc-error: #B42318; }
+:root {
+  --pc-navy: #0F3E17;
+  --pc-green: #39734A;
+  --pc-copper: #B04A1B;
+  --pc-ink: #1F2937;
+  --pc-muted: #4B5563;
+  --pc-bg: #FAF9F4;
+  --pc-line: #E2E8F0;
+  --pc-error: #B42318;
+}
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--pc-bg); color: var(--pc-ink); font-family: Inter, Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; }
 .pc-skip { position: absolute; left: -9999px; top: 0; background: #fff; color: var(--pc-navy); padding: 8px 12px; z-index: 10; }
@@ -28,7 +37,7 @@ body { margin: 0; background: var(--pc-bg); color: var(--pc-ink); font-family: I
 .pc-error-summary { background: #FEF3F2; border: 2px solid var(--pc-error); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .pc-error-summary h2 { margin: 0 0 8px; font-size: 1.1rem; color: var(--pc-error); }
 .pc-error-summary a { color: var(--pc-error); }
-.pc-notice { background: #ECFDF3; border: 1px solid #ABEFC6; border-radius: 12px; padding: 12px 16px; color: #05603A; }
+.pc-notice { background: #E3F4F2; border: 1px solid #B7DFDC; border-radius: 12px; padding: 12px 16px; color: #0A5F63; }
 .pc-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
 .pc-btn { font: inherit; font-weight: 700; min-height: 48px; padding: 12px 20px; border-radius: 10px; border: 2px solid var(--pc-navy); background: var(--pc-navy); color: #fff; cursor: pointer; }
 .pc-btn-secondary { background: #fff; color: var(--pc-navy); }
