@@ -438,6 +438,7 @@ $router->get('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signa
 $router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
 $router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
 $router->get('/planos/{id}/imprimir', $requireAuth([$dashCtrl, 'printMealPlan']));
+$router->get('/planos/{id}/lista-compras', $requireAuth([$dashCtrl, 'shoppingList']));
 $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
 $router->post('/planos/{id}/refeicoes', $requireAuth([$dashCtrl, 'addMealToPlan']));
 $router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl, 'deleteMealFromPlan']));
@@ -1253,6 +1254,26 @@ $router->get('/api/v1/patient/recipes-shopping-list', function() use ($authentic
     $recipeService = new \ClyoNutri\Domain\Recipe\RecipeService($db);
     $list = $recipeService->generateShoppingListFromRecipes($patientId, [], $days);
     echo json_encode(['data' => $list]);
+});
+
+// Lista de Compras do Plano Alimentar Publicado Vigente (NI2-116)
+$router->get('/api/v1/patient/shopping-list', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $days = isset($_GET['days']) ? max(1, min(90, (int)$_GET['days'])) : 7;
+
+    try {
+        $service = new \ClyoNutri\Domain\ShoppingList\ShoppingListService($db);
+        $list = $service->generateForPatient($patientId, $days);
+        echo json_encode(['data' => $list]);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(404);
+        echo json_encode(['error' => $e->getMessage()]);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Erro interno ao processar lista de compras.']);
+    }
 });
 
 // 5. API Móvel do Nutricionista / Profissional (/api/v1/professional/... — NI2-292)

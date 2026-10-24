@@ -77,7 +77,11 @@ assert($template['id'] > 0, "Template deve ser criado com sucesso");
 $novoPlano = $templateService->applyTemplateToPatient($template['id'], $patient['id'], $nutri['user_id']);
 assert($novoPlano['plan_id'] > 0, "Plano deve ser gerado a partir do template");
 assert($novoPlano['daily_energy_kcal'] > 400.0, "Cálculo calórico automático aplicado");
-echo "  ✓ Template criado e clonado para o paciente em 1 clique (Total: {$novoPlano['daily_energy_kcal']} kcal).\n\n";
+
+// Publicar o plano para atender AC1 do NI2-116 (somente versões publicadas)
+$mealPlanService = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+$mealPlanService->publishPlan($novoPlano['plan_id']);
+echo "  ✓ Template criado, clonado para o paciente e publicado com sucesso (Total: {$novoPlano['daily_energy_kcal']} kcal).\n\n";
 
 // 2. NI2-114: Módulo de Receitas Culinárias com Cálculo Nutricional
 echo "[2/4] Testando NI2-114: Módulo de Receitas Culinárias...\n";

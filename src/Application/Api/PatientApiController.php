@@ -170,6 +170,19 @@ class PatientApiController
         return $this->portal()->getPrescribedWaterGoal($patientId);
     }
 
+    /**
+     * Retorna lista de compras e receitas do plano alimentar publicado vigente (NI2-116).
+     */
+    public function getShoppingList(int $patientId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $days = isset($_GET['days']) ? max(1, min(90, (int)$_GET['days'])) : 7;
+        $service = new \ClyoNutri\Domain\ShoppingList\ShoppingListService($this->db);
+        return $service->generateForPatient($patientId, $days);
+    }
+
     public function portal(): \ClyoNutri\Domain\PatientPortal\PatientPortalService
     {
         return new \ClyoNutri\Domain\PatientPortal\PatientPortalService($this->db);

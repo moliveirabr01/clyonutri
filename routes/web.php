@@ -64,6 +64,7 @@ $router->post('/consulta/{id}/concluir', [DashboardController::class, 'completeC
 // Nutrição, Planos e Finanças
 $router->get('/alimentos', [DashboardController::class, 'foods'])->name('foods.index');
 $router->get('/planos', [DashboardController::class, 'mealPlans'])->name('mealplans.index');
+$router->get('/planos/{id}/lista-compras', [DashboardController::class, 'shoppingList'])->name('mealplans.shopping_list');
 $router->get('/financeiro', [DashboardController::class, 'finance'])->name('finance.index');
 $router->get('/configuracoes', [DashboardController::class, 'settings'])->name('settings.index');
 

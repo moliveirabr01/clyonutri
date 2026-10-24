@@ -16,6 +16,7 @@ $router->post('/api/v1/patient/logout', [PatientApiController::class, 'logout'])
 // 2. Recursos Protegidos do Paciente (Sanctum Auth)
 $router->get('/api/v1/patient/home', [PatientApiController::class, 'home']);
 $router->get('/api/v1/patient/meal-plan', [PatientApiController::class, 'getDailyMealPlan']);
+$router->get('/api/v1/patient/shopping-list', [PatientApiController::class, 'getShoppingList']);
 $router->post('/api/v1/patient/hydration', [PatientApiController::class, 'logHydration']);
 $router->post('/api/v1/patient/checkin', [PatientApiController::class, 'submitCheckin']);
 $router->post('/api/v1/patient/appointment/confirm', [PatientApiController::class, 'confirmAppointment']);

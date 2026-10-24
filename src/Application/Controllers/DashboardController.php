@@ -1637,6 +1637,36 @@ class DashboardController
     }
 
     /**
+     * Lista de compras interativa e categorizada por gôndolas (NI2-116).
+     */
+    public function shoppingList(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $days = isset($_GET['dias']) ? max(1, min(90, (int)$_GET['dias'])) : 7;
+
+        try {
+            $db = Connection::getInstance();
+            $service = new \ClyoNutri\Domain\ShoppingList\ShoppingListService($db);
+            // No painel profissional, permitimos preview de rascunhos com badge indicativo
+            $list = $service->generateForPlan($planId, $days, ['require_published' => false]);
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(403);
+            echo 'Acesso não autorizado ao plano desta clínica.';
+            return;
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(404);
+            echo htmlspecialchars($e->getMessage());
+            return;
+        }
+
+        if (!headers_sent()) {
+            header('Cache-Control: no-store');
+            header('Referrer-Policy: same-origin');
+        }
+        require __DIR__ . '/../../../views/meal_plans/shopping_list.php';
+    }
+
+    /**
      * Prontuário para impressão (A4 / salvar em PDF pelo navegador).
      * Rota sob /pacientes: perfis não clínicos (ex.: secretaria) já são barrados pela autorização web.
      */
@@ -3510,6 +3540,7 @@ class DashboardController
             <p style="color: var(--neutral-gray-500); margin-top: 4px;">Paciente: <strong><?= htmlspecialchars($plan['patient_name']) ?></strong> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <a href="/planos/<?= (int)$planId ?>/lista-compras" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">🛒 Lista de Compras</a>
             <a href="/planos/<?= (int)$planId ?>/imprimir" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">Imprimir plano</a>
             <?php if ($canEditItems): ?>
             <form method="POST" action="/planos/<?= $planId ?>/duplicar" data-confirm="Deseja criar um novo rascunho a partir deste plano?">
