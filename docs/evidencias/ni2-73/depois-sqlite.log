@@ -1,0 +1,35 @@
+PASS [base] TACO 4ª ed. importada do CSV (593 alimentos)
+PASS [termos] Dois termos fora da ordem e da pontuação da TACO: "arroz integral" acha "Arroz, integral, cozido" e "…cru"
+PASS [termos] Ordem invertida ("cozido arroz integral") acha o mesmo alimento
+PASS [termos] Sem acento, maiúsculas e espaços extras ("FEIJAO   carioca")
+PASS [termos] "pão francês" acha "Pão, trigo, francês" (termos não precisam estar juntos)
+PASS [termos] Plural simples ("ovos") acha "Ovo, …"
+PASS [termos] Três termos restringem ("frango peito grelhado" → só o peito grelhado)
+PASS [termos] Alimento da própria clínica entra na busca ("queijo casa" → "Pão de queijo da casa")
+PASS [ordem] "maçã": os nomes que começam com a palavra vêm antes de "Macarrão" e "Banana, maçã"
+PASS [ordem] "leite integral": o que começa com "Leite" vem antes de "Canjica, com leite integral"
+PASS [autocomplete] Começo de palavra ("fran") já traz Frango primeiro
+PASS [autocomplete] Campo vazio lista o catálogo (25 por página, em ordem alfabética)
+PASS [paginação] Página 1 com 25, has_more e total; página 2 sem repetir
+PASS [paginação] Última página: has_more=false
+PASS [paginação] Página fora de 1–100, busca em lista e busca com mais de 80 caracteres → 422
+PASS [paginação] Caracteres especiais (%, _, !) não viram curinga nem erro; número é termo ("100")
+PASS [paginação] "_" sozinho não é curinga: lista o catálogo em ordem (sem erro)
+PASS [porção] Alimento com medidas: porção de referência e medidas caseiras no resultado
+PASS [origem] Alimento da clínica identificado (is_custom, "Cadastro da clínica nº …")
+PASS [porção] Alimento TACO sem medida: diz que os valores são por 100 g (não inventa porção)
+PASS [origem] Alimento TACO com origem e número oficial ("TACO 4ª ed. nº 1")
+PASS [isolamento] Alimento personalizado de outra clínica não aparece
+PASS [acesso] Recepção não usa o catálogo (403)
+PASS [acesso] Sem login → 401 (pedido JSON) sem dados
+PASS [índice] Alimento inserido direto no banco (como no SQL manual da TACO) aparece na próxima busca
+PASS [índice] Nenhum alimento sem texto de busca depois da sincronização
+PASS [base] /alimentos com termos responde (antes: 500 no SQLite) e lista os dois arrozes integrais
+PASS [base] /alimentos busca também pela categoria ("leguminosas")
+PASS [desempenho] Base representativa carregada: 20909 alimentos (400 clínicas × 50 + 300 da própria clínica + TACO)
+DESEMPENHO {"search":{"n":60,"p50_ms":7.6,"p95_ms":11.2,"max_ms":49.5},"page":{"n":6,"p50_ms":17.8,"p95_ms":19.9,"max_ms":19.9},"foods_total":20909,"driver":"sqlite","budget_p95_ms":300}
+PASS [desempenho] Busca do seletor (60 buscas, HTTP): p95 11.2 ms ≤ 300 ms
+PASS [desempenho] Base de alimentos (/alimentos): p95 19.9 ms ≤ 600 ms
+PASS [desempenho] Com a base grande, alimentos de outras clínicas continuam fora (total só TACO + própria clínica)
+
+NI2-73 (SQLite): 32 PASS, 0 FAIL

@@ -1,0 +1,21 @@
+PASS [base] TACO 4ª ed. importada do CSV (593 alimentos)
+FAIL [termos] Dois termos fora da ordem e da pontuação da TACO: "arroz integral" acha "Arroz, integral, cozido" e "…cru" → []
+FAIL [termos] Ordem invertida ("cozido arroz integral") acha o mesmo alimento → []
+FAIL [termos] Sem acento, maiúsculas e espaços extras ("FEIJAO   carioca") → []
+FAIL [termos] "pão francês" acha "Pão, trigo, francês" (termos não precisam estar juntos) → ["Torrada, pão francês"]
+FAIL [termos] Plural simples ("ovos") acha "Ovo, …" → ["Macarrão, trigo, cru, com ovos","Maionese, tradicional com ovos"]
+FAIL [termos] Três termos restringem ("frango peito grelhado" → só o peito grelhado) → []
+FAIL [termos] Alimento da própria clínica entra na busca ("queijo casa" → "Pão de queijo da casa") → []
+FAIL [ordem] "maçã": os nomes que começam com a palavra vêm antes de "Macarrão" e "Banana, maçã" → ["Banana, maçã, crua","Macarrão, instantâneo","Macarrão, molho bolognesa","Macarrão, trigo, cru","Macarrão, trigo, cru, com ovos","Macaúba, crua","Maçã, Argentina, com casca, crua","Maçã, Fuji, com casca, crua"]
+FAIL [ordem] "leite integral": o que começa com "Leite" vem antes de "Canjica, com leite integral" → ["Canjica, com leite integral"]
+FAIL [autocomplete] Começo de palavra ("fran") já traz Frango primeiro → ["Coxinha de frango, frita","Empada de frango, pré-cozida, assada","Empada, de frango, pré-cozida","Estrogonofe de frango"]
+PASS [autocomplete] Campo vazio lista o catálogo (25 por página, em ordem alfabética)
+FAIL [paginação] Página 1 com 25, has_more e total; página 2 sem repetir → {"n2":25}
+PASS [paginação] Página fora de 1–100, busca em lista e busca com mais de 80 caracteres → 422
+PASS [paginação] Caracteres especiais (%, _, !) não viram curinga nem erro; número é termo ("100")
+FAIL [paginação] "_" sozinho não é curinga: lista o catálogo em ordem (sem erro) → 200
+FAIL [porção] Alimento com medidas: porção de referência e medidas caseiras no resultado
+FAIL [origem] Alimento da clínica identificado (is_custom, "Cadastro da clínica nº …")
+FAIL [erro] Execução sem exceção → "TypeError: Cannot read properties of undefined (reading 'portion')\n    at <arvore-d73ce0b>/tests/ni2_73_food_search_real_test.cjs:111:110\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+
+NI2-73 (SQLite): 4 PASS, 15 FAIL

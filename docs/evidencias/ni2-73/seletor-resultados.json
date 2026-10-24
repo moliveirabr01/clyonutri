@@ -1,0 +1,40 @@
+{
+ "checks": [
+  {
+   "n": "Busca por termos no seletor: \"arroz integral\" traz \"Arroz, integral, cozido\" e \"…cru\"",
+   "ok": true
+  },
+  {
+   "n": "Cada resultado mostra origem (Catálogo TACO e nº TACO) e a porção (\"valores por 100 g\" quando não há medida)",
+   "ok": true
+  },
+  {
+   "n": "Alimento da clínica com medidas caseiras: \"Porção: 1 unidade = 40 g · 1 unidade pequena = 20 g…\"",
+   "ok": true
+  },
+  {
+   "n": "Contagem honesta com paginação: \"Mostrando 25 de N alimentos\"",
+   "ok": true
+  },
+  {
+   "n": "\"Carregar mais\" acrescenta a página 2 (50 de N)",
+   "ok": true
+  },
+  {
+   "n": "Escolha por teclado (seta + Enter) seleciona o primeiro resultado",
+   "ok": true
+  },
+  {
+   "n": "Sem resultado: orienta a tentar outro nome ou menos palavras",
+   "ok": true
+  },
+  {
+   "n": "Diálogo de busca sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script",
+   "ok": true
+  }
+ ]
+}

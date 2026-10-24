@@ -175,23 +175,32 @@ class FoodCatalogService
         $where = '(is_custom = 0 OR clinic_id = :clinic_id)';
         $params = ['clinic_id' => $clinicId];
 
+        $order = 'name ASC, id ASC';
+        $orderParams = [];
         if ($q !== '') {
-            $normalized = mb_strtolower(strtr($q, self::ACCENTS));
-            $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $normalized) . '%';
-            $nameSql = 'name';
-            foreach (self::ACCENTS as $from => $to) {
-                $nameSql = 'REPLACE(' . $nameSql . ', ' . $this->db->quote($from) . ', ' . $this->db->quote($to) . ')';
+            // NI2-73: termos em qualquer ordem no nome (foods.search_text) OU o texto inteiro no nome da categoria.
+            // Sem a cadeia de REPLACE no SQL (estourava a pilha do parser do SQLite: 500 em qualquer busca).
+            FoodSearchIndex::sync($this->db);
+            $terms = FoodSearchIndex::terms($q);
+            $fs = FoodSearchIndex::sql($terms);
+            $catMatches = [];
+            $needle = FoodSearchIndex::normalize($q);
+            foreach ($this->listCategories() as $cat) {
+                if ($needle !== '' && str_contains(FoodSearchIndex::normalize($cat), $needle)) {
+                    $catMatches[] = $cat;
+                }
             }
-            $nameSql = 'LOWER(' . $nameSql . ')';
-            // Também busca na categoria (placeholder da UI: "alimento ou categoria")
-            $catSql = "COALESCE(category, '')";
-            foreach (self::ACCENTS as $from => $to) {
-                $catSql = 'REPLACE(' . $catSql . ', ' . $this->db->quote($from) . ', ' . $this->db->quote($to) . ')';
+            $catSql = '';
+            foreach ($catMatches as $i => $cat) {
+                $params["cat_m{$i}"] = $cat;
             }
-            $catSql = 'LOWER(' . $catSql . ')';
-            $where .= " AND ({$nameSql} LIKE :term ESCAPE '!' OR {$catSql} LIKE :term_cat ESCAPE '!')";
-            $params['term'] = $like;
-            $params['term_cat'] = $like;
+            if ($catMatches) {
+                $catSql = ' OR category IN (' . implode(',', array_map(static fn($i) => ":cat_m{$i}", array_keys($catMatches))) . ')';
+            }
+            $where .= " AND ({$fs['where']}{$catSql})";
+            $params += $fs['where_params'];
+            $order = $fs['order'] . ', id ASC';
+            $orderParams = $fs['order_params'];
         }
 
         if ($category !== '') {
@@ -213,9 +222,9 @@ class FoodCatalogService
         $page = max(1, min($pages, $page));
         $offset = ($page - 1) * $perPage;
 
-        $sql = "SELECT * FROM foods WHERE {$where} ORDER BY name ASC, id ASC LIMIT :limit OFFSET :offset";
+        $sql = "SELECT * FROM foods WHERE {$where} ORDER BY {$order} LIMIT :limit OFFSET :offset";
         $stmt = $this->db->prepare($sql);
-        foreach ($params as $k => $v) {
+        foreach ($params + $orderParams as $k => $v) {
             $stmt->bindValue(':' . $k, $v);
         }
         $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);

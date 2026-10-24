@@ -30,8 +30,11 @@
       meta.className = 'food-result__meta'; meta.dataset.reference = refOf(food);
       meta.textContent = [food.category, refOf(food)].filter(Boolean).join(' · ');
       energy.textContent = fmt(food.energy_kcal) + ' kcal · P ' + fmt(food.protein_g) + ' g · C ' + fmt(food.carbohydrate_g) + ' g · G ' + fmt(food.lipid_g) + ' g por 100 g';
-      button.append(name, badge, meta, energy);
-      button.setAttribute('aria-label', food.name + ', ' + originOf(food) + ', ' + meta.textContent + ', ' + energy.textContent);
+      // NI2-73: porção de referência e medidas caseiras cadastradas (ou o aviso de que não há).
+      const portion = document.createElement('span'); portion.className = 'food-result__portion';
+      portion.textContent = (food.portion && food.portion.label) || 'Valores por 100 g';
+      button.append(name, badge, meta, energy, portion);
+      button.setAttribute('aria-label', food.name + ', ' + originOf(food) + ', ' + meta.textContent + ', ' + energy.textContent + ', ' + portion.textContent);
       button.addEventListener('click', () => {
         select.value = String(food.id); validate(); render();
         chosen.textContent = 'Selecionado: ' + food.name + ' (' + refOf(food) + ')'; chosen.hidden = false;
@@ -88,7 +91,10 @@
         if (!append) { foods = []; select.replaceChildren(new Option('Selecione um alimento', '')); }
         data.data.forEach(food => { if (!foods.some(item => String(item.id) === String(food.id))) { foods.push(food); select.add(new Option(food.name, food.id)); } });
         render(); validate();
-        status.textContent = foods.length ? (foods.length === 1 ? '1 alimento encontrado.' : foods.length + ' alimentos encontrados.') + ' Clique para selecionar.' : 'Nenhum alimento encontrado. Tente outro nome.';
+        const total = Number.isFinite(data.total) ? data.total : foods.length;
+        status.textContent = foods.length
+          ? (total === 1 ? '1 alimento encontrado.' : (foods.length < total ? 'Mostrando ' + foods.length + ' de ' + total + ' alimentos.' : total + ' alimentos encontrados.')) + ' Clique para selecionar.'
+          : 'Nenhum alimento encontrado. Tente outro nome ou menos palavras.';
         next.hidden = !data.has_more;
       } catch (error) {
         if (error.name !== 'AbortError' && seq === sequence) { status.textContent = 'Não foi possível buscar alimentos. Tente novamente.'; retry.hidden = false; }

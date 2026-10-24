@@ -1,0 +1,68 @@
+# SQL manual da migração 50 (NI2-73) no MySQL 8.0.46-0ubuntu0.24.04.4
+## 1) Banco da instalação até a migração 49 (chaves INT)
+dados: alimentos da instalação (TACO completa)
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_49_aplicada	alimentos	alimentos_taco	alimentos_das_clinicas	maior_nome
+OK — PRONTO PARA MIGRAR	1	0	1	594	594	0	64
+### migração
+resultado	alimentos	a_indexar_na_primeira_busca
+OK — migração 50 aplicada (busca de alimentos por termos)	594	594
+### migração de novo (idempotente)
+resultado	alimentos	a_indexar_na_primeira_busca
+OK — migração 50 aplicada (busca de alimentos por termos)	594	594
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_49_aplicada	alimentos	alimentos_taco	alimentos_das_clinicas	maior_nome
+OK — migração 50 já aplicada	1	1	1	594	594	0	64
+### coluna e índice
+COLUMN_NAME	COLUMN_TYPE	IS_NULLABLE
+search_text	varchar(255)	YES
+INDEX_NAME
+idx_foods_name
+idx_foods_search_text
+### o app preenche search_text na primeira busca
+indexados: 594
+name	search_text
+Arroz integral cozido	 arroz integral cozido 
+Feijão carioca cozido	 feijao carioca cozido 
+Castanha-do-Pará	 castanha do para 
+Pão, de queijo, cru	 pao de queijo cru 
+Castanha-de-caju, torrada, salgada	 castanha de caju torrada salgada 
+sem_texto
+0
+### migrations
+migration
+2026_10_23_000050_add_food_search_text
+
+## 2) Banco no formato da produção (chaves BIGINT UNSIGNED)
+dados: alimentos da instalação (TACO completa)
+### preflight (antes)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_49_aplicada	alimentos	alimentos_taco	alimentos_das_clinicas	maior_nome
+OK — PRONTO PARA MIGRAR	1	0	1	594	594	0	64
+### migração
+resultado	alimentos	a_indexar_na_primeira_busca
+OK — migração 50 aplicada (busca de alimentos por termos)	594	594
+### migração de novo (idempotente)
+resultado	alimentos	a_indexar_na_primeira_busca
+OK — migração 50 aplicada (busca de alimentos por termos)	594	594
+### preflight (depois)
+preflight_status	pronto_para_migrar	migracao_ja_aplicada	migracao_49_aplicada	alimentos	alimentos_taco	alimentos_das_clinicas	maior_nome
+OK — migração 50 já aplicada	1	1	1	594	594	0	64
+### coluna e índice
+COLUMN_NAME	COLUMN_TYPE	IS_NULLABLE
+search_text	varchar(255)	YES
+INDEX_NAME
+idx_foods_name
+idx_foods_search_text
+### o app preenche search_text na primeira busca
+indexados: 594
+name	search_text
+Arroz integral cozido	 arroz integral cozido 
+Feijão carioca cozido	 feijao carioca cozido 
+Castanha-do-Pará	 castanha do para 
+Pão, de queijo, cru	 pao de queijo cru 
+Castanha-de-caju, torrada, salgada	 castanha de caju torrada salgada 
+sem_texto
+0
+### migrations
+migration
+2026_10_23_000050_add_food_search_text
