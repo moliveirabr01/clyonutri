@@ -251,6 +251,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </div>
 
         <form method="POST" action="/app/primeiro-acesso">
+          <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
           <input type="hidden" name="invitation_code" value="<?= htmlspecialchars((string)$codeVal) ?>">
 
           <div class="form-group">
@@ -402,8 +403,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         <!-- Aba 2: Login com Credenciais -->
         <div id="tab-login" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-login" hidden>
           <form method="POST" action="/app/login">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
             <div class="form-group">
-              <label class="form-label" for="login-input">E-mail, celular ou CPF</label>
+              <label class="form-label" for="login-input">E-mail ou celular</label>
               <input class="form-control" id="login-input" type="text" name="login" required placeholder="Digite seus dados de acesso">
             </div>
             <div class="form-group">
