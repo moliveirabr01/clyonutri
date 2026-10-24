@@ -36,7 +36,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       align-items: center;
       gap: 12px;
       text-decoration: none;
-      color: #0f172a;
+      color: #0F3E17;
       font-weight: 700;
       font-size: 1.15rem;
     }
@@ -71,12 +71,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       border-bottom: 3px solid #e2e8f0;
     }
     .step-pill.active {
-      color: #c2410c;
-      border-bottom-color: #c2410c;
+      color: #39734A;
+      border-bottom-color: #39734A;
     }
     .step-pill.completed {
-      color: #16a34a;
-      border-bottom-color: #16a34a;
+      color: #0A7075;
+      border-bottom-color: #0A7075;
     }
     .form-group {
       margin-bottom: 20px;
@@ -98,8 +98,8 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     }
     .form-control:focus {
       outline: none;
-      border-color: #c2410c;
-      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
+      border-color: #39734A;
+      box-shadow: 0 0 0 3px rgba(57, 115, 74, 0.20);
     }
     .modality-picker {
       display: grid;
@@ -116,11 +116,11 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       transition: all 0.2s ease;
     }
     .modality-card:hover {
-      border-color: #fdba74;
+      border-color: #BFD8C2;
     }
     .modality-card.selected {
-      border-color: #c2410c;
-      background: #fff7ed;
+      border-color: #39734A;
+      background: #E5F0E5;
     }
     .slots-grid {
       display: grid;
@@ -138,19 +138,19 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       border-radius: 8px;
       font-size: 0.95rem;
       font-weight: 600;
-      color: #0f172a;
+      color: #0F3E17;
       cursor: pointer;
       transition: all 0.15s ease;
     }
     .slot-btn:hover {
-      background: #c2410c;
+      background: #39734A;
       color: #fff;
-      border-color: #c2410c;
+      border-color: #39734A;
     }
     .slot-btn.selected {
-      background: #c2410c;
+      background: #39734A;
       color: #fff;
-      border-color: #c2410c;
+      border-color: #39734A;
     }
     .hold-banner {
       background: #fef3c7;
@@ -173,7 +173,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     .btn-submit {
       width: 100%;
       padding: 14px;
-      background: #c2410c;
+      background: #39734A;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -183,7 +183,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       transition: background 0.15s ease;
     }
     .btn-submit:hover {
-      background: #9a3412;
+      background: #2F6140;
     }
     .btn-cancel-hold {
       background: none;
@@ -206,17 +206,17 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       color: #991b1b;
     }
     .alert-success {
-      background: #f0fdf4;
-      border-left: 4px solid #16a34a;
-      color: #166534;
+      background: #E3F4F2;
+      border-left: 4px solid #0A7075;
+      color: #0A5F63;
     }
   </style>
 </head>
 <body>
   <header class="booking-header">
     <a href="/agendar" class="booking-header__brand">
-      <span style="color: #c2410c;">Clyo</span>Nutri
-      <span style="font-size: 0.8rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 9999px; font-weight: 500;">Autoagendamento</span>
+      <span style="color: #B04A1B;">Clyo</span>Nutri
+      <span style="font-size: 0.8rem; background: #E5F0E5; color: #0F3E17; padding: 2px 8px; border-radius: 9999px; font-weight: 500;">Autoagendamento</span>
     </a>
     <div>
       <a href="/app" style="color: #475569; text-decoration: none; font-size: 0.9rem; font-weight: 500;">
@@ -239,13 +239,13 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
       <!-- ETAPA 1: Seleção de Especialista e Modalidade -->
       <section id="section-step-1">
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0 0 16px 0; color: #0f172a;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0 0 16px 0; color: #0F3E17;">
           Escolha o profissional e a modalidade
         </h2>
 
         <div class="form-group">
           <p class="form-label" style="margin-bottom: 4px;">Nutricionista</p>
-          <p style="margin: 0; font-weight: 700; color: #0f172a;" data-testid="booking-professional"><?= htmlspecialchars($selectedProf['name']) ?> <span style="font-weight: 400; color: #475569;">— <?= htmlspecialchars($selectedProf['clinic_name']) ?></span></p>
+          <p style="margin: 0; font-weight: 700; color: #0F3E17;" data-testid="booking-professional"><?= htmlspecialchars($selectedProf['name']) ?> <span style="font-weight: 400; color: #475569;">— <?= htmlspecialchars($selectedProf['clinic_name']) ?></span></p>
           <p style="margin: 4px 0 0; font-size: 0.85rem; color: #475569;">Consulta de <?= (int)$selectedProf['duration_minutes'] ?> minutos.</p>
           <select id="select-prof" hidden aria-hidden="true" tabindex="-1"><option value="<?= (int)$selectedProf['id'] ?>" data-clinic="<?= (int)$selectedProf['clinic_id'] ?>" selected></option></select>
         </div>
@@ -256,14 +256,14 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <?php if ($allowPres): ?>
           <div class="modality-card selected" id="modality-presential" data-value="presential">
             <div style="font-size: 1.5rem; margin-bottom: 6px;">🏢</div>
-            <strong style="color: #0f172a; display: block;">Presencial</strong>
+            <strong style="color: #0F3E17; display: block;">Presencial</strong>
             <span style="font-size: 0.8rem; color: #475569;">No consultório</span>
           </div>
           <?php endif; ?>
           <?php if ($allowTele): ?>
           <div class="modality-card<?= $allowPres ? '' : ' selected' ?>" id="modality-telehealth" data-value="telehealth">
             <div style="font-size: 1.5rem; margin-bottom: 6px;">📹</div>
-            <strong style="color: #0f172a; display: block;">Teleconsulta</strong>
+            <strong style="color: #0F3E17; display: block;">Teleconsulta</strong>
             <span style="font-size: 0.8rem; color: #475569;">Vídeo sem app</span>
           </div>
           <?php endif; ?>
@@ -285,7 +285,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       <!-- ETAPA 2: Seleção de Data e Slot -->
       <section id="section-step-2" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #0f172a;">
+          <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #0F3E17;">
             Selecione o dia e o horário
           </h2>
           <button type="button" id="btn-back-to-step-1" class="btn-cancel-hold">&larr; Voltar</button>
@@ -324,7 +324,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
         </div>
 
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0 0 16px 0; color: #0f172a;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0 0 16px 0; color: #0F3E17;">
           Identificação do Paciente
         </h2>
 
@@ -353,7 +353,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <div class="form-group" style="margin-bottom: 24px;">
             <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; color: #475569; cursor: pointer;">
               <input type="checkbox" id="terms-accept" required style="margin-top: 2px;">
-              <span>Li e aceito o termo &ldquo;<?= htmlspecialchars((string)($consentTerm['title'] ?? 'Assistência clínica')) ?>&rdquo; (versão <?= htmlspecialchars((string)($consentTerm['version'] ?? '')) ?>) e autorizo o uso dos meus dados para o atendimento nutricional. <a href="/privacidade" target="_blank" rel="noopener" style="color: #c2410c;">Política de privacidade</a>.</span>
+              <span>Li e aceito o termo &ldquo;<?= htmlspecialchars((string)($consentTerm['title'] ?? 'Assistência clínica')) ?>&rdquo; (versão <?= htmlspecialchars((string)($consentTerm['version'] ?? '')) ?>) e autorizo o uso dos meus dados para o atendimento nutricional. <a href="/privacidade" target="_blank" rel="noopener" style="color: #B04A1B;">Política de privacidade</a>.</span>
             </label>
           </div>
 
@@ -366,7 +366,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       <!-- ETAPA 4: Sucesso e Comprovante -->
       <section id="section-step-4" style="display: none; text-align: center;">
         <div style="font-size: 3rem; margin-bottom: 12px;">🎉</div>
-        <h2 style="font-size: 1.4rem; font-weight: 700; color: #166534; margin: 0 0 8px 0;">
+        <h2 style="font-size: 1.4rem; font-weight: 700; color: #0A5F63; margin: 0 0 8px 0;">
           Consulta Agendada com Sucesso!
         </h2>
         <p style="color: #475569; font-size: 0.95rem; margin: 0 0 24px 0;">
@@ -375,13 +375,13 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px;">
           <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Código da Consulta</div>
-          <div id="receipt-id" style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px;"></div>
+          <div id="receipt-id" style="font-size: 1.1rem; font-weight: 700; color: #0F3E17; margin-bottom: 12px;"></div>
 
           <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Data e Horário</div>
-          <div id="receipt-datetime" style="font-size: 1.05rem; font-weight: 600; color: #0f172a; margin-bottom: 12px;"></div>
+          <div id="receipt-datetime" style="font-size: 1.05rem; font-weight: 600; color: #0F3E17; margin-bottom: 12px;"></div>
 
           <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">Modalidade</div>
-          <div id="receipt-modality" style="font-size: 1rem; color: #0f172a;"></div>
+          <div id="receipt-modality" style="font-size: 1rem; color: #0F3E17;"></div>
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: center;">

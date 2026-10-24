@@ -9,16 +9,18 @@
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <style>
     :root {
-      --admin-navy-950: #070d17;
-      --admin-navy-900: #0b192c;
-      --admin-navy-850: #0f243d;
-      --admin-navy-800: #1e3e62;
-      --admin-navy-700: #2d5584;
-      --admin-copper-600: #c2410c;
-      --admin-copper-500: #ea580c;
-      --admin-copper-400: #f97316;
-      --admin-copper-100: #ffedd5;
-      --admin-copper-50: #fff7ed;
+      --admin-navy-950: #0A2A10;
+      --admin-navy-900: #0F3E17;
+      --admin-navy-850: #154820;
+      --admin-navy-800: #1B5226;
+      --admin-navy-700: #2F6140;
+      --admin-green-600: #39734A;
+      --admin-green-700: #2F6140;
+      --admin-copper-600: #B04A1B;
+      --admin-copper-500: #EF8F4F;
+      --admin-copper-400: #F4A06A;
+      --admin-copper-100: #FBEADF;
+      --admin-copper-50: #FDF4EE;
       --admin-gray-50: #f8fafc;
       --admin-gray-100: #f1f5f9;
       --admin-gray-200: #e2e8f0;
@@ -30,9 +32,10 @@
       --admin-gray-800: #1e293b;
       --admin-gray-900: #0f172a;
       /* Semânticos = os mesmos do DS (clinical-botanical.css). Os Tailwind 600 de antes
-         ficavam abaixo de 4,5:1 como texto (sucesso 3,3; alerta 3,2; info 4,1). NI2-25. */
-      --admin-success: #18794E;
-      --admin-success-bg: #dcfce7;
+         ficavam abaixo de 4,5:1 como texto (sucesso 3,3; alerta 3,2; info 4,1). NI2-25.
+         Sucesso é teal (distinto do Clyo Green da marca). */
+      --admin-success: #0A7075;
+      --admin-success-bg: #E3F4F2;
       --admin-warning: #946200;
       --admin-warning-bg: #fef3c7;
       --admin-danger: #B42318;
@@ -79,7 +82,7 @@
       width: 100%;
     }
 
-    /* Sidebar - Navy Escuro com Acentos Cobre */
+    /* Sidebar - Forest escuro com acentos cobre (nomes --admin-navy-* são legados; o valor é Forest) */
     .admin-sidebar {
       width: 270px;
       background-color: var(--admin-navy-900);
@@ -111,7 +114,7 @@
       color: #fff;
       font-weight: 700;
       font-size: 1.1rem;
-      box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+      box-shadow: 0 2px 8px rgba(239, 143, 79, 0.35);
     }
 
     .admin-sidebar__brand-text h1 {
@@ -210,7 +213,7 @@
       height: 8px;
       border-radius: 50%;
       background-color: var(--admin-success);
-      box-shadow: 0 0 6px rgba(24, 121, 78, 0.6);
+      box-shadow: 0 0 6px rgba(10, 112, 117, 0.6);
     }
 
     /* Main Content Area */
@@ -270,9 +273,9 @@
     }
     .admin-search-form input:focus {
       outline: none;
-      border-color: var(--admin-copper-500);
+      border-color: var(--admin-green-600);
       background-color: #fff;
-      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+      box-shadow: 0 0 0 3px rgba(57, 115, 74, 0.18);
     }
     .admin-search-icon {
       position: absolute;
@@ -389,8 +392,8 @@
     }
     .admin-alert--success {
       background-color: var(--admin-success-bg);
-      color: #14532d;
-      border: 1px solid #bbf7d0;
+      color: #0A5F63;
+      border: 1px solid #B7DFDC;
     }
     .admin-alert--error {
       background-color: var(--admin-danger-bg);
@@ -466,7 +469,7 @@
     }
     .badge--active, .badge--success {
       background-color: var(--admin-success-bg);
-      color: #15803d;
+      color: #0A5F63;
     }
     .badge--suspended, .badge--danger {
       background-color: var(--admin-danger-bg);
@@ -477,8 +480,8 @@
       color: #b45309;
     }
     .badge--info {
-      background-color: var(--admin-info-bg);
-      color: #0369a1;
+      background-color: var(--botanical-sage-100, #E5F0E5);
+      color: #0F3E17;
     }
 
     .btn {
@@ -496,11 +499,11 @@
       transition: all 0.15s;
     }
     .btn--primary {
-      background-color: var(--admin-copper-600);
+      background-color: var(--admin-green-600);
       color: #fff;
     }
     .btn--primary:hover {
-      background-color: var(--admin-copper-500);
+      background-color: var(--admin-green-700);
     }
     .btn--secondary {
       background-color: #fff;

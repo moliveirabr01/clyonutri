@@ -1,5 +1,5 @@
 /* Prontuário para impressão — A4, tokens do design system ClyoNutri. */
-:root { --navy: #0F2747; --copper-dark: #B94F1F; --text: #1F2937; --muted: #667085; --border: #E5E7EB; --error: #B42318; }
+:root { --navy: #0F3E17; --green: #39734A; --copper-dark: #B04A1B; --text: #1F2937; --muted: #667085; --border: #E5E7EB; --error: #B42318; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--text); background: #F4F5F6; font-size: 14px; line-height: 1.5; }
 .pi-toolbar { max-width: 210mm; margin: 16px auto 0; padding: 12px 16px; background: #fff; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
@@ -9,7 +9,7 @@ body { margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; co
 .pi-check input { width: 18px; height: 18px; }
 .pi-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pi-btn { min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: var(--navy); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
-.pi-btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.pi-btn-primary { background: var(--green); border-color: var(--green); color: #fff; }
 .pi-btn:focus-visible, input:focus-visible { outline: 3px solid var(--copper-dark); outline-offset: 2px; }
 .pi-page { max-width: 210mm; margin: 16px auto; padding: 18mm 16mm; background: #fff; border: 1px solid var(--border); }
 .pi-header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--navy); padding-bottom: 10px; margin-bottom: 14px; flex-wrap: wrap; }

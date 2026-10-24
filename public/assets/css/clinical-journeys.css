@@ -1,7 +1,7 @@
 .skip-clinical-content { position: absolute; left: -9999px; }
 .skip-clinical-content:focus { left: var(--space-4); top: var(--space-3); z-index: 2000; background: var(--neutral-white); padding: var(--space-3); }
 .clinical-mobile-priority, #clinical-menu-toggle { display: none; }
-.badge-success { color: #246443; }
+.badge-success { color: #0A5F63; }
 .app-main { min-width: 0; }
 .app-content { min-width: 0; }
 :focus-visible { outline: 3px solid var(--brand-copper-600); outline-offset: 3px; }
@@ -45,26 +45,26 @@ html.cn-dialog-open { overflow: hidden; }
 
 /* NI2-415 (UX-03): resultados de alimentos distinguíveis */
 .food-result { display: grid; gap: 2px; text-align: left; }
-.food-result__badge { justify-self: start; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #EEF2F7; color: #1E3A5F; }
-.food-result__badge--custom { background: #FFF4ED; color: #9A3412; }
+.food-result__badge { justify-self: start; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #E5F0E5; color: #0F3E17; }
+.food-result__badge--custom { background: #FBEADF; color: #8F3D14; }
 .food-result__meta { font-size: 0.75rem; color: #475569; }
 .food-result__dup { font-size: 0.72rem; color: #92400E; }
 /* UX-08 (v14): grupo de cadastros equivalentes */
 .food-result-group { display: flex; flex-direction: column; gap: 4px; }
-.food-result__equivalents { align-self: flex-start; background: none; border: none; padding: 2px 4px; font-size: 0.75rem; color: var(--brand-copper-600, #9A5B2E); text-decoration: underline; cursor: pointer; text-align: left; }
+.food-result__equivalents { align-self: flex-start; background: none; border: none; padding: 2px 4px; font-size: 0.75rem; color: var(--brand-copper-600, #B04A1B); text-decoration: underline; cursor: pointer; text-align: left; }
 .food-result--equivalent { margin-left: 16px; border-style: dashed; }
 
 /* NI2-418 (UX-06): próximo passo e navegação por seções do perfil */
-.cn-next-step { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-left: 4px solid var(--brand-copper-500, #C2703D); margin-bottom: var(--space-4); }
+.cn-next-step { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-left: 4px solid var(--brand-copper-500, #B04A1B); margin-bottom: var(--space-4); }
 .cn-section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-6); padding: 0; list-style: none; }
-.cn-section-nav a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--neutral-gray-300, #CBD5E1); border-radius: 999px; text-decoration: none; color: var(--brand-navy-900, #0F2747); font-size: 0.85rem; background: #fff; }
+.cn-section-nav a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--neutral-gray-300, #CBD5E1); border-radius: 999px; text-decoration: none; color: var(--brand-navy-900, #0F3E17); font-size: 0.85rem; background: #fff; }
 [id^="secao-"] { scroll-margin-top: 16px; }
 
 /* NI2-420 (UX-08): índice e barra de ações persistente da anamnese */
 .cn-anamnesis-index { position: sticky; top: 0; z-index: 5; background: var(--neutral-white, #fff); padding: 8px 0; margin-bottom: 12px; border-bottom: 1px solid var(--neutral-gray-200, #E2E8F0); }
 .cn-anamnesis-index ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-.cn-anamnesis-index a { display: inline-flex; gap: 4px; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--neutral-gray-300, #CBD5E1); font-size: 0.8rem; text-decoration: none; color: var(--brand-navy-900, #0F2747); }
-.cn-anamnesis-index a[data-filled="true"]::before { content: "●"; color: #18794E; }
+.cn-anamnesis-index a { display: inline-flex; gap: 4px; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--neutral-gray-300, #CBD5E1); font-size: 0.8rem; text-decoration: none; color: var(--brand-navy-900, #0F3E17); }
+.cn-anamnesis-index a[data-filled="true"]::before { content: "●"; color: #0A7075; }
 .cn-anamnesis-index a[data-filled="false"]::before { content: "○"; color: #94A3B8; }
 .cn-sticky-actions { position: sticky; bottom: 0; z-index: 5; background: var(--neutral-white, #fff); display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; border-top: 1px solid var(--neutral-gray-200, #E2E8F0); padding: 12px 0; }
 .cn-sticky-actions__status { margin-right: auto; font-size: 0.8rem; color: #475569; }

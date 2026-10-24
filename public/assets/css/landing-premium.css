@@ -1,20 +1,33 @@
-/* Landing e páginas legais. Navy, cobre 500 e warm 50 seguem clinical-botanical.css
-   (estavam nos valores antigos, de antes do PX-21). Cobre 600, cinza 500 e tinta 900
-   ficam um pouco mais escuros aqui de propósito: texto pequeno sobre fundo creme
-   precisa de folga de contraste. NI2-25 — ver docs/design-system/tokens.md. */
+/* Landing e páginas legais — paleta oficial Clinical Botanical (NI2-25).
+   Os valores Botanical são os mesmos de clinical-botanical.css (o teste confere). Os nomes
+   --brand-* são legados e apontam para eles. Cinza 500 e tinta 900 ficam um pouco mais
+   escuros aqui de propósito: texto pequeno sobre fundo Cream precisa de folga de contraste.
+   Ver docs/design-system/tokens.md. */
 :root {
-  --brand-navy-900: #0F2747;
-  --brand-navy-800: #193C58;
-  --brand-copper-500: #E67A3F;
-  --brand-copper-600: #A94716;
-  --brand-green-500: #2E7D58;
-  --brand-green-200: #A7C7A1;
-  --neutral-warm-50: #FAF7F2;
+  --botanical-forest-950: #0A2A10;
+  --botanical-forest-900: #0F3E17;
+  --botanical-forest-800: #1B5226;
+  --botanical-green-700: #2F6140;
+  --botanical-green-600: #39734A;
+  --botanical-sage-300: #BFD8C2;
+  --botanical-sage-200: #D3E5D5;
+  --botanical-sage-100: #E5F0E5;
+  --botanical-cream-50: #FAF9F4;
+  --botanical-copper-400: #F4A06A;
+  --botanical-copper-500: #EF8F4F;
+  --botanical-copper-600: #B04A1B;
+  --brand-navy-900: var(--botanical-forest-900);
+  --brand-navy-800: var(--botanical-forest-800);
+  --brand-copper-500: var(--botanical-copper-500);
+  --brand-copper-600: var(--botanical-copper-600);
+  --brand-green-500: var(--botanical-green-600);
+  --brand-green-200: var(--botanical-sage-300);
+  --neutral-warm-50: var(--botanical-cream-50);
   --neutral-white: #FFFFFF;
   --neutral-gray-100: #F4F5F6;
   --neutral-gray-200: #E5E7EB;
   --neutral-gray-500: #596575;
-  --neutral-ink-900: #223548;
+  --neutral-ink-900: #1F2A22;
   --font-body: 'Inter', Arial, sans-serif;
   --font-editorial: 'Playfair Display', Georgia, serif;
 }
@@ -42,8 +55,11 @@ h4 { font-size: 22px; color: var(--brand-navy-900); }
 .muted { color: var(--neutral-gray-500); font-size: 14px; }
 .small-label { color: var(--neutral-gray-500); font-size: 10px; letter-spacing: .1em; font-weight: 700; margin-bottom: 8px; }
 .btn-primary,.btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 16px; min-height: 48px; padding: 12px 22px; border-radius: 6px; font-size: 14px; font-weight: 700; transition: background-color .15s; }
-.btn-primary { background: var(--brand-copper-500); color: var(--brand-navy-900); border: 1px solid transparent; }
-.btn-primary:hover { background: #F09657; }
+.btn-primary { background: var(--botanical-green-600); color: #FFFFFF; border: 1px solid transparent; }
+.btn-primary:hover { background: var(--botanical-green-700); }
+/* Sobre Forest o Clyo Green some (2,16:1): botão em cobre claro com texto Forest (5,06:1). */
+.clinical-preview .btn-primary, .final-section .btn-primary { background: var(--botanical-copper-500); color: var(--botanical-forest-900); }
+.clinical-preview .btn-primary:hover, .final-section .btn-primary:hover { background: var(--botanical-copper-400); }
 .btn-secondary { border: 1px solid var(--neutral-gray-200); }
 .text-link { display: inline-block; color: var(--brand-navy-900); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 5px; }
 .text-link:hover { color: var(--brand-copper-600); }
@@ -64,19 +80,18 @@ h4 { font-size: 22px; color: var(--brand-navy-900); }
 .hero h1 em { font-style: normal; color: var(--brand-copper-600); }
 .hero .lead { margin-top: 28px; max-width: 540px; }
 .hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin: 30px 0 20px; }
-.clinical-preview { background: var(--brand-navy-900); color: white; padding: 32px; border-radius: 10px; box-shadow: 0 24px 45px -30px #0F2A4460; }
+.clinical-preview { background: var(--brand-navy-900); color: white; padding: 32px; border-radius: 10px; box-shadow: 0 24px 45px -30px rgba(15, 62, 23, .38); }
 .preview-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 34px; }
 .demo-label { display: inline-block; font-size: 9px; letter-spacing: .12em; font-weight: 600; color: var(--neutral-gray-500); }
-.clinical-preview .demo-label { color: #C4D2DE; }
+.clinical-preview .demo-label { color: var(--botanical-sage-200); }
 .preview-symbol { font-size: 26px; color: var(--brand-copper-500); }
-.preview-caption { font-size: 13px; color: #C4D2DE; }
+.preview-caption { font-size: 13px; color: var(--botanical-sage-200); }
 .clinical-preview h2 { font: 600 23px/1.35 var(--font-body); color: white; margin: 8px 0; letter-spacing: -.02em; }
-.clinical-preview .muted { color: #C4D2DE; font-size: 12px; }
+.clinical-preview .muted { color: var(--botanical-sage-200); font-size: 12px; }
 .clinical-note { display: flex; gap: 16px; border-top: 1px solid #FFFFFF25; padding-top: 23px; margin-top: 23px; font-size: 14px; }
 .clinical-note p + p { margin-top: 0; }
-.clinical-note .small-label { color: #C4D2DE; }
 .note-index { color: var(--brand-copper-500); font-size: 12px; padding-top: 2px; }
-.preview-bottom { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 32px; color: #C4D2DE; font-size: 10px; }
+.preview-bottom { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 32px; color: var(--botanical-sage-200); font-size: 10px; }
 .section-intro { max-width: 680px; margin-bottom: 46px; }
 .section-intro > p:last-child { color: var(--neutral-gray-500); margin-top: 22px; max-width: 580px; }
 .journey-tabs { display: grid; grid-template-columns: repeat(3,1fr); border-bottom: 1px solid var(--neutral-gray-200); }
@@ -128,8 +143,9 @@ dd { margin: 0; font-size: 14px; }
 .final-section { background: var(--brand-navy-900); padding-block: 70px; }
 .final-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; }
 .final-inner h2 { color: white; }
-.final-inner .eyebrow { color: #F5AA75; }
-.final-login { display: block; color: #D6E1EB; margin-top: 20px; text-align: center; font-size: 13px; }
+.final-inner .eyebrow { color: var(--botanical-copper-500); }
+.clinical-preview .eyebrow, .clinical-preview .small-label { color: var(--botanical-copper-500); }
+.final-login { display: block; color: var(--botanical-sage-200); margin-top: 20px; text-align: center; font-size: 13px; }
 .final-section :focus-visible { outline-color: white; }
 .footer { padding-top: 50px; background: white; }
 .footer-grid { display: flex; justify-content: space-between; gap: 40px; }
