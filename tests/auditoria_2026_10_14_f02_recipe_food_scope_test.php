@@ -33,7 +33,10 @@ foreach (['create' => [], 'edit' => ['id' => (string)$fx['recipeA']]] as $m => $
     $html = $render($m, $p);
     aud_check(!str_contains($html, 'Segredo particular da Beta'), "formulário {$m}: alimento particular da clínica B não aparece");
     if ($m === 'create') { // o formulário de edição não lista ingredientes (só metadados), apenas não pode vazar os de B
-        aud_check(str_contains($html, 'Arroz global de teste') && str_contains($html, 'Pão particular da Alfa'), "formulário {$m}: alimento global e próprio continuam disponíveis");
+        // NI2-73: os ingredientes vêm da busca do catálogo (/catalogo/alimentos/busca, filtro global + própria clínica,
+        // coberto por tests/ni2_73_food_search_real_test.cjs e ni2_73_recipe_ingredients_browser_test.cjs); o formulário
+        // não embute mais nenhum alimento.
+        aud_check(str_contains($html, 'src="/assets/js/food-picker.js"') && !str_contains($html, 'Arroz global de teste') && !str_contains($html, 'Pão particular da Alfa'), "formulário {$m}: ingredientes pela busca do catálogo, sem lista embutida");
     }
 }
 $list = array_column($svc->listFoodsForClinic($fx['clinicA']), 'id');

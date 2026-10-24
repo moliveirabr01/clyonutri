@@ -81,3 +81,28 @@ não da busca, mas é o tipo de coisa que a nutricionista vai estranhar.
 | Primeira busca após importação, MySQL | 5,1 s com 5.000 linhas (M3) |
 | Mesma ordem nos dois bancos | FAIL em empates (B1) |
 | Produção HostGator | NOT TESTED |
+
+## Status das correções (23/10/2026)
+
+| Achado | Status | O que mudou |
+|---|---|---|
+| M1 receitas | **Corrigido** | Cada ingrediente usa a busca do catálogo (`food-picker.js` + `/catalogo/alimentos/busca`); o formulário não embute mais os 300 alimentos. O servidor continua recusando `food_id` de outra clínica (F02). `food-picker.js` ganhou `ClyoFoodPicker.init()` para linhas criadas depois. |
+| M2 plurais | **Corrigido** | `FoodSearchIndex::singular()`: -ões/-ães→-ão, -ais/-eis/-ois→-l, -ns→-m, -res/-zes/-ses→sem "es", -s. |
+| M3 primeira busca | **Corrigido** | `sync()` grava cada lote de 500 numa transação. MySQL, 5.000 linhas novas: 6.590 ms → 1.169 ms. |
+| B1 ordem entre bancos | **Corrigido** | `CHAR_LENGTH` no MySQL, `LENGTH` no SQLite. |
+| B2 índice | Mantido | Informativo; p95 de 12–13 ms com 20.909 alimentos. |
+| B3 plano sem JS | Mantido | Só afeta quem está sem JavaScript. |
+
+Mudança de comportamento: o formulário de receita depende de JavaScript para escolher ingredientes (aviso em `<noscript>`).
+A recepção já não abria `/receitas/nova`; o aviso "Seu perfil não tem acesso ao catálogo" (403) no seletor foi
+acrescentado, mas nenhuma tela com recepção chega a ele hoje (NOT TESTED em uso real).
+
+### Provas (`docs/evidencias/ni2-73/correcoes-code-review/`)
+- Antes (código do commit 3b3cdf9, testes novos): HTTP MySQL **36 PASS / 7 FAIL**; receitas no navegador **0 PASS / 3 FAIL**.
+- Depois: HTTP **43/43 SQLite** e **43/43 MySQL 8**; receitas no navegador **16/16** (salvar com Tomate, Uva e
+  alimento da clínica, quantidade/medida, POST com alimento de outra clínica recusado, XSS com nome hostil, 390 px sem
+  rolagem, axe sem violações); seletor do plano **9/9**.
+- Testes antigos ajustados ao novo formulário: `auditoria_2026_10_14_xss_food_name_js_test.php` e
+  `auditoria_2026_10_14_f02_recipe_food_scope_test.php` (ambos OK).
+- Regressão: 77 suítes PASS; falhas iguais à linha de base; `ni2_292` e `px_13` dependem do horário e falham também
+  no código antigo depois das 21h.

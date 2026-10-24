@@ -1,0 +1,52 @@
+PASS [base] TACO 4ª ed. importada do CSV (593 alimentos)
+PASS [termos] Dois termos fora da ordem e da pontuação da TACO: "arroz integral" acha "Arroz, integral, cozido" e "…cru"
+PASS [termos] Ordem invertida ("cozido arroz integral") acha o mesmo alimento
+PASS [termos] Sem acento, maiúsculas e espaços extras ("FEIJAO   carioca")
+PASS [termos] "pão francês" acha "Pão, trigo, francês" (termos não precisam estar juntos)
+PASS [termos] Plural simples ("ovos") acha "Ovo, …"
+PASS [termos] Três termos restringem ("frango peito grelhado" → só o peito grelhado)
+FAIL [termos] Plural "feijões" acha Feijão → []
+FAIL [termos] Plural "pães" acha Pão → []
+FAIL [termos] Plural "limões" acha Limão → []
+FAIL [termos] Plural "integrais" acha integral → []
+PASS [termos] Plural "tomates" acha Tomate
+PASS [termos] Plural "queijos" acha Queijo
+FAIL [termos] Dois plurais juntos ("pães integrais") acham "Pão, trigo, forma, integral" → []
+PASS [termos] Alimento da própria clínica entra na busca ("queijo casa" → "Pão de queijo da casa")
+PASS [ordem] "maçã": os nomes que começam com a palavra vêm antes de "Macarrão" e "Banana, maçã"
+PASS [ordem] "leite integral": o que começa com "Leite" vem antes de "Canjica, com leite integral"
+FAIL [ordem] Desempate pelo tamanho do nome em letras (igual no MySQL e no SQLite; antes o MySQL contava bytes) → ["Pão, de soja:12","Pão, aveia, forma:17","Pão, milho, forma:17","Pão, trigo, sovado:18","Pão, de queijo, cru:19","Pão, glúten, forma:18","Pão, trigo, francês:19","Pão, de queijo, assado:22","Pão, trigo, forma, integral:27"]
+PASS [autocomplete] Começo de palavra ("fran") já traz Frango primeiro
+PASS [autocomplete] Campo vazio lista o catálogo (25 por página, em ordem alfabética)
+PASS [paginação] Página 1 com 25, has_more e total; página 2 sem repetir
+PASS [paginação] Última página: has_more=false
+PASS [paginação] Página fora de 1–100, busca em lista e busca com mais de 80 caracteres → 422
+PASS [paginação] Caracteres especiais (%, _, !) não viram curinga nem erro; número é termo ("100")
+PASS [paginação] "_" sozinho não é curinga: lista o catálogo em ordem (sem erro)
+PASS [porção] Alimento com medidas: porção de referência e medidas caseiras no resultado
+PASS [origem] Alimento da clínica identificado (is_custom, "Cadastro da clínica nº …")
+PASS [porção] Alimento TACO sem medida: diz que os valores são por 100 g (não inventa porção)
+PASS [origem] Alimento TACO com origem e número oficial ("TACO 4ª ed. nº 1")
+PASS [isolamento] Alimento personalizado de outra clínica não aparece
+PASS [acesso] Recepção não usa o catálogo (403)
+PASS [acesso] Sem login → 401 (pedido JSON) sem dados
+PASS [índice] Alimento inserido direto no banco (como no SQL manual da TACO) aparece na próxima busca
+PASS [índice] Nenhum alimento sem texto de busca depois da sincronização
+PASS [base] /alimentos com termos responde (antes: 500 no SQLite) e lista os dois arrozes integrais
+PASS [base] /alimentos busca também pela categoria ("leguminosas")
+PASS [desempenho] Base representativa carregada: 20909 alimentos (400 clínicas × 50 + 300 da própria clínica + TACO)
+DESEMPENHO {"search":{"n":60,"p50_ms":9,"p95_ms":13,"max_ms":368.9},"page":{"n":6,"p50_ms":47.9,"p95_ms":49.5,"max_ms":49.5},"foods_total":20909,"driver":"mysql","budget_p95_ms":300}
+PASS [desempenho] Busca do seletor (60 buscas, HTTP): p95 13 ms ≤ 300 ms
+PASS [desempenho] Base de alimentos (/alimentos): p95 49.5 ms ≤ 600 ms
+PASS [desempenho] Com a base grande, alimentos de outras clínicas continuam fora (total só TACO + própria clínica)
+IMPORTACAO {"rows":5000,"first_ms":6590,"next_ms":28}
+FAIL [desempenho] Primeira busca depois de 5000 alimentos importados direto no banco: 6590 ms ≤ 2000 ms (preenche em lotes com transação) → {"rows":5000,"first_ms":6590,"next_ms":28}
+PASS [desempenho] Todas as linhas importadas ficaram com texto de busca
+PASS [índice] Linha da importação aparece pela busca
+
+NI2-73 (MySQL): 36 PASS, 7 FAIL
+FAIL Formulário não carrega mais a lista fixa de 300 alimentos → 300
+FAIL Primeira linha de ingrediente já vem com a busca → undefined
+FAIL Execução sem exceção → "locator.fill: Timeout 30000ms exceeded.\nCall log:\n  \u001b[2m- waiting for locator('.recipe-ingredient-row').first().locator('[data-food-query]')\u001b[22m\n\n    at pick (/tmp/b73old/tests/ni2_73_recipe_ingredients_browser_test.cjs:34:44)\n    at /tmp/b73old/tests/ni2_73_recipe_ingredients_browser_test.cjs:49:21"
+
+NI2-73 receitas (navegador): 0 PASS, 3 FAIL

@@ -1,0 +1,68 @@
+{
+ "checks": [
+  {
+   "n": "Formulário não carrega mais a lista fixa de 300 alimentos",
+   "ok": true
+  },
+  {
+   "n": "Primeira linha de ingrediente já vem com a busca",
+   "ok": true
+  },
+  {
+   "n": "Busca acha \"Tomate, com semente, cru\" (estava fora dos 300)",
+   "ok": true
+  },
+  {
+   "n": "Catálogo inteiro acessível na receita: campo vazio mostra \"Mostrando 25 de 595\" (todos os alimentos da clínica)",
+   "ok": true
+  },
+  {
+   "n": "Segunda linha (criada depois) também busca: \"Uva, Itália, crua\"",
+   "ok": true
+  },
+  {
+   "n": "Alimento da própria clínica aparece, com origem e porção",
+   "ok": true
+  },
+  {
+   "n": "Linha com busca digitada mas sem alimento escolhido impede salvar",
+   "ok": true
+  },
+  {
+   "n": "Remover a linha tira o ingrediente",
+   "ok": true
+  },
+  {
+   "n": "Receita salva com os três ingredientes escolhidos pela busca",
+   "ok": true
+  },
+  {
+   "n": "Quantidade e medida do ingrediente salvas (2 unidade)",
+   "ok": true
+  },
+  {
+   "n": "XSS: nome hostil aparece como texto, sem alert e sem <img> injetado",
+   "ok": true
+  },
+  {
+   "n": "Alimento de outra clínica no POST é recusado e nada é salvo",
+   "ok": true
+  },
+  {
+   "n": "Recepção não abre o formulário de receita",
+   "ok": true
+  },
+  {
+   "n": "Celular (390 px): linha do ingrediente sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "n": "Linhas de ingrediente sem violações WCAG 2 A/AA (axe)",
+   "ok": true
+  },
+  {
+   "n": "Sem erro de script",
+   "ok": true
+  }
+ ]
+}

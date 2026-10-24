@@ -22,31 +22,15 @@ ob_start();
 $html = (string)ob_get_clean();
 
 aud_check(!str_contains($html, 'addslashes') && !str_contains($html, 'foodOptionsHtml'), 'template literal com HTML de opções não existe mais');
-aud_check(preg_match('/const foodOptions = (\[.*?\]);\n/s', $html, $m) === 1, 'opções são entregues como JSON (const foodOptions = [...])');
-$json = $m[1];
-// Crase e ${} ficam DENTRO de string JSON com aspas duplas: em JS isso é texto literal, sem interpolação.
-$scriptStart = strrpos(substr($html, 0, strpos($html, 'const foodOptions')), '<script');
-$before = substr($html, $scriptStart, strpos($html, 'const foodOptions') - $scriptStart);
-aud_check(substr_count($before, '`') % 2 === 0, 'JSON não está dentro de um template literal (crases balanceadas antes dele)');
-foreach (['</script', '<img', "'", '\"duplas'] as $bad) {
-    aud_check(!str_contains($json, $bad), 'JSON embutido não contém ' . json_encode($bad) . ' cru');
-}
-$decoded = json_decode($json, true);
-$names = array_column($decoded, 'name');
-aud_check(in_array($evil, $names, true), 'JSON decodifica exatamente para o nome original (dado preservado)');
-aud_check(str_contains($html, 'opt.textContent = f.name'), 'option criada via DOM/textContent (sem innerHTML com o nome)');
-$scripts = preg_match_all('/<script\b/i', $html) ;
+// NI2-73: o formulário não embute mais o catálogo; os nomes chegam pela busca (JSON) e viram texto no navegador.
+aud_check(!str_contains($html, 'const foodOptions'), 'formulário de receita não embute lista de alimentos no script');
+aud_check(!str_contains($html, 'Ataque') && !str_contains($html, htmlspecialchars($evil)), 'nome do alimento não aparece no HTML do formulário (nem cru, nem escapado)');
+$scripts = preg_match_all('/<script\b/i', $html);
 aud_check($scripts === preg_match_all('/<\/script>/i', $html), 'nenhum </script> injetado: aberturas e fechamentos de <script> batem');
-// Execução real do trecho no Node (se disponível): alert nunca é chamado e o nome chega intacto
-if (trim((string)shell_exec('command -v node')) !== '') {
-    $js = tempnam(sys_get_temp_dir(), 'audxss') . '.js';
-    file_put_contents($js, "let called=false; globalThis.alert=()=>{called=true}; globalThis.document={cookie:'c'};\nconst foodOptions = {$json};\nconst names=foodOptions.map(f=>f.name);\nprocess.stdout.write(JSON.stringify({called, ok: names.includes(" . json_encode($evil, JSON_HEX_TAG) . ")}));");
-    $r = json_decode((string)shell_exec('node ' . escapeshellarg($js)), true);
-    @unlink($js);
-    aud_check(($r['called'] ?? true) === false && ($r['ok'] ?? false) === true, 'Node: avaliar o script não executa alert e preserva o texto');
-}
-// a lista em <select> HTML (server-side) continua escapada
-aud_check(str_contains($html, htmlspecialchars($evil)), 'select renderizado no servidor usa htmlspecialchars');
+aud_check(str_contains($html, 'src="/assets/js/food-picker.js"'), 'ingredientes usam o seletor de alimentos (food-picker.js)');
+$picker = (string)file_get_contents(__DIR__ . '/../public/assets/js/food-picker.js');
+aud_check(str_contains($picker, 'name.textContent = food.name') && str_contains($picker, 'new Option(food.name, food.id)'), 'food-picker.js põe o nome via textContent/Option (sem innerHTML)');
+aud_check(!preg_match('/innerHTML[^;]*food\./', $picker), 'food-picker.js não usa innerHTML com dados do alimento');
 
 // Mesmo padrão no dashboard (onclick): json_encode + htmlspecialchars gera literal JS válido e inerte
 $dash = (string)file_get_contents(__DIR__ . '/../src/Application/Controllers/DashboardController.php');

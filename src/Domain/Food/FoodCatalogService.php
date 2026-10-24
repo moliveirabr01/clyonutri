@@ -182,7 +182,7 @@ class FoodCatalogService
             // Sem a cadeia de REPLACE no SQL (estourava a pilha do parser do SQLite: 500 em qualquer busca).
             FoodSearchIndex::sync($this->db);
             $terms = FoodSearchIndex::terms($q);
-            $fs = FoodSearchIndex::sql($terms);
+            $fs = FoodSearchIndex::sql($terms, 'search_text', 'name', $this->db);
             $catMatches = [];
             $needle = FoodSearchIndex::normalize($q);
             foreach ($this->listCategories() as $cat) {

@@ -72,6 +72,13 @@ const pct = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Mat
     check('termos', 'Plural simples ("ovos") acha "Ovo, …"', names(r).length > 0 && names(r).every((n) => /ovo/i.test(n)) && /^Ovo,/.test(names(r)[0]), names(r).slice(0, 4));
     r = await s('frango peito grelhado');
     check('termos', 'Três termos restringem ("frango peito grelhado" → só o peito grelhado)', names(r).length >= 1 && names(r)[0] === 'Frango, peito, sem pele, grelhado' && names(r).every((n) => /grelhad/i.test(n)), names(r));
+    // Plurais do português (code review: "feijões"/"pães" não achavam nada)
+    for (const [q, re, label] of [['feijões', /^Feijão,/, 'Feijão'], ['pães', /^Pão,/, 'Pão'], ['limões', /^Limão,/, 'Limão'], ['integrais', /integral/i, 'integral'], ['tomates', /^Tomate,/, 'Tomate'], ['queijos', /^Queijo,/, 'Queijo']]) {
+      r = await s(q);
+      check('termos', `Plural "${q}" acha ${label}`, r.status === 200 && names(r).length > 0 && re.test(names(r)[0]), names(r).slice(0, 3));
+    }
+    r = await s('pães integrais');
+    check('termos', 'Dois plurais juntos ("pães integrais") acham "Pão, trigo, forma, integral"', names(r).includes('Pão, trigo, forma, integral'), names(r));
     r = await s('queijo casa');
     check('termos', 'Alimento da própria clínica entra na busca ("queijo casa" → "Pão de queijo da casa")', names(r).includes('Pão de queijo da casa'), names(r));
 
@@ -80,6 +87,9 @@ const pct = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Mat
     check('ordem', '"maçã": os nomes que começam com a palavra vêm antes de "Macarrão" e "Banana, maçã"', /^Maçã,/.test(names(r)[0]) && names(r).findIndex((n) => /^Macarr/.test(n)) > names(r).findIndex((n) => /^Maçã/.test(n)) && names(r).indexOf('Banana, maçã, crua') > names(r).findIndex((n) => /^Macarr/.test(n)), names(r).slice(0, 8));
     r = await s('leite integral');
     check('ordem', '"leite integral": o que começa com "Leite" vem antes de "Canjica, com leite integral"', /^Leite,/.test(names(r)[0]), names(r).slice(0, 4));
+    r = await s('pao');
+    const paoTier = names(r).filter((n) => /^Pão,/.test(n)), lens = paoTier.map((n) => [...n].length);
+    check('ordem', 'Desempate pelo tamanho do nome em letras (igual no MySQL e no SQLite; antes o MySQL contava bytes)', paoTier.length >= 8 && lens.every((v, i) => i === 0 || v >= lens[i - 1]), paoTier.map((n, i) => n + ':' + lens[i]));
     r = await s('fran');
     check('autocomplete', 'Começo de palavra ("fran") já traz Frango primeiro', /^Frango/.test(names(r)[0]), names(r).slice(0, 4));
     r = await s('');
@@ -150,6 +160,17 @@ const pct = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Mat
     check('desempenho', `Base de alimentos (/alimentos): p95 ${perf.page.p95_ms} ms ≤ ${P95_BUDGET_MS * 2} ms`, perf.page.p95_ms <= P95_BUDGET_MS * 2, perf.page);
     r = await s('arroz integral');
     check('desempenho', 'Com a base grande, alimentos de outras clínicas continuam fora (total só TACO + própria clínica)', r.json.data.every((x) => !x.is_custom || x.reference.startsWith('Cadastro da clínica')) && r.json.total < 40, r.json.total);
+
+    // ------------------------------------------------------------------ Importação manual grande (code review M3)
+    const RAW = Number(process.env.RAW_BULK || 5000);
+    fx('raw-bulk', RAW);
+    const first = await s('arroz'); const again = await s('arroz');
+    perf.after_raw_bulk = { rows: RAW, first_ms: Math.round(first.ms), next_ms: Math.round(again.ms) };
+    console.log('IMPORTACAO', JSON.stringify(perf.after_raw_bulk));
+    check('desempenho', `Primeira busca depois de ${RAW} alimentos importados direto no banco: ${perf.after_raw_bulk.first_ms} ms ≤ 2000 ms (preenche em lotes com transação)`, first.status === 200 && first.ms <= 2000, perf.after_raw_bulk);
+    check('desempenho', 'Todas as linhas importadas ficaram com texto de busca', Number(Object.values(sql('SELECT COUNT(*) AS n FROM foods WHERE search_text IS NULL')[0])[0]) === 0);
+    r = await s('importado manualmente 4321');
+    check('índice', 'Linha da importação aparece pela busca', names(r).includes('Alimento importado manualmente 4321, cru'), names(r));
   } catch (e) {
     check('erro', 'Execução sem exceção', false, e.stack);
   } finally {

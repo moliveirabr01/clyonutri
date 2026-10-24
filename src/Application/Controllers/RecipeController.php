@@ -455,9 +455,8 @@ class RecipeController
     {
         $auth = $this->getAuthInfo();
 
-        // Buscar alimentos do catálogo TACO oficial para autocomplete/select
-        // F02: somente catálogo global + alimentos particulares da própria clínica.
-        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
+        // NI2-73: os ingredientes são escolhidos pela busca do catálogo (/catalogo/alimentos/busca), que já aplica
+        // F02 (globais + da própria clínica); o servidor confere de novo cada food_id ao salvar.
 
         $title = 'Nova Receita Culinária';
         $activeNav = 'receitas';
@@ -548,27 +547,8 @@ class RecipeController
                 <button type="button" class="btn btn-secondary" data-call="addIngredientRow">+ Adicionar Ingrediente</button>
               </div>
 
-              <div id="ingredientsContainer" style="display: flex; flex-direction: column; gap: 8px;">
-                <div class="item-row" style="display: grid; grid-template-columns: 3fr 1fr 1.5fr auto; gap: 8px; align-items: center;">
-                  <select name="ingredients[0][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
-                    <option value="">Selecione o alimento TACO...</option>
-                    <?php foreach ($foods as $f): ?>
-                      <option value="<?= (int)$f['id'] ?>"><?= htmlspecialchars($f['name']) ?> (<?= htmlspecialchars($f['category'] ?? '') ?>)</option>
-                    <?php endforeach; ?>
-                  </select>
-                  <input type="number" step="0.1" name="ingredients[0][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
-                  <select name="ingredients[0][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
-                    <option value="g">g (gramas)</option>
-                    <option value="colher de sopa">colher de sopa</option>
-                    <option value="colher de chá">colher de chá</option>
-                    <option value="xícara de chá">xícara de chá</option>
-                    <option value="unidade">unidade</option>
-                    <option value="fatia">fatia</option>
-                    <option value="ml">ml</option>
-                  </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
-                </div>
-              </div>
+              <div id="ingredientsContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
+              <noscript><p style="color: var(--semantic-error);">Ative o JavaScript para buscar e adicionar ingredientes.</p></noscript>
             </div>
 
             <!-- Passos de Preparo -->
@@ -612,43 +592,47 @@ class RecipeController
         </div>
 
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
-          let ingredientIndex = 1;
-          // XSS (auditoria 14/10/2026): dados via JSON com escapes HEX e <option> criado por DOM/textContent.
-          const foodOptions = <?= json_encode(array_map(static fn($f) => ['id' => (int)$f['id'], 'name' => (string)$f['name']], $foods), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
-          function fillFoodOptions(select) {
-              foodOptions.forEach(function (f) {
-                  const opt = document.createElement('option');
-                  opt.value = String(f.id);
-                  opt.textContent = f.name;
-                  select.appendChild(opt);
-              });
-          }
-
+          let ingredientIndex = 0;
+          // NI2-73: cada ingrediente usa a mesma busca do plano (catálogo inteiro, termos, porção e origem),
+          // em vez de um <select> com os 300 primeiros alimentos em ordem alfabética.
           function addIngredientRow() {
               const container = document.getElementById('ingredientsContainer');
+              const i = ingredientIndex++;
               const row = document.createElement('div');
-              row.className = 'item-row';
-              row.style.cssText = 'display: grid; grid-template-columns: 3fr 1fr 1.5fr auto; gap: 8px; align-items: center;';
+              row.className = 'item-row recipe-ingredient-row';
               row.innerHTML = `
-                  <select name="ingredients[${ingredientIndex}][food_id]" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
-                      <option value="">Selecione o alimento TACO...</option>
-                  </select>
-                  <input type="number" step="0.1" name="ingredients[${ingredientIndex}][amount]" placeholder="Qtd" value="100" required style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem;">
-                  <select name="ingredients[${ingredientIndex}][measure_unit]" style="padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.9rem; background: #fff;">
-                      <option value="g">g (gramas)</option>
-                      <option value="colher de sopa">colher de sopa</option>
-                      <option value="colher de chá">colher de chá</option>
-                      <option value="xícara de chá">xícara de chá</option>
-                      <option value="unidade">unidade</option>
-                      <option value="fatia">fatia</option>
-                      <option value="ml">ml</option>
-                  </select>
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
+                  <div data-food-picker class="recipe-ingredient-row__food">
+                      <label class="form-label" for="rc-food-q-${i}">Buscar alimento</label>
+                      <input class="form-control" id="rc-food-q-${i}" data-food-query type="search" maxlength="80" placeholder="Ex.: ovo, arroz integral, banana">
+                      <p role="status" aria-live="polite" class="recipe-ingredient-row__status">Busque e selecione o alimento.</p>
+                      <label class="form-label" data-food-results-label for="rc-food-${i}">Resultados da busca</label>
+                      <select id="rc-food-${i}" name="ingredients[${i}][food_id]" required><option value="">Selecione o alimento</option></select>
+                      <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>
+                      <button type="button" class="btn btn-secondary" data-food-retry hidden>Tentar busca novamente</button>
+                  </div>
+                  <div>
+                      <label class="form-label" for="rc-amount-${i}">Quantidade</label>
+                      <input id="rc-amount-${i}" type="number" step="0.1" min="0.1" name="ingredients[${i}][amount]" value="100" required class="form-control">
+                  </div>
+                  <div>
+                      <label class="form-label" for="rc-unit-${i}">Medida</label>
+                      <select id="rc-unit-${i}" name="ingredients[${i}][measure_unit]" class="form-control">
+                          <option value="g">g (gramas)</option>
+                          <option value="colher de sopa">colher de sopa</option>
+                          <option value="colher de chá">colher de chá</option>
+                          <option value="xícara de chá">xícara de chá</option>
+                          <option value="unidade">unidade</option>
+                          <option value="fatia">fatia</option>
+                          <option value="ml">ml</option>
+                      </select>
+                  </div>
+                  <button type="button" class="btn recipe-ingredient-row__remove" aria-label="Remover ingrediente" data-remove-parent>✕</button>
               `;
-              fillFoodOptions(row.querySelector('select'));
               container.appendChild(row);
-              ingredientIndex++;
+              if (window.ClyoFoodPicker) window.ClyoFoodPicker.init(row.querySelector('[data-food-picker]'));
+              return row;
           }
+          addIngredientRow(); // o seletor (food-picker.js, carregado com defer) inicia esta primeira linha
 
           function addStepRow() {
               const container = document.getElementById('stepsContainer');
@@ -662,6 +646,7 @@ class RecipeController
               container.appendChild(row);
           }
         </script>
+        <script src="/assets/js/food-picker.js" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
@@ -982,8 +967,6 @@ class RecipeController
             return;
         }
 
-        // F02: somente catálogo global + alimentos particulares da própria clínica.
-        $foods = $this->recipeService->listFoodsForClinic((int)$auth['clinicId']);
 
         $title = 'Editar Receita — ' . $recipe['title'];
         $activeNav = 'receitas';

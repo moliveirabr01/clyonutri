@@ -15,7 +15,7 @@ final class FoodSearchController
         // NI2-73: termos em qualquer ordem, sem acento nem pontuação; ordem de relevância explicada em FoodSearchIndex.
         \ClyoNutri\Domain\Food\FoodSearchIndex::sync($db);
         $terms=\ClyoNutri\Domain\Food\FoodSearchIndex::terms($term);
-        $q=\ClyoNutri\Domain\Food\FoodSearchIndex::sql($terms);
+        $q=\ClyoNutri\Domain\Food\FoodSearchIndex::sql($terms,'search_text','name',$db);
         $tenant='(clinic_id IS NULL OR clinic_id=:cid)';
         $count=$db->prepare("SELECT COUNT(*) FROM foods WHERE $tenant AND {$q['where']}");
         $count->execute(['cid'=>TenantContext::getClinicId()]+$q['where_params']);$total=(int)$count->fetchColumn();

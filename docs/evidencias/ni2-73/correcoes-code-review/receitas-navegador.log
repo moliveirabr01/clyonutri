@@ -1,0 +1,18 @@
+PASS Formulário não carrega mais a lista fixa de 300 alimentos
+PASS Primeira linha de ingrediente já vem com a busca
+PASS Busca acha "Tomate, com semente, cru" (estava fora dos 300)
+PASS Catálogo inteiro acessível na receita: campo vazio mostra "Mostrando 25 de 595" (todos os alimentos da clínica)
+PASS Segunda linha (criada depois) também busca: "Uva, Itália, crua"
+PASS Alimento da própria clínica aparece, com origem e porção
+PASS Linha com busca digitada mas sem alimento escolhido impede salvar
+PASS Remover a linha tira o ingrediente
+PASS Receita salva com os três ingredientes escolhidos pela busca
+PASS Quantidade e medida do ingrediente salvas (2 unidade)
+PASS XSS: nome hostil aparece como texto, sem alert e sem <img> injetado
+PASS Alimento de outra clínica no POST é recusado e nada é salvo
+PASS Recepção não abre o formulário de receita
+PASS Celular (390 px): linha do ingrediente sem rolagem horizontal
+PASS Linhas de ingrediente sem violações WCAG 2 A/AA (axe)
+PASS Sem erro de script
+
+NI2-73 receitas (navegador): 16 PASS, 0 FAIL

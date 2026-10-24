@@ -1,0 +1,287 @@
+{
+ "driver": "mysql",
+ "pass": 43,
+ "fail": 0,
+ "perf": {
+  "search": {
+   "n": 60,
+   "p50_ms": 8.6,
+   "p95_ms": 12.1,
+   "max_ms": 73.6
+  },
+  "page": {
+   "n": 6,
+   "p50_ms": 51.3,
+   "p95_ms": 55.3,
+   "max_ms": 55.3
+  },
+  "foods_total": 20909,
+  "driver": "mysql",
+  "budget_p95_ms": 300,
+  "after_raw_bulk": {
+   "rows": 5000,
+   "first_ms": 1169,
+   "next_ms": 24
+  }
+ },
+ "results": [
+  {
+   "crit": "base",
+   "name": "TACO 4ª ed. importada do CSV (593 alimentos)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Dois termos fora da ordem e da pontuação da TACO: \"arroz integral\" acha \"Arroz, integral, cozido\" e \"…cru\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Ordem invertida (\"cozido arroz integral\") acha o mesmo alimento",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Sem acento, maiúsculas e espaços extras (\"FEIJAO   carioca\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "\"pão francês\" acha \"Pão, trigo, francês\" (termos não precisam estar juntos)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural simples (\"ovos\") acha \"Ovo, …\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Três termos restringem (\"frango peito grelhado\" → só o peito grelhado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"feijões\" acha Feijão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"pães\" acha Pão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"limões\" acha Limão",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"integrais\" acha integral",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"tomates\" acha Tomate",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Plural \"queijos\" acha Queijo",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Dois plurais juntos (\"pães integrais\") acham \"Pão, trigo, forma, integral\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "termos",
+   "name": "Alimento da própria clínica entra na busca (\"queijo casa\" → \"Pão de queijo da casa\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "ordem",
+   "name": "\"maçã\": os nomes que começam com a palavra vêm antes de \"Macarrão\" e \"Banana, maçã\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "ordem",
+   "name": "\"leite integral\": o que começa com \"Leite\" vem antes de \"Canjica, com leite integral\"",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "ordem",
+   "name": "Desempate pelo tamanho do nome em letras (igual no MySQL e no SQLite; antes o MySQL contava bytes)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "autocomplete",
+   "name": "Começo de palavra (\"fran\") já traz Frango primeiro",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "autocomplete",
+   "name": "Campo vazio lista o catálogo (25 por página, em ordem alfabética)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Página 1 com 25, has_more e total; página 2 sem repetir",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Última página: has_more=false",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Página fora de 1–100, busca em lista e busca com mais de 80 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "Caracteres especiais (%, _, !) não viram curinga nem erro; número é termo (\"100\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "paginação",
+   "name": "\"_\" sozinho não é curinga: lista o catálogo em ordem (sem erro)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "porção",
+   "name": "Alimento com medidas: porção de referência e medidas caseiras no resultado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "origem",
+   "name": "Alimento da clínica identificado (is_custom, \"Cadastro da clínica nº …\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "porção",
+   "name": "Alimento TACO sem medida: diz que os valores são por 100 g (não inventa porção)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "origem",
+   "name": "Alimento TACO com origem e número oficial (\"TACO 4ª ed. nº 1\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "isolamento",
+   "name": "Alimento personalizado de outra clínica não aparece",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "acesso",
+   "name": "Recepção não usa o catálogo (403)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "acesso",
+   "name": "Sem login → 401 (pedido JSON) sem dados",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "índice",
+   "name": "Alimento inserido direto no banco (como no SQL manual da TACO) aparece na próxima busca",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "índice",
+   "name": "Nenhum alimento sem texto de busca depois da sincronização",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "base",
+   "name": "/alimentos com termos responde (antes: 500 no SQLite) e lista os dois arrozes integrais",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "base",
+   "name": "/alimentos busca também pela categoria (\"leguminosas\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Base representativa carregada: 20909 alimentos (400 clínicas × 50 + 300 da própria clínica + TACO)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Busca do seletor (60 buscas, HTTP): p95 12.1 ms ≤ 300 ms",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Base de alimentos (/alimentos): p95 55.3 ms ≤ 600 ms",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Com a base grande, alimentos de outras clínicas continuam fora (total só TACO + própria clínica)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Primeira busca depois de 5000 alimentos importados direto no banco: 1169 ms ≤ 2000 ms (preenche em lotes com transação)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "desempenho",
+   "name": "Todas as linhas importadas ficaram com texto de busca",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "índice",
+   "name": "Linha da importação aparece pela busca",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

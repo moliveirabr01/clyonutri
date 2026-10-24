@@ -1,5 +1,8 @@
 (() => {
-  document.querySelectorAll('[data-food-picker]').forEach(box => {
+  // NI2-73: init(box) também serve a linhas criadas depois (ingredientes da receita).
+  function initFoodPicker(box) {
+    if (!box || box.dataset.foodPickerReady === '1') return;
+    box.dataset.foodPickerReady = '1';
     const input = box.querySelector('[data-food-query]'), select = box.querySelector('select');
     const status = box.querySelector('[role=status]'), next = box.querySelector('[data-food-next]'), retry = box.querySelector('[data-food-retry]');
     const results = document.createElement('div'), chosen = document.createElement('p');
@@ -86,6 +89,7 @@
       status.textContent = 'Buscando alimentos…'; box.setAttribute('aria-busy', 'true');
       try {
         const response = await fetch('/catalogo/alimentos/busca?q=' + encodeURIComponent(input.value) + '&page=' + page, {signal: controller.signal, headers: {Accept: 'application/json'}});
+        if (response.status === 403) { const e = Error('sem acesso'); e.name = 'ForbiddenError'; throw e; }
         if (!response.ok) throw Error('Falha na busca');
         const data = await response.json(); if (seq !== sequence) return;
         if (!append) { foods = []; select.replaceChildren(new Option('Selecione um alimento', '')); }
@@ -97,6 +101,7 @@
           : 'Nenhum alimento encontrado. Tente outro nome ou menos palavras.';
         next.hidden = !data.has_more;
       } catch (error) {
+        if (error.name === 'ForbiddenError' && seq === sequence) { status.textContent = 'Seu perfil não tem acesso ao catálogo de alimentos. Peça a uma nutricionista da clínica.'; return; }
         if (error.name !== 'AbortError' && seq === sequence) { status.textContent = 'Não foi possível buscar alimentos. Tente novamente.'; retry.hidden = false; }
       } finally { if (seq === sequence) box.setAttribute('aria-busy', 'false'); }
     }
@@ -124,7 +129,9 @@
       if (event.key === 'ArrowDown') (list[i + 1] || list[i]).focus();
       else (i === 0 ? input : list[i - 1]).focus();
     });
-  });
+  }
+  window.ClyoFoodPicker = { init: initFoodPicker };
+  document.querySelectorAll('[data-food-picker]').forEach(initFoodPicker);
   // NI2-417 (UX-05): os diálogos de alimento usam o componente compartilhado (clinical-journeys.js)
   window.openFoodDialog = id => {
     const modal = window.ClyoDialog ? window.ClyoDialog.open(id) : document.getElementById(id);
