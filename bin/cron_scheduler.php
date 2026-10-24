@@ -8,11 +8,15 @@ declare(strict_types=1);
  * ==============================================================================
  * Referência: inventario-migracao-laravel.md § 6.5 e Épico NI2-142
  *
- * Configuração no cPanel da HostGator (Trabalhos Cron):
- *   * / 15 * * * * /opt/cpanel/ea-php83/root/usr/bin/php ~/clyonutri/current/bin/cron_scheduler.php >> /dev/null 2>&1
+ * Configuração no cPanel da HostGator (Trabalhos Cron) — NI2-95: a cada minuto, para o push e o e-mail não atrasarem:
+ *   * * * * * /opt/cpanel/ea-php83/root/usr/bin/php ~/clyonutri/current/bin/cron_scheduler.php >> /dev/null 2>&1
+ * (Se o plano só permitir de 15 em 15 minutos, tudo continua funcionando; os avisos só demoram mais para sair.)
+ * Duas execuções nunca rodam juntas: a segunda sai na hora se a anterior ainda estiver trabalhando (trava em storage/).
  *
- * Funções executadas a cada ciclo de 15 minutos:
- *  1. Drenagem de fila database em lote (--stop-when-empty, max 120s, timeout 50s)
+ * Funções executadas a cada ciclo:
+ *  1. Fila de avisos (NI2-95): lembretes de consulta (antecedência configurada em Configurações, padrão 24 h),
+ *     entrega de notification_deliveries vencidas (e-mail e push em lotes de 100), recibos do Expo e,
+ *     uma vez por dia, limpeza de avisos lidos há mais de 180 dias
  *  2. Atualização de heartbeat de observabilidade (scheduler:heartbeat)
  *  3. Limpeza de tokens expirados e sessões antigas
  *     + contadores antigos de tentativas de login (login_attempts, v6)
@@ -38,13 +42,20 @@ class HostGatorCronScheduler
         if (file_exists(__DIR__ . '/../.env')) {
             Env::load(__DIR__ . '/../.env');
         }
+        // NI2-95: o PHP de linha de comando da HostGator vem em UTC. Horários de consulta e de silêncio são locais.
+        date_default_timezone_set((string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo'));
     }
 
     public function run(): array
     {
         $startTime = microtime(true);
+        $lock = @fopen($this->storageDir . '/cron_scheduler.lock', 'c');
+        if ($lock !== false && !flock($lock, LOCK_EX | LOCK_NB)) {
+            return ['heartbeat' => 'SKIPPED', 'status' => 'ALREADY_RUNNING', 'duration_seconds' => 0, 'timestamp' => date('c')];
+        }
         $this->recordHeartbeat();
         $this->drainDatabaseQueue();
+        $this->purgeNotifications();
         $this->pruneExpiredTokens();
         $this->pruneLoginAttempts();
         $this->pruneOldLogs();
@@ -66,50 +77,46 @@ class HostGatorCronScheduler
             'last_run' => date('c'),
             'timestamp' => time(),
             'status' => 'HEALTHY',
-            'interval_expected_minutes' => 15,
+            'interval_expected_minutes' => 1,
             'hostname' => gethostname() ?: 'hostgator_shared',
         ];
         file_put_contents($heartbeatFile, json_encode($payload, JSON_PRETTY_PRINT));
         $this->executionLog['heartbeat'] = 'RECORDED';
     }
 
+    /**
+     * NI2-95: fila real de avisos. Antes este passo só contava `notifications` não lidas e dizia DRAINED.
+     * Agora cria os lembretes de consulta (antecedência da clínica/profissional) e os avisos do check-in diário, entrega o que venceu em
+     * notification_deliveries (push em lotes de até 100 pelo Expo) e confere os recibos do push.
+     */
     private function drainDatabaseQueue(): void
     {
-        // Na HostGator, o worker roda com teto estrito de tempo para não ser morto pelo cPanel
-        $maxTime = 120; // 2 minutos
-        $processedJobs = 0;
-
         try {
             $db = Connection::getInstance();
-            // Verifica se tabela de jobs existe
-            $tableExists = false;
-            try {
-                $check = $db->query("SELECT 1 FROM notifications LIMIT 1");
-                $tableExists = true;
-            } catch (\Throwable $e) {
-                $tableExists = false;
-            }
-
-            if ($tableExists) {
-                // Simulação/execução de jobs pendentes
-                $stmt = $db->query("SELECT COUNT(*) FROM notifications WHERE read_at IS NULL");
-                $pendingCount = (int)$stmt->fetchColumn();
-                $this->executionLog['queue'] = [
-                    'driver' => 'database',
-                    'unread_notifications' => $pendingCount,
-                    'status' => 'DRAINED',
-                ];
-            } else {
-                $this->executionLog['queue'] = [
-                    'driver' => 'database',
-                    'status' => 'NO_JOBS_PENDING',
-                ];
-            }
+            $service = new \ClyoNutri\Domain\Notification\NotificationService($db);
+            $reminders = (new \ClyoNutri\Domain\Notification\AppointmentReminderScheduler($db, $service))->schedule();
+            $checkins = (new \ClyoNutri\Domain\Notification\CheckinNotificationScheduler($db, $service))->schedule();
+            $queue = $service->drain(200);
+            $receipts = $service->checkPushReceipts();
+            $this->executionLog['queue'] = ['driver' => 'database', 'appointment_reminders' => $reminders, 'checkin_notifications' => $checkins, 'push_receipts' => $receipts] + $queue;
         } catch (\Throwable $e) {
-            $this->executionLog['queue'] = [
-                'error' => $e->getMessage(),
-                'status' => 'WARNING',
-            ];
+            $this->executionLog['queue'] = ['status' => 'WARNING', 'error' => get_class($e)];
+        }
+    }
+
+    /** NI2-95: retenção dos avisos (lidos há mais de 180 dias, aparelhos desativados, recibos antigos). Uma vez por dia. */
+    private function purgeNotifications(): void
+    {
+        $marker = $this->storageDir . '/notifications_retention_last_run';
+        if (is_file($marker) && time() - (int)@file_get_contents($marker) < 86400) {
+            $this->executionLog['notifications_retention'] = 'already_ran_today';
+            return;
+        }
+        try {
+            $this->executionLog['notifications_retention'] = (new \ClyoNutri\Domain\Notification\NotificationService(Connection::getInstance()))->purge();
+            @file_put_contents($marker, (string)time());
+        } catch (\Throwable $e) {
+            $this->executionLog['notifications_retention'] = 'error: ' . get_class($e);
         }
     }
 
@@ -191,12 +198,23 @@ class HostGatorCronScheduler
 
 if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
     echo "========================================================================\n";
-    echo "   CLYONUTRI II — AGENDADOR HOSTGATOR (CICLO DE 15 MINUTOS)\n";
+    echo "   CLYONUTRI II — AGENDADOR HOSTGATOR (CICLO DE 1 MINUTO)\n";
     echo "========================================================================\n";
     $scheduler = new HostGatorCronScheduler();
     $report = $scheduler->run();
+    if (($report['status'] ?? '') === 'ALREADY_RUNNING') {
+        echo " Status    : a execução anterior ainda está rodando; esta saiu sem fazer nada.\n";
+        exit(0);
+    }
     echo " Heartbeat : " . $report['heartbeat'] . "\n";
-    echo " Fila      : " . ($report['queue']['status'] ?? 'OK') . "\n";
+    $q = $report['queue'] ?? [];
+    echo " Fila      : " . ($q['status'] ?? 'OK') . (isset($q['processed']) ? " (entregas {$q['processed']}, enviadas " . ($q['sent'] + $q['logged']) . ", falhas {$q['failed']}, na fila {$q['pending']})" : '') . "\n";
+    $ar = $q['appointment_reminders'] ?? null;
+    if (is_array($ar) && isset($ar['created'])) echo " Consultas : {$ar['created']} lembrete(s) de consulta novo(s)\n";
+    $ck = $q['checkin_notifications'] ?? null;
+    if (is_array($ck) && isset($ck['reminders'])) echo " Check-in  : {$ck['reminders']['created']} lembrete(s) para paciente, {$ck['submitted']['created']} aviso(s) de check-in recebido\n";
+    $pr = $q['push_receipts'] ?? null;
+    if (is_array($pr) && isset($pr['checked'])) echo " Push      : {$pr['checked']} recibo(s) conferido(s), {$pr['error']} com erro, {$pr['deactivated']} aparelho(s) desativado(s)\n";
     $tele = $report['teleconsultation_reminders'] ?? 'n/d';
     echo " Lembretes : " . (is_array($tele) ? "enviados {$tele['sent']}, falhas {$tele['failed']}, sem e-mail {$tele['skipped']}" : $tele) . "\n";
     echo " Login     : " . ($report['login_attempts_pruned'] ?? '-') . " registro(s) antigo(s) de tentativa removido(s)\n";

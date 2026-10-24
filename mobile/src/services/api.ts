@@ -235,6 +235,19 @@ export interface PatientRecipeDetails {
 export interface PatientConsent { purpose: string; term_title: string | null; term_version: string | null; granted: boolean; granted_at: string | null; revoked_at: string | null; revocation_reason: string | null; }
 export interface PrivacyRequest { id: number; request_type: string; status: string; deadline_at: string; completed_at?: string | null; response_notes?: string | null; created_at: string; already_open?: boolean; }
 export interface PatientPrivacyData { consents: PatientConsent[]; requests: PrivacyRequest[]; }
+// NI2-95: avisos e preferências de aviso.
+export type NotificationCategory = 'chat' | 'appointments' | 'plan' | 'checkin';
+export interface PatientNotification { id: number; event_type: string; category: NotificationCategory; title: string; body: string; link: string | null; created_at: string; read: boolean; }
+export interface NotificationInbox { items: PatientNotification[]; unread_count: number; next_before_id: number | null; }
+export interface NotificationCategoryPref { category: NotificationCategory; label: string; email_enabled: boolean; push_enabled: boolean; }
+/** NI2-95: lembrete do check-in diário (opt-in). available=false quando o app ainda não tem check-in diário. */
+export interface CheckinReminderPref { available: boolean; enabled: boolean; time: string; }
+export interface NotificationPreferences { categories: NotificationCategoryPref[]; quiet_hours: { enabled: boolean; start: string; end: string }; timezone: string; push_available: boolean; checkin_reminder?: CheckinReminderPref; }
+export interface NotificationPreferencesUpdate {
+  categories?: Partial<Record<NotificationCategory, { email_enabled?: boolean; push_enabled?: boolean }>>;
+  quiet_hours?: { enabled?: boolean; start?: string; end?: string };
+  checkin_reminder?: { enabled?: boolean; time?: string };
+}
 
 export interface PatientHomeData {
   patient_name: string;
@@ -352,6 +365,8 @@ if (typeof window !== 'undefined' && window.location && window.location.hostname
 }
 let currentApiBaseUrl: string = (process.env.EXPO_PUBLIC_API_URL || defaultBaseUrl).replace(/\/+$/, '');
 let onSessionExpired: (() => void) | null = null;
+/** NI2-95: token do Expo Push deste aparelho, guardado só em memória para desligar no logout. */
+let currentPushToken: string | null = null;
 
 export function setSessionExpiredHandler(handler: (() => void) | null) {
   onSessionExpired = handler;
@@ -482,13 +497,51 @@ export const ApiService = {
     if (!data.request?.id) throw new ApiError('Resposta do pedido inválida.', 200, 'invalid');
     return data.request;
   },
+  async getNotifications(beforeId?: number | null): Promise<NotificationInbox> {
+    const data = await request<NotificationInbox>('/api/v1/patient/notifications' + (beforeId ? `?before_id=${beforeId}` : ''));
+    if (!Array.isArray(data.items)) throw new ApiError('Resposta de avisos inválida.', 200, 'invalid');
+    return data;
+  },
+  async markNotificationRead(id: number): Promise<{ unread_count: number }> {
+    return request<{ unread_count: number }>(`/api/v1/patient/notifications/${id}/read`, { method: 'POST', body: '{}' });
+  },
+  async markAllNotificationsRead(): Promise<{ unread_count: number }> {
+    return request<{ unread_count: number }>('/api/v1/patient/notifications/read-all', { method: 'POST', body: '{}' });
+  },
+  async getNotificationPreferences(): Promise<NotificationPreferences> {
+    const data = await request<NotificationPreferences>('/api/v1/patient/notification-preferences');
+    if (!Array.isArray(data.categories) || !data.quiet_hours) throw new ApiError('Resposta de preferências inválida.', 200, 'invalid');
+    return data;
+  },
+  async saveNotificationPreferences(update: NotificationPreferencesUpdate): Promise<NotificationPreferences> {
+    return request<NotificationPreferences>('/api/v1/patient/notification-preferences', { method: 'POST', body: JSON.stringify(update) });
+  },
   /** Encerra a sessão só neste aparelho, sem depender da rede (code review NI2-91, M3). */
   forgetLocalSession(): void {
     setAuthToken(null);
   },
 
+  /** NI2-95: cadastra este aparelho para o aviso no celular. */
+  async registerPushToken(token: string, platform: string): Promise<{ registered: boolean; push_enabled: boolean }> {
+    const res = await request<{ registered: boolean; push_enabled: boolean }>('/api/v1/patient/push-tokens', { method: 'POST', body: JSON.stringify({ token, platform }) });
+    currentPushToken = token;
+    return res;
+  },
+  /** NI2-95: desliga o aviso no celular deste aparelho. Nunca impede o logout. */
+  async removePushToken(): Promise<void> {
+    const token = currentPushToken;
+    if (!token || !getAuthToken()) return;
+    try {
+      await request<{ removed: boolean }>('/api/v1/patient/push-tokens/remove', { method: 'POST', body: JSON.stringify({ token }) });
+      currentPushToken = null;
+    } catch (_) {
+      // Sem rede ou sessão já expirada: o servidor desliga o token sozinho quando o Expo avisar que ele não vale mais.
+    }
+  },
+
   async logout(): Promise<{ message: string }> {
     // Keep the token on transport failure so the patient can retry server revocation.
+    await ApiService.removePushToken();
     try {
       const res = await request<{ message: string }>('/api/v1/auth/patient-logout', {
         method: 'POST',

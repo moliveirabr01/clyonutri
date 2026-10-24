@@ -453,6 +453,11 @@ $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
 $router->post('/financeiro/recebiveis/novo', $requireAuth([$dashCtrl, 'createReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/pagar', $requireAuth([$dashCtrl, 'payReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/cancelar', $requireAuth([$dashCtrl, 'cancelReceivableAction']));
+// NI2-95: avisos do profissional na web (mensagem nova no chat etc.)
+$noticesCtrl = new \ClyoNutri\Application\Controllers\NotificationsController();
+$router->get('/avisos', $requireAuth([$noticesCtrl, 'index']));
+$router->post('/avisos/lidas', $requireAuth([$noticesCtrl, 'markAll']));
+$router->post('/avisos/{id}/lida', $requireAuth([$noticesCtrl, 'markOne']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->post('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->get('/configuracoes/assinatura', $requireAuth([$subCtrl, 'show']));
@@ -1195,6 +1200,91 @@ $router->get('/api/v1/chat/anexo/{token}', function($params = []) use ($chatApi)
     $api = $chatApi();
     if (!$api->enabled()) return;
     $api->downloadByToken((string)($params['token'] ?? ''));
+});
+
+// 4.2 Avisos da paciente (NI2-95): caixa de avisos e preferências por tipo de aviso e canal.
+$notificationApi = static fn() => new \ClyoNutri\Domain\Notification\NotificationService($db);
+$router->get('/api/v1/patient/notifications', function() use ($authenticatePatientApi, $notificationApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $before = isset($_GET['before_id']) && is_string($_GET['before_id']) && ctype_digit($_GET['before_id']) ? (int)$_GET['before_id'] : null;
+    $limit = isset($_GET['limit']) && is_string($_GET['limit']) && ctype_digit($_GET['limit']) ? (int)$_GET['limit'] : 20;
+    echo json_encode($notificationApi()->inbox((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $before, $limit), JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/notifications/read-all', function() use ($authenticatePatientApi, $notificationApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $svc = $notificationApi();
+    $marked = $svc->markAllRead((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id']);
+    echo json_encode(['marked' => $marked, 'unread_count' => $svc->unreadCount((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'])], JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/notifications/{id}/read', function($params = []) use ($authenticatePatientApi, $notificationApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    $id = (string)($params['id'] ?? '');
+    $svc = $notificationApi();
+    if (!ctype_digit($id) || !$svc->available() || !$svc->markRead((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], (int)$id)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Aviso não encontrado.', 'code' => 'NOT_FOUND'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    echo json_encode(['id' => (int)$id, 'read' => true, 'unread_count' => $svc->unreadCount((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'])], JSON_UNESCAPED_UNICODE);
+});
+$router->get('/api/v1/patient/notification-preferences', function() use ($authenticatePatientApi, $notificationApi) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    echo json_encode($notificationApi()->preferences((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id']), JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/notification-preferences', function() use ($authenticatePatientApi, $getJsonInput, $notificationApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    $auth = $authenticatePatientApi();
+    try {
+        $res = $notificationApi()->savePreferences((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $getJsonInput());
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    } catch (\RuntimeException $e) {
+        http_response_code(503);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'UNAVAILABLE'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('NOTIFICATION_PREFERENCES_UPDATED', 'patients', (string)$auth['patient_id'], ['before' => $res['before'], 'after' => $res['after']]);
+    echo json_encode($res['after'], JSON_UNESCAPED_UNICODE);
+});
+// NI2-95: aparelho da paciente para o aviso no celular (token do Expo Push). O token nunca volta na resposta.
+$router->post('/api/v1/patient/push-tokens', function() use ($authenticatePatientApi, $getJsonInput, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $in = $getJsonInput();
+    try {
+        $res = (new \ClyoNutri\Domain\Notification\PushTokenService($db))->register((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $in['token'] ?? null, $in['platform'] ?? null);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(422);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
+        return;
+    } catch (\RuntimeException $e) {
+        http_response_code(503);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'UNAVAILABLE'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('PUSH_DEVICE_REGISTERED', 'patients', (string)$auth['patient_id'], ['platform' => is_string($in['platform'] ?? null) ? substr($in['platform'], 0, 16) : 'unknown']);
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
+});
+$router->post('/api/v1/patient/push-tokens/remove', function() use ($authenticatePatientApi, $getJsonInput, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $in = $getJsonInput();
+    $removed = (new \ClyoNutri\Domain\Notification\PushTokenService($db))->remove((int)$auth['clinic_id'], 'patient', (int)$auth['patient_id'], $in['token'] ?? null);
+    if ($removed) {
+        (new \ClyoNutri\Core\Audit\AuditLogger($db))->log('PUSH_DEVICE_REMOVED', 'patients', (string)$auth['patient_id'], []);
+    }
+    // Idempotente: sair duas vezes, ou com token que não é seu, responde igual (sem revelar se existe).
+    echo json_encode(['removed' => true], JSON_UNESCAPED_UNICODE);
 });
 
 // 4.4 Privacidade da paciente: consentimentos e pedidos LGPD (code review NI2-91, C1)

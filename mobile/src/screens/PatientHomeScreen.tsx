@@ -19,6 +19,8 @@ import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
 import DailyCheckinCard from '../components/DailyCheckinCard';
 import PatientChat from '../components/PatientChat';
+import PatientNotifications from '../components/PatientNotifications';
+import { setupPushNotifications, onPushOpened } from '../services/pushNotifications';
 import BrandLogo from '../components/BrandLogo';
 import HydrationHistory from '../components/HydrationHistory';
 import { HydrationQueue, QueuedHydration, memoryStorage, webStorage } from '../services/hydrationQueue';
@@ -199,6 +201,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // NI2-95: aviso no celular. Pede permissão depois do login e, ao tocar no aviso, abre a aba certa.
+  useEffect(() => {
+    void setupPushNotifications();
+    // Lembrete de check-in abre em Hoje, onde fica o check-in do dia (NI2-96); os outros avisos, em Perfil.
+    return onPushOpened((category) => setCurrentTab(category === 'chat' ? 'Chat' : category === 'checkin' ? 'Hoje' : 'Perfil'));
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -876,6 +885,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar Sessão (Logout)'}</Text>
               </TouchableOpacity>
             </View>
+
+            <PatientNotifications active={currentTab === 'Perfil'} />
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>🔒 Seus Dados e Privacidade (LGPD)</Text>

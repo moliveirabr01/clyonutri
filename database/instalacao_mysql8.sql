@@ -1368,6 +1368,196 @@ INSERT INTO `migrations` VALUES (1,'2026_10_07_000001_create_tenants_and_users_t
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_checkin_settings` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `patient_id` int NOT NULL,
+  `enabled` tinyint NOT NULL DEFAULT '0',
+  `remind_time` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '20:00',
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_checkin_settings` (`clinic_id`,`patient_id`),
+  KEY `patient_id` (`patient_id`),
+  CONSTRAINT `notification_checkin_settings_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `notification_checkin_settings_ibfk_2` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_checkin_settings` WRITE;
+/*!40000 ALTER TABLE `notification_checkin_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_checkin_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_deliveries` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `event_id` int NOT NULL,
+  `channel` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `reason` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `attempts` int NOT NULL DEFAULT '0',
+  `next_attempt_at` datetime DEFAULT NULL,
+  `sent_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_deliveries_channel` (`event_id`,`channel`),
+  KEY `clinic_id` (`clinic_id`),
+  KEY `idx_notification_deliveries_queue` (`status`,`next_attempt_at`),
+  CONSTRAINT `notification_deliveries_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `notification_deliveries_ibfk_2` FOREIGN KEY (`event_id`) REFERENCES `notification_events` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_deliveries` WRITE;
+/*!40000 ALTER TABLE `notification_deliveries` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_deliveries` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_events` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `event_type` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_id` int NOT NULL,
+  `title` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `body` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `link` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `critical` int NOT NULL DEFAULT '0',
+  `dedupe_key` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `read_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_events_dedupe` (`clinic_id`,`recipient_type`,`recipient_id`,`dedupe_key`),
+  KEY `idx_notification_events_inbox` (`clinic_id`,`recipient_type`,`recipient_id`,`id`),
+  KEY `idx_notification_events_retention` (`read_at`),
+  CONSTRAINT `notification_events_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_events` WRITE;
+/*!40000 ALTER TABLE `notification_events` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_events` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_preferences` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `recipient_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_id` int NOT NULL,
+  `category` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email_enabled` int NOT NULL DEFAULT '1',
+  `push_enabled` int NOT NULL DEFAULT '1',
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_preferences` (`clinic_id`,`recipient_type`,`recipient_id`,`category`),
+  CONSTRAINT `notification_preferences_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_preferences` WRITE;
+/*!40000 ALTER TABLE `notification_preferences` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_preferences` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_push_tickets` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `delivery_id` int NOT NULL,
+  `token_id` int NOT NULL,
+  `ticket_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `error` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `checked_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `clinic_id` (`clinic_id`),
+  KEY `delivery_id` (`delivery_id`),
+  KEY `token_id` (`token_id`),
+  KEY `idx_notification_push_tickets_receipt` (`status`,`created_at`),
+  CONSTRAINT `notification_push_tickets_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `notification_push_tickets_ibfk_2` FOREIGN KEY (`delivery_id`) REFERENCES `notification_deliveries` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `notification_push_tickets_ibfk_3` FOREIGN KEY (`token_id`) REFERENCES `notification_push_tokens` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_push_tickets` WRITE;
+/*!40000 ALTER TABLE `notification_push_tickets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_push_tickets` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_push_tokens` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `recipient_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_id` int NOT NULL,
+  `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `platform` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unknown',
+  `active` int NOT NULL DEFAULT '1',
+  `last_error` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  `last_sent_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_push_tokens_token` (`token`),
+  KEY `idx_notification_push_tokens_owner` (`clinic_id`,`recipient_type`,`recipient_id`,`active`),
+  CONSTRAINT `notification_push_tokens_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_push_tokens` WRITE;
+/*!40000 ALTER TABLE `notification_push_tokens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_push_tokens` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_quiet_hours` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `recipient_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_id` int NOT NULL,
+  `enabled` int NOT NULL DEFAULT '0',
+  `start_time` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '22:00',
+  `end_time` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '07:00',
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_quiet_hours` (`clinic_id`,`recipient_type`,`recipient_id`),
+  CONSTRAINT `notification_quiet_hours_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_quiet_hours` WRITE;
+/*!40000 ALTER TABLE `notification_quiet_hours` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_quiet_hours` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `notification_reminder_settings` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `professional_id` int NOT NULL DEFAULT '0',
+  `lead_hours` int NOT NULL,
+  `updated_by` int DEFAULT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notification_reminder_settings` (`clinic_id`,`professional_id`),
+  CONSTRAINT `notification_reminder_settings_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `notification_reminder_settings` WRITE;
+/*!40000 ALTER TABLE `notification_reminder_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notification_reminder_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
   `id` int NOT NULL AUTO_INCREMENT,
   `clinic_id` int NOT NULL,

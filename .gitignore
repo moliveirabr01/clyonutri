@@ -56,3 +56,7 @@ tests/plano_impressao/node_modules
 /clyonutri-hostgator-*.zip
 /release/clyonutri-hostgator-*/
 /_to_delete/
+
+# Marcadores de execução do agendador (NI2-95)
+storage/*_last_run
+storage/cron_scheduler.lock

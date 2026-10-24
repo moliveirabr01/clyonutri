@@ -21,6 +21,9 @@ use PDO;
  * - push: blocked — não há provedor de push configurado (Expo/FCM). Nada é marcado como enviado sem ter sido.
  *
  * Texto neutro: sem nome, sem conteúdo da mensagem e sem dado clínico.
+ *
+ * NI2-95: com a migration 52 aplicada, a decisão por canal passa pelo NotificationService (preferências por
+ * categoria, silêncio, caixa de avisos). Sem ela, vale o caminho antigo abaixo.
  */
 final class ChatNotificationDispatcher
 {
@@ -41,6 +44,11 @@ final class ChatNotificationDispatcher
     {
         $result = [];
         try {
+            $domain = new NotificationService($this->db, $this->mailer);
+            if ($domain->available()) {
+                return $this->viaDomain($domain, $clinicId, $conversationId, $messageId, $recipientType, $recipientId);
+            }
+            // Banco ainda sem a migration 52: segue o caminho do NI2-138.
             $prefs = $this->preferences($clinicId, $recipientType, $recipientId);
             $result['in_app'] = $this->record($clinicId, $conversationId, $messageId, $recipientType, $recipientId, 'in_app', 'sent', null);
             $result['email'] = $this->email($clinicId, $conversationId, $messageId, $recipientType, $recipientId, $prefs);
@@ -49,9 +57,38 @@ final class ChatNotificationDispatcher
                 : $this->record($clinicId, $conversationId, $messageId, $recipientType, $recipientId, 'push', 'skipped', 'preference_off');
         } catch (\Throwable $e) {
             // A notificação nunca derruba o envio da mensagem.
-            error_log('NI2-138 notificação do chat falhou: ' . $e->getMessage());
+            // Só a classe do erro: a mensagem de exceção do PDO/mailer pode trazer trecho de SQL, endereço ou texto.
+            error_log('NI2-138 notificação do chat falhou: ' . get_class($e));
         }
         return $result;
+    }
+
+    /**
+     * NI2-95: o aviso nasce no domínio (caixa de avisos + entregas com status real) e continua espelhado em
+     * chat_notifications_log, que é o histórico do chat lido pela tela e pela guarda/anonimização do NI2-138.
+     */
+    private function viaDomain(NotificationService $domain, int $clinicId, int $conversationId, int $messageId, string $type, int $id): array
+    {
+        $link = $type === 'professional' ? '/chat/' . $conversationId : '/';
+        $out = $domain->publish($clinicId, self::EVENT, $type, $id, 'chat.message:' . $messageId, $link, [],
+            $this->recentEmail($conversationId, $type, $id) ? ['email_skip_reason' => 'recent_email'] : []);
+        if ($out['duplicate']) {
+            return [];
+        }
+        $result = ['in_app' => $this->record($clinicId, $conversationId, $messageId, $type, $id, 'in_app', 'sent', null)];
+        foreach (['email', 'push'] as $channel) {
+            $d = $out['deliveries'][$channel] ?? ['status' => 'failed', 'reason' => 'internal_error'];
+            $result[$channel] = $this->record($clinicId, $conversationId, $messageId, $type, $id, $channel, $d['status'], $d['reason']);
+        }
+        return $result;
+    }
+
+    private function recentEmail(int $conversationId, string $type, int $id): bool
+    {
+        $recent = $this->db->prepare("SELECT 1 FROM chat_notifications_log WHERE conversation_id = ? AND recipient_type = ? AND recipient_id = ?
+            AND channel = 'email' AND status IN ('sent', 'logged') AND sent_at >= ? LIMIT 1");
+        $recent->execute([$conversationId, $type, $id, date('Y-m-d H:i:s', time() - self::EMAIL_COOLDOWN_MINUTES * 60)]);
+        return (bool)$recent->fetchColumn();
     }
 
     private function email(int $clinicId, int $conversationId, int $messageId, string $type, int $id, array $prefs): array
@@ -137,6 +174,7 @@ final class ChatNotificationDispatcher
 
     private function record(int $clinicId, int $conversationId, int $messageId, string $type, int $id, string $channel, string $status, ?string $reason): array
     {
+        $reason = NotificationService::safeReason($reason);
         $hasReason = SchemaInfo::hasColumn($this->db, 'chat_notifications_log', 'failure_reason');
         $this->db->prepare('INSERT INTO chat_notifications_log (clinic_id, conversation_id, message_id, recipient_type, recipient_id, channel, title, body_preview,
                 contains_clinical_data, status, sent_at' . ($hasReason ? ', failure_reason' : '') . ')

@@ -814,6 +814,14 @@ class MealPlanService
 
             $this->db->commit();
 
+            // NI2-95: aviso à paciente (fila do cron). Falha aqui nunca desfaz a publicação.
+            try {
+                (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish($clinicId, 'meal_plan.published', 'patient', $patientId,
+                    'meal_plan.published:' . $planId . ':v' . $nextVersionNumber, '/');
+            } catch (\Throwable $notifyError) {
+                error_log('NI2-95 aviso de plano publicado falhou: ' . get_class($notifyError));
+            }
+
             if ($returnDetails) {
                 return [
                     'plan_id' => $planId,
