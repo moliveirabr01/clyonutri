@@ -390,12 +390,12 @@ class ChatController
         }
         .conv-card-time {
             font-size: 0.75rem;
-            color: #64748b;
+            color: #475569;
             font-weight: normal;
         }
         .conv-card-preview {
             font-size: 0.85rem;
-            color: #64748b;
+            color: #475569;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
