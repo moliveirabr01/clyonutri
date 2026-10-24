@@ -4,8 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/../../vendor/autoload.php';
 use ClyoNutri\Core\Database\Connection;
 
-$isMysqlTestDb = getenv('DB_CONNECTION') === 'mysql' && preg_match('/^ni2_(24|73|91|96|137|138|140)_test_[a-z0-9]+$/', getenv('DB_DATABASE') ?: '');
-if (!$isMysqlTestDb && !preg_match('#^/tmp/ni2-(24|73|91|96|137|138|140)-#', getenv('DB_DATABASE') ?: '')) throw new RuntimeException('Isolated test database required');
+$isMysqlTestDb = getenv('DB_CONNECTION') === 'mysql' && preg_match('/^ni2_(24|73|91|96|137|132|138|140)_test_[a-z0-9]+$/', getenv('DB_DATABASE') ?: '');
+if (!$isMysqlTestDb && !preg_match('#^/tmp/ni2-(24|73|91|96|137|132|138|140)-#', getenv('DB_DATABASE') ?: '')) throw new RuntimeException('Isolated test database required');
 $mode = $argv[1] ?? 'prepare';
 if ($mode === 'prepare') {
     passthru('php ' . escapeshellarg(__DIR__ . '/ni2_89_fixture.php') . ' prepare > /dev/null', $rc);

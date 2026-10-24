@@ -1,0 +1,543 @@
+{
+ "driver": "sqlite",
+ "pass": 27,
+ "fail": 33,
+ "results": [
+  {
+   "crit": "setup",
+   "name": "Login de 3 pacientes e 2 profissionais (clínicas 1 e 2)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Corpo vazio → 422 (antes: 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Requisição sem corpo → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "JSON malformado → 4xx em JSON, sem vazar detalhe",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name em lista → 422 (antes: 500)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name em objeto → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name vazio → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name só espaços → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name 101 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name com caractere de controle → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":1,\"meal_name\":\"Almo\\u00e7o\\u0000x\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:26\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "validação",
+   "name": "meal_name número → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Nos limites exatos (100/2000/1000, fome 5, saciedade 1) → 201",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":2,\"meal_name\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:26\",\"description\":\"xxxxxxxxxxx"
+   }
+  },
+  {
+   "crit": "validação",
+   "name": "descrição com 2001 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "sintomas com 1001 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "descrição em lista → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 0 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 6 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome \"abc\" → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "fome 2.5 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "saciedade 9 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Chave de idempotência com 65 caracteres → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Chave de idempotência que não é texto → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "validação",
+   "name": "Nada foi gravado pelas requisições recusadas (só o caso dos limites exatos)",
+   "ok": false,
+   "detail": {
+    "before": 0,
+    "after": 2
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at texto livre → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at data inexistente → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":3,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"2026-03-02 07:00:00\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at antes de 2000 → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":4,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"1999-12-31 21:59:59\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at ano 0001 → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":5,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"0000-12-31 20:53:32\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at 10 minutos no futuro → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":6,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:56:27\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at no ano 2999 → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at lista → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "consumed_at número → 422",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Nenhum horário absurdo foi gravado",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "horário",
+   "name": "Até 5 minutos no futuro é tolerado (relógio do celular) → 201",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":7,\"meal_name\":\"Hor\\u00e1rio ok\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:47:27\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "timezone que não é IANA → 422",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":8,\"meal_name\":\"Fuso inv\\u00e1lido\",\"patient_id\":1,\"consumed_at\":\"2026-10-20 08:00:00\",\"description\":null,\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "Horário local de Manaus (UTC-4) é convertido para o horário da clínica (+1 h) e o fuso fica registrado",
+   "ok": false,
+   "detail": {
+    "id": 9,
+    "meal_name": "Manaus",
+    "patient_id": 1,
+    "consumed_at": "2026-10-20 08:00:00",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "Horário com Z (UTC) 15:30 vira 12:30 no horário da clínica — o app mostra 12:30, não 15:30",
+   "ok": false,
+   "detail": {
+    "id": 10,
+    "meal_name": "UTC",
+    "patient_id": 1,
+    "consumed_at": "2026-10-20 12:30:00",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "Offset na própria data (-04:00) é respeitado e guardado em consumed_tz",
+   "ok": false,
+   "detail": {
+    "id": 11,
+    "meal_name": "Offset",
+    "patient_id": 1,
+    "consumed_at": "2026-10-20 09:00:00",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "Horário sem fuso é tratado como horário da clínica (comportamento anterior preservado)",
+   "ok": false,
+   "detail": {
+    "id": 12,
+    "meal_name": "Sem fuso",
+    "patient_id": 1,
+    "consumed_at": "2026-10-20 07:45:00",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "horário",
+   "name": "Sem consumed_at usa o agora da clínica (±2 min)",
+   "ok": false,
+   "detail": {
+    "id": 13,
+    "meal_name": "Agora",
+    "patient_id": 1,
+    "consumed_at": "2026-10-24 00:46:27",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "foto",
+   "name": "photo_path vindo do cliente é ignorado: /etc/passwd nunca chega ao banco",
+   "ok": false,
+   "detail": {
+    "id": 14,
+    "meal_name": "Com foto",
+    "patient_id": 1,
+    "consumed_at": "2026-10-24 00:46:27",
+    "description": null,
+    "idempotent_replay": false
+   }
+  },
+  {
+   "crit": "foto",
+   "name": "photo_path com ../ também não é gravado",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "foto",
+   "name": "Serviço recusa caminho absoluto, ../, esquema, barra invertida e byte nulo; aceita caminho relativo seguro e /uploads/diary/",
+   "ok": false,
+   "detail": {
+    "/etc/passwd": "aceito",
+    "../../etc/passwd": "aceito",
+    "a/../../b.jpg": "aceito",
+    "C:\\Windows\\x.jpg": "aceito",
+    "http://example.test/x.jpg": "aceito",
+    "fotos/a\u0000.jpg": "aceito",
+    "fotos/ok-1.jpg": "aceito",
+    "/uploads/diary/ok-2.jpg": "aceito",
+    "/uploads/outro/x.jpg": "aceito"
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Criação → 201 com os campos públicos e idempotent_replay=false",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "k": [
+     "id",
+     "meal_name",
+     "patient_id",
+     "consumed_at",
+     "description",
+     "idempotent_replay"
+    ]
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Resposta não expõe clinic_id, idempotency_key, request_hash nem photo_path",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Cache-Control: no-store",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave e mesmo conteúdo → 200, mesmo id, idempotent_replay=true, sem linha nova",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "j": {
+     "id": 26,
+     "meal_name": "Café da manhã",
+     "patient_id": 1,
+     "consumed_at": "2026-10-21 08:10:00",
+     "description": "Pão com ovos (TESTE)",
+     "idempotent_replay": false
+    }
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Chave no corpo também é respeitada (mesmo conteúdo → 200)",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "j": {
+     "id": 27,
+     "meal_name": "Café da manhã",
+     "patient_id": 1,
+     "consumed_at": "2026-10-21 08:10:00",
+     "description": "Pão com ovos (TESTE)",
+     "idempotent_replay": false
+    }
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra refeição → 409 IDEMPOTENCY_KEY_REUSED",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "t": "{\"id\":28,\"meal_name\":\"Almo\\u00e7o\",\"patient_id\":1,\"consumed_at\":\"2026-10-21 08:10:00\",\"description\":\"P\\u00e3o com ovos (TESTE)\",\"idempotent_replay\":false}"
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra descrição → 409",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outro horário → 409",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Mesma chave com outra fome → 409",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "Depois dos 409 o registro original continua igual e único",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "A mesma chave em outro paciente é independente (201) e não vaza o registro da Ana",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "j": {
+     "id": 32,
+     "meal_name": "Do Bruno",
+     "patient_id": 2,
+     "consumed_at": "2026-10-21 08:10:00",
+     "description": "Pão com ovos (TESTE)",
+     "idempotent_replay": false
+    }
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Reenvio sem consumed_at (o \"agora\" muda) continua sendo o mesmo conteúdo → 200",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "j": {
+     "id": 34,
+     "meal_name": "Sem horário",
+     "patient_id": 1,
+     "consumed_at": "2026-10-24 00:46:27",
+     "description": null,
+     "idempotent_replay": false
+    }
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Sem chave, duas requisições iguais geram dois registros (comportamento esperado)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "idempotência",
+   "name": "4 requisições iguais em paralelo → 1 linha, todas 200/201 com o mesmo id",
+   "ok": false,
+   "detail": [
+    [
+     200,
+     "{\"id\":37,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"
+    ],
+    [
+     200,
+     "{\"id\":38,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"
+    ],
+    [
+     200,
+     "{\"id\":39,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"
+    ],
+    [
+     200,
+     "{\"id\":40,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"
+    ]
+   ]
+  },
+  {
+   "crit": "idempotência",
+   "name": "Em paralelo com conteúdos diferentes: 1 linha, os demais recebem 409 (nunca 500)",
+   "ok": false,
+   "detail": [
+    [
+     200,
+     "{\"id\":41,\"meal_name\":\"Paralelo A\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"
+    ],
+    [
+     200,
+     "{\"id\":42,\"meal_name\":\"Paralelo B\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"
+    ],
+    [
+     200,
+     "{\"id\":43,\"meal_name\":\"Paralelo A\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"
+    ],
+    [
+     200,
+     "{\"id\":44,\"meal_name\":\"Paralelo B\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"
+    ]
+   ]
+  },
+  {
+   "crit": "idempotência",
+   "name": "Registro anterior à migração (sem hash): mesmo conteúdo → 200 (comparação campo a campo)",
+   "ok": false,
+   "detail": {
+    "s": 200,
+    "j": {
+     "id": 46,
+     "meal_name": "Jantar legado",
+     "patient_id": 1,
+     "consumed_at": "2026-10-01 20:00:00",
+     "description": "Sopa (TESTE)",
+     "idempotent_replay": false
+    }
+   }
+  },
+  {
+   "crit": "idempotência",
+   "name": "Registro anterior à migração: conteúdo diferente → 409",
+   "ok": false,
+   "detail": null
+  },
+  {
+   "crit": "erro",
+   "name": "Execução sem exceção",
+   "ok": false,
+   "detail": "Error: Command failed: php /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php down53\nPHP Warning:  require_once(/workspace/ni2132/basecopy2/tests/support/../../database/migrations/2026_10_24_000053_harden_food_diary_entries.php): Failed to open stream: No such file or directory in /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php on line 42\nPHP Fatal error:  Uncaught Error: Failed opening required '/workspace/ni2132/basecopy2/tests/support/../../database/migrations/2026_10_24_000053_harden_food_diary_entries.php' (include_path='.:/usr/share/php') in /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php:42\nStack trace:\n#0 {main}\n  thrown in /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php on line 42\n\n    at genericNodeError (node:internal/errors:984:15)\n    at wrappedFn (node:internal/errors:538:14)\n    at checkExecSyncError (node:child_process:891:11)\n    at execFileSync (node:child_process:927:15)\n    at fx (/workspace/ni2132/src/tests/ni2_132_food_diary_http_test.cjs:25:25)\n    at /workspace/ni2132/src/tests/ni2_132_food_diary_http_test.cjs:185:5\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)"
+  }
+ ]
+}

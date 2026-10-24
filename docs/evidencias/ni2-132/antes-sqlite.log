@@ -1,0 +1,62 @@
+PASS [setup] Login de 3 pacientes e 2 profissionais (clínicas 1 e 2)
+PASS [validação] Corpo vazio → 422 (antes: 500)
+PASS [validação] Requisição sem corpo → 422
+PASS [validação] JSON malformado → 4xx em JSON, sem vazar detalhe
+PASS [validação] meal_name em lista → 422 (antes: 500)
+PASS [validação] meal_name em objeto → 422
+PASS [validação] meal_name vazio → 422
+PASS [validação] meal_name só espaços → 422
+PASS [validação] meal_name 101 caracteres → 422
+FAIL [validação] meal_name com caractere de controle → 422 → {"s":200,"t":"{\"id\":1,\"meal_name\":\"Almo\\u00e7o\\u0000x\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:26\",\"description\":null,\"idempotent_replay\":false}"}
+PASS [validação] meal_name número → 422
+FAIL [validação] Nos limites exatos (100/2000/1000, fome 5, saciedade 1) → 201 → {"s":200,"t":"{\"id\":2,\"meal_name\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:26\",\"description\":\"xxxxxxxxxxx"}
+PASS [validação] descrição com 2001 → 422
+PASS [validação] sintomas com 1001 → 422
+PASS [validação] descrição em lista → 422
+PASS [validação] fome 0 → 422
+PASS [validação] fome 6 → 422
+PASS [validação] fome "abc" → 422
+PASS [validação] fome 2.5 → 422
+PASS [validação] saciedade 9 → 422
+PASS [validação] Chave de idempotência com 65 caracteres → 422
+PASS [validação] Chave de idempotência que não é texto → 422
+FAIL [validação] Nada foi gravado pelas requisições recusadas (só o caso dos limites exatos) → {"before":0,"after":2}
+PASS [horário] consumed_at texto livre → 422
+FAIL [horário] consumed_at data inexistente → 422 → {"s":200,"t":"{\"id\":3,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"2026-03-02 07:00:00\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [horário] consumed_at antes de 2000 → 422 → {"s":200,"t":"{\"id\":4,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"1999-12-31 21:59:59\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [horário] consumed_at ano 0001 → 422 → {"s":200,"t":"{\"id\":5,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"0000-12-31 20:53:32\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [horário] consumed_at 10 minutos no futuro → 422 → {"s":200,"t":"{\"id\":6,\"meal_name\":\"Hor\\u00e1rio\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:56:27\",\"description\":null,\"idempotent_replay\":false}"}
+PASS [horário] consumed_at no ano 2999 → 422
+PASS [horário] consumed_at lista → 422
+PASS [horário] consumed_at número → 422
+FAIL [horário] Nenhum horário absurdo foi gravado
+FAIL [horário] Até 5 minutos no futuro é tolerado (relógio do celular) → 201 → {"s":200,"t":"{\"id\":7,\"meal_name\":\"Hor\\u00e1rio ok\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:47:27\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [horário] timezone que não é IANA → 422 → {"s":200,"t":"{\"id\":8,\"meal_name\":\"Fuso inv\\u00e1lido\",\"patient_id\":1,\"consumed_at\":\"2026-10-20 08:00:00\",\"description\":null,\"idempotent_replay\":false}"}
+FAIL [horário] Horário local de Manaus (UTC-4) é convertido para o horário da clínica (+1 h) e o fuso fica registrado → {"id":9,"meal_name":"Manaus","patient_id":1,"consumed_at":"2026-10-20 08:00:00","description":null,"idempotent_replay":false}
+FAIL [horário] Horário com Z (UTC) 15:30 vira 12:30 no horário da clínica — o app mostra 12:30, não 15:30 → {"id":10,"meal_name":"UTC","patient_id":1,"consumed_at":"2026-10-20 12:30:00","description":null,"idempotent_replay":false}
+FAIL [horário] Offset na própria data (-04:00) é respeitado e guardado em consumed_tz → {"id":11,"meal_name":"Offset","patient_id":1,"consumed_at":"2026-10-20 09:00:00","description":null,"idempotent_replay":false}
+FAIL [horário] Horário sem fuso é tratado como horário da clínica (comportamento anterior preservado) → {"id":12,"meal_name":"Sem fuso","patient_id":1,"consumed_at":"2026-10-20 07:45:00","description":null,"idempotent_replay":false}
+FAIL [horário] Sem consumed_at usa o agora da clínica (±2 min) → {"id":13,"meal_name":"Agora","patient_id":1,"consumed_at":"2026-10-24 00:46:27","description":null,"idempotent_replay":false}
+FAIL [foto] photo_path vindo do cliente é ignorado: /etc/passwd nunca chega ao banco → {"id":14,"meal_name":"Com foto","patient_id":1,"consumed_at":"2026-10-24 00:46:27","description":null,"idempotent_replay":false}
+FAIL [foto] photo_path com ../ também não é gravado
+FAIL [foto] Serviço recusa caminho absoluto, ../, esquema, barra invertida e byte nulo; aceita caminho relativo seguro e /uploads/diary/ → {"/etc/passwd":"aceito","../../etc/passwd":"aceito","a/../../b.jpg":"aceito","C:\\Windows\\x.jpg":"aceito","http://example.test/x.jpg":"aceito","fotos/a\u0000.jpg":"aceito","fotos/ok-1.jpg":"aceito","/uploads/diary/ok-2.jpg":"aceito","/uploads/outro/x.jpg":"aceito"}
+FAIL [idempotência] Criação → 201 com os campos públicos e idempotent_replay=false → {"s":200,"k":["id","meal_name","patient_id","consumed_at","description","idempotent_replay"]}
+PASS [idempotência] Resposta não expõe clinic_id, idempotency_key, request_hash nem photo_path
+PASS [idempotência] Cache-Control: no-store
+FAIL [idempotência] Mesma chave e mesmo conteúdo → 200, mesmo id, idempotent_replay=true, sem linha nova → {"s":200,"j":{"id":26,"meal_name":"Café da manhã","patient_id":1,"consumed_at":"2026-10-21 08:10:00","description":"Pão com ovos (TESTE)","idempotent_replay":false}}
+FAIL [idempotência] Chave no corpo também é respeitada (mesmo conteúdo → 200) → {"s":200,"j":{"id":27,"meal_name":"Café da manhã","patient_id":1,"consumed_at":"2026-10-21 08:10:00","description":"Pão com ovos (TESTE)","idempotent_replay":false}}
+FAIL [idempotência] Mesma chave com outra refeição → 409 IDEMPOTENCY_KEY_REUSED → {"s":200,"t":"{\"id\":28,\"meal_name\":\"Almo\\u00e7o\",\"patient_id\":1,\"consumed_at\":\"2026-10-21 08:10:00\",\"description\":\"P\\u00e3o com ovos (TESTE)\",\"idempotent_replay\":false}"}
+FAIL [idempotência] Mesma chave com outra descrição → 409
+FAIL [idempotência] Mesma chave com outro horário → 409
+FAIL [idempotência] Mesma chave com outra fome → 409
+FAIL [idempotência] Depois dos 409 o registro original continua igual e único
+FAIL [idempotência] A mesma chave em outro paciente é independente (201) e não vaza o registro da Ana → {"s":200,"j":{"id":32,"meal_name":"Do Bruno","patient_id":2,"consumed_at":"2026-10-21 08:10:00","description":"Pão com ovos (TESTE)","idempotent_replay":false}}
+FAIL [idempotência] Reenvio sem consumed_at (o "agora" muda) continua sendo o mesmo conteúdo → 200 → {"s":200,"j":{"id":34,"meal_name":"Sem horário","patient_id":1,"consumed_at":"2026-10-24 00:46:27","description":null,"idempotent_replay":false}}
+PASS [idempotência] Sem chave, duas requisições iguais geram dois registros (comportamento esperado)
+FAIL [idempotência] 4 requisições iguais em paralelo → 1 linha, todas 200/201 com o mesmo id → [[200,"{\"id\":37,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"],[200,"{\"id\":38,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"],[200,"{\"id\":39,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"],[200,"{\"id\":40,\"meal_name\":\"Paralelo\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46:2"]]
+FAIL [idempotência] Em paralelo com conteúdos diferentes: 1 linha, os demais recebem 409 (nunca 500) → [[200,"{\"id\":41,\"meal_name\":\"Paralelo A\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"],[200,"{\"id\":42,\"meal_name\":\"Paralelo B\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"],[200,"{\"id\":43,\"meal_name\":\"Paralelo A\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"],[200,"{\"id\":44,\"meal_name\":\"Paralelo B\",\"patient_id\":1,\"consumed_at\":\"2026-10-24 00:46"]]
+FAIL [idempotência] Registro anterior à migração (sem hash): mesmo conteúdo → 200 (comparação campo a campo) → {"s":200,"j":{"id":46,"meal_name":"Jantar legado","patient_id":1,"consumed_at":"2026-10-01 20:00:00","description":"Sopa (TESTE)","idempotent_replay":false}}
+FAIL [idempotência] Registro anterior à migração: conteúdo diferente → 409
+FAIL [erro] Execução sem exceção → "Error: Command failed: php /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php down54\nPHP Warning:  require_once(/workspace/ni2132/basecopy2/tests/support/../../database/migrations/2026_10_24_000054_harden_food_diary_entries.php): Failed to open stream: No such file or directory in /workspace/ni2132/basecopy2/tests/support/ni2_132_fixture.php on line 42\nPHP Fatal error:  Uncaught Error: Failed opening required '/workspace/ni2132/basecopy2/tests/support/../../database/migrations/2026
+
+NI2-132 (SQLite): 27 PASS, 33 FAIL

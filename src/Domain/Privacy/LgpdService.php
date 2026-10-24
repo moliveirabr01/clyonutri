@@ -20,7 +20,7 @@ class LgpdService
         'appointments' => [],
         'checkins' => [],
         'receivables' => [],
-        'food_diary_entries' => ['photo_path', 'idempotency_key'],
+        'food_diary_entries' => ['photo_path', 'idempotency_key', 'request_hash'],
         'hydration_logs' => ['idempotency_key'],
         'skinfold_measurements' => [],
         'patient_self_metrics' => [],
@@ -214,6 +214,12 @@ class LgpdService
                         ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
                 }
             }
+
+            // NI2-132: o texto livre do diário (descrição, sintomas, feedback do profissional e caminho de foto) é dado
+            // de saúde que pode identificar a pessoa: é apagado. Ficam nome da refeição, horário, fome e saciedade
+            // (uso estatístico, sem vínculo identificável porque o cadastro já foi anonimizado).
+            $this->db->prepare("UPDATE food_diary_entries SET description = NULL, symptoms = NULL, feedback_from_professional = NULL, photo_path = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
+                ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
 
             // Registrar revogação de consentimentos
             $revStmt = $this->db->prepare("

@@ -1080,35 +1080,93 @@ $router->post('/api/v1/patient/reschedule-requests/{id}/cancel', function($param
     $patientAppointmentApi()->withdrawRequest((int)$auth['patient_id'], (int)($params['id'] ?? 0));
 });
 
-// Obter Diário Alimentar do Paciente
-$router->get('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db) {
-    header('Content-Type: application/json; charset=utf-8');
-    $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-
-    $foodDiary = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
-    $timeline = $foodDiary->getPatientTimeline($patientId);
-    echo json_encode(['entries' => $timeline]);
-});
-
-// Registrar Refeição no Diário
-$router->post('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db, $getJsonInput) {
-    header('Content-Type: application/json; charset=utf-8');
-    $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
-    $input = $getJsonInput();
-    // NI2-89: o app não envia arquivos por esta rota; caminho de foto vindo do cliente não é aceito.
-    unset($input['photo_path']);
-
-    $foodDiary = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
-    try {
-        $res = $foodDiary->logMeal($patientId, $input);
-    } catch (\InvalidArgumentException $e) {
+// Diário alimentar da paciente (NI2-132). Regras em src/Domain/FoodDiary/FoodDiaryService.php e docs/api/openapi_v1.json.
+$foodDiaryRespondError = static function (\Throwable $e, string $notFound = 'Registro não encontrado.'): void {
+    if ($e instanceof \InvalidArgumentException) {
         http_response_code(422);
         echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
         return;
     }
-    echo json_encode($res);
+    if ($e instanceof \ClyoNutri\Domain\FoodDiary\IdempotencyKeyReusedException) {
+        http_response_code(409);
+        echo json_encode(['error' => $e->getMessage(), 'code' => 'IDEMPOTENCY_KEY_REUSED'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    if ($e instanceof \ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationRateLimitException) {
+        http_response_code(429);
+        header('Retry-After: 60');
+        echo json_encode(['error' => 'Muitos registros em pouco tempo. Aguarde um minuto e tente de novo.', 'code' => 'RATE_LIMITED'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    if ($e instanceof \ClyoNutri\Core\Security\TenantSecurityException) {
+        http_response_code(404);
+        echo json_encode(['error' => $notFound, 'code' => 'NOT_FOUND'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    throw $e;
+};
+// Parâmetros de lista (limit, cursor, from, to): valor fora do formato vira 422, nunca é ignorado em silêncio.
+$foodDiaryListParams = static function (): array {
+    $out = [];
+    if (isset($_GET['limit'])) {
+        if (!is_string($_GET['limit']) || !ctype_digit($_GET['limit']) || (int)$_GET['limit'] < 1) {
+            throw new \InvalidArgumentException('O limite deve ser um número inteiro maior que zero.');
+        }
+        $out['limit'] = (int)$_GET['limit'];
+    }
+    foreach (['cursor', 'from', 'to'] as $k) {
+        if (isset($_GET[$k]) && $_GET[$k] !== '') {
+            if (!is_string($_GET[$k])) throw new \InvalidArgumentException("Parâmetro {$k} inválido.");
+            $out[$k] = $_GET[$k];
+        }
+    }
+    return $out;
+};
+// Limite de escrita por paciente (M5). Ajustável por FOOD_DIARY_RATE_LIMIT_PER_MINUTE (padrão 30, como na hidratação).
+$foodDiaryRateLimit = static function (array $auth) use ($db): void {
+    $max = getenv('FOOD_DIARY_RATE_LIMIT_PER_MINUTE');
+    $max = is_string($max) && ctype_digit($max) && (int)$max > 0 ? (int)$max : 30;
+    (new \ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter($db))
+        ->hit('food_diary_write', 'patient:' . (int)$auth['clinic_id'] . ':' . (int)$auth['patient_id'], $max, 60);
+};
+
+// Obter o diário alimentar da paciente: ?limit= (padrão 30, máx. 100), ?cursor= (next_cursor), ?from= e ?to= (AAAA-MM-DD)
+$router->get('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db, $foodDiaryRespondError, $foodDiaryListParams) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    try {
+        $page = (new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db))->listPatientEntries((int)$auth['patient_id'], $foodDiaryListParams());
+        echo json_encode($page, JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $foodDiaryRespondError($e);
+    }
+});
+
+// Registrar refeição no diário: 201 ao criar; 200 com idempotent_replay=true no reenvio idêntico; 409 se a chave
+// (Idempotency-Key ou idempotency_key) for reutilizada com outro conteúdo; 429 acima do limite por minuto.
+$router->post('/api/v1/patient/food-diary', function() use ($authenticatePatientApi, $db, $getJsonInput, $foodDiaryRespondError, $foodDiaryRateLimit) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $patientId = (int)$auth['patient_id'];
+    $input = $getJsonInput();
+    $input = is_array($input) ? $input : [];
+    // NI2-89: o app não envia arquivos por esta rota; caminho de foto vindo do cliente não é aceito.
+    unset($input['photo_path']);
+    $headerKey = trim((string)($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? ''));
+    if ($headerKey !== '') {
+        $input['idempotency_key'] = $headerKey;
+    }
+
+    try {
+        $foodDiaryRateLimit($auth);
+        $res = (new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db))->logMeal($patientId, $input);
+        http_response_code($res['idempotent_replay'] ? 200 : 201);
+        echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $foodDiaryRespondError($e);
+    }
 });
 
 // Obter Linha do Tempo de Evolução
@@ -1695,59 +1753,87 @@ $router->get('/api/v1/professional/patients', function() use ($authenticateProfe
     ]);
 });
 
-// Linha do tempo de diários alimentares dos pacientes da clínica
-$router->get('/api/v1/professional/food-diaries', function() use ($authenticateProfessionalApi, $db) {
+// Diários alimentares dos pacientes da clínica (NI2-132).
+// Filtros: ?patient_id= ?pending=1 ?from= ?to= (AAAA-MM-DD) ?limit= (padrão 30, máx. 100) ?cursor= (next_cursor).
+// Cada leitura fica na auditoria (FOOD_DIARY_VIEWED). Sem e-mail, chave interna nem clinic_id.
+$router->get('/api/v1/professional/food-diaries', function() use ($authenticateProfessionalApi, $db, $foodDiaryRespondError, $foodDiaryListParams) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     $auth = $authenticateProfessionalApi();
     $clinicId = (int)$auth['clinic_id'];
 
-    $foodDiaryService = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
-    $diaries = $foodDiaryService->getClinicDiaries($clinicId, 50);
+    try {
+        $opts = $foodDiaryListParams();
+        if (isset($_GET['patient_id'])) {
+            if (!is_string($_GET['patient_id']) || !ctype_digit($_GET['patient_id']) || (int)$_GET['patient_id'] < 1) {
+                throw new \InvalidArgumentException('Paciente inválido (patient_id).');
+            }
+            $opts['patient_id'] = (int)$_GET['patient_id'];
+        }
+        $opts['pending'] = isset($_GET['pending']) && in_array((string)$_GET['pending'], ['1', 'true'], true);
+        $service = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
+        $page = $service->listClinicEntries($clinicId, $opts);
+    } catch (\Throwable $e) {
+        $foodDiaryRespondError($e, 'Paciente não encontrado.');
+        return;
+    }
+    $service->auditProfessionalRead($clinicId, (int)$auth['user_id'], $opts['patient_id'] ?? null, [
+        'returned' => count($page['diaries']),
+        'pending_only' => $opts['pending'],
+        'from' => $opts['from'] ?? null,
+        'to' => $opts['to'] ?? null,
+        'paged' => isset($opts['cursor']),
+    ]);
 
-    echo json_encode(['diaries' => $diaries]);
+    echo json_encode($page, JSON_UNESCAPED_UNICODE);
 });
 
-// Envio de feedback contextual em diário alimentar pelo nutricionista
-$router->post('/api/v1/professional/food-diary/{id}/feedback', function($params = []) use ($authenticateProfessionalApi, $db, $getJsonInput) {
+// Envio de feedback contextual em diário alimentar pelo nutricionista (até 2000 caracteres; substitui o anterior)
+$router->post('/api/v1/professional/food-diary/{id}/feedback', function($params = []) use ($authenticateProfessionalApi, $db, $getJsonInput, $foodDiaryRespondError) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     $auth = $authenticateProfessionalApi();
     $clinicId = (int)$auth['clinic_id'];
     $entryId = (int)($params['id'] ?? 0);
 
     $input = $getJsonInput();
-    $feedback = trim((string)($input['feedback'] ?? ''));
+    $feedback = is_array($input) && is_string($input['feedback'] ?? null) ? $input['feedback'] : '';
 
-    if ($entryId <= 0 || $feedback === '') {
-        http_response_code(400);
-        echo json_encode(['error' => 'Identificador da refeição e mensagem de feedback clínico são obrigatórios.']);
+    try {
+        if ($entryId <= 0) {
+            throw new \InvalidArgumentException('Identificador da refeição inválido.');
+        }
+        $entry = (new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db))->submitProfessionalFeedback($entryId, $feedback);
+    } catch (\Throwable $e) {
+        $foodDiaryRespondError($e);
+        return;
+    }
+    if ($entry === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Registro no diário não encontrado.', 'code' => 'NOT_FOUND'], JSON_UNESCAPED_UNICODE);
         return;
     }
 
-    $foodDiaryService = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
-    $success = $foodDiaryService->addProfessionalFeedback($entryId, $feedback);
+    $db->prepare("
+        INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
+        VALUES (:cid, :uid, 'FOOD_DIARY_FEEDBACK_GIVEN', 'food_diary_entry', :eid, :val, CURRENT_TIMESTAMP)
+    ")->execute([
+        'cid' => $clinicId,
+        'uid' => (int)$auth['user_id'],
+        'eid' => (string)$entryId,
+        'val' => json_encode([
+            'patient_id' => $entry['patient_id'],
+            'feedback_length' => mb_strlen($entry['feedback_from_professional'], 'UTF-8'),
+            'replaced_previous' => $entry['_replaced'],
+        ]),
+    ]);
 
-    if ($success) {
-        $stmtAudit = $db->prepare("
-            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
-            VALUES (:cid, :uid, 'FOOD_DIARY_FEEDBACK_GIVEN', 'food_diary_entry', :eid, :val, CURRENT_TIMESTAMP)
-        ");
-        $stmtAudit->execute([
-            'cid' => $clinicId,
-            'uid' => (int)$auth['user_id'],
-            'eid' => (string)$entryId,
-            'val' => json_encode(['feedback_length' => strlen($feedback)]),
-        ]);
-
-        echo json_encode([
-            'success' => true,
-            'entry_id' => $entryId,
-            'feedback' => $feedback,
-            'reviewed_at' => date('Y-m-d H:i:s'),
-        ]);
-    } else {
-        http_response_code(404);
-        echo json_encode(['error' => 'Registro no diário não encontrado.']);
-    }
+    echo json_encode([
+        'success' => true,
+        'entry_id' => $entryId,
+        'feedback' => $entry['feedback_from_professional'],
+        'reviewed_at' => $entry['reviewed_at'],
+    ], JSON_UNESCAPED_UNICODE);
 });
 
 // 5.2 Chat do profissional no app (NI2-292 / NI2-189, revisto na NI2-138)

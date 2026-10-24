@@ -13,7 +13,7 @@ import {
   Platform,
   AppState,
 } from 'react-native';
-import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
+import { displayDateTime, displayLocalDateTime, isMealToday, tabLabels } from '../utils/presentation';
 import EvolutionChart from '../components/EvolutionChart';
 import NextAppointmentCard from '../components/NextAppointmentCard';
 import DailyCheckinCard from '../components/DailyCheckinCard';
@@ -40,6 +40,10 @@ import {
 
 type ResourceState = { loading: boolean; error: string | null; updatedAt: string | null };
 const initialResource: ResourceState = { loading: false, error: null, updatedAt: null };
+/** Fuso do aparelho (ex.: America/Sao_Paulo), enviado junto do horário da refeição. */
+function deviceTimezone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
+}
 function resourceError(error: unknown): string {
   if (error instanceof ApiError) return error.message + (error.requestId ? ` Código de atendimento: ${error.requestId}.` : '');
   return 'Não foi possível carregar os dados. Tente novamente.';
@@ -67,6 +71,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [diaryEntries, setDiaryEntries] = useState<FoodDiaryEntry[]>([]);
   const [evolutionData, setEvolutionData] = useState<EvolutionData | null>(null);
   const [diaryState, setDiaryState] = useState<ResourceState>(initialResource);
+  const [diaryCursor, setDiaryCursor] = useState<string | null>(null);
+  const [diaryMoreLoading, setDiaryMoreLoading] = useState(false);
   const [evolutionState, setEvolutionState] = useState<ResourceState>(initialResource);
   const [evolutionPeriod, setEvolutionPeriod] = useState<'30' | '90' | '365' | 'all'>('365');
   const [metricType, setMetricType] = useState<string | null>(null);
@@ -147,12 +153,27 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     try {
       const diary = await ApiService.getFoodDiary();
       setDiaryEntries(diary.entries);
+      setDiaryCursor(diary.has_more ? diary.next_cursor : null);
       setDiaryState({ loading: false, error: null, updatedAt: new Date().toLocaleString('pt-BR') });
     } catch (error) {
       if (error instanceof ApiError && error.kind === 'auth') return;
       setDiaryState(prev => ({ ...prev, loading: false, error: resourceError(error) }));
     }
   }, []);
+  const loadMoreDiary = async () => {
+    if (!diaryCursor || diaryMoreLoading) return;
+    setDiaryMoreLoading(true);
+    try {
+      const more = await ApiService.getFoodDiary({ cursor: diaryCursor });
+      setDiaryEntries(prev => [...prev, ...more.entries.filter(e => !prev.some(p => p.id === e.id))]);
+      setDiaryCursor(more.has_more ? more.next_cursor : null);
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'auth') return;
+      setDiaryState(prev => ({ ...prev, error: resourceError(error) }));
+    } finally {
+      setDiaryMoreLoading(false);
+    }
+  };
   const refreshEvolution = useCallback(async () => {
     setEvolutionState(prev => ({ ...prev, loading: true }));
     try {
@@ -361,6 +382,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         meal_name: mealName,
         description: pending.description,
         consumed_at: pending.consumedAt,
+        timezone: deviceTimezone(),
         idempotency_key: pending.key,
       });
       delete pendingMealWrites.current[mealName];
@@ -368,11 +390,22 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         if (prev.some(e => e.id === entry.id)) return prev;
         return [entry, ...prev];
       });
-      setMealFeedback(`${mealName} registrado em ${displayDateTime(entry.consumed_at)}. Você pode conferir no Diário.`);
+      setMealFeedback(`${mealName} registrado em ${displayLocalDateTime(entry.consumed_at)}. Você pode conferir no Diário.`);
       setMealError(null);
       setMealDraft(null);
     } catch (err: any) {
-      setMealError('Não foi possível confirmar o registro. Seus dados foram preservados. Tente salvar novamente para confirmar o mesmo consumo.');
+      if (err instanceof ApiError && err.kind === 'auth') {
+        // A sessão expirou: o app volta ao login. O registro continua pendente com a mesma chave.
+        setMealError('Sua sessão expirou. Entre novamente e confirme o registro.');
+      } else if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
+        // O servidor recusou o conteúdo (validação, chave reutilizada): reenviar o mesmo registro nunca vai funcionar.
+        delete pendingMealWrites.current[mealName];
+        setMealError(`${err.message} Revise e registre de novo.`);
+      } else if (err instanceof ApiError && err.status === 429) {
+        setMealError('Você fez muitos registros em pouco tempo. Aguarde um minuto e toque em confirmar de novo; seus dados foram preservados.');
+      } else {
+        setMealError('Não foi possível confirmar o registro. Seus dados foram preservados. Tente salvar novamente para confirmar o mesmo consumo.');
+      }
     } finally {
       mealWriteBusy.current = false;
       setRegisteringMeal(null);
@@ -597,7 +630,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                     <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
                   )}
 
-                  {diaryEntries.filter(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayDateTime(entry.consumed_at)}</Text>)}
+                  {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
             {mealDraft?.name === meal.name && <View style={styles.card}>
               <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
               <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
@@ -631,7 +664,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                       accessibilityLabel={`Registrar consumo da refeição ${meal.name}`}
                     >
                       <Text style={styles.registerMealText}>
-                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && new Date(entry.consumed_at).toLocaleDateString() === new Date().toLocaleDateString()) ? 'Registrar outro consumo' : 'Registrar consumo'}
+                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -760,7 +793,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               diaryEntries.map((entry) => (
                 <View key={entry.id} style={styles.card}>
                   <Text style={styles.cardTitle}>
-                    {entry.meal_name} • {displayDateTime(entry.consumed_at)}
+                    {entry.meal_name} • {displayLocalDateTime(entry.consumed_at)}
                   </Text>
                   {entry.description && (
                     <Text style={styles.mealItem}>{entry.description}</Text>
@@ -776,12 +809,17 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               ))
             ) : !diaryState.error && !diaryState.loading ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>Nenhum registro ainda hoje</Text>
+                <Text style={styles.emptyTitle}>Nenhum registro ainda</Text>
                 <Text style={styles.emptyDescription}>
                   Toque em &ldquo;Registrar consumo&rdquo; na aba Hoje para anotar o que você comeu.
                 </Text>
               </View>
             ) : null}
+            {diaryCursor && (
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Carregar registros mais antigos do diário" onPress={loadMoreDiary} disabled={diaryMoreLoading} accessibilityState={{ busy: diaryMoreLoading, disabled: diaryMoreLoading }} style={{ minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ color: t.navy }}>{diaryMoreLoading ? 'Carregando...' : 'Carregar registros mais antigos'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
