@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import BrandLogo from '../components/BrandLogo';
 import { tokens as t } from '../theme/tokens';
+import { displayLocalDateTime } from '../utils/presentation';
 import {
   ApiService,
   newChatKey,
@@ -45,6 +46,8 @@ export default function ProfessionalHomeScreen({
   const [dashboard, setDashboard] = useState<ProfessionalDashboardData | null>(null);
   const [patients, setPatients] = useState<ProfessionalPatientItem[]>([]);
   const [diaries, setDiaries] = useState<ProfessionalFoodDiaryItem[]>([]);
+  const [diaryCursor, setDiaryCursor] = useState<string | null>(null);
+  const [diaryMoreLoading, setDiaryMoreLoading] = useState(false);
 
   // Estado para feedback em diário
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
@@ -110,11 +113,27 @@ export default function ProfessionalHomeScreen({
     try {
       const res = await ApiService.getProfessionalFoodDiaries();
       setDiaries(res.diaries);
+      setDiaryCursor(res.has_more ? res.next_cursor : null);
     } catch (err) {
       if (err instanceof ApiError && err.kind === 'auth') return;
       setErrorMessage('Não foi possível carregar os diários alimentares.');
     }
   }, []);
+
+  const loadMoreDiaries = async () => {
+    if (!diaryCursor || diaryMoreLoading) return;
+    setDiaryMoreLoading(true);
+    try {
+      const res = await ApiService.getProfessionalFoodDiaries({ cursor: diaryCursor });
+      setDiaries((prev) => [...prev, ...res.diaries.filter((d) => !prev.some((p) => p.id === d.id))]);
+      setDiaryCursor(res.has_more ? res.next_cursor : null);
+    } catch (err) {
+      if (err instanceof ApiError && err.kind === 'auth') return;
+      Alert.alert('Erro', 'Não foi possível carregar mais diários. Tente novamente.');
+    } finally {
+      setDiaryMoreLoading(false);
+    }
+  };
 
   const fetchAllData = useCallback(async () => {
     setErrorMessage(null);
@@ -238,6 +257,7 @@ export default function ProfessionalHomeScreen({
         });
       }
     } catch (err: any) {
+      if (err instanceof ApiError && err.kind === 'auth') return; // sessão expirada: o app volta ao login
       Alert.alert('Erro', err?.message || 'Não foi possível registrar o feedback clínico.');
     } finally {
       setSendingFeedback(false);
@@ -473,7 +493,7 @@ export default function ProfessionalHomeScreen({
                 <View key={d.id} style={styles.card}>
                   <View style={styles.cardHeaderRow}>
                     <Text style={styles.cardAuthor}>{d.patient_name}</Text>
-                    <Text style={styles.cardTimeSmall}>{d.consumed_at}</Text>
+                    <Text style={styles.cardTimeSmall}>{displayLocalDateTime(d.consumed_at)}</Text>
                   </View>
                   <Text style={styles.mealTitle}>🍽️ {d.meal_name}</Text>
                   {d.description && <Text style={styles.mealDesc}>{d.description}</Text>}
@@ -484,7 +504,7 @@ export default function ProfessionalHomeScreen({
                       <Text style={styles.feedbackGivenTitle}>✓ Seu feedback clínico:</Text>
                       <Text style={styles.feedbackGivenText}>{d.feedback_from_professional}</Text>
                       {d.reviewed_at && (
-                        <Text style={styles.reviewedAtText}>Revisado em: {d.reviewed_at}</Text>
+                        <Text style={styles.reviewedAtText}>Revisado em: {displayLocalDateTime(d.reviewed_at)}</Text>
                       )}
                     </View>
                   ) : (
@@ -555,6 +575,18 @@ export default function ProfessionalHomeScreen({
                   Assim que os pacientes anotarem refeições no aplicativo, elas serão listadas aqui para sua revisão.
                 </Text>
               </View>
+            )}
+            {diaryCursor && (
+              <TouchableOpacity
+                style={styles.pageButton}
+                onPress={loadMoreDiaries}
+                disabled={diaryMoreLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Carregar diários mais antigos"
+                accessibilityState={{ busy: diaryMoreLoading, disabled: diaryMoreLoading }}
+              >
+                <Text style={styles.pageButtonText}>{diaryMoreLoading ? 'Carregando...' : 'Carregar mais antigos'}</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}

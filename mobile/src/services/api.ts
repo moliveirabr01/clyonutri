@@ -65,13 +65,11 @@ export interface ProfessionalPatientItem {
 
 export interface ProfessionalFoodDiaryItem {
   id: number;
-  clinic_id: number;
   patient_id: number;
   patient_name: string;
-  patient_email: string;
   meal_name: string;
   consumed_at: string;
-  photo_path?: string;
+  consumed_tz?: string | null;
   description?: string;
   hunger_level?: number;
   satiety_level?: number;
@@ -268,8 +266,8 @@ export interface FoodDiaryEntry {
   patient_id: number;
   meal_name: string;
   consumed_at: string;
+  consumed_tz?: string | null;
   description?: string;
-  photo_path?: string;
   hunger_level?: number;
   satiety_level?: number;
   symptoms?: string;
@@ -520,13 +518,16 @@ export const ApiService = {
     return data;
   },
 
-  async getFoodDiary(): Promise<{ entries: FoodDiaryEntry[] }> {
-    const data = await request<{ entries: FoodDiaryEntry[] }>('/api/v1/patient/food-diary');
+  async getFoodDiary(opts: { cursor?: string | null; limit?: number } = {}): Promise<{ entries: FoodDiaryEntry[]; next_cursor: string | null; has_more: boolean }> {
+    const qs = new URLSearchParams();
+    if (opts.limit) qs.set('limit', String(opts.limit));
+    if (opts.cursor) qs.set('cursor', opts.cursor);
+    const data = await request<{ entries: FoodDiaryEntry[]; next_cursor?: string | null; has_more?: boolean }>(`/api/v1/patient/food-diary${qs.toString() ? `?${qs}` : ''}`);
     if (!Array.isArray(data.entries)) throw new ApiError('Resposta do diário inválida. Tente novamente.', 200, 'invalid');
-    return data;
+    return { entries: data.entries, next_cursor: data.next_cursor ?? null, has_more: Boolean(data.has_more) };
   },
 
-  async logMeal(entry: { meal_name: string; description?: string; consumed_at?: string; idempotency_key?: string }): Promise<FoodDiaryEntry> {
+  async logMeal(entry: { meal_name: string; description?: string; consumed_at?: string; timezone?: string; idempotency_key?: string }): Promise<FoodDiaryEntry> {
     return request<FoodDiaryEntry>('/api/v1/patient/food-diary', {
       method: 'POST',
       body: JSON.stringify(entry),
@@ -606,8 +607,15 @@ export const ApiService = {
     return request<{ patients: ProfessionalPatientItem[]; total?: number; page?: number; limit?: number; has_more?: boolean }>(endpoint);
   },
 
-  async getProfessionalFoodDiaries(): Promise<{ diaries: ProfessionalFoodDiaryItem[] }> {
-    return request<{ diaries: ProfessionalFoodDiaryItem[] }>('/api/v1/professional/food-diaries');
+  async getProfessionalFoodDiaries(opts: { patientId?: number; pendingOnly?: boolean; cursor?: string | null; limit?: number } = {}): Promise<{ diaries: ProfessionalFoodDiaryItem[]; next_cursor: string | null; has_more: boolean; pending_total?: number }> {
+    const qs = new URLSearchParams();
+    if (opts.patientId) qs.set('patient_id', String(opts.patientId));
+    if (opts.pendingOnly) qs.set('pending', '1');
+    if (opts.limit) qs.set('limit', String(opts.limit));
+    if (opts.cursor) qs.set('cursor', opts.cursor);
+    const data = await request<{ diaries: ProfessionalFoodDiaryItem[]; next_cursor?: string | null; has_more?: boolean; pending_total?: number }>(`/api/v1/professional/food-diaries${qs.toString() ? `?${qs}` : ''}`);
+    if (!Array.isArray(data.diaries)) throw new ApiError('Resposta dos diários inválida. Tente novamente.', 200, 'invalid');
+    return { diaries: data.diaries, next_cursor: data.next_cursor ?? null, has_more: Boolean(data.has_more), pending_total: data.pending_total };
   },
 
   async submitFoodDiaryFeedback(entryId: number, feedback: string): Promise<{ success: boolean; entry_id: number; feedback: string; reviewed_at: string }> {

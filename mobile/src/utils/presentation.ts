@@ -11,6 +11,20 @@ export function displayLocalDateTime(value?: string | null, withTime = true): st
   if (!m) return 'Data não informada';
   return `${m[3]}/${m[2]}/${m[1]}` + (withTime && m[4] ? ` ${m[4]}:${m[5]}` : '');
 }
+/** Dia (AAAA-MM-DD) de uma data de refeição gravada no horário do consultório, sem converter fuso. */
+export function localDayKey(value?: string | null): string | null {
+  const m = typeof value === 'string' ? value.match(/^(\d{4}-\d{2}-\d{2})/) : null;
+  return m ? m[1] : null;
+}
+/** Hoje no aparelho, no mesmo formato de localDayKey. */
+export function todayDayKey(now: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+/** A refeição foi registrada hoje? Compara o texto do dia, sem passar por Date (que mudaria o dia por causa do fuso). */
+export function isMealToday(value?: string | null, now: Date = new Date()): boolean {
+  return localDayKey(value) === todayDayKey(now);
+}
 const WEEKDAYS = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.'];
 const WEEKDAYS_LONG = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?([+-])(\d{2}):(\d{2})$/;
