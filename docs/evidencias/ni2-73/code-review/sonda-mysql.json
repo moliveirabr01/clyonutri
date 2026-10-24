@@ -1,0 +1,122 @@
+{
+ "engine": "mysql",
+ "recipe": {
+  "status": 200,
+  "visible_for_clinic": 595,
+  "options": 300,
+  "last_option": "Frango, coxa, com pele, assada",
+  "has": {
+   "Uva, Itália, crua": false,
+   "Tomate, com semente, cru": false,
+   "Pão de queijo da casa": false,
+   "Ovo, de galinha, inteiro, cozido/10minutos": false,
+   "Arroz, integral, cozido": true
+  }
+ },
+ "plurals": {
+  "feijões": {
+   "total": 0,
+   "top": null,
+   "ok": false
+  },
+  "pães": {
+   "total": 0,
+   "top": null,
+   "ok": false
+  },
+  "limões": {
+   "total": 0,
+   "top": null,
+   "ok": false
+  },
+  "melões": {
+   "total": 0,
+   "top": null,
+   "ok": false
+  },
+  "ovos": {
+   "total": 8,
+   "top": "Ovo, de codorna, inteiro, cru",
+   "ok": true
+  },
+  "maçãs": {
+   "total": 8,
+   "top": "Maçã, Fuji, com casca, crua",
+   "ok": true
+  }
+ },
+ "order": {
+  "maca": [
+   "Maçã, Fuji, com casca, crua",
+   "Maçã, Argentina, com casca, crua",
+   "Macaúba, crua",
+   "Macarrão, trigo, cru",
+   "Macarrão, instantâneo",
+   "Macarrão, molho bolognesa",
+   "Macarrão, trigo, cru, com ovos",
+   "Banana, maçã, crua"
+  ],
+  "pao": [
+   "Pão, de soja",
+   "Pão, aveia, forma",
+   "Pão, milho, forma",
+   "Pão, trigo, sovado",
+   "Pão, de queijo, cru",
+   "Pão, glúten, forma",
+   "Pão, trigo, francês",
+   "Pão de queijo da casa",
+   "Pão, de queijo, assado",
+   "Pão, trigo, forma, integral",
+   "Fruta-pão, crua",
+   "Torrada, pão francês"
+  ],
+  "acai": [
+   "Açaí, polpa, congelada",
+   "Açaí, polpa, com xarope de guaraná e glucose"
+  ],
+  "leite": [
+   "Leite, de coco",
+   "Leite, de cabra",
+   "Leite, condensado",
+   "Leite, fermentado",
+   "Leite, de vaca, achocolatado",
+   "Leite, de vaca, integral, pó",
+   "Leite, de vaca, desnatado, pó",
+   "Creme de Leite",
+   "Chocolate, ao leite",
+   "Doce, de leite, cremoso",
+   "Canjica, com leite integral",
+   "Chocolate, ao leite, dietético"
+  ],
+  "queijo": [
+   "Queijo, prato",
+   "Queijo, ricota",
+   "Queijo, mozarela",
+   "Queijo, parmesão",
+   "Queijo, pasteurizado",
+   "Queijo, minas, frescal",
+   "Queijo, minas, meia cura",
+   "Queijo, requeijão, cremoso",
+   "Queijo, petit suisse, morango",
+   "Omelete, de queijo",
+   "Soja, queijo (tofu)",
+   "Pão, de queijo, cru"
+  ],
+  "cha": [
+   "Chá, mate, infusão 5%",
+   "Chá, preto, infusão 5%",
+   "Chá, erva-doce, infusão 5%",
+   "Charuto, de repolho",
+   "Chantilly, spray, com gordura vegetal",
+   "Carne, bovina, charque, cru",
+   "Carne, bovina, charque, cozido"
+  ]
+ },
+ "sync": {
+  "raw_rows": 5000,
+  "first_ms": 5083,
+  "second_ms": 15,
+  "first_status": 200,
+  "still_null": 0
+ }
+}
