@@ -2,26 +2,38 @@
 // As chaves de `cssVars` são os nomes das variáveis CSS sem o "--". Mudou lá, muda aqui:
 // tests/ni2_25_design_tokens_test.php compara os dois arquivos valor a valor.
 //
-// tokens.ts continua existindo porque as telas importam dele; a migração das telas para
-// este arquivo fica para o card do app (NI2-140), para não brigar com aquela correção.
+// Clinical Botanical é a paleta oficial. tokens.ts continua com os valores Premium antigos
+// porque as telas importam dele; a migração das telas para este arquivo está pendente
+// no card do app (NI2-140), para não brigar com aquela correção.
 
 export const cssVars = {
-  // Marca ativa (DS Premium PX-21)
-  'brand-navy-900': '#0F2747',
-  'brand-copper-500': '#E67A3F',
-  'brand-copper-600': '#B94F1F',
-  'brand-green-500': '#2E7D58',
-  'brand-green-200': '#A7C7A1',
-
-  // Paleta Clinical Botanical (documentada; ainda não é a marca ativa)
+  // Paleta oficial: Clinical Botanical
+  'botanical-forest-950': '#0A2A10',
   'botanical-forest-900': '#0F3E17',
+  'botanical-forest-800': '#1B5226',
+  'botanical-green-700': '#2F6140',
   'botanical-green-600': '#39734A',
   'botanical-sage-300': '#BFD8C2',
+  'botanical-sage-200': '#D3E5D5',
   'botanical-sage-100': '#E5F0E5',
   'botanical-cream-50': '#FAF9F4',
+  'botanical-copper-400': '#F4A06A',
+  'botanical-copper-500': '#EF8F4F',
+  'botanical-copper-600': '#B04A1B',
+  'botanical-copper-700': '#8F3D14',
+  'botanical-copper-100': '#FBEADF',
+
+  // Legado do DS Premium (deprecado): aliases com o valor já resolvido. Não use em código novo.
+  'brand-navy-900': '#0F3E17',
+  'brand-navy-reference': '#0F3E17',
+  'brand-copper-500': '#EF8F4F',
+  'brand-copper-600': '#B04A1B',
+  'brand-copper-reference': '#EF8F4F',
+  'brand-green-500': '#39734A',
+  'brand-green-200': '#BFD8C2',
 
   // Neutros
-  'neutral-warm-50': '#FAF7F2',
+  'neutral-warm-50': '#FAF9F4',
   'neutral-white': '#FFFFFF',
   'neutral-gray-100': '#F4F5F6',
   'neutral-gray-200': '#E5E7EB',
@@ -29,9 +41,11 @@ export const cssVars = {
   'neutral-gray-500': '#667085',
   'neutral-ink-900': '#1F2937',
 
-  // Semânticos (independentes da marca)
-  'semantic-success': '#18794E',
-  'semantic-success-light': '#E8F5E9',
+  // Semânticos (independentes da marca; sucesso é teal)
+  'semantic-success': '#0A7075',
+  'semantic-success-light': '#E3F4F2',
+  'semantic-success-text': '#0A5F63',
+  'semantic-success-on-dark': '#4FC3B8',
   'semantic-warning': '#946200',
   'semantic-warning-light': '#FEF3C7',
   'semantic-error': '#B42318',

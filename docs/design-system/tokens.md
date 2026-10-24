@@ -13,51 +13,63 @@ Referência dos tokens visuais da web e do app (NI2-25).
 
 O teste compara este documento, o CSS e o arquivo do app. Mudou um valor? Mude nos três, senão o teste quebra.
 
-## Decisão pendente: qual paleta é a marca
+## Paleta oficial: Clinical Botanical
 
-Hoje existem duas paletas no projeto, e elas não combinam:
+O Maicon ratificou o Clinical Botanical como paleta oficial da marca. Forest e Clyo Green são a marca, Sage e Cream são superfícies, o cobre é só acento e o verde-azulado (teal) é o sucesso. O DS Premium (Navy/Cobre, PX-21) está **legado/deprecado**: os nomes `--brand-*` continuam existindo só para não quebrar tela antiga, e apontam para os valores Botanical. Código novo usa `--botanical-*`.
 
-- **Navy/Cobre (DS Premium, PX-21).** É a que a interface usa de fato, em todas as telas. Está em `CLYONUTRI_DESIGN_SYSTEM_PREMIUM.md`, que ainda está marcado como "Proposta" e pede para evitar verde como cor principal.
-- **Clinical Botanical (blueprint, NI2-25).** É a que o card pede: Forest, Clyo Green, Sage e Cream. Até esta correção ela não existia em nenhum arquivo de código.
-
-A NI2-25 deixa a paleta Botanical **documentada e disponível como token** (`--botanical-*`), sem repintar nada. Trocar a cor da marca no produto inteiro é decisão de produto, não de código, e mexe em todas as telas.
-
-Falta o Maicon ratificar uma das duas. Depois disso:
-
-- se ficar **Navy/Cobre**, o card NI2-25 (e o NI2-45, que é duplicado) deve ter o critério de cores atualizado, e os tokens `--botanical-*` ficam só como referência;
-- se ficar **Botanical**, os `--brand-*` passam a apontar para os `--botanical-*` e o tom de sucesso precisa mudar (ver abaixo).
+Os valores antigos do Premium ficam registrados no fim desta seção, para consulta e para desfazer, se for preciso.
 
 ## Cores
 
-### Marca ativa (Navy/Cobre)
+### Marca
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--brand-navy-900` | `#0F2747` | títulos, menu lateral, texto forte |
-| `--brand-copper-500` | `#E67A3F` | fundo de botão primário (texto navy por cima), detalhes |
-| `--brand-copper-600` | `#B94F1F` | texto e links em cobre, anel de foco |
-| `--brand-green-500` | `#2E7D58` | reservado (hoje sem uso) |
-| `--brand-green-200` | `#A7C7A1` | reservado (hoje sem uso) |
-
-O cobre 500 **não serve como texto** sobre branco (2,91:1). Para texto em cobre use o 600.
-
-### Paleta Clinical Botanical
-
-| Token | Nome no blueprint | Valor |
-|---|---|---|
-| `--botanical-forest-900` | Forest | `#0F3E17` |
-| `--botanical-green-600` | Clyo Green | `#39734A` |
-| `--botanical-sage-300` | Sage | `#BFD8C2` |
-| `--botanical-sage-100` | Sage claro | `#E5F0E5` |
-| `--botanical-cream-50` | Cream | `#FAF9F4` |
+| `--botanical-forest-950` | `#0A2A10` | fundo mais fundo (rodapé do menu, borda) |
+| `--botanical-forest-900` | `#0F3E17` | Forest: menu lateral, títulos, texto forte, seções escuras |
+| `--botanical-forest-800` | `#1B5226` | degradê e hover em superfície escura |
+| `--botanical-green-700` | `#2F6140` | hover do botão primário |
+| `--botanical-green-600` | `#39734A` | Clyo Green: botão primário (texto branco por cima), links, foco de campo |
+| `--botanical-sage-300` | `#BFD8C2` | Sage: fundo e enfeite |
+| `--botanical-sage-200` | `#D3E5D5` | bordas suaves e texto secundário sobre Forest |
+| `--botanical-sage-100` | `#E5F0E5` | fundo de selo, cartão suave |
+| `--botanical-cream-50` | `#FAF9F4` | Cream: fundo de página |
 
 Sage `#BFD8C2` sobre branco dá 1,52:1. Serve para fundo e enfeite, **nunca** como borda de campo nem como único sinal de algo (a regra de componentes de interface pede 3:1).
+
+### Cobre (acento restrito)
+
+O cobre não é cor de botão primário. Aparece em detalhes: eyebrow, link de ênfase, selo de destaque, botão de destaque sobre fundo Forest.
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--botanical-copper-400` | `#F4A06A` | hover do cobre 500 sobre Forest |
+| `--botanical-copper-500` | `#EF8F4F` | acento **sobre Forest** (texto, anel de foco, botão com texto Forest) e detalhes decorativos. Sobre branco é só decoração (2,5:1) |
+| `--botanical-copper-600` | `#B04A1B` | acento **sobre claro**: texto, link, anel de foco |
+| `--botanical-copper-700` | `#8F3D14` | hover do botão de destaque; texto sobre o fundo `copper-100` |
+| `--botanical-copper-100` | `#FBEADF` | fundo de selo de destaque |
+
+### Legado do DS Premium (deprecado)
+
+Nomes antigos que ainda aparecem em views e controllers. Cada um é um alias: mudou o `--botanical-*`, muda junto. O valor abaixo é o resolvido.
+
+| Token | Valor | Aponta para |
+|---|---|---|
+| `--brand-navy-900` | `#0F3E17` | `--botanical-forest-900` |
+| `--brand-navy-reference` | `#0F3E17` | `--botanical-forest-900` |
+| `--brand-copper-500` | `#EF8F4F` | `--botanical-copper-500` |
+| `--brand-copper-600` | `#B04A1B` | `--botanical-copper-600` |
+| `--brand-copper-reference` | `#EF8F4F` | `--botanical-copper-500` |
+| `--brand-green-500` | `#39734A` | `--botanical-green-600` |
+| `--brand-green-200` | `#BFD8C2` | `--botanical-sage-300` |
+| `--neutral-warm-50` | `#FAF9F4` | `--botanical-cream-50` |
+
+Valores antigos do Premium (não use em código novo): Navy 900 #0F2747 (referência #0F2A44 na landing e no admin), cobre 500 #E67A3F (#E67E3A em alguns pontos), cobre 600 #B94F1F, verde 500 #2E7D58, verde 200 #A7C7A1, fundo quente #FAF7F2, sucesso #18794E sobre #E8F5E9.
 
 ### Neutros
 
 | Token | Valor |
 |---|---|
-| `--neutral-warm-50` | `#FAF7F2` |
 | `--neutral-white` | `#FFFFFF` |
 | `--neutral-gray-100` | `#F4F5F6` |
 | `--neutral-gray-200` | `#E5E7EB` |
@@ -67,44 +79,63 @@ Sage `#BFD8C2` sobre branco dá 1,52:1. Serve para fundo e enfeite, **nunca** co
 
 ### Semânticos (independentes da marca)
 
-Valores próprios, nunca `var(--brand-*)`. Assim, se a marca mudar, erro continua vermelho e sucesso continua verde.
+Valores próprios, nunca `var(--brand-*)` nem `var(--botanical-*)`. Sucesso é **teal**, de propósito: o Clyo Green da marca e um "deu certo" em verde ficariam quase iguais e a confirmação pareceria só cor de marca.
 
 | Token | Valor | Fundo claro | Valor |
 |---|---|---|---|
-| `--semantic-success` | `#18794E` | `--semantic-success-light` | `#E8F5E9` |
+| `--semantic-success` | `#0A7075` | `--semantic-success-light` | `#E3F4F2` |
 | `--semantic-warning` | `#946200` | `--semantic-warning-light` | `#FEF3C7` |
 | `--semantic-error` | `#B42318` | `--semantic-error-light` | `#FEE2E2` |
 | `--semantic-info` | `#175CD3` | `--semantic-info-light` | `#EFF6FF` |
 
+Variantes do sucesso:
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--semantic-success-text` | `#0A5F63` | texto de selo e alerta sobre o fundo claro |
+| `--semantic-success-on-dark` | `#4FC3B8` | sucesso sobre Forest (ponto de status do menu). O teal 700 some ali: 2,08:1 |
+
 Regras:
 
 - Status nunca vai só na cor: sempre com texto ou ícone ("Pago", "Atrasado", ícone de alerta).
-- O painel admin usa os mesmos valores (`--admin-success` etc. em `views/layouts/admin-shell.php`). Os tons Tailwind 600 que estavam lá ficavam abaixo de 4,5:1 como texto.
-- **Se a marca virar Botanical:** o sucesso `#18794E` e o Clyo Green `#39734A` ficam praticamente iguais (1,04:1 entre eles). Nesse caso o sucesso precisa de outro tom, ou a confirmação vai parecer só "cor da marca".
+- O painel admin usa os mesmos valores (`--admin-success` etc. em `views/layouts/admin-shell.php`).
+- Prioridade P1 do Service Desk continua laranja (escala de severidade vermelho > laranja > âmbar), não é cobre de marca.
 
 ### Contraste conferido (WCAG 2.2)
 
 | Texto | Fundo | Razão |
 |---|---|---|
-| navy 900 | branco | 14,98 |
-| navy 900 | warm 50 | 14,02 |
-| tinta 900 | branco | 14,68 |
-| cinza 500 | branco | 4,97 |
-| cinza 500 | cinza 100 | 4,56 |
-| cobre 600 | branco | 5,00 |
-| navy 900 | cobre 500 (botão) | 5,15 |
 | Forest | branco | 12,20 |
 | Forest | Cream | 11,57 |
-| Clyo Green | branco | 5,64 |
+| tinta 900 | branco | 14,68 |
+| cinza 500 | branco | 4,97 |
+| branco | Clyo Green (botão) | 5,64 |
+| branco | Green 700 (hover) | 7,23 |
 | Clyo Green | Cream | 5,35 |
 | Clyo Green | Sage claro | 4,81 |
 | Forest | Sage | 8,02 |
-| sucesso | branco / fundo claro | 5,41 / 4,81 |
+| cobre 600 | branco | 5,47 |
+| cobre 600 | Cream | 5,19 |
+| cobre 600 | cobre 100 | 4,67 |
+| cobre 700 | cobre 100 | 6,30 |
+| Forest | cobre 500 (botão sobre fundo Forest) | 5,06 |
+| cobre 500 | Forest | 5,06 |
+| cobre 400 | Forest | 5,86 |
+| Sage 200 | Forest | 9,26 |
+| sucesso | branco / fundo claro | 5,85 / 5,15 |
+| sucesso (texto) | fundo claro | 6,53 |
+| sucesso sobre escuro | Forest | 5,71 |
 | alerta | branco / fundo claro | 5,24 / 4,71 |
 | erro | branco / fundo claro | 6,57 / 5,38 |
 | info | branco / fundo claro | 5,99 / 5,50 |
 
-Anel de foco: cobre 600 (5,00:1 sobre branco). No menu lateral, que é navy, o anel usa o cobre 500 (5,15:1); o 600 ficaria em 3,00:1, no limite.
+Anel de foco: cobre 600 sobre claro (5,47:1 no branco). No menu lateral, que é Forest, o anel usa o cobre 500 (5,06:1); o 600 ficaria em 2,23:1.
+
+Atenção com o laranja de antes: o cobre 500 `#EF8F4F` **não** serve como texto sobre branco nem como fundo de botão com texto branco. Em fundo claro use o cobre 600; em fundo Forest, o 500.
+
+### Logo (pendente)
+
+O logo é imagem e não foi redesenhado. Os SVGs `clyonutri-logo-light.svg`, `clyonutri-logo-dark.svg` e `clyonutri-icon.svg` ganharam só um recolor **temporário** (azul para Forest, cobre para `#EF8F4F`/`#B04A1B`). Os PNGs (`clyonutri-logo*.png`, ícones de app e favicon) continuam com o azul antigo. Falta o Maicon entregar a versão verde oficial do logo (SVG e PNG, claro e escuro, ícone quadrado, favicon).
 
 ## Tipografia
 
@@ -186,9 +217,11 @@ Discretas, para separar camadas.
 
 ## O que ainda está fora dos tokens
 
-Isto não foi mexido na NI2-25. Fica registrado para não se perder:
+Registrado para não se perder:
 
-- Há muita cor escrita direto no código: perto de 345 ocorrências em `views/`, 582 em `src/Application`, 143 nos CSS e 170 no app (só `PatientHomeScreen` tem 72). Vale trocar aos poucos, tela por tela.
-- `views/patient/app.php` tem um `:root` próprio com cores Tailwind e `mobile/src/theme/tokens.ts` está com valores antigos. Os dois estão sendo tratados na NI2-140.
-- `teleconsulta.css`, `pre-consulta.css` e `prontuario-impressao.css` repetem um `:root` com os mesmos valores. Não divergem hoje, mas podem divergir.
-- O painel admin tem paleta própria (navy e laranja Tailwind). Só os semânticos foram alinhados.
+- **`mobile/src/theme/tokens.ts`** ainda tem os valores Premium antigos. As telas do app importam dele, então a migração para `clinicalBotanical.ts` está pendente e fica no NI2-140. Até lá o app mistura a paleta antiga (telas) com a nova (arquivo `clinicalBotanical.ts`).
+- **Logo e ícones em PNG** (ver "Logo (pendente)" acima).
+- **Cores escritas direto no código.** Esta correção remapeou o que é da marca (azul, cobre e verde de sucesso) nas 17 views, nos CSS das telas e nos controllers e e-mails com HTML. Slate neutro, vermelho, âmbar, roxo (gráficos), azul de "info" e o verde do WhatsApp ficaram como estavam. O Service Desk (`HelpdeskController`) manteve o laranja da prioridade P1. Vale trocar o restante aos poucos, tela por tela, por `var(--botanical-*)`.
+- **Telas com `:root` próprio**, que não carregam `clinical-botanical.css`: landing (`landing-premium.css`), admin (`admin-shell.php`), `/app` (`views/patient/app.php`), `teleconsulta.css`, `pre-consulta.css` e `prontuario-impressao.css`. Os valores já são Botanical, mas continuam em arquivos separados e podem divergir. O teste confere a landing e o admin contra este documento.
+- **Telas do app (`mobile/src/screens`)** não foram tocadas (NI2-140).
+- Impressão: o prontuário continua em fundo branco, com Forest só em títulos e filetes, para sair bem em impressora comum.
