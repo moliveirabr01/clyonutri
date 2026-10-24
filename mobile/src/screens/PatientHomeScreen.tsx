@@ -786,7 +786,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         {currentTab === 'Diario' && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionTitle} accessibilityRole="header">Diário alimentar</Text>
-            <Text style={styles.helperText}>O que você registrou, com data e hora. O que veio do plano aparece como “Conforme o plano”.</Text>
+            <Text style={styles.helperText}>Refeições que você registrou e os comentários do seu nutricionista, com data e hora. O que veio do plano aparece como “Conforme o plano”.</Text>
 
             {<ResourceNotice state={diaryState} retry={refreshDiary} name="diário" />}
             {diaryEntries.length > 0 ? (

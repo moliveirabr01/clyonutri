@@ -101,7 +101,7 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     // ------------------------------------------------------------ preferências
     r = await call('GET', '/api/v1/patient/notification-preferences', { token: ana });
     const cats = r.status === 200 ? Object.fromEntries(r.json.categories.map((c) => [c.category, c])) : {};
-    check('pref', 'Padrão: tudo ligado, silêncio desligado, push indisponível', cats.chat && cats.appointments && cats.plan && Object.values(cats).every((c) => c.email_enabled && c.push_enabled)
+    check('pref', 'Padrão: tudo ligado, silêncio desligado, push indisponível', cats.chat && cats.appointments && cats.plan && ['chat', 'appointments', 'plan'].every((k) => cats[k].email_enabled && cats[k].push_enabled)
       && r.json.quiet_hours.enabled === false && r.json.push_available === false && r.json.timezone === 'America/Sao_Paulo', r.json);
     r = await call('POST', '/api/v1/patient/notification-preferences', { token: ana, body: { categories: { appointments: { email_enabled: false } }, quiet_hours: { enabled: true, start: '21:30', end: '07:00' } } });
     const c2 = r.status === 200 ? Object.fromEntries(r.json.categories.map((c) => [c.category, c])) : {};
@@ -116,12 +116,13 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     r = await call('POST', '/api/v1/patient/notification-preferences', { token: ana, raw: '{quebrado' });
     check('pref', 'JSON quebrado → 422', r.status === 422, r);
     r = await call('GET', '/api/v1/patient/notification-preferences', { token: carla });
-    check('pref', 'Preferência da Ana não vaza para a Carla', r.json.quiet_hours.enabled === false && r.json.categories.every((c) => c.email_enabled), r.json);
-    check('checkin', 'Sem o check-in diário (NI2-96) o lembrete vem indisponível e desligado', r.json.checkin_reminder && r.json.checkin_reminder.available === false
-      && r.json.checkin_reminder.enabled === false && !r.json.categories.some((c) => c.category === 'checkin'), r.json);
+    check('pref', 'Preferência da Ana não vaza para a Carla', r.json.quiet_hours.enabled === false && r.json.categories.filter((c) => c.category !== 'checkin').every((c) => c.email_enabled), r.json);
+    // Integração com a NI2-96: o check-in diário existe, então o lembrete está disponível, desligado e com e-mail desligado por padrão.
+    check('checkin', 'Com o check-in diário (NI2-96) o lembrete vem disponível e desligado, e a categoria checkin aparece', r.json.checkin_reminder && r.json.checkin_reminder.available === true
+      && r.json.checkin_reminder.enabled === false && cats.checkin && cats.checkin.email_enabled === false && cats.checkin.push_enabled === true, r.json);
     r = await call('POST', '/api/v1/patient/notification-preferences', { token: ana, body: { checkin_reminder: { enabled: true, time: '20:00' } } });
-    check('checkin', 'Ligar o lembrete sem check-in diário → 422 com texto claro e nada gravado', r.status === 422 && r.json.code === 'VALIDATION_ERROR'
-      && /ainda não está disponível/.test(r.json.error) && Number(one('SELECT COUNT(*) AS n FROM notification_checkin_settings')) === 0, r);
+    check('checkin', 'Ligar o lembrete de check-in grava a configuração da Ana', r.status === 200 && r.json.checkin_reminder.enabled === true
+      && Number(one('SELECT COUNT(*) AS n FROM notification_checkin_settings')) === 1, r);
 
     // ------------------------------------------------------------ web: avisos do profissional em Configurações
     let cookie = '';

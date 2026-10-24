@@ -36,6 +36,11 @@ const EXCLUDED = {
   '/api/v1/chat/anexo/{token}': 'link assinado HMAC', '/pre-consulta/{token}': 'token da pré-consulta', '/recuperar-senha/{token}': 'token de recuperação',
   '/teleconsulta/sala-espera/{token}': 'token da paciente', '/teleconsulta/sala-espera/{token}/status': 'token da paciente', '/teleconsulta/sala-espera/{token}/{acao}': 'token da paciente',
   '/teleconsulta/sala/{token}': 'token da paciente', '/teleconsulta/sala/{token}/midia': 'token da paciente', '/teleconsulta/sinal/{room}': 'credencial da sala (cabeçalho)',
+  // Integração NI2-92 e NI2-95: rotas novas já testadas com paciente de outra clínica e da mesma clínica nos testes próprios.
+  '/api/v1/patient/hydration/{id}/update': 'ni2_92_hydration_http_test (Carla, outra clínica, e Bruno, mesma clínica)',
+  '/api/v1/patient/hydration/{id}/delete': 'ni2_92_hydration_http_test (Carla, outra clínica, e Bruno, mesma clínica)',
+  '/api/v1/patient/notifications/{id}/read': 'ni2_95_notifications_real_test (aviso da Carla, do Bruno e inexistente)',
+  '/avisos/{id}/lida': 'ni2_95_notifications_real_test (aviso de outro usuário da clínica)',
   '/admin/clinicas/{id}/status': 'console da plataforma', '/admin/usuarios/{id}/status': 'console da plataforma', '/admin/usuarios/{id}/revogar-sessoes': 'console da plataforma',
 };
 
