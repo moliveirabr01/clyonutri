@@ -101,21 +101,21 @@ final class PatientAppController
         $step = 'landing';
 
         if ($login === '' || $password === '') {
-            $error = 'Informe seu e-mail, celular ou CPF e sua senha.';
+            $error = 'Informe seu e-mail ou celular e sua senha.';
             require __DIR__ . '/../../../views/patient/app.php';
             return;
         }
 
-        $cleanDigits = preg_replace('/\D/', '', $login);
+        // A tabela patients não tem coluna cpf (nem no instalacao_mysql8.sql nem nas migrations): o login é por e-mail ou celular.
         $stmt = $db->prepare("
             SELECT p.*, c.name AS clinic_name 
             FROM patients p 
             JOIN clinics c ON c.id = p.clinic_id 
-            WHERE (LOWER(p.email) = LOWER(:login) OR p.phone = :login OR (p.cpf IS NOT NULL AND p.cpf = :clean_digits))
+            WHERE (LOWER(p.email) = LOWER(:login_email) OR p.phone = :login_phone)
               AND p.status = 'active' AND c.status = 'active'
             LIMIT 1
         ");
-        $stmt->execute(['login' => $login, 'clean_digits' => $cleanDigits]);
+        $stmt->execute(['login_email' => $login, 'login_phone' => $login]);
         $patient = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$patient || empty($patient['password_hash']) || !password_verify($password, $patient['password_hash'])) {

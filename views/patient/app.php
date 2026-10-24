@@ -366,7 +366,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <form method="POST" action="/app/login">
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
             <div class="form-group">
-              <label class="form-label" for="login-input">E-mail, Celular ou CPF</label>
+              <label class="form-label" for="login-input">E-mail ou celular</label>
               <input class="form-control" id="login-input" type="text" name="login" required placeholder="Digite seus dados de acesso">
             </div>
             <div class="form-group">
