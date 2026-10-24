@@ -16,6 +16,6 @@ SELECT
        ELSE 'OK — PRONTO PARA MIGRAR' END AS preflight_status,
   (@base = 1 AND @mig = 1) AS pronto_para_migrar,
   @c_hash AS tem_request_hash, @c_tz AS tem_consumed_tz, (@i_p > 0) AS tem_indice_paciente, (@i_c > 0) AS tem_indice_clinica,
-  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_24_000054_harden_food_diary_entries') AS migracao_53_registrada,
+  (SELECT COUNT(*) FROM `migrations` WHERE `migration` = '2026_10_24_000054_harden_food_diary_entries') AS migracao_54_registrada,
   (SELECT COUNT(*) FROM `food_diary_entries`) AS registros_no_diario,
   (SELECT COUNT(*) FROM `food_diary_entries` WHERE `idempotency_key` IS NOT NULL) AS registros_com_chave;
