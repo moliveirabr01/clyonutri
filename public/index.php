@@ -31,6 +31,9 @@ Env::load(__DIR__ . '/../.env');
 $appTimezone = (string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo');
 date_default_timezone_set($appTimezone);
 
+// NI2-24: toda tentativa de usar id de outra clínica fica na auditoria, qualquer que seja a resposta do controller.
+\ClyoNutri\Core\Security\CrossTenantAccessAuditor::register();
+
 // Suporte a CORS para Mobile Web e Apps Híbridos (/api/v1/...)
 if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/v1/')) {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -1568,7 +1571,7 @@ $router->post('/api/v1/professional/food-diary/{id}/feedback', function($params 
         ]);
     } else {
         http_response_code(404);
-        echo json_encode(['error' => 'Registro no diário não encontrado ou não pertence a esta clínica.']);
+        echo json_encode(['error' => 'Registro no diário não encontrado.']);
     }
 });
 

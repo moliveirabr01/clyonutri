@@ -108,8 +108,8 @@ class FinanceService
 
             $newStatus = ($totalPaid >= (int)$receivable['amount_cents']) ? 'paid' : 'partially_paid';
 
-            $upStmt = $this->db->prepare("UPDATE receivables SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
-            $upStmt->execute(['status' => $newStatus, 'id' => $receivableId]);
+            $upStmt = $this->db->prepare("UPDATE receivables SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
+            $upStmt->execute(['status' => $newStatus, 'id' => $receivableId, 'clinic_id' => $clinicId]);
 
             $this->db->commit();
 
@@ -138,8 +138,8 @@ class FinanceService
             return $receivable;
         }
 
-        $stmt = $this->db->prepare("UPDATE receivables SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE id = :id");
-        $stmt->execute(['id' => $receivableId]);
+        $stmt = $this->db->prepare("UPDATE receivables SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
+        $stmt->execute(['id' => $receivableId, 'clinic_id' => $clinicId]);
 
         $receivable['status'] = 'canceled';
         return $receivable;

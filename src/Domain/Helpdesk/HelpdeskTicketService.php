@@ -236,7 +236,7 @@ class HelpdeskTicketService
 
         // Validação de acesso do cliente
         if (!$isSupportUser && ((int)$ticket['clinic_id'] !== $clinicId || (int)$ticket['user_id'] !== $userId)) {
-            throw new RuntimeException('Acesso negado: Você não tem permissão para visualizar este chamado.');
+            throw new RuntimeException('Chamado não encontrado.'); // NI2-24: igual ao inexistente (sem oráculo); a tentativa vai para a auditoria
         }
 
         // Buscar mensagens da timeline
@@ -288,7 +288,7 @@ class HelpdeskTicketService
         $stmt->execute(['proto' => trim($protocol)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
-            throw new RuntimeException("Chamado com protocolo '{$protocol}' não encontrado.");
+            throw new RuntimeException('Chamado não encontrado.');
         }
         return $this->getTicketById((int)$row['id'], $userId, $clinicId, $isSupportUser);
     }

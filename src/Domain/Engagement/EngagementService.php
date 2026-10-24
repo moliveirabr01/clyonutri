@@ -94,8 +94,8 @@ class EngagementService
         $stamp = $now->format('Y-m-d H:i:s');
         $existing = $this->findCheckin($clinicId, $patientId, $today);
         if ($existing) {
-            $this->db->prepare('UPDATE checkins SET energy_level = ?, hunger_level = ?, meal_adherence_pct = ?, notes = ?, updated_at = ? WHERE id = ?')
-                ->execute([$energy, $hunger, $adh, $notes, $stamp, (int)$existing['id']]);
+            $this->db->prepare('UPDATE checkins SET energy_level = ?, hunger_level = ?, meal_adherence_pct = ?, notes = ?, updated_at = ? WHERE id = ? AND clinic_id = ?')
+                ->execute([$energy, $hunger, $adh, $notes, $stamp, (int)$existing['id'], $clinicId]);
             $id = (int)$existing['id'];
         } else {
             $this->db->prepare('INSERT INTO checkins (clinic_id, patient_id, energy_level, hunger_level, meal_adherence_pct, notes, checkin_date, created_at, updated_at)

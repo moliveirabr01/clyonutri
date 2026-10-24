@@ -521,7 +521,7 @@ class RecipeService
         // Validação estrita de visibilidade multi-tenant
         if ($recipe['clinic_id'] !== null && $tenantClinicId !== null && (int)$recipe['clinic_id'] !== $tenantClinicId) {
             if ($recipe['visibility'] !== 'public') {
-                throw new TenantSecurityException("Acesso negado: a receita #{$recipeId} é privada de outra clínica (403 Forbidden).", 403);
+                throw new TenantSecurityException("Acesso negado: receita não encontrada nesta clínica.", 403);
             }
         }
 
@@ -798,7 +798,7 @@ class RecipeService
             $chk = $this->db->prepare("SELECT id FROM meal_plans WHERE id = :id AND clinic_id = :cid AND patient_id = :pid");
             $chk->execute(['id' => $mealPlanId, 'cid' => $clinicId, 'pid' => $patientId]);
             if (!$chk->fetchColumn()) {
-                throw new TenantSecurityException("Acesso negado: plano alimentar não pertence a este paciente/clínica.", 403);
+                throw new TenantSecurityException("Acesso negado: plano alimentar não encontrado para este paciente.", 403);
             }
         }
 

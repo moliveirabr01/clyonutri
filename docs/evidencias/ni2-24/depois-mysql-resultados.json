@@ -1,0 +1,73 @@
+{
+ "driver": "mysql",
+ "pass": 11,
+ "fail": 0,
+ "results": [
+  {
+   "crit": "cobertura",
+   "name": "Todas as 109 rotas com parâmetro estão no teste (94) ou excluídas com motivo (15)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "Nenhum dos 111 pedidos com id da clínica 1 mostra dado dela (nome, e-mail, marcador)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "escrita",
+   "name": "Nenhum dos 111 pedidos altera registro da clínica 1 (impressão digital de todas as tabelas dela, conferida pedido a pedido)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "resposta",
+   "name": "Nenhum erro 5xx (antes: 500 ao encerrar vínculo do chat de paciente de outra clínica)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "resposta",
+   "name": "Nenhuma mensagem com detalhe interno (\"403 Forbidden\", \"não pertence\", \"ID n\")",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "Toda tentativa com id de outra clínica fica na auditoria (111/111)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "Registro com rota, método, status, autor e alvo (recurso, id, clínica dona), sem PII",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "resposta",
+   "name": "Id de outra clínica responde igual a id inexistente (sem oráculo de existência; antes: anamnese 403 × 404)",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "leitura",
+   "name": "Listagens e buscas (14: pacientes, conversas, planos, financeiro, LGPD, remarcações, painel, catálogo, APIs) sem nada da clínica 1",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "auditoria",
+   "name": "Acessos da própria clínica 1 aos mesmos ids não geram alerta de acesso cruzado",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "crit": "escrita",
+   "name": "Estado final da clínica 1 intacto (plano rascunho, cobrança pendente, consulta agendada, pedido pendente, vínculo ativo, item existe, nenhuma mensagem do atacante)",
+   "ok": true,
+   "detail": null
+  }
+ ]
+}

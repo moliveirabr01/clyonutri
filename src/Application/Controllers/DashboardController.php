@@ -2171,14 +2171,9 @@ class DashboardController
         }
 
         if (!(new PatientRepository())->findById($patientId)) {
-            $db = Connection::getInstance();
-            $patientExists = $db->prepare("SELECT 1 FROM patients WHERE id = ?");
-            $patientExists->execute([$patientId]);
-            if ($patientExists->fetchColumn()) {
-                $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
-            } else {
-                $this->anamnesisError(404, 'Paciente não encontrado.');
-            }
+            // NI2-24 (M2): mesma resposta para paciente de outra clínica e inexistente (sem oráculo de existência);
+            // a tentativa cruzada fica na auditoria (CrossTenantAccessAuditor).
+            $this->anamnesisError(404, 'Paciente não encontrado.');
             return;
         }
         \ClyoNutri\Domain\Clinical\FormRecovery::remember($patientId,'anamnese',$_POST);

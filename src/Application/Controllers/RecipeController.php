@@ -909,7 +909,7 @@ class RecipeController
             $status = self::httpStatusForException($e);
             http_response_code($status);
             echo $status === 403
-                ? "Acesso negado: paciente ou plano não pertence à sua clínica."
+                ? "Acesso negado: paciente ou plano não encontrado nesta clínica."
                 : "Erro ao prescrever receita: " . htmlspecialchars($e->getMessage());
             return;
         }

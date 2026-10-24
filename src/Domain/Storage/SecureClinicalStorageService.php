@@ -142,7 +142,7 @@ class SecureClinicalStorageService
         $att = $stmt->fetch();
 
         if (!$att) {
-            throw new TenantSecurityException("Acesso negado: anexo não encontrado ou pertence a outra organização (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: anexo não encontrado nesta clínica.", 403);
         }
 
         TenantGuard::assertPatientBelongsToClinic((int)$att['patient_id'], $clinicId, $this->db);

@@ -66,7 +66,12 @@ final class ChatLinkController
         $pid = (int)($params['id'] ?? 0);
         $linkId = (int)($params['linkId'] ?? 0);
         $svc = new PatientLinkService();
-        $own = array_filter($svc->linksForPatient($pid), static fn($l) => (int)$l['id'] === $linkId);
+        try {
+            $links = $svc->linksForPatient($pid);
+        } catch (TenantSecurityException) {
+            http_response_code(404); echo 'Paciente não encontrado.'; return; // NI2-24 (M3): antes era 500
+        }
+        $own = array_filter($links, static fn($l) => (int)$l['id'] === $linkId);
         $link = $own ? array_values($own)[0] : null;
         if ($link === null) { $this->back($pid, 'error', 'Vínculo não encontrado.'); return; }
         if ($a['role'] === 'nutritionist' && (int)$link['professional_id'] !== (int)$a['professional_id']) {

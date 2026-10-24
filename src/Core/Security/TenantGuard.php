@@ -28,7 +28,7 @@ class TenantGuard
         $actor = TenantContext::getUser();
         if (!$patient || (int)$patient['clinic_id'] !== $clinicId || (($actor['role']??'')==='patient' && (int)($actor['id']??0)!==$patientId)) {
             self::logSecurityViolation($db, $clinicId, 'patients', $patientId, 'Tentativa de acesso a paciente de outro tenant');
-            throw new TenantSecurityException("Acesso negado: o paciente ID {$patientId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         return $patient;
@@ -56,7 +56,7 @@ class TenantGuard
 
         if (!$professional) {
             self::logSecurityViolation($db, $clinicId, 'professionals', $professionalId, 'Tentativa de acesso a profissional de outro tenant ou ID não-canônico');
-            throw new TenantSecurityException("Acesso negado: o profissional ID {$professionalId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         return $professional;
@@ -73,7 +73,7 @@ class TenantGuard
 
         if (!$appointment || (int)$appointment['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'appointments', $appointmentId, 'Tentativa de acesso a consulta de outro tenant');
-            throw new TenantSecurityException("Acesso negado: o agendamento ID {$appointmentId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$appointment['patient_id'],$clinicId,$db);
@@ -91,7 +91,7 @@ class TenantGuard
 
         if (!$receivable || (int)$receivable['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'receivables', $receivableId, 'Tentativa de acesso a recebível de outro tenant');
-            throw new TenantSecurityException("Acesso negado: o recebível ID {$receivableId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$receivable['patient_id'],$clinicId,$db);
@@ -109,7 +109,7 @@ class TenantGuard
 
         if (!$conversation || (int)$conversation['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'chat_conversations', $conversationId, 'Tentativa de acesso a conversa de outro tenant');
-            throw new TenantSecurityException("Acesso negado: a conversa ID {$conversationId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$conversation['patient_id'],$clinicId,$db);
@@ -127,7 +127,7 @@ class TenantGuard
 
         if (!$plan || (int)$plan['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'meal_plans', $planId, 'Tentativa de acesso a plano alimentar de outro tenant');
-            throw new TenantSecurityException("Acesso negado: o plano alimentar ID {$planId} não pertence à clínica ativa (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
         if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$plan['patient_id'],$clinicId,$db);
@@ -149,14 +149,18 @@ class TenantGuard
 
         if ($food['clinic_id'] !== null && (int)$food['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'foods', $foodId, 'Tentativa de uso de alimento customizado de outro tenant');
-            throw new TenantSecurityException("Acesso negado: o alimento ID {$foodId} pertence a outra organização (403 Forbidden).", 403);
+            throw new TenantSecurityException("Acesso negado: alimento não disponível nesta clínica.", 403);
         }
 
         return $food;
     }
 
+    /** NI2-24: o CrossTenantAccessAuditor não registra de novo o que já foi registrado aqui no mesmo pedido. */
+    public static bool $violationLogged = false;
+
     private static function logSecurityViolation(PDO $db, int $clinicId, string $resource, int $resourceId, string $reason): void
     {
+        self::$violationLogged = true;
         try {
             $logger = new AuditLogger($db);
             // Registra evento de auditoria sem PII

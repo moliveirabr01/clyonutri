@@ -1,0 +1,14 @@
+PASS [cobertura] Todas as 109 rotas com parâmetro estão no teste (94) ou excluídas com motivo (15)
+PASS [leitura] Nenhum dos 111 pedidos com id da clínica 1 mostra dado dela (nome, e-mail, marcador)
+PASS [escrita] Nenhum dos 111 pedidos altera registro da clínica 1 (impressão digital de todas as tabelas dela, conferida pedido a pedido)
+PASS [resposta] Nenhum erro 5xx (antes: 500 ao encerrar vínculo do chat de paciente de outra clínica)
+PASS [resposta] Nenhuma mensagem com detalhe interno ("403 Forbidden", "não pertence", "ID n")
+PASS [auditoria] Toda tentativa com id de outra clínica fica na auditoria (111/111)
+PASS [auditoria] Registro com rota, método, status, autor e alvo (recurso, id, clínica dona), sem PII
+PASS [resposta] Id de outra clínica responde igual a id inexistente (sem oráculo de existência; antes: anamnese 403 × 404)
+PASS [leitura] Listagens e buscas (14: pacientes, conversas, planos, financeiro, LGPD, remarcações, painel, catálogo, APIs) sem nada da clínica 1
+PASS [auditoria] Acessos da própria clínica 1 aos mesmos ids não geram alerta de acesso cruzado
+PASS [escrita] Estado final da clínica 1 intacto (plano rascunho, cobrança pendente, consulta agendada, pedido pendente, vínculo ativo, item existe, nenhuma mensagem do atacante)
+(111 ataques, 14 listagens, 109 rotas com parâmetro)
+
+NI2-24 (MySQL): 11 PASS, 0 FAIL

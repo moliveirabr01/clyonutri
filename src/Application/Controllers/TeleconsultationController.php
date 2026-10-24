@@ -64,6 +64,14 @@ class TeleconsultationController
         if ($existing && (int)$existing['professional_id'] === $professionalId) {
             $this->redirect('/teleconsulta/' . (int)$existing['id'] . '/atendimento');
         }
+        // NI2-24 (B1): consulta de outra clínica (ou inexistente) não mostra a tela de abrir o consultório.
+        $own = $this->db->prepare('SELECT 1 FROM appointments WHERE id = :a AND clinic_id = :c');
+        $own->execute(['a' => $appointmentId, 'c' => $clinicId]);
+        if (!$own->fetchColumn()) {
+            http_response_code(404);
+            echo 'Consulta não encontrada.';
+            return;
+        }
         $csrf = Csrf::generate();
         $this->securityHeaders();
         $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');

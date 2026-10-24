@@ -48,7 +48,7 @@ class PracticeCrmService
         $pkgStmt = $this->db->prepare("SELECT id FROM consultation_packages WHERE id = :id AND clinic_id = :clinic_id");
         $pkgStmt->execute(['id' => $packageId, 'clinic_id' => $clinicId]);
         if (!$pkgStmt->fetchColumn()) {
-            throw new \ClyoNutri\Core\Security\TenantSecurityException("Pacote não encontrado ou pertence a outra organização (403 Forbidden).", 403);
+            throw new \ClyoNutri\Core\Security\TenantSecurityException("Pacote não encontrado nesta clínica.", 403);
         }
 
         $stmt = $this->db->prepare("

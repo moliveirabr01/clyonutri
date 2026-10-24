@@ -273,7 +273,7 @@ class ChatController
             exit;
         } catch (\ClyoNutri\Domain\Chat\ChatException | TenantSecurityException $e) {
             http_response_code(404);
-            echo '<h1>Anexo não encontrado</h1><p>O anexo não existe ou não pertence às suas conversas.</p>';
+            echo '<h1>Anexo não encontrado</h1><p>O anexo não foi encontrado nas suas conversas.</p>';
             exit;
         }
     }
