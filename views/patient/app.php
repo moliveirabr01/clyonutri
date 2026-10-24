@@ -16,10 +16,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   <link rel="stylesheet" href="/assets/css/design-system.css">
   <style>
     :root {
+      /* NI2-140 (A8): mesmas cores do DS (clinical-botanical.css). copper-600 é a cor de ação (branco sobre ela: 5,0:1). */
       --brand-navy-950: #0a1120;
-      --brand-navy-900: #0f172a;
-      --brand-copper-600: #c2410c;
-      --brand-copper-500: #ea580c;
+      --brand-navy-900: #0F2747;
+      --brand-copper-700: #9A3F18;
+      --brand-copper-600: #B94F1F;
+      --brand-muted: #667085;
       --neutral-50: #f8fafc;
       --neutral-100: #f1f5f9;
       --neutral-200: #e2e8f0;
@@ -79,7 +81,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     .portal-footer {
       text-align: center;
       padding: 24px 16px;
-      color: #94a3b8;
+      color: var(--brand-muted);
       font-size: 0.8rem;
       border-top: 1px solid #f1f5f9;
       background: #fff;
@@ -97,7 +99,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     .form-control {
       width: 100%;
       padding: 10px 14px;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #858D9C;
       border-radius: 8px;
       font-size: 0.95rem;
       box-sizing: border-box;
@@ -105,13 +107,26 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     }
     .form-control:focus {
       outline: none;
-      border-color: #c2410c;
-      box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.15);
+      border-color: var(--brand-copper-600);
+      box-shadow: 0 0 0 3px rgba(185, 79, 31, 0.35);
+    }
+    /* Foco de teclado sempre visível (WCAG 2.4.7). */
+    a:focus-visible,
+    button:focus-visible,
+    input[type="checkbox"]:focus-visible {
+      outline: 3px solid var(--brand-copper-600);
+      outline-offset: 2px;
+    }
+    .help-text {
+      font-size: 0.75rem;
+      color: var(--brand-muted);
+      display: block;
+      margin-top: 4px;
     }
     .btn-submit {
       width: 100%;
       padding: 12px;
-      background: #ea580c;
+      background: var(--brand-copper-600);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -121,7 +136,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       transition: background 0.15s ease;
     }
     .btn-submit:hover {
-      background: #c2410c;
+      background: var(--brand-copper-700);
     }
     .alert-error {
       background: #fef2f2;
@@ -145,14 +160,18 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       border: none;
       font-weight: 600;
       font-size: 0.95rem;
-      color: #64748b;
+      color: #475569;
       cursor: pointer;
+      min-height: 44px;
       border-bottom: 2px solid transparent;
       margin-bottom: -2px;
     }
-    .tab-btn.active {
-      color: #c2410c;
-      border-bottom-color: #c2410c;
+    .tab-btn[aria-selected="true"] {
+      color: var(--brand-copper-600);
+      border-bottom-color: var(--brand-copper-600);
+    }
+    .tab-content[hidden] {
+      display: none;
     }
     .feature-list {
       display: grid;
@@ -168,6 +187,17 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       font-size: 0.85rem;
       color: #475569;
     }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @media (max-width: 480px) {
       .portal-card {
         padding: 20px;
@@ -182,7 +212,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
   <header class="portal-header">
     <a href="/app" class="portal-header__brand">
-      <img src="/assets/clyonutri-icon.png" alt="ClyoNutri" width="28" height="28" style="border-radius:6px;">
+      <img src="/assets/clyonutri-icon.png" alt="" width="28" height="28" style="border-radius:6px;">
       <span>ClyoNutri</span>
     </a>
     <span class="portal-header__badge">Portal do Paciente</span>
@@ -200,8 +230,8 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       <?php if ($step === 'first_access' && !empty($preview)): ?>
         <!-- Tela de Confirmação do Primeiro Acesso -->
         <div style="text-align: center; margin-bottom: 24px;">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: #ffedd5; color: #c2410c; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.5rem;">
-            👋
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: #ffedd5; color: var(--brand-copper-600); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.5rem;" aria-hidden="true">
+            <?= htmlspecialchars(mb_substr((string)($preview['patient']['name'] ?? 'P'), 0, 1)) ?>
           </div>
           <h1 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">
             Olá, <?= htmlspecialchars($preview['patient']['name']) ?>!
@@ -215,7 +245,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <input type="hidden" name="invitation_code" value="<?= htmlspecialchars((string)$codeVal) ?>">
 
           <div class="form-group">
-            <label class="form-label" for="fa-name">Nome Completo</label>
+            <label class="form-label" for="fa-name">Nome completo</label>
             <input class="form-control" id="fa-name" type="text" name="name" required value="<?= htmlspecialchars((string)($preview['patient']['name'] ?? '')) ?>">
           </div>
 
@@ -231,40 +261,40 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="fa-password">Criar uma Senha de Acesso</label>
-            <input class="form-control" id="fa-password" type="password" name="password" required minlength="8" maxlength="72" placeholder="Mínimo de 8 caracteres">
-            <span style="font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 4px;">Use no mínimo 8 caracteres (letras, números ou símbolos).</span>
+            <label class="form-label" for="fa-password">Crie uma senha</label>
+            <input class="form-control" id="fa-password" type="password" name="password" required minlength="8" maxlength="72" placeholder="Mínimo de 8 caracteres" aria-describedby="fa-password-help">
+            <span class="help-text" id="fa-password-help">Use no mínimo 8 caracteres (letras, números ou símbolos).</span>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="fa-confirm">Confirmar Senha</label>
+            <label class="form-label" for="fa-confirm">Confirme a senha</label>
             <input class="form-control" id="fa-confirm" type="password" name="password_confirmation" required minlength="8" maxlength="72" placeholder="Repita a senha digitada">
           </div>
 
           <div style="margin-bottom: 24px;">
             <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 0.85rem; color: #475569; cursor: pointer;">
               <input type="checkbox" name="terms_accepted" value="1" required style="margin-top: 3px;">
-              <span>Li e concordo com os <a href="/termos" target="_blank" style="color:#c2410c;">Termos de Uso</a> e a <a href="/privacidade" target="_blank" style="color:#c2410c;">Política de Privacidade</a> do ClyoNutri.</span>
+              <span>Li e concordo com os <a href="/termos" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Termos de Uso<span class="sr-only"> (abre em nova aba)</span></a> e a <a href="/privacidade" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></a> do ClyoNutri.</span>
             </label>
           </div>
 
           <button type="submit" class="btn-submit">
-            Ativar Meu Acesso e Entrar
+            Ativar meu acesso e entrar
           </button>
         </form>
 
         <div style="text-align: center; margin-top: 20px;">
-          <a href="/app" style="color: #64748b; font-size: 0.85rem; text-decoration: none;">← Voltar ao início</a>
+          <a href="/app" style="color: #475569; font-size: 0.85rem;">Voltar ao início</a>
         </div>
 
       <?php elseif ($step === 'activated'): ?>
         <!-- Tela de Sucesso da Ativação -->
         <div style="text-align: center; padding: 12px 0;">
-          <div style="width: 56px; height: 56px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 2rem;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 2rem;" aria-hidden="true">
             ✓
           </div>
           <h1 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0 0 8px 0;">
-            Acesso Ativado com Sucesso!
+            Acesso ativado
           </h1>
           <p style="color: #475569; font-size: 0.95rem; margin: 0 0 24px 0; line-height: 1.5;">
             Parabéns, <strong><?= htmlspecialchars($patient['name'] ?? 'Paciente') ?></strong>! Sua senha foi criada e seu perfil está pronto para uso.
@@ -282,9 +312,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
           <div style="display: flex; flex-direction: column; gap: 10px;">
             <a href="/app" class="btn-submit" style="display: block; text-decoration: none; text-align: center;">
-              Ir para o Meu Portal
+              Ir para o meu portal
             </a>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px;">
+            <div style="font-size: 0.8rem; color: var(--brand-muted); margin-top: 8px;">
               Dica: adicione esta página à tela de início do seu celular para abrir como aplicativo a qualquer momento.
             </div>
           </div>
@@ -303,80 +333,80 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
         <div class="feature-list" style="margin-bottom: 24px;">
           <div class="feature-item">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">🥗 Plano Alimentar</strong>
+            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Plano alimentar</strong>
             Consulte suas refeições prescritas, gramas e opções de substituição.
           </div>
           <div class="feature-item">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">💧 Hidratação & Diário</strong>
+            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Hidratação e diário</strong>
             Registre água e acompanhe seu consumo ao longo do dia.
           </div>
           <div class="feature-item">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">📹 Teleconsultas</strong>
+            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Teleconsultas</strong>
             Acesse a sala virtual sem instalar nada.
           </div>
           <div class="feature-item">
-            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">💬 Chat com Nutricionista</strong>
+            <strong style="color: #0f172a; display: block; margin-bottom: 4px;">Chat com o nutricionista</strong>
             Envie dúvidas e compartilhe sua rotina.
           </div>
         </div>
 
         <div style="text-align: center;">
-          <a href="/app" style="color: #c2410c; font-size: 0.85rem; text-decoration: none; font-weight: 600;">Sessão ativa • Atualizar página</a>
+          <a href="/app" style="color: var(--brand-copper-600); font-size: 0.85rem; font-weight: 600;">Sessão ativa · Atualizar página</a>
         </div>
 
       <?php else: ?>
         <!-- Tela Inicial: Abas Primeiro Acesso e Login -->
         <div style="text-align: center; margin-bottom: 20px;">
           <h1 style="font-size: 1.35rem; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">
-            Acompanhe seu Plano no ClyoNutri
+            Acompanhe seu plano no ClyoNutri
           </h1>
           <p style="color: #64748b; font-size: 0.875rem; margin: 0;">
             Acesse seu plano alimentar, diário e consultas de qualquer dispositivo.
           </p>
         </div>
 
-        <div class="tabs-nav" role="tablist">
-          <button type="button" class="tab-btn active" id="tab-btn-first" data-target="tab-first">
-            Primeiro Acesso
+        <div class="tabs-nav" role="tablist" aria-label="Como você quer entrar">
+          <button type="button" class="tab-btn" role="tab" id="tab-btn-first" aria-controls="tab-first" aria-selected="true">
+            Primeiro acesso
           </button>
-          <button type="button" class="tab-btn" id="tab-btn-login" data-target="tab-login">
-            Já Tenho Cadastro
+          <button type="button" class="tab-btn" role="tab" id="tab-btn-login" aria-controls="tab-login" aria-selected="false" tabindex="-1">
+            Já tenho cadastro
           </button>
         </div>
 
         <!-- Aba 1: Primeiro Acesso com Código -->
-        <div id="tab-first" class="tab-content">
+        <div id="tab-first" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-first">
           <form method="GET" action="/app">
             <div class="form-group">
-              <label class="form-label" for="code-input">Código do Convite</label>
-              <input class="form-control" id="code-input" type="text" name="code" required placeholder="Cole o código recebido do seu nutricionista" value="<?= htmlspecialchars((string)$codeVal) ?>" style="font-family: monospace; font-size: 0.85rem;">
-              <span style="font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 4px;">
+              <label class="form-label" for="code-input">Código do convite</label>
+              <input class="form-control" id="code-input" type="text" name="code" required placeholder="Cole o código recebido do seu nutricionista" value="<?= htmlspecialchars((string)$codeVal) ?>" style="font-family: monospace; font-size: 0.85rem;" aria-describedby="code-help">
+              <span class="help-text" id="code-help">
                 O nutricionista gera este código privativo para você. Válido por 48 horas.
               </span>
             </div>
             <button type="submit" class="btn-submit">
-              Continuar com Convite
+              Continuar com o convite
             </button>
           </form>
         </div>
 
         <!-- Aba 2: Login com Credenciais -->
-        <div id="tab-login" class="tab-content" style="display: none;">
+        <div id="tab-login" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-login" hidden>
           <form method="POST" action="/app/login">
             <div class="form-group">
-              <label class="form-label" for="login-input">E-mail, Celular ou CPF</label>
+              <label class="form-label" for="login-input">E-mail, celular ou CPF</label>
               <input class="form-control" id="login-input" type="text" name="login" required placeholder="Digite seus dados de acesso">
             </div>
             <div class="form-group">
-              <label class="form-label" for="login-pass">Sua Senha</label>
+              <label class="form-label" for="login-pass">Senha</label>
               <input class="form-control" id="login-pass" type="password" name="password" required placeholder="Sua senha cadastrada">
             </div>
             <button type="submit" class="btn-submit">
-              Entrar no Portal
+              Entrar no portal
             </button>
           </form>
           <div style="text-align: center; margin-top: 14px;">
-            <a href="/recuperar-senha" style="font-size: 0.8rem; color: #c2410c; text-decoration: none;">
+            <a href="/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600);">
               Esqueci minha senha
             </a>
           </div>
@@ -385,10 +415,10 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         <!-- Destaques -->
         <div class="feature-list">
           <div class="feature-item">
-            📱 <strong>Web & Celular:</strong> Funciona direto no navegador, sem ocupar espaço.
+            <strong>Web e celular:</strong> funciona direto no navegador, sem instalar nada.
           </div>
           <div class="feature-item">
-            🥗 <strong>Plano Dinâmico:</strong> Alimentos, quantidades em gramas e substituições.
+            <strong>Seu plano:</strong> alimentos, quantidades e substituições.
           </div>
         </div>
 
@@ -398,7 +428,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   </main>
 
   <footer class="portal-footer">
-    <div>&copy; <?= date('Y') ?> ClyoNutri • A plataforma de alta performance para nutrição clínica.</div>
+    <div>&copy; <?= date('Y') ?> ClyoNutri • Acompanhamento nutricional.</div>
     <div style="margin-top: 4px;">
       <a href="/termos" style="color: #64748b; text-decoration: none;">Termos de Uso</a> •
       <a href="/privacidade" style="color: #64748b; text-decoration: none;">Política de Privacidade</a>
@@ -406,16 +436,32 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   </footer>
 
   <script nonce="<?= $nonce ?>">
-    document.querySelectorAll('.tab-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-content').forEach(function(c) { c.style.display = 'none'; });
-        btn.classList.add('active');
-        var targetId = btn.getAttribute('data-target');
-        var targetEl = document.getElementById(targetId);
-        if (targetEl) targetEl.style.display = 'block';
+    // NI2-140 (A8): abas no padrão WAI-ARIA (aria-selected, tabpanel, setas, Home e End).
+    (function () {
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+      if (!tabs.length) return;
+      function select(tab, focus) {
+        tabs.forEach(function (t) {
+          var on = t === tab;
+          t.setAttribute('aria-selected', on ? 'true' : 'false');
+          t.tabIndex = on ? 0 : -1;
+          var panel = document.getElementById(t.getAttribute('aria-controls'));
+          if (panel) panel.hidden = !on;
+        });
+        if (focus) tab.focus();
+      }
+      tabs.forEach(function (tab, i) {
+        tab.addEventListener('click', function () { select(tab, false); });
+        tab.addEventListener('keydown', function (e) {
+          var next = null;
+          if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+          else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+          else if (e.key === 'Home') next = tabs[0];
+          else if (e.key === 'End') next = tabs[tabs.length - 1];
+          if (next) { e.preventDefault(); select(next, true); }
+        });
       });
-    });
+    })();
   </script>
 </body>
 </html>

@@ -38,7 +38,7 @@ export default function PatientOnboardingScreen({ onBack, onActivated, initialCo
         </> : <>
           <Text style={s.description}>{preview ? `Confira seu cadastro em ${preview.clinic_name}. Nutricionista: ${preview.professional_name}.` : 'Peça um convite ao seu nutricionista e cole o código abaixo. O convite é pessoal e vale por 48 horas.'}</Text>
           <Text style={s.description}>{preview ? 'Etapa 2 de 2 · Cadastro e senha' : 'Etapa 1 de 2 · Seu convite'}</Text>
-          {!preview ? <><Text style={s.label}>Código do convite</Text><TextInput accessibilityLabel="Código do convite" style={s.input} value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} maxLength={64} editable={!busy} placeholder="Cole o código recebido" /></> : <>
+          {!preview ? <><Text style={s.label}>Código do convite</Text><TextInput accessibilityLabel="Código do convite" style={s.input} value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} maxLength={64} editable={!busy} placeholder="Cole o código recebido" placeholderTextColor={t.muted} /></> : <>
             <Text style={s.label}>Nome completo</Text><TextInput accessibilityLabel="Nome completo" style={s.input} value={name} onChangeText={setName} maxLength={255} editable={!busy} autoComplete="name" />
             <Text style={s.label}>E-mail</Text><TextInput accessibilityLabel="E-mail para acessar o app" style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={255} editable={!busy} />
             <Text style={s.label}>Celular (opcional)</Text><TextInput accessibilityLabel="Celular" style={s.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={30} editable={!busy} />
@@ -57,9 +57,9 @@ export default function PatientOnboardingScreen({ onBack, onActivated, initialCo
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: t.background }, content: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: t.border },
-  brand: { padding: 24, backgroundColor: t.navy, alignItems: 'center', gap: 10, borderTopWidth: 4, borderTopColor: '#E67E3A' }, caption: { color: '#D7E1E9' },
+  brand: { padding: 24, backgroundColor: t.navy, alignItems: 'center', gap: 10, borderTopWidth: 4, borderTopColor: t.copperAccent }, caption: { color: '#D7E1E9' },
   body: { padding: 24, gap: 12 }, title: { fontSize: 23, fontWeight: '700', color: t.navy }, description: { fontSize: 14, lineHeight: 22, color: t.muted },
-  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.border, borderRadius: 8, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
+  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
   button: { backgroundColor: t.copper, padding: 14, borderRadius: 10, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, buttonText: { color: t.white, fontWeight: '600', fontSize: 16 },
   back: { minHeight: 44, alignItems: 'center', justifyContent: 'center' }, link: { color: t.navy, fontWeight: '600' }, error: { color: t.error, fontSize: 14, lineHeight: 22 },
 });

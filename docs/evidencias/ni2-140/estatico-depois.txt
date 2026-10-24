@@ -1,0 +1,63 @@
+PASS M1: tokens.navy igual a --brand-navy-900 do DS
+PASS M1: tokens.copper igual a --brand-copper-600 do DS
+PASS M1: tokens.background igual a --neutral-warm-50 do DS
+PASS M1: tokens.success igual a --semantic-success do DS
+PASS A1: texto branco sobre o botão cobre: 5.00:1 (mínimo 4.5)
+PASS A1: texto branco sobre o navy: 14.98:1 (mínimo 4.5)
+PASS M2: texto auxiliar (muted) sobre branco: 4.97:1 (mínimo 4.5)
+PASS M2: texto auxiliar (muted) sobre o fundo: 4.66:1 (mínimo 4.5)
+PASS M2: borda de campo sobre branco (1.4.11): 3.34:1 (mínimo 3.0)
+PASS Texto de erro sobre o fundo de erro: 6.05:1 (mínimo 4.5)
+PASS Texto de sucesso sobre o fundo de sucesso: 5.13:1 (mínimo 4.5)
+PASS Texto cobre (links, horários) sobre o fundo: 4.68:1 (mínimo 4.5)
+PASS Texto principal sobre o fundo: 13.74:1 (mínimo 4.5)
+PASS A1: copperAccent continua reprovado para texto, então só pode ser decorativo
+PASS A4: PatientHomeScreen.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: PatientHomeScreen.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: PatientHomeScreen.tsx sem as cores reprovadas ou antigas
+PASS M1: PatientHomeScreen.tsx usa o token do navy, sem o hex solto
+PASS A4: PatientOnboardingScreen.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: PatientOnboardingScreen.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: PatientOnboardingScreen.tsx sem as cores reprovadas ou antigas
+PASS M1: PatientOnboardingScreen.tsx usa o token do navy, sem o hex solto
+PASS A4: PatientChat.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: PatientChat.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: PatientChat.tsx sem as cores reprovadas ou antigas
+PASS M1: PatientChat.tsx usa o token do navy, sem o hex solto
+PASS A4: NextAppointmentCard.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: NextAppointmentCard.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: NextAppointmentCard.tsx sem as cores reprovadas ou antigas
+PASS M1: NextAppointmentCard.tsx usa o token do navy, sem o hex solto
+PASS A4: DailyCheckinCard.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: DailyCheckinCard.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: DailyCheckinCard.tsx sem as cores reprovadas ou antigas
+PASS M1: DailyCheckinCard.tsx usa o token do navy, sem o hex solto
+PASS A4: BrandLogo.tsx sem Alert.alert (no web ele não aparece)
+PASS M6: BrandLogo.tsx sem emoji ou glifo no texto
+PASS A1/M1/M2: BrandLogo.tsx sem as cores reprovadas ou antigas
+PASS M1: BrandLogo.tsx usa o token do navy, sem o hex solto
+PASS A2: card de Hidratação sem container accessible (os botões continuam focáveis) e com barra de progresso
+PASS A4: registro de água com aviso na tela e anúncio para o leitor de tela
+PASS A4: avisos de refeição, medida, privacidade e saída também são anunciados
+PASS A3: rótulo das abas com limite de ampliação (maxFontSizeMultiplier)
+PASS A3: barra de abas no fluxo, sem altura fixa
+PASS A3: barra de abas rola na horizontal dentro de um tablist
+PASS B1: abas sem "Aba …" no rótulo
+PASS B4: nenhum chip com 36 px de altura
+PASS B2: botões e títulos em caixa de frase
+PASS B2: "Toque", não "Clique"
+PASS M3: conteúdo com landmark main
+PASS A2: o alerta de erro do chat fica no texto, não no container do botão "Tentar de novo"
+PASS B6: logo com rótulo
+PASS M3: index.html do web em pt-BR, com título do produto
+PASS B5: foco do teclado visível no web
+PASS A8: abas com role=tab, aria-controls e painéis
+PASS A8: abas navegáveis por setas e Home/End
+PASS A8: sem as cores do Tailwind reprovadas no contraste
+PASS A8: botão do /app no cobre do DS com 4,5:1
+PASS A8: texto auxiliar do /app com 4,5:1
+PASS A8: logo decorativo com alt vazio
+PASS M6: /app sem emoji lido em voz alta
+PASS B2: /app em caixa de frase
+
+NI2-140 (estático): 61 PASS, 0 FAIL

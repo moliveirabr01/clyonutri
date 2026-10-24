@@ -95,7 +95,7 @@ export default function HydrationHistory({ refreshToken, onChanged }: { refreshT
                     onChangeText={(value) => setEditing({ id: e.id, value: value.replace(/\D/g, '').slice(0, 4) })}
                     keyboardType="number-pad"
                     accessibilityLabel="Novo volume em mililitros"
-                    style={{ borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, minHeight: 44, minWidth: 80, paddingHorizontal: 8 }}
+                    style={{ borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, minHeight: 44, minWidth: 80, paddingHorizontal: 8 }}
                   />
                   <TouchableOpacity style={btn} accessibilityRole="button" disabled={busy === e.id} accessibilityState={{ busy: busy === e.id, disabled: busy === e.id }} onPress={() => save(e)}>
                     <Text style={{ color: t.navy, fontWeight: '600' }}>Salvar</Text>

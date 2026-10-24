@@ -154,7 +154,7 @@ export default function NextAppointmentCard({ appointment, onChanged, onOpenTele
           <Text style={styles.requestTitle}>Cancelar a consulta de {when}?</Text>
           <Text style={styles.muted}>O horário fica livre na agenda do consultório. Para voltar, será preciso marcar de novo.</Text>
           <Text style={styles.label} nativeID="cancel-reason-label">Motivo (opcional)</Text>
-          <TextInput style={styles.input} value={reason} onChangeText={setReason} maxLength={300} accessibilityLabelledBy="cancel-reason-label" accessibilityLabel="Motivo do cancelamento (opcional)" placeholder="Ex.: imprevisto no trabalho" />
+          <TextInput style={styles.input} value={reason} onChangeText={setReason} maxLength={300} accessibilityLabelledBy="cancel-reason-label" accessibilityLabel="Motivo do cancelamento (opcional)" placeholder="Ex.: imprevisto no trabalho" placeholderTextColor={t.muted} />
           <TouchableOpacity style={[styles.dangerButton, busy ? styles.disabled : null]} onPress={cancel} disabled={!!busy} accessibilityRole="button" accessibilityState={{ disabled: !!busy, busy: busy === 'cancel' }}>
             {busy === 'cancel' ? <ActivityIndicator color={t.white} accessibilityLabel="Cancelando" /> : <Text style={styles.buttonText}>Sim, cancelar consulta</Text>}
           </TouchableOpacity>
@@ -188,7 +188,7 @@ export default function NextAppointmentCard({ appointment, onChanged, onOpenTele
           {options && options.days.length > 0 && (
             <>
               <Text style={styles.label} nativeID="reschedule-reason-label">Motivo (opcional)</Text>
-              <TextInput style={styles.input} value={reason} onChangeText={setReason} maxLength={300} accessibilityLabelledBy="reschedule-reason-label" accessibilityLabel="Motivo do pedido (opcional)" placeholder="Ex.: viagem a trabalho" />
+              <TextInput style={styles.input} value={reason} onChangeText={setReason} maxLength={300} accessibilityLabelledBy="reschedule-reason-label" accessibilityLabel="Motivo do pedido (opcional)" placeholder="Ex.: viagem a trabalho" placeholderTextColor={t.muted} />
               <TouchableOpacity style={[styles.primaryButton, (!selected || busy) ? styles.disabled : null]} onPress={sendRequest} disabled={!selected || !!busy} accessibilityRole="button" accessibilityState={{ disabled: !selected || !!busy, busy: busy === 'request' }}>
                 {busy === 'request' ? <ActivityIndicator color={t.white} accessibilityLabel="Enviando pedido" /> : <Text style={styles.buttonText}>{selected ? `Pedir ${formatClinicDateTime(options.days.flatMap((d) => d.slots).find((s) => s.scheduled_at === selected)?.scheduled_at_iso)}` : 'Escolha um horário'}</Text>}
               </TouchableOpacity>
@@ -218,11 +218,11 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, color: '#92400E', marginTop: 4 },
   line: { fontSize: 14, color: t.ink, marginTop: 6 },
   label: { fontSize: 13, fontWeight: '600', color: t.ink, marginTop: 10 },
-  input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, padding: 10, marginTop: 4, minHeight: 44, color: t.ink },
+  input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 10, marginTop: 4, minHeight: 44, color: t.ink },
   primaryButton: { backgroundColor: t.copper, borderRadius: t.buttonRadius, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 12, paddingHorizontal: 16 },
   onlineButton: { backgroundColor: '#027A48', borderRadius: t.buttonRadius, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   dangerButton: { backgroundColor: t.error, borderRadius: t.buttonRadius, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 12 },
-  secondaryButton: { borderWidth: 1, borderColor: t.border, borderRadius: t.buttonRadius, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
+  secondaryButton: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.buttonRadius, minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
   buttonText: { color: t.white, fontWeight: '700', fontSize: 14 },
   secondaryText: { color: t.navy, fontWeight: '600', fontSize: 14 },
   dangerText: { color: t.error, fontWeight: '600', fontSize: 14 },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   requestTitle: { fontSize: 14, fontWeight: '700', color: t.ink },
   dayLabel: { fontSize: 13, fontWeight: '700', color: t.ink, marginTop: 4 },
   slotRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  slot: { borderWidth: 1, borderColor: t.border, borderRadius: 8, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
+  slot: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
   slotOn: { backgroundColor: t.navy, borderColor: t.navy },
   slotText: { color: t.ink, fontWeight: '600' },
   slotTextOn: { color: t.white, fontWeight: '700' },

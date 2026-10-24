@@ -170,7 +170,7 @@ const s = StyleSheet.create({
   item: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.border },
   itemUnread: { borderLeftWidth: 3, borderLeftColor: t.copper, paddingLeft: 8 },
   itemTitle: { fontSize: 15, color: t.navy },
-  input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, paddingHorizontal: 10, paddingVertical: 8, width: 72, color: t.ink, minHeight: 44 },
+  input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, paddingHorizontal: 10, paddingVertical: 8, width: 72, color: t.ink, minHeight: 44 },
   button: { backgroundColor: t.navy, borderRadius: t.buttonRadius, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
   buttonText: { color: t.white, fontWeight: '700' },
 });
