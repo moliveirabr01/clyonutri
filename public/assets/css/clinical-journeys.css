@@ -49,8 +49,8 @@ html.cn-dialog-open { overflow: hidden; }
 .food-result__badge--custom { background: #FBEADF; color: #8F3D14; }
 .food-result__meta { font-size: 0.75rem; color: #475569; }
 /* NI2-73: contraste AA — ".food-result span" (clinical-botanical) tinha mais especificidade e deixava o selo em #64748b sobre #EEF2F7 (4,2:1) */
-.food-result .food-result__badge { color: #1E3A5F; }
-.food-result .food-result__badge--custom { color: #9A3412; }
+.food-result .food-result__badge { color: #0F3E17; }
+.food-result .food-result__badge--custom { color: #8F3D14; }
 .food-result .food-result__meta, .food-result .food-result__portion { color: #475569; }
 /* NI2-73: porção de referência / medidas caseiras no resultado da busca */
 .food-result__portion { display: block; font-size: 0.75rem; color: #475569; }

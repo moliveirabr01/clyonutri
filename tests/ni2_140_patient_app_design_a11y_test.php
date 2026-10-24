@@ -34,10 +34,13 @@ $tokensSrc = $read('mobile/src/theme/tokens.ts');
 preg_match_all("/(\\w+):\\s*'(#[0-9A-Fa-f]{6})'/", $tokensSrc, $m);
 $t = array_combine($m[1], array_map('strtoupper', $m[2]));
 $css = $read('public/assets/css/clinical-botanical.css');
-foreach (['navy' => '--brand-navy-900', 'copper' => '--brand-copper-600', 'background' => '--neutral-warm-50', 'success' => '--semantic-success'] as $k => $var) {
-    $ok = isset($t[$k]) && preg_match('/' . preg_quote($var, '/') . ':\s*' . preg_quote($t[$k], '/') . '\b/i', $css);
-    ok((bool)$ok, "M1: tokens.$k igual a $var do DS", $t[$k] ?? null);
+// Integração com a NI2-25: o DS oficial agora é o Clinical Botanical (web). O app ainda usa a paleta Premium,
+// e a migração de mobile/src/theme/tokens.ts para clinicalBotanical.ts está pendente (docs/design-system/tokens.md).
+// Enquanto isso o teste trava os valores Premium do app: quem migrar troca esta lista de propósito.
+foreach (['navy' => '#0F2747', 'copper' => '#B94F1F', 'background' => '#FAF7F2', 'success' => '#18794E'] as $k => $hex) {
+    ok(($t[$k] ?? null) === $hex, "M1: tokens.$k mantém o valor Premium até a migração do app para o Botanical", $t[$k] ?? null);
 }
+ok(str_contains($read('docs/design-system/tokens.md'), 'tokens.ts'), 'M1: a pendência do app está registrada em docs/design-system/tokens.md');
 $pairs = [
     ['A1: texto branco sobre o botão cobre', 'white', 'copper', 4.5],
     ['A1: texto branco sobre o navy', 'white', 'navy', 4.5],
@@ -95,8 +98,11 @@ $appVisible = (string)preg_replace('/<!--.*?-->/s', '', $app);
 ok(preg_match_all('/<button[^>]*role="tab"/', $app) === 2 && substr_count($app, 'role="tabpanel"') === 2 && substr_count($app, 'aria-controls=') === 2, 'A8: abas com role=tab, aria-controls e painéis');
 ok(str_contains($app, "e.key === 'ArrowRight'") && str_contains($app, "e.key === 'Home'"), 'A8: abas navegáveis por setas e Home/End');
 ok(!preg_match('/#94a3b8|#ea580c|#c2410c/i', $app, $h), 'A8: sem as cores do Tailwind reprovadas no contraste', $h[0] ?? null);
-preg_match('/--brand-copper-600:\s*(#[0-9A-Fa-f]{6})/', $app, $c);
-ok(isset($c[1]) && strtoupper($c[1]) === '#B94F1F' && ratio('#FFFFFF', $c[1]) >= 4.5, 'A8: botão do /app no cobre do DS com 4,5:1', $c[1] ?? null);
+// Com o Botanical, o botão do /app é verde (--botanical-green-600) e o cobre (--brand-copper-600) fica para texto e link.
+preg_match('/--botanical-green-600:\s*(#[0-9A-Fa-f]{6})/', $app, $c);
+ok(isset($c[1]) && ratio('#FFFFFF', $c[1]) >= 4.5, 'A8: botão do /app no verde do DS com 4,5:1', $c[1] ?? null);
+preg_match('/--botanical-copper-600:\s*(#[0-9A-Fa-f]{6})/', $app, $cb);
+ok(isset($cb[1]) && ratio('#FFFFFF', $cb[1]) >= 4.5, 'A8: links em cobre do /app com 4,5:1 sobre branco', $cb[1] ?? null);
 preg_match('/--brand-muted:\s*(#[0-9A-Fa-f]{6})/', $app, $mu);
 ok(isset($mu[1]) && ratio($mu[1], '#FFFFFF') >= 4.5, 'A8: texto auxiliar do /app com 4,5:1', $mu[1] ?? null);
 ok(str_contains($app, '<img src="/assets/clyonutri-icon.png" alt=""'), 'A8: logo decorativo com alt vazio');
