@@ -131,7 +131,8 @@ const axe = async (p, sel) => { await p.addScriptTag({ path: axePath }).catch(()
     const vimg = await p.evaluate(async () => (await window.axe.run(document, { runOnly: ['image-redundant-alt'] })).violations.length);
     ck('A8: logo sem alt redundante ao lado do nome', vimg === 0, vimg);
     const submitBg = await p.locator('#tab-first .btn-submit').evaluate((e) => getComputedStyle(e).backgroundColor);
-    ck('A8: botão principal no cobre do DS (#B94F1F)', submitBg === 'rgb(185, 79, 31)', submitBg);
+    // Integração com a NI2-25: o botão de ação do /app agora é o Clyo Green do Clinical Botanical (#39734A).
+    ck('A8: botão principal no verde do DS Clinical Botanical (#39734A)', submitBg === 'rgb(57, 115, 74)', submitBg);
     await p.getByRole('tab', { name: 'Primeiro acesso' }).focus();
     await p.keyboard.press('ArrowRight');
     const st = await p.evaluate(() => ({ sel: document.getElementById('tab-btn-login').getAttribute('aria-selected'), focus: document.activeElement.id,
