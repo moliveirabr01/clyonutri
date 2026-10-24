@@ -10,8 +10,8 @@ use PDO;
 
 class EngagementService
 {
-    public const HYDRATION_MIN_ML = 1;
-    public const HYDRATION_MAX_ML = 5000;
+    public const HYDRATION_MIN_ML = HydrationService::MIN_ML;
+    public const HYDRATION_MAX_ML = HydrationService::MAX_ML;
 
     private PDO $db;
 
@@ -20,32 +20,14 @@ class EngagementService
         $this->db = $db ?? Connection::getInstance();
     }
 
-    public function logHydration(int $patientId, int $amountMl): array
+    /**
+     * Registra água (NI2-92). Regras em HydrationService: 1–5000 ml por registro, teto diário,
+     * horário no fuso da aplicação, idempotência por chave e auditoria.
+     * $options: idempotency_key, logged_at (ISO 8601), source.
+     */
+    public function logHydration(int $patientId, mixed $amountMl, array $options = []): array
     {
-        $clinicId = TenantContext::getClinicId();
-        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
-        // NI2-89: registro precisa ser um volume plausível (um copo a uma garrafa grande).
-        if ($amountMl < self::HYDRATION_MIN_ML || $amountMl > self::HYDRATION_MAX_ML) {
-            throw new \InvalidArgumentException('Informe um volume de água entre ' . self::HYDRATION_MIN_ML . ' e ' . self::HYDRATION_MAX_ML . ' ml.');
-        }
-
-        // Horário no fuso da aplicação: o total "de hoje" (date(logged_at) = hoje) usa o mesmo fuso.
-        // Com CURRENT_TIMESTAMP (UTC no SQLite), registros feitos depois das 21h contavam para o dia seguinte.
-        $stmt = $this->db->prepare("
-            INSERT INTO hydration_logs (clinic_id, patient_id, amount_ml, logged_at)
-            VALUES (:clinic_id, :patient_id, :amount_ml, :logged_at)
-        ");
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'patient_id' => $patientId,
-            'amount_ml' => $amountMl,
-            'logged_at' => (new \DateTimeImmutable('now', new \DateTimeZone(date_default_timezone_get())))->format('Y-m-d H:i:s'),
-        ]);
-
-        return [
-            'id' => (int)$this->db->lastInsertId(),
-            'amount_ml' => $amountMl,
-        ];
+        return (new HydrationService($this->db))->create($patientId, $amountMl, $options);
     }
 
     /** NI2-96: escala do check-in do app ("quanto do plano você seguiu hoje"). */

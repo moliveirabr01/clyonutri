@@ -12,6 +12,7 @@ import {
   Alert,
   Linking,
   Platform,
+  AppState,
 } from 'react-native';
 import { displayDateTime, displayLocalDateTime, tabLabels } from '../utils/presentation';
 import EvolutionChart from '../components/EvolutionChart';
@@ -19,6 +20,8 @@ import NextAppointmentCard from '../components/NextAppointmentCard';
 import DailyCheckinCard from '../components/DailyCheckinCard';
 import PatientChat from '../components/PatientChat';
 import BrandLogo from '../components/BrandLogo';
+import HydrationHistory from '../components/HydrationHistory';
+import { HydrationQueue, QueuedHydration, memoryStorage, webStorage } from '../services/hydrationQueue';
 import { tokens as t } from '../theme/tokens';
 import {
   ApiService,
@@ -30,6 +33,7 @@ import {
   PatientRecipePrescription,
   PatientRecipeDetails,
   PatientPrivacyData,
+  HydrationResult,
 } from '../services/api';
 
 type ResourceState = { loading: boolean; error: string | null; updatedAt: string | null };
@@ -97,7 +101,6 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       setPrivacyError('Não foi possível registrar o pedido. Verifique sua conexão e tente de novo.');
     } finally { setPrivacyBusy(false); }
   };
-  const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   const [recipes, setRecipes] = useState<PatientRecipePrescription[]>([]);
   const [recipesState, setRecipesState] = useState<ResourceState>(initialResource);
@@ -202,26 +205,91 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
     fetchAllData();
   }, [fetchAllData]);
 
-  // Registro real e persistido de hidratação (NI2-176)
-  const handleAddWater = async (amountMl: number) => {
-    if (!homeData) return;
-    setActionLoading(true);
+  // Hidratação (NI2-92): cada toque entra numa fila com chave própria; a fila reenvia com a MESMA chave
+  // até o servidor confirmar (sem rede, tempo esgotado, 5xx, 429). Nada duplica e nada some em silêncio.
+  const [waterPendingMl, setWaterPendingMl] = useState(0);
+  const [waterError, setWaterError] = useState<string | null>(null);
+  const [waterNotice, setWaterNotice] = useState<string | null>(null);
+  const [waterSending, setWaterSending] = useState(false);
+  const [showWaterHistory, setShowWaterHistory] = useState(false);
+  const [waterHistoryToken, setWaterHistoryToken] = useState(0);
+  const lastWaterTap = useRef(0);
+  const waterQueueRef = useRef<HydrationQueue<HydrationResult> | null>(null);
+  if (!waterQueueRef.current) {
+    const storage = (Platform.OS === 'web' && webStorage(session.patient.id)) || memoryStorage();
+    waterQueueRef.current = new HydrationQueue<HydrationResult>(storage, async (item: QueuedHydration) => {
+      // 1ª tentativa: horário do servidor (relógio do aparelho pode estar adiantado).
+      // Reenvios: horário do toque, para o registro cair no dia/horário em que a paciente bebeu.
+      const opts = { idempotencyKey: item.key, loggedAt: item.attempts > 0 ? item.loggedAt : undefined };
+      try {
+        return await ApiService.logHydration(item.amountMl, opts);
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'HYDRATION_DATE_IN_FUTURE') return ApiService.logHydration(item.amountMl, { idempotencyKey: item.key });
+        throw err;
+      }
+    }, session.patient.id);
+  }
+
+  const applyWaterTotal = useCallback((total: number) => {
+    setHomeData(prev => prev ? { ...prev, water_ml_today: total } : prev);
+  }, []);
+
+  const flushWater = useCallback(async () => {
+    const queue = waterQueueRef.current;
+    if (!queue || queue.items().length === 0) { setWaterPendingMl(0); return; }
+    setWaterSending(true);
     try {
-      const res = await ApiService.logHydration(amountMl);
-      setHomeData(prev => prev ? {
-        ...prev,
-        water_ml_today: res.total_water_today ?? (prev.water_ml_today + amountMl),
-      } : null);
-      setIsOffline(false);
-    } catch (err: any) {
-      Alert.alert('Erro ao registrar', 'Não foi possível salvar o registro de água no servidor.');
-      setIsOffline(err instanceof ApiError && err.kind === 'offline');
+      const out = await queue.flush();
+      const last = out.sent[out.sent.length - 1];
+      if (last) applyWaterTotal(last.result.total_water_today);
+      if (out.rejected.length) {
+        const r = out.rejected[out.rejected.length - 1];
+        const reason = r.error instanceof ApiError ? r.error.message : 'O servidor recusou o registro.';
+        setWaterError(`Não registramos ${r.item.amountMl} ml: ${reason}`);
+      }
+      const pending = out.remaining.reduce((sum, i) => sum + i.amountMl, 0);
+      setWaterPendingMl(pending);
+      if (pending > 0) {
+        const e = out.lastRetryableError;
+        const why = e instanceof ApiError && e.kind === 'auth' ? 'Sua sessão expirou; entre de novo para enviar.'
+          : e instanceof ApiError && e.status === 429 ? 'Muitos registros seguidos; tentaremos de novo em 1 minuto.'
+          : e instanceof ApiError && (e.kind === 'offline' || e.kind === 'timeout') ? 'Sem conexão; enviaremos automaticamente quando a internet voltar.'
+          : 'O servidor não respondeu; tentaremos de novo automaticamente.';
+        setWaterNotice(`${pending} ml aguardando envio. ${why}${queue.persistent ? '' : ' Mantenha o app aberto até enviar.'}`);
+        setIsOffline(e instanceof ApiError && e.kind === 'offline');
+      } else {
+        if (out.sent.length) { setWaterNotice(null); setWaterHistoryToken(n => n + 1); }
+        setIsOffline(false);
+      }
     } finally {
-      setActionLoading(false);
+      setWaterSending(false);
     }
+  }, [applyWaterTotal]);
+
+  const handleAddWater = (amountMl: number) => {
+    // Toque duplo/rápido não vira dois registros: ignora toques a menos de 800 ms do anterior.
+    const now = Date.now();
+    if (now - lastWaterTap.current < 800) return;
+    lastWaterTap.current = now;
+    if (!homeData || !waterQueueRef.current) return;
+    setWaterError(null);
+    waterQueueRef.current.enqueue(amountMl);
+    setWaterPendingMl(waterQueueRef.current.pendingMl());
+    flushWater();
   };
 
-  // NI2-137: o card da consulta recarrega só a home depois de cada ação (estado real do servidor).
+  // Reenvio automático: ao abrir, a cada 30 s enquanto houver pendência, quando a rede volta (web)
+  // e quando o app volta ao primeiro plano (nativo).
+  useEffect(() => {
+    flushWater();
+    const timer = setInterval(() => { if (waterQueueRef.current?.items().length) flushWater(); }, 30000);
+    const onReconnect = () => flushWater();
+    const w: any = typeof window !== 'undefined' ? window : null;
+    w?.addEventListener?.('online', onReconnect);
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') flushWater(); });
+    return () => { clearInterval(timer); w?.removeEventListener?.('online', onReconnect); sub.remove(); };
+  }, [flushWater]);
+
   const reloadHome = useCallback(async () => {
     try {
       setHomeData(await ApiService.getHome());
@@ -395,21 +463,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             {/* NI2-96: check-in do dia (um por dia, corrigível no mesmo dia) */}
             <DailyCheckinCard checkin={homeData?.checkin_today ?? null} />
 
-            {/* Card de Hidratação Diária com persistência no servidor (Critério 3 e PX-20 / NI2-313) */}
-            <View
-              style={styles.card}
-              accessible={true}
-              accessibilityLabel={
-                waterGoal !== null && waterGoal > 0
-                  ? `Meta de hidratação: ${waterMl} ml de ${waterGoal} ml`
-                  : `Hidratação registrada: ${waterMl} ml. Nenhuma meta hídrica prescrita.`
-              }
-            >
-              <Text style={styles.cardTitle}>💧 Hidratação Diária</Text>
+            {/* Card de Hidratação Diária (PX-20 / NI2-313; fila, histórico e correção NI2-92) */}
+            <View style={styles.card} testID="water-card">
+              <Text style={styles.cardTitle} accessibilityRole="header">💧 Hidratação Diária</Text>
               {waterGoal !== null && waterGoal > 0 ? (
                 <>
-                  <Text style={styles.waterValue}>{waterMl} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
-                  <View style={styles.progressBarBackground}>
+                  <Text style={styles.waterValue} accessibilityLabel={`${waterMl} mililitros de ${waterGoal} mililitros da meta de hoje`}>{waterMl.toLocaleString('pt-BR')} ml / {waterGoal.toLocaleString('pt-BR')} ml</Text>
+                  <View style={styles.progressBarBackground} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                     <View
                       style={[
                         styles.progressBarFill,
@@ -420,7 +480,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </>
               ) : (
                 <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.waterValue}>{waterMl} ml</Text>
+                  <Text style={styles.waterValue} accessibilityLabel={`${waterMl} mililitros hoje`}>{waterMl.toLocaleString('pt-BR')} ml</Text>
                   <Text style={styles.metaLabel}>Meta hídrica não definida pelo nutricionista</Text>
                 </View>
               )}
@@ -429,22 +489,36 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 <TouchableOpacity
                   style={styles.navyButton}
                   onPress={() => handleAddWater(250)}
-                  disabled={actionLoading}
                   accessibilityRole="button"
                   accessibilityLabel="Adicionar 250 mililitros de água"
+                  testID="water-add-250"
                 >
                   <Text style={styles.navyButtonText}>+ 250 ml</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.navyButton}
                   onPress={() => handleAddWater(500)}
-                  disabled={actionLoading}
                   accessibilityRole="button"
                   accessibilityLabel="Adicionar 500 mililitros de água"
+                  testID="water-add-500"
                 >
                   <Text style={styles.navyButtonText}>+ 500 ml</Text>
                 </TouchableOpacity>
               </View>
+              {waterSending && <Text style={styles.metaLabel} accessibilityLiveRegion="polite">Enviando…</Text>}
+              {waterPendingMl > 0 && waterNotice && (
+                <View style={{ marginTop: 8 }}>
+                  <Text testID="water-pending" accessibilityLiveRegion="polite" style={{ color: t.copper }}>{waterNotice}</Text>
+                  <TouchableOpacity style={{ minHeight: 44, justifyContent: 'center' }} accessibilityRole="button" onPress={flushWater} disabled={waterSending} accessibilityState={{ disabled: waterSending, busy: waterSending }}>
+                    <Text style={{ color: t.navy, textDecorationLine: 'underline' }}>Enviar agora</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {waterError && <Text testID="water-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: t.error, marginTop: 8 }}>{waterError}</Text>}
+              <TouchableOpacity style={{ minHeight: 44, justifyContent: 'center', marginTop: 4 }} accessibilityRole="button" accessibilityState={{ expanded: showWaterHistory }} onPress={() => setShowWaterHistory(v => !v)} testID="water-history-toggle">
+                <Text style={{ color: t.navy, textDecorationLine: 'underline' }}>{showWaterHistory ? 'Ocultar histórico' : 'Ver histórico e corrigir'}</Text>
+              </TouchableOpacity>
+              {showWaterHistory && <HydrationHistory refreshToken={waterHistoryToken} onChanged={(r) => applyWaterTotal(r.total_water_today)} />}
             </View>
 
             {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}

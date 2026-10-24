@@ -242,6 +242,12 @@ class DashboardController
         $chatProfessionals = $chatLinkSvc->clinicProfessionals();
         $chatActor = ChatLinkController::actor();
         $chatLinkFlash = $_SESSION['chat_link_flash'] ?? null; unset($_SESSION['chat_link_flash']);
+        // NI2-92: hidratação registrada pela paciente no app (somente leitura, escopo da clínica).
+        try {
+            $appHydration = (new \ClyoNutri\Domain\Engagement\HydrationService())->professionalSummary($id, 14);
+        } catch (\Throwable $e) {
+            $appHydration = null;
+        }
 
         ob_start();
         ?>
@@ -341,6 +347,7 @@ class DashboardController
             <li><a href="#secao-avaliacoes">Avaliações</a></li>
             <li><a href="#patient-appointments">Consultas</a></li>
             <li><a href="#patient-checkins">Check-ins</a></li>
+            <li><a href="#app-hidratacao">Hidratação</a></li>
             <li><a href="#patient-finance">Financeiro</a></li>
             <li><a href="#patient-consents">Privacidade</a></li>
           </ul>
@@ -601,6 +608,7 @@ class DashboardController
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
         <?php $pid = (int)$p['id']; require __DIR__ . '/../../../views/patients/app-evolution.php'; ?>
         <?php if ($chatLinkSvc->available()) require __DIR__ . '/../../../views/patients/chat-link.php'; ?>
+        <?php require __DIR__ . '/../../../views/patients/app-hydration.php'; ?>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">

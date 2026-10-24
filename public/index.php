@@ -43,7 +43,7 @@ if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/v1/')) {
         header('Vary: Origin');
     }
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, X-ClyoNutri-Web');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, X-ClyoNutri-Web, Idempotency-Key');
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
         header('Access-Control-Max-Age: 600');
         header_remove('Content-Type');
@@ -895,11 +895,8 @@ $router->get('/api/v1/patient/home', function() use ($authenticatePatientApi, $d
     $nextApp = $apiCtrl->portal()->getNextAppointment($patientId);
     $waterGoal = $apiCtrl->portal()->getPrescribedWaterGoal($patientId);
 
-    // Hidratação de hoje (ANSI SQL portável)
-    $todayDate = date('Y-m-d');
-    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = :today");
-    $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
-    $waterToday = (int)$hStmt->fetchColumn();
+    // Hidratação de hoje: dia local (APP_TIMEZONE), sem registros excluídos (NI2-92).
+    $waterToday = $apiCtrl->getHydrationTodayTotal($patientId);
 
     $checkinToday = (new \ClyoNutri\Domain\Engagement\EngagementService($db))->todayCheckin($patientId);
     // NI2-96: métrica agregada "plano visto" (sem conteúdo do plano, sem id da paciente no agregado).
@@ -917,36 +914,102 @@ $router->get('/api/v1/patient/home', function() use ($authenticatePatientApi, $d
     ]);
 });
 
-// Registrar Hidratação
-$router->post('/api/v1/patient/hydration', function() use ($authenticatePatientApi, $db, $getJsonInput) {
+// Hidratação da paciente (NI2-92): registrar, histórico, corrigir e excluir.
+// Regras em src/Domain/Engagement/HydrationService.php e docs/api/openapi_v1.json.
+$hydrationRespondError = static function (\Throwable $e): void {
+    if ($e instanceof \ClyoNutri\Domain\Engagement\HydrationException) {
+        http_response_code($e->httpStatus);
+        echo json_encode(['error' => $e->getMessage(), 'code' => $e->errorCode], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    if ($e instanceof \ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationRateLimitException) {
+        http_response_code(429);
+        header('Retry-After: 60');
+        echo json_encode(['error' => 'Muitos registros em pouco tempo. Aguarde um minuto e tente de novo.', 'code' => 'RATE_LIMITED'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    if ($e instanceof \ClyoNutri\Core\Security\TenantSecurityException) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Registro de água não encontrado.', 'code' => 'HYDRATION_NOT_FOUND'], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+    error_log('[ClyoNutri][hydration] ' . get_class($e) . ' #' . $e->getCode() . ' em ' . basename($e->getFile()) . ':' . $e->getLine());
+    http_response_code(500);
+    echo json_encode(['error' => 'Não foi possível salvar o registro de água. Tente novamente.', 'code' => 'INTERNAL_ERROR'], JSON_UNESCAPED_UNICODE);
+};
+// Limite de escrita por paciente (M1). Ajustável por HYDRATION_RATE_LIMIT_PER_MINUTE.
+$hydrationRateLimit = static function (array $auth) use ($db): void {
+    $max = getenv('HYDRATION_RATE_LIMIT_PER_MINUTE');
+    $max = is_string($max) && ctype_digit($max) && (int)$max > 0 ? (int)$max : 30;
+    (new \ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter($db))
+        ->hit('hydration_write', 'patient:' . (int)$auth['clinic_id'] . ':' . (int)$auth['patient_id'], $max, 60);
+};
+
+$router->post('/api/v1/patient/hydration', function() use ($authenticatePatientApi, $db, $getJsonInput, $hydrationRespondError, $hydrationRateLimit) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
     $auth = $authenticatePatientApi();
-    $patientId = (int)$auth['patient_id'];
     $input = $getJsonInput();
-    $rawAmount = $input['amount_ml'] ?? 250;
-    if (!is_numeric($rawAmount) || (int)$rawAmount != $rawAmount) {
-        http_response_code(422);
-        echo json_encode(['error' => 'Informe o volume de água em ml (número inteiro).', 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
-        return;
-    }
-
-    $apiCtrl = new \ClyoNutri\Application\Api\PatientApiController($db);
+    $input = is_array($input) ? $input : [];
     try {
-        $res = $apiCtrl->logHydration($patientId, (int)$rawAmount);
-    } catch (\InvalidArgumentException $e) {
-        http_response_code(422);
-        echo json_encode(['error' => $e->getMessage(), 'code' => 'VALIDATION_ERROR'], JSON_UNESCAPED_UNICODE);
-        return;
+        $hydrationRateLimit($auth);
+        $headerKey = trim((string)($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? ''));
+        $res = (new \ClyoNutri\Application\Api\PatientApiController($db))->logHydration((int)$auth['patient_id'], $input['amount_ml'] ?? null, [
+            'idempotency_key' => $headerKey !== '' ? $headerKey : ($input['idempotency_key'] ?? null),
+            'logged_at' => $input['logged_at'] ?? null,
+            'source' => 'app',
+        ]);
+        // NI2-96: conta o evento de adesão (sem valores nem id de paciente), só quando o registro é novo.
+        if (empty($res['idempotent_replay'])) {
+            (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::HYDRATION_LOGGED, (int)$auth['clinic_id'], (int)$auth['patient_id']);
+        }
+        echo json_encode($res, JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $hydrationRespondError($e);
     }
+});
 
-    // Retornar novo total acumulado hoje (ANSI SQL portável)
-    $todayDate = date('Y-m-d');
-    $hStmt = $db->prepare("SELECT COALESCE(SUM(amount_ml), 0) FROM hydration_logs WHERE patient_id = :pid AND clinic_id = :cid AND date(logged_at) = :today");
-    $hStmt->execute(['pid' => $patientId, 'cid' => (int)$auth['clinic_id'], 'today' => $todayDate]);
-    $res['total_water_today'] = (int)$hStmt->fetchColumn();
-    (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::HYDRATION_LOGGED, (int)$auth['clinic_id'], $patientId);
+$router->get('/api/v1/patient/hydration/history', function() use ($authenticatePatientApi, $db, $hydrationRespondError) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    try {
+        echo json_encode((new \ClyoNutri\Application\Api\PatientApiController($db))
+            ->getHydrationHistory((int)$auth['patient_id'], $_GET['before'] ?? null, $_GET['days'] ?? null), JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $hydrationRespondError($e);
+    }
+});
 
-    echo json_encode($res);
+$router->post('/api/v1/patient/hydration/{id}/update', function($params = []) use ($authenticatePatientApi, $db, $getJsonInput, $hydrationRespondError, $hydrationRateLimit) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $input = $getJsonInput();
+    $input = is_array($input) ? $input : [];
+    try {
+        $hydrationRateLimit($auth);
+        $id = ctype_digit((string)($params['id'] ?? '')) ? (int)$params['id'] : 0;
+        echo json_encode((new \ClyoNutri\Application\Api\PatientApiController($db))->updateHydration((int)$auth['patient_id'], $id, [
+            'amount_ml' => $input['amount_ml'] ?? null,
+            'logged_at' => $input['logged_at'] ?? null,
+        ]), JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $hydrationRespondError($e);
+    }
+});
+
+$router->post('/api/v1/patient/hydration/{id}/delete', function($params = []) use ($authenticatePatientApi, $db, $hydrationRespondError, $hydrationRateLimit) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    try {
+        $hydrationRateLimit($auth);
+        $id = ctype_digit((string)($params['id'] ?? '')) ? (int)$params['id'] : 0;
+        echo json_encode((new \ClyoNutri\Application\Api\PatientApiController($db))->deleteHydration((int)$auth['patient_id'], $id), JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $hydrationRespondError($e);
+    }
 });
 
 // Check-in diário (NI2-96): quanto do plano seguiu hoje (0–100 em passos de 25), energia e fome opcionais (1–5),

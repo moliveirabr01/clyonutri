@@ -21,7 +21,7 @@ class LgpdService
         'checkins' => [],
         'receivables' => [],
         'food_diary_entries' => ['photo_path', 'idempotency_key'],
-        'hydration_logs' => [],
+        'hydration_logs' => ['idempotency_key'],
         'skinfold_measurements' => [],
         'patient_self_metrics' => [],
         'health_sync_data' => [],

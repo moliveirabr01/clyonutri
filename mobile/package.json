@@ -7,8 +7,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "build:api-test": "tsc src/services/api.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck",
-    "test:auth": "npm run build:api-test && node ../tests/ni2_294_real_http_client_test.cjs"
+    "build:api-test": "tsc src/services/api.ts src/services/hydrationQueue.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck",
+    "test:auth": "npm run build:api-test && node ../tests/ni2_294_real_http_client_test.cjs",
+    "test:hydration": "npm run build:api-test && node ../tests/ni2_92_hydration_queue_test.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
