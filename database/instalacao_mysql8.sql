@@ -598,6 +598,7 @@ CREATE TABLE `clinic_subscriptions` (
   `started_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `current_period_start` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `current_period_end` datetime NOT NULL,
+  `trial_ends_at` datetime DEFAULT NULL,
   `canceled_at` datetime DEFAULT NULL,
   `cancellation_protocol` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `cancellation_reason_category` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -607,6 +608,7 @@ CREATE TABLE `clinic_subscriptions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `clinic_id` (`clinic_id`),
   KEY `plan_id` (`plan_id`),
+  KEY `idx_clinic_sub_trial` (`status`,`trial_ends_at`),
   CONSTRAINT `clinic_subscriptions_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE,
   CONSTRAINT `clinic_subscriptions_ibfk_2` FOREIGN KEY (`plan_id`) REFERENCES `saas_plans` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

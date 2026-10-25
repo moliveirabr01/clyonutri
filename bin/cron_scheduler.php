@@ -62,6 +62,7 @@ class HostGatorCronScheduler
         $this->sendTeleconsultationReminders();
         $this->purgeChatRetention();
         $this->purgeAnalyticsPseudonyms();
+        $this->expireSaaSTrials();
 
         $elapsed = round(microtime(true) - $startTime, 3);
         $this->executionLog['duration_seconds'] = $elapsed;
@@ -192,6 +193,18 @@ class HostGatorCronScheduler
                 }
             }
             $this->executionLog['logs_pruned'] = $deletedCount;
+        }
+    }
+
+    private function expireSaaSTrials(): void
+    {
+        try {
+            $db = Connection::getInstance();
+            $subService = new \ClyoNutri\Domain\Subscription\SubscriptionService($db);
+            $expired = $subService->expireTrials();
+            $this->executionLog['trials_expired'] = $expired;
+        } catch (\Throwable $e) {
+            $this->executionLog['trials_expired'] = 'ERROR: ' . $e->getMessage();
         }
     }
 }

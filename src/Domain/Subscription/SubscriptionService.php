@@ -11,6 +11,9 @@ final class SubscriptionService
 {
     private PDO $db;
 
+    public const DEFAULT_TRIAL_DAYS = 14;
+    public const DEFAULT_TRIAL_PLAN = 'PRO-02';
+
     public const VALID_CANCELLATION_REASONS = [
         'cost' => 'Custo ou orçamento',
         'career_change' => 'Mudança de carreira ou transição profissional',
@@ -61,6 +64,19 @@ final class SubscriptionService
             $sub = $this->initializeDefaultSubscription($clinicId);
         }
 
+        // Informações e cálculo do período de teste (trial)
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
+        $sub['is_trial'] = ($sub['status'] === 'trialing');
+        $sub['days_left_in_trial'] = 0;
+
+        if (!empty($sub['trial_ends_at'])) {
+            $trialEnd = new \DateTimeImmutable($sub['trial_ends_at'], new \DateTimeZone('America/Sao_Paulo'));
+            if ($trialEnd > $now) {
+                $interval = $now->diff($trialEnd);
+                $sub['days_left_in_trial'] = (int)$interval->days + ($interval->h > 0 || $interval->i > 0 ? 1 : 0);
+            }
+        }
+
         // Métricas de uso real (sem dados de saúde)
         $sub['usage'] = $this->getUsageMetrics($clinicId);
         $sub['invoices'] = $this->getInvoices($clinicId, (int)$sub['id']);
@@ -69,10 +85,14 @@ final class SubscriptionService
     }
 
     /**
-     * Inicializa a assinatura padrão (PRO-02) para clínicas pré-existentes ou recém-criadas.
+     * Inicializa a assinatura padrão em período de avaliação de 14 dias (PRO-02).
+     * Não gera fatura fictícia: cobrança só nasce após contratação real via gateway (NI2-450).
      */
-    public function initializeDefaultSubscription(int $clinicId, string $planCode = 'PRO-02'): array
-    {
+    public function initializeDefaultSubscription(
+        int $clinicId,
+        string $planCode = self::DEFAULT_TRIAL_PLAN,
+        int $trialDays = self::DEFAULT_TRIAL_DAYS
+    ): array {
         $stmtPlan = $this->db->prepare("SELECT * FROM saas_plans WHERE code = :code");
         $stmtPlan->execute(['code' => $planCode]);
         $plan = $stmtPlan->fetch(PDO::FETCH_ASSOC);
@@ -83,13 +103,14 @@ final class SubscriptionService
 
         $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
         $currentStart = $now->format('Y-m-d H:i:s');
-        $currentEnd = $now->modify('+30 days')->format('Y-m-d H:i:s');
+        $trialEndsAt = $now->modify("+{$trialDays} days")->format('Y-m-d H:i:s');
+        $currentEnd = $trialEndsAt;
 
         $stmtInsert = $this->db->prepare("
             INSERT INTO clinic_subscriptions 
-                (clinic_id, plan_id, status, billing_cycle, price_cents, started_at, current_period_start, current_period_end)
+                (clinic_id, plan_id, status, billing_cycle, price_cents, started_at, current_period_start, current_period_end, trial_ends_at)
             VALUES 
-                (:clinic_id, :plan_id, 'active', :billing_cycle, :price_cents, :started_at, :period_start, :period_end)
+                (:clinic_id, :plan_id, 'trialing', :billing_cycle, :price_cents, :started_at, :period_start, :period_end, :trial_ends_at)
         ");
         $stmtInsert->execute([
             'clinic_id' => $clinicId,
@@ -99,26 +120,12 @@ final class SubscriptionService
             'started_at' => $currentStart,
             'period_start' => $currentStart,
             'period_end' => $currentEnd,
+            'trial_ends_at' => $trialEndsAt,
         ]);
 
         $subId = (int)$this->db->lastInsertId();
 
-        // Gerar primeira fatura inicial paga
-        $invoiceNumber = 'FAT-' . $now->format('Ym') . '-' . str_pad((string)$clinicId, 4, '0', STR_PAD_LEFT);
-        $stmtInv = $this->db->prepare("
-            INSERT INTO subscription_invoices 
-                (clinic_id, subscription_id, invoice_number, amount_cents, status, due_date, paid_at, payment_method)
-            VALUES 
-                (:clinic_id, :sub_id, :inv_num, :amount, 'paid', :due, :paid, 'credit_card')
-        ");
-        $stmtInv->execute([
-            'clinic_id' => $clinicId,
-            'sub_id' => $subId,
-            'inv_num' => $invoiceNumber,
-            'amount' => $plan['price_cents'],
-            'due' => $now->format('Y-m-d'),
-            'paid' => $currentStart,
-        ]);
+        // Nenhuma fatura paga fictícia é gerada. Faturas só nascem com webhook de pagamento real.
 
         return [
             'id' => $subId,
@@ -126,7 +133,10 @@ final class SubscriptionService
             'plan_id' => $plan['id'],
             'plan_code' => $plan['code'],
             'plan_name' => $plan['name'],
-            'status' => 'active',
+            'status' => 'trialing',
+            'is_trial' => true,
+            'days_left_in_trial' => $trialDays,
+            'trial_ends_at' => $trialEndsAt,
             'billing_cycle' => $plan['billing_cycle'],
             'price_cents' => (int)$plan['price_cents'],
             'catalog_price_cents' => (int)$plan['price_cents'],
@@ -141,6 +151,126 @@ final class SubscriptionService
             'cancellation_protocol' => null,
             'cancellation_reason_category' => null,
             'cancellation_feedback' => null,
+        ];
+    }
+
+    /**
+     * Verifica se a clínica pode criar novos dados clínicos (pacientes, planos, consultas).
+     * Durante o trial ativo ou plano ativo: permitido.
+     * Trial expirado ou cancelado: bloqueia novas mutações mas mantém leitura e exportação.
+     */
+    public function canMutateClinicalData(int $clinicId): bool
+    {
+        $stmt = $this->db->prepare("SELECT status, trial_ends_at FROM clinic_subscriptions WHERE clinic_id = :clinic_id");
+        $stmt->execute(['clinic_id' => $clinicId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return true;
+        }
+
+        if ($row['status'] === 'active') {
+            return true;
+        }
+
+        if ($row['status'] === 'trialing') {
+            if (empty($row['trial_ends_at'])) {
+                return true;
+            }
+            $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
+            $trialEnd = new \DateTimeImmutable($row['trial_ends_at'], new \DateTimeZone('America/Sao_Paulo'));
+            return $trialEnd >= $now;
+        }
+
+        return false;
+    }
+
+    /**
+     * Rotina executada periodicamente (cron_scheduler) para expirar períodos de avaliação vencidos.
+     * Retorna a quantidade de assinaturas atualizadas de 'trialing' para 'expired'.
+     */
+    public function expireTrials(): int
+    {
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
+        $stmt = $this->db->prepare("
+            UPDATE clinic_subscriptions 
+            SET status = 'expired', updated_at = :now
+            WHERE status = 'trialing' 
+              AND trial_ends_at IS NOT NULL 
+              AND trial_ends_at < :now
+        ");
+        $stmt->execute(['now' => $now]);
+
+        return $stmt->rowCount();
+    }
+
+    /**
+     * Saneamento contábil e de segurança para bancos existentes (NI2-450):
+     * 1. Marca faturas fictícias antigas geradas automaticamente como 'void'.
+     * 2. Ajusta assinaturas sem pagamento real para 'trialing' ou 'expired'.
+     */
+    public function sanitizeLegacySubscriptions(): array
+    {
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
+
+        // 1. Anula faturas fictícias geradas pelo código legado (sem gateway)
+        $stmtVoid = $this->db->prepare("
+            UPDATE subscription_invoices
+            SET status = 'void'
+            WHERE status = 'paid'
+        ");
+        $stmtVoid->execute();
+        $voidedInvoices = $stmtVoid->rowCount();
+
+        // 2. Identificar assinaturas legadas ativas sem pagamento real
+        $stmtSubs = $this->db->query("
+            SELECT cs.id, cs.started_at, cs.status 
+            FROM clinic_subscriptions cs
+            WHERE cs.status = 'active'
+        ");
+        $subsToSanitize = $stmtSubs->fetchAll(PDO::FETCH_ASSOC);
+
+        $trialingCount = 0;
+        $expiredCount = 0;
+
+        $stmtUpdateSub = $this->db->prepare("
+            UPDATE clinic_subscriptions 
+            SET status = :status,
+                trial_ends_at = :trial_ends_at,
+                current_period_end = :current_period_end,
+                updated_at = :updated_at
+            WHERE id = :id
+        ");
+
+        $nowDt = new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
+        foreach ($subsToSanitize as $sub) {
+            $startedDt = new \DateTimeImmutable($sub['started_at'], new \DateTimeZone('America/Sao_Paulo'));
+            $trialEndDt = $startedDt->modify('+14 days');
+
+            if ($trialEndDt > $nowDt) {
+                // Ainda dentro dos 14 dias
+                $status = 'trialing';
+                $trialingCount++;
+            } else {
+                // Já passou de 14 dias
+                $status = 'expired';
+                $expiredCount++;
+            }
+
+            $stmtUpdateSub->execute([
+                'status' => $status,
+                'trial_ends_at' => $trialEndDt->format('Y-m-d H:i:s'),
+                'current_period_end' => $trialEndDt->format('Y-m-d H:i:s'),
+                'updated_at' => $now,
+                'id' => $sub['id'],
+            ]);
+        }
+
+        return [
+            'voided_invoices' => $voidedInvoices,
+            'trialing_subscriptions' => $trialingCount,
+            'expired_subscriptions' => $expiredCount,
+            'total_sanitized' => count($subsToSanitize),
         ];
     }
 

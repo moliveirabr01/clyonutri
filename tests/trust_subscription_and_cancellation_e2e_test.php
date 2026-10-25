@@ -90,9 +90,12 @@ final class TrustSubscriptionAndCancellationE2ETest
 
         $sub = $this->service->getClinicSubscription($clinicId);
 
-        $this->assertEquals('active', $sub['status'], "Assinatura inicializada como ativa.");
+        $this->assertEquals('trialing', $sub['status'], "Assinatura inicializada em período de avaliação ('trialing').");
+        $this->assertTrue($sub['is_trial'], "Flag is_trial é true.");
+        $this->assertEquals(14, (int)$sub['days_left_in_trial'], "14 dias restantes de avaliação.");
+        $this->assertTrue(!empty($sub['trial_ends_at']), "trial_ends_at devidamente preenchido.");
         $this->assertEquals('PRO-02', $sub['plan_code'], "Plano vinculado é PRO-02.");
-        $this->assertEquals(18900, (int)$sub['price_cents'], "Preço contratado de R$ 189,00 registrado com precisão.");
+        $this->assertEquals(18900, (int)$sub['price_cents'], "Preço do plano de R$ 189,00 registrado com precisão.");
         $this->assertEquals('monthly', $sub['billing_cycle'], "Ciclo mensal de faturamento registrado.");
         
         // Vigência calculada
@@ -105,10 +108,8 @@ final class TrustSubscriptionAndCancellationE2ETest
         $this->assertTrue(isset($sub['usage']['active_professionals']), "Métrica de profissionais ativos retornada.");
         $this->assertEquals(1, (int)$sub['usage']['active_professionals'], "1 profissional ativo contabilizado.");
 
-        // Fatura gerada
-        $this->assertTrue(count($sub['invoices']) >= 1, "Pelo menos 1 fatura gerada.");
-        $this->assertEquals('paid', $sub['invoices'][0]['status'], "Fatura inicial gerada com status 'paid'.");
-        $this->assertEquals(18900, (int)$sub['invoices'][0]['amount_cents'], "Valor da fatura bate com o plano (18900 centavos).");
+        // Zero faturas fictícias geradas (NI2-450)
+        $this->assertEquals(0, count($sub['invoices']), "Zero faturas fictícias geradas durante o período de avaliação.");
     }
 
     private function testRbacOwnerAuthorization(): void

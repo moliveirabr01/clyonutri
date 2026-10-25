@@ -31,22 +31,61 @@
     </div>
   <?php endif; ?>
 
+  <?php if ($subscription['status'] === 'trialing'): ?>
+    <!-- Banner do Período de Avaliação (NI2-450) -->
+    <div role="status" style="background: #FFFBEB; border-left: 4px solid var(--brand-copper-500); padding: 16px 20px; border-radius: 6px; margin-bottom: var(--space-6); color: #92400E;">
+      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Período de Avaliação Gratuita (14 dias)
+        </span>
+        <span style="background: #FDE68A; color: #78350F; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;">
+          <?= (int)$subscription['days_left_in_trial'] ?> dia(s) restante(s)
+        </span>
+      </div>
+      <p style="margin: 0; font-size: 0.92rem; line-height: 1.55; color: #78350F;">
+        Você está usufruindo do teste gratuito com todos os recursos do plano <strong><?= htmlspecialchars($subscription['plan_name']) ?></strong> liberados até <strong><?= !empty($subscription['trial_ends_at']) ? (new \DateTimeImmutable($subscription['trial_ends_at']))->format('d/m/Y') : '' ?></strong>, sem necessidade de cartão de crédito. Nenhuma cobrança é realizada. Ao término dos 14 dias, para continuar criando novos planos e registrando consultas, você poderá escolher o plano de sua preferência. Todos os seus dados cadastrados continuam seguros e disponíveis para exportação.
+      </p>
+    </div>
+  <?php elseif ($subscription['status'] === 'expired'): ?>
+    <!-- Banner de Período de Teste Expirado -->
+    <div role="alert" style="background: #FEF2F2; border-left: 4px solid var(--semantic-error); padding: 16px 20px; border-radius: 6px; margin-bottom: var(--space-6); color: #991B1B;">
+      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px;">
+        Seu período de teste de 14 dias terminou
+      </div>
+      <p style="margin: 0; font-size: 0.92rem; line-height: 1.55; color: #7F1D1D;">
+        Seus dados, pacientes e prontuários estão salvos e preservados. Para voltar a prescrever novos planos, registrar evoluções e agendar consultas, selecione seu plano comercial de preferência na página de planos.
+      </p>
+      <div style="margin-top: 10px;">
+        <a href="/planos" class="btn btn-primary" style="text-decoration: none; display: inline-block; padding: 8px 16px; font-size: 0.875rem;">Conhecer e Assinar Planos</a>
+      </div>
+    </div>
+  <?php endif; ?>
+
   <!-- Visão Geral do Contrato Vigente -->
-  <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid <?= $subscription['status'] === 'canceled' ? '#E11D48' : 'var(--brand-botanical-500)' ?>;">
+  <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid <?= $subscription['status'] === 'canceled' ? '#E11D48' : ($subscription['status'] === 'trialing' ? 'var(--brand-copper-500)' : 'var(--brand-botanical-500)') ?>;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: var(--space-4);">
       <div>
-        <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--neutral-gray-500);">Plano Contratado</span>
+        <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--neutral-gray-500);">Plano <?= $subscription['status'] === 'trialing' ? 'em Degustação' : 'Contratado' ?></span>
         <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--brand-navy-900); margin: 4px 0;">
           <?= htmlspecialchars($subscription['plan_name']) ?> (<code><?= htmlspecialchars($subscription['plan_code']) ?></code>)
         </h2>
         <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.9rem;">
-          Cobrança <?= $subscription['billing_cycle'] === 'monthly' ? 'mensal recorrente' : 'anual' ?> sem fidelidade.
+          <?= $subscription['status'] === 'trialing' ? 'Avaliação gratuita de 14 dias sem cartão de crédito cadastrado.' : 'Cobrança ' . ($subscription['billing_cycle'] === 'monthly' ? 'mensal recorrente' : 'anual') . ' sem fidelidade.' ?>
         </p>
       </div>
       <div>
         <?php if ($subscription['status'] === 'canceled'): ?>
           <span style="display: inline-flex; align-items: center; gap: 6px; background: #FFE4E6; color: #9F1239; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
             ● Assinatura Cancelada
+          </span>
+        <?php elseif ($subscription['status'] === 'trialing'): ?>
+          <span style="display: inline-flex; align-items: center; gap: 6px; background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+            ● Período de Avaliação (Trial)
+          </span>
+        <?php elseif ($subscription['status'] === 'expired'): ?>
+          <span style="display: inline-flex; align-items: center; gap: 6px; background: #FEE2E2; color: #991B1B; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+            ● Teste Expirado
           </span>
         <?php else: ?>
           <span style="display: inline-flex; align-items: center; gap: 6px; background: #E3F4F2; color: #0A5F63; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
@@ -59,14 +98,23 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; background: var(--neutral-gray-50); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--neutral-gray-200);">
       <div>
         <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">VALOR DA RECORRÊNCIA</div>
-        <div style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 2px;">
-          R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?> <span style="font-size: 0.85rem; font-weight: 400; color: var(--neutral-gray-500);">/ mês</span>
-        </div>
+        <?php if ($subscription['status'] === 'trialing'): ?>
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 2px;">
+            R$ 0,00 <span style="font-size: 0.85rem; font-weight: 400; color: var(--neutral-gray-500);">(Período de Teste)</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 2px;">
+            R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?>/mês caso decida assinar
+          </div>
+        <?php else: ?>
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 2px;">
+            R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?> <span style="font-size: 0.85rem; font-weight: 400; color: var(--neutral-gray-500);">/ mês</span>
+          </div>
+        <?php endif; ?>
       </div>
       <div>
         <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">VIGÊNCIA DO CICLO ATUAL</div>
         <div style="font-size: 1.1rem; font-weight: 600; color: var(--brand-navy-900); margin-top: 4px;">
-          Até <?= (new \DateTimeImmutable($subscription['current_period_end']))->format('d/m/Y') ?>
+          <?= $subscription['status'] === 'trialing' ? 'Teste até ' : 'Até ' ?><?= (new \DateTimeImmutable($subscription['trial_ends_at'] ?? $subscription['current_period_end']))->format('d/m/Y') ?>
         </div>
       </div>
       <div>
@@ -158,7 +206,9 @@
     </div>
 
     <?php if (empty($subscription['invoices'])): ?>
-      <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhuma fatura emitida até o momento.</p>
+      <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin: 0;">
+        <?= $subscription['status'] === 'trialing' ? 'Nenhuma fatura emitida. O período de avaliação de 14 dias não gera cobranças nem faturas fictícias.' : 'Nenhuma fatura emitida até o momento.' ?>
+      </p>
     <?php else: ?>
       <div style="overflow-x: auto;">
         <table class="table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
@@ -183,6 +233,8 @@
                 <td style="padding: 12px 8px;">
                   <?php if ($inv['status'] === 'paid'): ?>
                     <span style="background: #E3F4F2; color: #0A5F63; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Paga</span>
+                  <?php elseif ($inv['status'] === 'void'): ?>
+                    <span style="background: #F1F5F9; color: #64748B; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Anulada</span>
                   <?php else: ?>
                     <span style="background: #FEF3C7; color: #92400E; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;"><?= htmlspecialchars(ucfirst($inv['status'])) ?></span>
                   <?php endif; ?>
