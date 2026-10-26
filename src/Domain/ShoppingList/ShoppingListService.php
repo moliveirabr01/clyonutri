@@ -7,6 +7,7 @@ namespace ClyoNutri\Domain\ShoppingList;
 use ClyoNutri\Core\Audit\AuditLogger;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Domain\Clinical\AllergenSafetyValidator;
 use InvalidArgumentException;
@@ -324,8 +325,8 @@ class ShoppingListService
         $anamnesisStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
         $anamnesis = $anamnesisStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $patientAllergiesRaw = trim((string)($anamnesis['allergies'] ?? ''));
-        $patientRestrictionsRaw = trim((string)($anamnesis['restrictions'] ?? ''));
+        $patientAllergiesRaw = trim((string)(ClinicalEncryptionService::decrypt($anamnesis['allergies'] ?? '') ?? ''));
+        $patientRestrictionsRaw = trim((string)(ClinicalEncryptionService::decrypt($anamnesis['restrictions'] ?? '') ?? ''));
 
         // Validação de segurança com o validador fail-closed
         $allergenSafety = $this->allergenValidator->validateFoodsForPatient($patientId, array_keys($allFoodsToEvaluate));

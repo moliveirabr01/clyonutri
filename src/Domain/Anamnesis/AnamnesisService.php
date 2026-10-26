@@ -6,6 +6,7 @@ namespace ClyoNutri\Domain\Anamnesis;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use InvalidArgumentException;
 use PDO;
@@ -126,18 +127,18 @@ class AnamnesisService
             ");
             $stmt->execute([
                 'professional_id' => $professionalId,
-                'objectives' => $cleanData['objectives'],
-                'routine' => $cleanData['routine'],
-                'food_preferences' => $cleanData['food_preferences'],
-                'restrictions' => $cleanData['restrictions'],
-                'allergies' => $cleanData['allergies'],
+                'objectives' => ClinicalEncryptionService::encrypt($cleanData['objectives']),
+                'routine' => ClinicalEncryptionService::encrypt($cleanData['routine']),
+                'food_preferences' => ClinicalEncryptionService::encrypt($cleanData['food_preferences']),
+                'restrictions' => ClinicalEncryptionService::encrypt($cleanData['restrictions']),
+                'allergies' => ClinicalEncryptionService::encrypt($cleanData['allergies']),
                 'allergy_assessment' => $assessment,
-                'symptoms' => $cleanData['symptoms'],
-                'habits' => $cleanData['habits'],
-                'clinical_history' => $cleanData['clinical_history'],
+                'symptoms' => ClinicalEncryptionService::encrypt($cleanData['symptoms']),
+                'habits' => ClinicalEncryptionService::encrypt($cleanData['habits']),
+                'clinical_history' => ClinicalEncryptionService::encrypt($cleanData['clinical_history']),
                 'water_intake_ml' => $cleanData['water_intake_ml'],
                 'is_draft' => $isDraft ? 1 : 0,
-                'notes' => $cleanData['notes'],
+                'notes' => ClinicalEncryptionService::encrypt($cleanData['notes']),
                 'created_at' => $createdAt,
                 'id' => $id,
                 'clinic_id' => $clinicId,
@@ -168,18 +169,18 @@ class AnamnesisService
                 'patient_id' => $patientId,
                 'professional_id' => $professionalId,
                 'version' => $nextVersion,
-                'objectives' => $cleanData['objectives'],
-                'routine' => $cleanData['routine'],
-                'food_preferences' => $cleanData['food_preferences'],
-                'restrictions' => $cleanData['restrictions'],
-                'allergies' => $cleanData['allergies'],
+                'objectives' => ClinicalEncryptionService::encrypt($cleanData['objectives']),
+                'routine' => ClinicalEncryptionService::encrypt($cleanData['routine']),
+                'food_preferences' => ClinicalEncryptionService::encrypt($cleanData['food_preferences']),
+                'restrictions' => ClinicalEncryptionService::encrypt($cleanData['restrictions']),
+                'allergies' => ClinicalEncryptionService::encrypt($cleanData['allergies']),
                 'allergy_assessment' => $assessment,
-                'symptoms' => $cleanData['symptoms'],
-                'habits' => $cleanData['habits'],
-                'clinical_history' => $cleanData['clinical_history'],
+                'symptoms' => ClinicalEncryptionService::encrypt($cleanData['symptoms']),
+                'habits' => ClinicalEncryptionService::encrypt($cleanData['habits']),
+                'clinical_history' => ClinicalEncryptionService::encrypt($cleanData['clinical_history']),
                 'water_intake_ml' => $cleanData['water_intake_ml'],
                 'is_draft' => $isDraft ? 1 : 0,
-                'notes' => $cleanData['notes'],
+                'notes' => ClinicalEncryptionService::encrypt($cleanData['notes']),
                 'created_at' => $createdAt,
             ]);
             $id = (int)$this->db->lastInsertId();
@@ -234,7 +235,7 @@ class AnamnesisService
         $stmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
         $row = $stmt->fetch();
 
-        return $row ?: null;
+        return $row ? ClinicalEncryptionService::decryptAnamnesisRow($row) : null;
     }
 
     /**
@@ -254,7 +255,7 @@ class AnamnesisService
             ORDER BY a.version DESC
         ");
         $stmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
-        return $stmt->fetchAll();
+        return ClinicalEncryptionService::decryptAnamnesisRows($stmt->fetchAll());
     }
 
     /**
@@ -279,7 +280,7 @@ class AnamnesisService
         ]);
         $row = $stmt->fetch();
 
-        return $row ?: null;
+        return $row ? ClinicalEncryptionService::decryptAnamnesisRow($row) : null;
     }
 
     /**

@@ -71,32 +71,41 @@ if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
 
 // Carregar TenantContext a partir da sessão se o usuário estiver autenticado e vínculo ativo (PX-23 / NI2-316)
 if (!empty($_SESSION['clinic_id']) && !empty($_SESSION['user_id'])) {
-    try {
-        $validMember = $db->prepare("
-            SELECT u.auth_version, u.role AS user_role, cm.role AS member_role, cm.status AS member_status, c.status AS clinic_status
-            FROM users u
-            JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
-            JOIN clinics c ON c.id = cm.clinic_id
-            WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
-            LIMIT 1
-        ");
-        $validMember->execute([
-            'clinic_id' => (int)$_SESSION['clinic_id'],
-            'user_id' => (int)$_SESSION['user_id'],
-        ]);
-        $mRow = $validMember->fetch();
-        if ($mRow && (int)$mRow['auth_version'] === (int)($_SESSION['auth_version'] ?? 0)) {
-            TenantContext::set((int)$_SESSION['clinic_id'], [
-                'id' => (int)$_SESSION['user_id'],
-                'name' => $_SESSION['user_name'] ?? 'Nutricionista',
+    // NI2-479 (Onda 2): Timeout de inatividade de sessão web (30 minutos = 1800 segundos)
+    $now = time();
+    $idleTimeout = 1800;
+    if (isset($_SESSION['last_activity']) && ($now - (int)$_SESSION['last_activity'] > $idleTimeout)) {
+        $_SESSION = [];
+        TenantContext::clear();
+    } else {
+        $_SESSION['last_activity'] = $now;
+        try {
+            $validMember = $db->prepare("
+                SELECT u.auth_version, u.role AS user_role, cm.role AS member_role, cm.status AS member_status, c.status AS clinic_status
+                FROM users u
+                JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
+                JOIN clinics c ON c.id = cm.clinic_id
+                WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
+                LIMIT 1
+            ");
+            $validMember->execute([
+                'clinic_id' => (int)$_SESSION['clinic_id'],
+                'user_id' => (int)$_SESSION['user_id'],
             ]);
-        } else {
+            $mRow = $validMember->fetch();
+            if ($mRow && (int)$mRow['auth_version'] === (int)($_SESSION['auth_version'] ?? 0)) {
+                TenantContext::set((int)$_SESSION['clinic_id'], [
+                    'id' => (int)$_SESSION['user_id'],
+                    'name' => $_SESSION['user_name'] ?? 'Nutricionista',
+                ]);
+            } else {
+                $_SESSION = [];
+                TenantContext::clear();
+            }
+        } catch (\Throwable) {
             $_SESSION = [];
             TenantContext::clear();
         }
-    } catch (\Throwable) {
-        $_SESSION = [];
-        TenantContext::clear();
     }
 }
 

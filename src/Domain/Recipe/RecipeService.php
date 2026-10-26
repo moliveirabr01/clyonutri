@@ -6,6 +6,7 @@ namespace ClyoNutri\Domain\Recipe;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Core\Security\TenantSecurityException;
 use ClyoNutri\Domain\Nutrition\NutritionCalculator;
@@ -1315,7 +1316,9 @@ class RecipeService
         $row = $an->fetch(PDO::FETCH_ASSOC);
         $allergies = [];
         if ($row) {
-            $raw = trim((string)($row['allergies'] ?? '') . ' ' . (string)($row['restrictions'] ?? ''));
+            $al = ClinicalEncryptionService::decrypt($row['allergies'] ?? '');
+            $re = ClinicalEncryptionService::decrypt($row['restrictions'] ?? '');
+            $raw = trim((string)$al . ' ' . (string)$re);
             if ($raw !== '') {
                 $allergies = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $raw))));
             }
@@ -1336,7 +1339,9 @@ class RecipeService
             return [];
         }
 
-        $rawText = ($row['allergies'] ?? '') . ' ' . ($row['restrictions'] ?? '');
+        $al = ClinicalEncryptionService::decrypt($row['allergies'] ?? '');
+        $re = ClinicalEncryptionService::decrypt($row['restrictions'] ?? '');
+        $rawText = ((string)$al) . ' ' . ((string)$re);
         $normPatient = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $rawText) ?: mb_strtolower($rawText, 'UTF-8');
         $conflicts = [];
 

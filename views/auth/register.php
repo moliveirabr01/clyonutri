@@ -94,6 +94,12 @@
       <form method="POST" action="/cadastro">
         <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
+        <!-- Campo honeypot anti-bot: deve permanecer vazio (NI2-479 / SEC-01) -->
+        <div style="position: absolute !important; left: -9999px !important; opacity: 0 !important; height: 0 !important; width: 0 !important; pointer-events: none !important;" aria-hidden="true">
+          <label for="website_url">Não preencha este campo</label>
+          <input type="text" id="website_url" name="website_url" tabindex="-1" autocomplete="off" value="">
+        </div>
+
         <div class="form-group">
           <label class="form-label" for="name">Nome completo do nutricionista *</label>
           <input type="text" id="name" name="name" class="form-control" placeholder="Dra. Juliana Mendes" required autofocus value="<?= htmlspecialchars($old['name'] ?? '') ?>">

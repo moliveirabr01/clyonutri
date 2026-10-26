@@ -6,6 +6,7 @@ $isDraft = ($list['status'] === 'draft');
 $days = (int)$list['days'];
 $allergensInfo = $list['allergens_and_restrictions'] ?? [];
 $recipes = $list['linked_recipes'] ?? [];
+$nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 ?><!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -309,10 +310,10 @@ $recipes = $list['linked_recipes'] ?? [];
           <a href="?dias=14" class="sl-days-btn <?= $days === 14 ? 'active' : '' ?>">14 dias</a>
           <a href="?dias=30" class="sl-days-btn <?= $days === 30 ? 'active' : '' ?>">30 dias</a>
         </div>
-        <button type="button" onclick="window.print()" class="sl-btn sl-btn-primary">
+        <button type="button" id="btn-print" class="sl-btn sl-btn-primary">
           🖨️ Imprimir
         </button>
-        <button type="button" onclick="copyShoppingList()" class="sl-btn sl-btn-outline" id="btn-copy">
+        <button type="button" class="sl-btn sl-btn-outline" id="btn-copy">
           📋 Copiar Texto
         </button>
       </div>
@@ -355,7 +356,7 @@ $recipes = $list['linked_recipes'] ?? [];
               <?php foreach ($items as $item): ?>
                 <div class="sl-item" data-key="<?= $e($item['key']) ?>">
                   <div class="sl-item-left">
-                    <input type="checkbox" class="sl-checkbox no-print" onchange="toggleItem(this)">
+                    <input type="checkbox" class="sl-checkbox no-print">
                     <div>
                       <div class="sl-item-name"><?= $e($item['name']) ?></div>
                       <div class="sl-item-meta">
@@ -395,7 +396,7 @@ $recipes = $list['linked_recipes'] ?? [];
     <!-- Adicionar Item Manual no Navegador -->
     <div class="sl-manual-form no-print">
       <input type="text" id="manual-item-input" class="sl-manual-input" placeholder="+ Adicionar item avulso à lista (ex: Azeite de oliva extra virgem)">
-      <button type="button" class="sl-btn sl-btn-primary" onclick="addManualItem()">
+      <button type="button" class="sl-btn sl-btn-primary" id="btn-add-manual">
         Adicionar
       </button>
     </div>
@@ -430,7 +431,7 @@ $recipes = $list['linked_recipes'] ?? [];
   </div>
 </div>
 
-<script>
+<script nonce="<?= $e($nonce) ?>">
   const STORAGE_KEY = 'clyo_sl_checked_<?= $planId ?>';
 
   // Carregar itens marcados do localStorage
@@ -481,7 +482,7 @@ $recipes = $list['linked_recipes'] ?? [];
       div.dataset.key = 'custom_' + Date.now();
       div.innerHTML = `
         <div class="sl-item-left">
-          <input type="checkbox" class="sl-checkbox no-print" onchange="toggleItem(this)">
+          <input type="checkbox" class="sl-checkbox no-print">
           <div>
             <div class="sl-item-name">${val}</div>
             <div class="sl-item-meta"><span class="sl-tag sl-tag-sub">Adicionado manualmente</span></div>
@@ -520,7 +521,23 @@ $recipes = $list['linked_recipes'] ?? [];
     });
   }
 
-  document.addEventListener('DOMContentLoaded', loadCheckedItems);
+  document.addEventListener('DOMContentLoaded', () => {
+    loadCheckedItems();
+    document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+    document.getElementById('btn-copy')?.addEventListener('click', copyShoppingList);
+    document.getElementById('btn-add-manual')?.addEventListener('click', addManualItem);
+    document.getElementById('manual-item-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addManualItem();
+      }
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.classList && e.target.classList.contains('sl-checkbox')) {
+        toggleItem(e.target);
+      }
+    });
+  });
 </script>
 </body>
 </html>

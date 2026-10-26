@@ -7,6 +7,7 @@ namespace ClyoNutri\Domain\Privacy;
 use ClyoNutri\Core\Audit\AuditLogger;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use PDO;
 
 class LgpdService
@@ -81,7 +82,7 @@ class LgpdService
         // Anamneses
         $aStmt = $this->db->prepare("SELECT * FROM anamneses WHERE patient_id = :id AND clinic_id = :clinic_id");
         $aStmt->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
-        $anamneses = $aStmt->fetchAll();
+        $anamneses = ClinicalEncryptionService::decryptAnamnesisRows($aStmt->fetchAll());
 
         // Antropometrias
         $antStmt = $this->db->prepare("SELECT * FROM anthropometric_assessments WHERE patient_id = :id AND clinic_id = :clinic_id");

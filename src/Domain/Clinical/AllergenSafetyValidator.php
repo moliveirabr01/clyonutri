@@ -6,6 +6,7 @@ namespace ClyoNutri\Domain\Clinical;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use PDO;
 
@@ -82,7 +83,8 @@ class AllergenSafetyValidator
             LIMIT 1
         ");
         $stmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
-        $raw = trim((string)($stmt->fetchColumn() ?: ''));
+        $val = $stmt->fetchColumn();
+        $raw = trim((string)(ClinicalEncryptionService::decrypt($val !== false ? (string)$val : '') ?? ''));
         if ($raw === '') {
             return ['raw' => '', 'groups' => []];
         }

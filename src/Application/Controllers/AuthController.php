@@ -7,17 +7,24 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
+use ClyoNutri\Core\Security\RegistrationRateLimiter;
 
 class AuthController
 {
     private AuthService $authService;
     private PasswordResetService $resetService;
+    private RegistrationRateLimiter $registrationRateLimiter;
 
-    public function __construct(?AuthService $authService = null, ?PasswordResetService $resetService = null)
-    {
+    public function __construct(
+        ?AuthService $authService = null,
+        ?PasswordResetService $resetService = null,
+        ?RegistrationRateLimiter $registrationRateLimiter = null
+    ) {
         $this->authService = $authService ?? new AuthService();
         $this->resetService = $resetService ?? new PasswordResetService();
+        $this->registrationRateLimiter = $registrationRateLimiter ?? new RegistrationRateLimiter(Connection::getInstance());
     }
 
     public function showLogin(): void
@@ -82,6 +89,7 @@ class AuthController
         $_SESSION['user_role'] = $user['role'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['clinic_name'] = $user['clinic_name'] ?? 'Minha Clínica';
+        $_SESSION['last_activity'] = time();
 
         $destination = match ($user['role']) {
             'superadmin', 'admin_operacional', 'finance_admin', 'security_auditor' => '/admin',
@@ -162,6 +170,40 @@ class AuthController
 
     public function register(): void
     {
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+
+        // 1. Anti-Bot Honeypot (campo website_url deve permanecer vazio)
+        $honeypot = trim((string)($_POST['website_url'] ?? ''));
+        if ($honeypot !== '') {
+            try {
+                $db = Connection::getInstance();
+                $st = $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, details, ip_address, user_agent) VALUES (NULL, NULL, 'REGISTER_BOT_BLOCKED', 'auth', :d, :ip, :ua)");
+                $st->execute([
+                    'd' => json_encode(['reason' => 'honeypot_filled'], JSON_UNESCAPED_SLASHES),
+                    'ip' => $ip,
+                    'ua' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                ]);
+            } catch (\Throwable) {}
+
+            $_SESSION['flash_error'] = 'Requisição inválida detectada.';
+            header('Location: /cadastro');
+            exit;
+        }
+
+        // 2. Limitador de taxa por IP (NI2-479 / SEC-01)
+        $rateCheck = $this->registrationRateLimiter->attempt($ip);
+        if (!$rateCheck['allowed']) {
+            $_SESSION['flash_error'] = 'Muitas tentativas de cadastro a partir deste endereço IP. Por favor, aguarde alguns minutos e tente novamente.';
+            $cleanOld = $_POST;
+            unset($cleanOld['password'], $cleanOld['website_url']);
+            $_SESSION['old_input'] = $cleanOld;
+            header('Retry-After: ' . max(1, (int)$rateCheck['retry_after']));
+            http_response_code(429);
+            header('Location: /cadastro');
+            exit;
+        }
+
+        // 3. Validação de token CSRF
         $token = $_POST['_csrf_token'] ?? '';
         if (!Csrf::validate($token)) {
             $_SESSION['flash_error'] = 'Token de segurança expirado. Tente novamente.';
@@ -214,6 +256,7 @@ class AuthController
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['clinic_name'] = $clinicName;
+            $_SESSION['last_activity'] = time();
 
             header('Location: /onboarding');
             exit;
