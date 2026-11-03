@@ -1,23 +1,30 @@
+<?php
+$professionalViewContext=\ClyoNutri\Core\Auth\ProfessionalViewContext::resolve();
+$clinicName=$professionalViewContext['clinicName'];$userName=$professionalViewContext['userName'];
+// NI2-616: no topo, o nome completo aparece uma vez (consultório); a saudação usa só o primeiro nome.
+$shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n==='')return 'Nutricionista';$first=preg_split('/\s+/u',$n)[0];return mb_convert_case(mb_strtolower($first,'UTF-8'),MB_CASE_TITLE,'UTF-8');})($userName??null);
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta name="csrf-token" content="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES) ?>">
-  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg?v=botanical-v54-9">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= htmlspecialchars($title ?? 'ClyoNutri') ?> — Sistema do Nutricionista</title>
+  <title><?= htmlspecialchars($title ?? 'Clyo Nutri') ?> — Sistema do Nutricionista</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css">
-  <link rel="stylesheet" href="/assets/css/clinical-botanical.css">
-  <link rel="stylesheet" href="/assets/css/clinical-journeys.css">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/clinical-journeys.css?v=v54-17">
 </head>
-<body>
-  <a class="skip-clinical-content" href="#clinical-main-content">Ir para o conteúdo</a>
+<?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) {} ?>
+<body data-session-ttl="<?= (int)$shellSessionTtl ?>">
+  <a class="skip-link skip-clinical-content" href="#clinical-main-content">Pular para o conteúdo principal</a>
   <div class="app-container">
     <!-- Sidebar Navegação Profissional -->
     <aside class="app-sidebar">
       <div class="app-sidebar__logo">
-        <img src="/assets/clyonutri-logo-dark.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64">
+        <img src="/assets/clyonutri-logo-dark.svg?v=botanical-v54-9" alt="Clyo Nutri" width="260" height="64">
       </div>
       <button type="button" id="clinical-menu-toggle" aria-controls="clinical-navigation" aria-expanded="false">Menu</button>
       <nav class="clinical-mobile-priority" aria-label="Tarefas principais"><a href="/pacientes">Pacientes</a><a href="/agenda">Agenda</a><a href="/planos">Planos</a><a href="/chat">Conversas</a></nav>
@@ -40,7 +47,11 @@
         </a>
         <a href="/planos" class="app-nav__item <?= ($activeNav ?? '') === 'planos' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-          <span>Planos Alimentares</span>
+          <span>Planos alimentares</span>
+        </a>
+        <a href="/exames" class="app-nav__item <?= ($activeNav ?? '') === 'exames' ? 'active' : '' ?>">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span>Exames</span>
         </a>
         <a href="/receitas" class="app-nav__item <?= ($activeNav ?? '') === 'receitas' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>
@@ -67,6 +78,10 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           <span>Pedidos LGPD</span>
         </a>
+        <a href="/academy" class="app-nav__item <?= ($activeNav ?? '') === 'academy' ? 'active' : '' ?>">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+          <span>Clyo Academy</span>
+        </a>
         <a href="/ajuda" class="app-nav__item <?= ($activeNav ?? '') === 'ajuda' ? 'active' : '' ?>">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span>Central de Ajuda</span>
@@ -74,13 +89,21 @@
         <?php if (!empty($_SESSION['user_role']) && in_array($_SESSION['user_role'], ['admin', 'operator', 'support_agent'], true)): ?>
           <a href="/suporte/fila" class="app-nav__item <?= ($activeNav ?? '') === 'service_desk' ? 'active' : '' ?>">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            <span>Service Desk</span>
+            <span>Service desk</span>
           </a>
         <?php endif; ?>
+        <div class="clinical-nav__mobile-user" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.85rem;">
+          <div style="margin-bottom: 6px; font-weight: 600;"><?= htmlspecialchars($clinicName ?? 'Clínica principal') ?></div>
+          <div style="margin-bottom: 12px; color: var(--neutral-gray-400, #98A2B3);">Olá, <?= htmlspecialchars($shellFirstName) ?></div>
+          <form method="POST" action="/logout" style="margin: 0;">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit" class="btn btn-secondary btn-sm" style="color: #fff; border-color: rgba(255,255,255,0.3); background: transparent; width: 100%;">Sair</button>
+          </form>
+        </div>
       </nav>
       <div class="app-sidebar__version">
         <span class="app-sidebar__status-dot" aria-hidden="true"></span>
-        v1.0.0 • Ambiente do consultório
+        v54.17
       </div>
     </aside>
 
@@ -89,11 +112,11 @@
       <header class="app-header">
         <div class="app-header__tenant">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <span><?= htmlspecialchars($clinicName ?? 'Clínica Principal') ?></span>
+          <span class="app-header__tenant-name" title="<?= htmlspecialchars($clinicName ?? 'Clínica principal', ENT_QUOTES) ?>"><?= htmlspecialchars($clinicName ?? 'Clínica principal') ?></span>
         </div>
         <div class="app-header__user">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neutral-gray-500);"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
-          <span>Olá, <strong><?= htmlspecialchars($userName ?? 'Nutricionista') ?></strong></span>
+          <span title="<?= htmlspecialchars($userName ?? 'Nutricionista', ENT_QUOTES) ?>">Olá, <strong><?= htmlspecialchars($shellFirstName) ?></strong></span>
           <form method="POST" action="/logout" class="logout-form" data-testid="logout-form">
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
             <button type="submit" class="app-header__logout">
@@ -112,6 +135,9 @@
 <?php $recovery=\ClyoNutri\Domain\Clinical\FormRecovery::forCurrentPage(); if($recovery): ?>
 <script type="application/json" id="clinical-form-recovery"><?= json_encode($recovery,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR) ?></script>
 <?php endif; ?>
-<script src="/assets/js/clinical-journeys.js" defer></script>
+<script src="/assets/js/validacao-ptbr.js" defer></script>
+<script src="/assets/js/clinical-journeys.js?v=v54-17" defer></script>
+<script src="/assets/js/session-timeout.js?v=v54-10" defer></script>
+<script src="/assets/js/avaliacao-confirmacoes.js" defer></script>
 </body>
 </html>

@@ -56,56 +56,80 @@ if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/v1/')) {
 $db = Connection::getInstance();
 
 // Configuração segura de cookies de sessão
+// NI2-604 (UX-R3-03): a sessão caía no meio do uso. Causas tratadas aqui:
+//  - o cookie tinha validade fixa de 7200 s a partir do login e nunca era renovado;
+//  - as sessões ficavam na pasta comum da hospedagem, limpa com o gc_maxlifetime padrão (24 min) de qualquer site.
+// Agora: pasta própria (storage/sessions), gc_maxlifetime = tempo de inatividade da plataforma + 10 min, e o cookie
+// é renovado a cada requisição de quem está logado. O encerramento continua sendo pela inatividade (requireAuth).
+$sessionTtl = 7200;
+try {
+    $sessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes($db) * 60;
+} catch (\Throwable $e) {
+    $sessionTtl = 7200;
+}
+$sessionCookieSecure = \ClyoNutri\Core\Http\Transport::isHttps() || \ClyoNutri\Core\Http\Transport::forceHttpsEnabled();
 if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
+    $sessionDir = dirname(__DIR__) . '/storage/sessions';
+    if ((is_dir($sessionDir) || @mkdir($sessionDir, 0700, true)) && is_writable($sessionDir)) {
+        ini_set('session.save_path', $sessionDir);
+        ini_set('session.gc_probability', '1'); // pasta própria: a limpeza do servidor não passa por ela
+        ini_set('session.gc_divisor', '100');
+    }
+    ini_set('session.gc_maxlifetime', (string)($sessionTtl + 600));
     session_set_cookie_params([
-        'lifetime' => 7200,
+        'lifetime' => $sessionTtl,
         'path' => '/',
         'httponly' => true,
         'samesite' => 'Lax',
         // NI2-427: Secure sempre que a requisição chegou por HTTPS (inclui proxy confiável)
         // ou quando FORCE_HTTPS está ativo (nesse caso HTTP nunca chega até aqui).
-        'secure' => \ClyoNutri\Core\Http\Transport::isHttps() || \ClyoNutri\Core\Http\Transport::forceHttpsEnabled(),
+        'secure' => $sessionCookieSecure,
     ]);
     session_start();
+    if (!empty($_SESSION['user_id']) && !headers_sent()) {
+        // NI2-604: renova a validade do cookie a cada requisição (antes vencia 2 h depois do login, mesmo em uso).
+        setcookie(session_name(), session_id(), ['expires' => time() + $sessionTtl, 'path' => '/', 'httponly' => true,
+            'samesite' => 'Lax', 'secure' => $sessionCookieSecure]);
+    }
 }
+
+/** NI2-604: caminho interno para voltar depois do login (só GET de página, nunca URL externa nem /login). */
+$sessionReturnPath = static function (): ?string {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+        return null;
+    }
+    $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+    return \ClyoNutri\Core\Http\SafeReturnPath::clean($uri);
+};
 
 // Carregar TenantContext a partir da sessão se o usuário estiver autenticado e vínculo ativo (PX-23 / NI2-316)
 if (!empty($_SESSION['clinic_id']) && !empty($_SESSION['user_id'])) {
-    // NI2-479 (Onda 2): Timeout de inatividade de sessão web (30 minutos = 1800 segundos)
-    $now = time();
-    $idleTimeout = 1800;
-    if (isset($_SESSION['last_activity']) && ($now - (int)$_SESSION['last_activity'] > $idleTimeout)) {
-        $_SESSION = [];
-        TenantContext::clear();
-    } else {
-        $_SESSION['last_activity'] = $now;
-        try {
-            $validMember = $db->prepare("
-                SELECT u.auth_version, u.role AS user_role, cm.role AS member_role, cm.status AS member_status, c.status AS clinic_status
-                FROM users u
-                JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
-                JOIN clinics c ON c.id = cm.clinic_id
-                WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
-                LIMIT 1
-            ");
-            $validMember->execute([
-                'clinic_id' => (int)$_SESSION['clinic_id'],
-                'user_id' => (int)$_SESSION['user_id'],
+    try {
+        $validMember = $db->prepare("
+            SELECT u.auth_version, u.role AS user_role, cm.role AS member_role, cm.status AS member_status, c.status AS clinic_status
+            FROM users u
+            JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic_id
+            JOIN clinics c ON c.id = cm.clinic_id
+            WHERE u.id = :user_id AND u.status = 'active' AND cm.status = 'active' AND c.status = 'active'
+            LIMIT 1
+        ");
+        $validMember->execute([
+            'clinic_id' => (int)$_SESSION['clinic_id'],
+            'user_id' => (int)$_SESSION['user_id'],
+        ]);
+        $mRow = $validMember->fetch();
+        if ($mRow && (int)$mRow['auth_version'] === (int)($_SESSION['auth_version'] ?? 0)) {
+            TenantContext::set((int)$_SESSION['clinic_id'], [
+                'id' => (int)$_SESSION['user_id'],
+                'name' => $_SESSION['user_name'] ?? 'Nutricionista',
             ]);
-            $mRow = $validMember->fetch();
-            if ($mRow && (int)$mRow['auth_version'] === (int)($_SESSION['auth_version'] ?? 0)) {
-                TenantContext::set((int)$_SESSION['clinic_id'], [
-                    'id' => (int)$_SESSION['user_id'],
-                    'name' => $_SESSION['user_name'] ?? 'Nutricionista',
-                ]);
-            } else {
-                $_SESSION = [];
-                TenantContext::clear();
-            }
-        } catch (\Throwable) {
+        } else {
             $_SESSION = [];
             TenantContext::clear();
         }
+    } catch (\Throwable) {
+        $_SESSION = [];
+        TenantContext::clear();
     }
 }
 
@@ -188,14 +212,14 @@ if ($isMaintenanceActive) {
             exit;
         }
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Manutenção - ClyoNutri II</title><style>body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1.5rem;box-sizing:border-box;}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:2.5rem;max-width:520px;text-align:center;box-shadow:0 4px 6px -1px rgba(0,0,0,0.08);}h1{font-size:1.35rem;color:#0f172a;margin-top:0;}p{font-size:0.92rem;color:#64748b;line-height:1.5;}</style></head><body><div class="card"><h1>Manutenção Programada em Andamento</h1><p>A plataforma ClyoNutri II está passando por calibração de segurança. O acesso aos consultórios será restabelecido em breve.</p><p style="font-size:0.8rem;color:#94a3b8;margin-top:1.5rem;">HTTP 503 Service Unavailable &bull; Modo de Manutenção Ativo</p></div></body></html>';
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Manutenção - Clyo Nutri</title><style>body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1.5rem;box-sizing:border-box;}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:2.5rem;max-width:520px;text-align:center;box-shadow:0 4px 6px -1px rgba(0,0,0,0.08);}h1{font-size:1.35rem;color:#0f172a;margin-top:0;}p{font-size:0.92rem;color:#64748b;line-height:1.5;}</style></head><body><div class="card"><h1>Manutenção Programada em Andamento</h1><p>A plataforma Clyo Nutri está passando por calibração de segurança. O acesso aos consultórios será restabelecido em breve.</p><p style="font-size:0.8rem;color:#94a3b8;margin-top:1.5rem;">HTTP 503 Service Unavailable &bull; Modo de Manutenção Ativo</p></div></body></html>';
         exit;
     }
 }
 
 // Middleware de proteção: se tentar acessar rotas privadas sem login ou com vínculo revogado, bloqueia e redireciona (PX-23 / NI2-316 / NI2-256)
-$requireAuth = function (callable $action) use ($db) {
-    return function ($params = []) use ($action, $db) {
+$requireAuth = function (callable $action) use ($db, $sessionReturnPath) {
+    return function ($params = []) use ($action, $db, $sessionReturnPath) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -221,7 +245,8 @@ $requireAuth = function (callable $action) use ($db) {
                 echo json_encode(['status' => 'unauthenticated', 'error' => 'Sessão encerrada por inatividade.']);
                 exit;
             }
-            \ClyoNutri\Core\Http\Response::redirect('/login?error=session_timeout');
+            $back = $sessionReturnPath();
+            \ClyoNutri\Core\Http\Response::redirect('/login?error=session_timeout' . ($back !== null ? '&voltar=' . rawurlencode($back) : ''));
         }
         $_SESSION['last_activity'] = time();
 
@@ -232,7 +257,12 @@ $requireAuth = function (callable $action) use ($db) {
                 echo json_encode(['status' => 'unauthenticated', 'error' => 'Sessão expirada ou não autenticada.']);
                 exit;
             }
-            \ClyoNutri\Core\Http\Response::redirect('/login');
+            // NI2-604: quem tinha cookie de sessão e chegou sem login teve a sessão encerrada: o login diz o motivo
+            // e, depois de entrar, volta para esta página.
+            $back = $sessionReturnPath();
+            $hadSession = isset($_COOKIE[session_name()]);
+            $q = array_filter(['error' => $hadSession ? 'session_expired' : null, 'voltar' => $back]);
+            \ClyoNutri\Core\Http\Response::redirect('/login' . ($q ? '?' . http_build_query($q) : ''));
         }
 
         $authUser = \ClyoNutri\Core\Auth\AuthContext::resolveFromSession($db);
@@ -269,6 +299,19 @@ $requireAuth = function (callable $action) use ($db) {
             http_response_code(403);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => $csrfError]);
+            return;
+        }
+        // NI2-449: sem aceite da versão vigente dos Termos/Política, a navegação vai para /aceite-termos.
+        $legalRedirect = \ClyoNutri\Domain\Legal\LegalAcceptanceGate::redirectFor(
+            $db,
+            $authUser->getUserId(),
+            $authUser->isSupport() || $authUser->isPlatformAdmin(),
+            (string)($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+            (string)($_SERVER['REQUEST_URI'] ?? '/'),
+            $wantsJsonAuthError
+        );
+        if ($legalRedirect !== null) {
+            \ClyoNutri\Core\Http\Response::redirect($legalRedirect);
             return;
         }
         $action($params);
@@ -320,13 +363,29 @@ $requireChat = function (callable $action) use ($db) {
 $router->get('/', [$landingCtrl, 'index']);
 $router->get('/termos', [$landingCtrl, 'terms']);
 $router->get('/privacidade', [$landingCtrl, 'privacy']);
+$router->get('/planos-assinatura', [$landingCtrl, 'plans']);
 
 // Portal & App do Paciente (P03 - Auditoria Navegação Assistida)
+// v20: /app colide com a pasta app/ da raiz (Require all denied => 403 da hospedagem).
+// URL pública passa a ser /paciente/app; /app fica como alias (e o .htaccess redireciona com 301).
+$router->get('/paciente/app', [$patientAppCtrl, 'index']);
+$router->post('/paciente/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
+$router->post('/paciente/app/login', [$patientAppCtrl, 'login']);
+$router->post('/paciente/app/aceite-termos', [$patientAppCtrl, 'acceptTerms']); // NI2-449
 $router->get('/app', [$patientAppCtrl, 'index']);
 $router->post('/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
 $router->post('/app/login', [$patientAppCtrl, 'login']);
+$router->post('/app/aceite-termos', [$patientAppCtrl, 'acceptTerms']); // NI2-449 (alias, como os demais /app)
+
+// Recuperação de senha do paciente (NI2-481). Públicas; CSRF nos POST é validado pelo Router.
+$patientPwResetCtrl = new \ClyoNutri\Application\Controllers\PatientPasswordResetController();
+$router->get('/paciente/recuperar-senha', [$patientPwResetCtrl, 'showRequest']);
+$router->post('/paciente/recuperar-senha', [$patientPwResetCtrl, 'submitRequest']);
+$router->get('/paciente/recuperar-senha/{token}', [$patientPwResetCtrl, 'showReset']);
+$router->post('/paciente/recuperar-senha/{token}', [$patientPwResetCtrl, 'submitReset']);
 
 // Autoagendamento Self-Service (NI2-433 / NI2-434)
+$router->get('/paciente/lista-espera', [$bookingCtrl, 'waitlistPage']);
 $router->get('/agendar', [$bookingCtrl, 'publicBookingPage']);
 $router->get('/agendar/{professionalId}', [$bookingCtrl, 'publicBookingPage']);
 $router->get('/api/v1/booking/slots', [$bookingCtrl, 'getSlots']);
@@ -340,9 +399,39 @@ $router->get('/onboarding', $requireAuth([$onboardingCtrl, 'show']));
 $router->post('/onboarding/passo', $requireAuth([$onboardingCtrl, 'submitStep']));
 $router->get('/api/v1/onboarding/status', $requireAuth([$onboardingCtrl, 'apiStatus']));
 
+// NI2-449: reaceite dos Termos de Uso e da Política de Privacidade (profissional e equipe).
+$legalAcceptanceCtrl = new \ClyoNutri\Application\Controllers\LegalAcceptanceController($db);
+$router->get('/aceite-termos', $requireAuth([$legalAcceptanceCtrl, 'show']));
+$router->post('/aceite-termos', $requireAuth([$legalAcceptanceCtrl, 'accept']));
 $router->get('/dashboard', $requireAuth([$dashCtrl, 'index']));
+// NI2-604: aviso de fim de sessão. /sessao/estado só lê (não conta como uso); /sessao/renovar passa pelo
+// requireAuth, que registra a atividade (é o "Continuar conectado" e o uso contínuo na mesma página).
+$router->get('/sessao/estado', function () use ($sessionTtl) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if (empty($_SESSION['user_id']) || empty($_SESSION['last_activity'])) {
+        http_response_code(401);
+        echo json_encode(['authenticated' => false]);
+        return;
+    }
+    $remaining = max(0, $sessionTtl - (time() - (int)$_SESSION['last_activity']));
+    echo json_encode(['authenticated' => $remaining > 0, 'remaining' => $remaining, 'ttl' => $sessionTtl]);
+});
+$router->get('/sessao/renovar', $requireAuth(function () use ($sessionTtl) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['authenticated' => true, 'remaining' => $sessionTtl, 'ttl' => $sessionTtl]);
+}));
 $router->get('/pacientes', $requireAuth([$dashCtrl, 'patients']));
 $router->post('/pacientes', $requireAuth([$dashCtrl, 'savePatient']));
+// NI2-522 (v42): importação de pacientes por CSV com prévia, relatório por linha e desfazer. Antes de /pacientes/{id}.
+$patientImportCtrl = new \ClyoNutri\Application\Controllers\PatientImportController();
+$router->get('/pacientes/importar', $requireAuth([$patientImportCtrl, 'index']));
+$router->get('/pacientes/importar/modelo.csv', $requireAuth([$patientImportCtrl, 'template']));
+$router->post('/pacientes/importar/previa', $requireAuth([$patientImportCtrl, 'preview']));
+$router->get('/pacientes/importar/{id}', $requireAuth([$patientImportCtrl, 'show']));
+$router->post('/pacientes/importar/{id}/confirmar', $requireAuth([$patientImportCtrl, 'confirm']));
+$router->post('/pacientes/importar/{id}/descartar', $requireAuth([$patientImportCtrl, 'discard']));
+$router->post('/pacientes/importar/{id}/desfazer', $requireAuth([$patientImportCtrl, 'rollback']));
 $router->get('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
 $router->post('/pacientes/{id}/editar', $requireAuth([$dashCtrl, 'editPatient']));
 $router->post('/pacientes/{id}/status', $requireAuth([$dashCtrl, 'patientStatus']));
@@ -369,11 +458,28 @@ $router->get('/pacientes/{id}/prontuario/exportar', $requireAuth([$dashCtrl, 'ex
 $router->get('/pacientes/{id}/prontuario/imprimir', $requireAuth([$dashCtrl, 'printMedicalRecord']));
 $router->get('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'patientAnamnesis']));
 $router->post('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'savePatientAnamnesis']));
+$router->post('/pacientes/{id}/alergias/revisao', $requireAuth([$dashCtrl, 'dismissAllergyHistory'])); // NI2-624
+// NI2-635: anamnese adaptativa (tudo 404 com feature_flag_clinical_protocols = 0)
+$cpCtrl = new \ClyoNutri\Application\Controllers\ClinicalProtocolController($db);
+$router->get('/configuracoes/protocolos', $requireAuth([$cpCtrl, 'settings']));
+$router->post('/configuracoes/protocolos', $requireAuth([$cpCtrl, 'toggle']));
+$cpEditorCtrl = new \ClyoNutri\Application\Controllers\ClinicProtocolEditorController($db);
+$router->get('/configuracoes/protocolos/editor', $requireAuth([$cpEditorCtrl, 'page']));
+$router->post('/configuracoes/protocolos/editor', $requireAuth([$cpEditorCtrl, 'mutate']));
+$router->post('/pacientes/{id}/condicoes', $requireAuth([$cpCtrl, 'recordCondition']));
+$router->post('/pacientes/{id}/condicoes/sugerir', $requireAuth([$cpCtrl, 'suggest']));
+$router->post('/pacientes/{id}/condicoes/{cid}/confirmar', $requireAuth([$cpCtrl, 'confirmCondition']));
+$router->post('/pacientes/{id}/condicoes/{cid}/encerrar', $requireAuth([$cpCtrl, 'closeCondition']));
+$router->post('/pacientes/{id}/protocolos', $requireAuth([$cpCtrl, 'saveAnswers']));
+$router->post('/pacientes/{id}/protocolos/{code}/dispensar', $requireAuth([$cpCtrl, 'dismissModule'])); // NI2-642
+$router->post('/pacientes/{id}/protocolos/{code}/reativar', $requireAuth([$cpCtrl, 'restoreModule']));
 $router->get('/pacientes/{id}/resumo-prescricao', $requireAuth([$dashCtrl, 'prescriptionSummary']));
 $router->get('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'patientAnthropometry']));
 $router->post('/pacientes/{id}/antropometria', $requireAuth([$dashCtrl, 'saveAnthropometry']));
 $router->post('/pacientes/{id}/antropometria/{evalId}/compartilhar', $requireAuth([$dashCtrl, 'shareAnthropometry']));
 $router->get('/pacientes/{id}/antropometria/comparar', $requireAuth([$dashCtrl, 'compareAnthropometry']));
+$router->get('/pacientes/{id}/planos/comparar', $requireAuth([$dashCtrl, 'compareMealPlanVersions'])); // NI2-526
+
 // NI2-439: dobras cutâneas por protocolo validado
 $skinfoldCtrl = new \ClyoNutri\Application\Controllers\SkinfoldController();
 $router->get('/pacientes/{id}/antropometria/dobras', $requireAuth([$skinfoldCtrl, 'show']));
@@ -389,6 +495,46 @@ $router->post('/pacientes/{id}/pre-consulta/{qid}/enviar', $requireAuth([$precon
 $router->post('/pacientes/{id}/pre-consulta/{qid}/revogar', $requireAuth([$preconsCtrl, 'revoke']));
 $router->post('/pacientes/{id}/pre-consulta/{qid}/revisar', $requireAuth([$preconsCtrl, 'review']));
 $router->post('/pacientes/{id}/pre-consulta/{qid}/importar', $requireAuth([$preconsCtrl, 'import']));
+$router->post('/pacientes/{id}/pre-consulta/{qid}/condicoes', $requireAuth([$preconsCtrl, 'suggestConditions']));
+// NI2-554: clinical prescriptions; author and tenant are revalidated by the service.
+$prescriptionCtrl = new \ClyoNutri\Application\Controllers\PrescriptionController($db);
+$router->get('/pacientes/{id}/prescricoes', $requireAuth([$prescriptionCtrl, 'index']));
+$router->post('/pacientes/{id}/prescricoes', $requireAuth([$prescriptionCtrl, 'mutate']));
+$router->get('/pacientes/{id}/prescricoes/{rxId}', $requireAuth([$prescriptionCtrl, 'show']));
+$router->post('/pacientes/{id}/prescricoes/{rxId}', $requireAuth([$prescriptionCtrl, 'mutate']));
+$router->get('/pacientes/{id}/prescricoes/{rxId}/arquivo/{file}', $requireAuth([$prescriptionCtrl, 'download']));
+
+// Solicitação de Exames Laboratoriais para Acompanhamento Nutricional (NI2-529 a NI2-533)
+$examRequestCtrl = new \ClyoNutri\Application\Controllers\ExamRequestController($db);
+$router->get('/pacientes/{id}/exames', $requireAuth([$examRequestCtrl, 'index']));
+$router->get('/pacientes/{id}/exames/novo', $requireAuth([$examRequestCtrl, 'create']));
+$router->post('/pacientes/{id}/exames', $requireAuth([$examRequestCtrl, 'store']));
+// v45: rotas estáticas antes de /{reqId}; fluxo rascunho → revisão → emissão (PDF no servidor).
+$router->get('/pacientes/{id}/exames/{reqId}/editar', $requireAuth([$examRequestCtrl, 'edit']));
+$router->post('/pacientes/{id}/exames/{reqId}/editar', $requireAuth([$examRequestCtrl, 'update']));
+$router->post('/pacientes/{id}/exames/{reqId}/revisar', $requireAuth([$examRequestCtrl, 'review']));
+$router->post('/pacientes/{id}/exames/{reqId}/emitir', $requireAuth([$examRequestCtrl, 'issue']));
+$router->get('/pacientes/{id}/exames/{reqId}/imprimir', $requireAuth([$examRequestCtrl, 'printView']));
+$router->get('/pacientes/{id}/exames/{reqId}/pdf', $requireAuth([$examRequestCtrl, 'downloadPdf']));
+$router->post('/pacientes/{id}/exames/{reqId}/cancelar', $requireAuth([$examRequestCtrl, 'cancel']));
+$router->post('/pacientes/{id}/exames/{reqId}/nova-versao', $requireAuth([$examRequestCtrl, 'newVersion'])); // v47 NI2-537
+$router->get('/pacientes/{id}/exames/{reqId}', $requireAuth([$examRequestCtrl, 'show']));
+$router->get('/api/exames/buscar', $requireAuth([$examRequestCtrl, 'searchApi']));
+// v47 (NI2-530, NI2-532): catálogo, favoritos, exames da clínica com validação e versões da política
+$examCatalogCtrl = new \ClyoNutri\Application\Controllers\ExamCatalogController($db);
+$router->get('/exames', $requireAuth([$examCatalogCtrl, 'index']));
+$router->get('/exames/catalogo', $requireAuth([$examCatalogCtrl, 'index']));
+$router->post('/exames/catalogo/favoritos/{examId}', $requireAuth([$examCatalogCtrl, 'toggleFavorite']));
+$router->post('/exames/catalogo/personalizados', $requireAuth([$examCatalogCtrl, 'submitCustom']));
+$router->post('/exames/catalogo/personalizados/{examId}/validar', $requireAuth([$examCatalogCtrl, 'validateCustom']));
+$router->get('/exames/politica', $requireAuth([$examCatalogCtrl, 'policy']));
+// v48 (NI2-539): laudos da solicitação, lado da nutricionista. O arquivo só sai por link assinado de 5 min + sessão.
+$examResultCtrl = new \ClyoNutri\Application\Controllers\ExamResultController($db);
+$router->post('/pacientes/{id}/exames/{reqId}/laudos', $requireAuth([$examResultCtrl, 'upload']));
+$router->post('/pacientes/{id}/exames/{reqId}/laudos/{docId}/revisar', $requireAuth([$examResultCtrl, 'review']));
+$router->post('/pacientes/{id}/exames/{reqId}/laudos/{docId}/nova-versao', $requireAuth([$examResultCtrl, 'newVersion']));
+$router->get('/pacientes/{id}/exames/{reqId}/laudos/{docId}/abrir', $requireAuth([$examResultCtrl, 'open']));
+$router->get('/exames/laudo/{token}', $requireAuth([$examResultCtrl, 'download']));
 // Paciente (público, acesso pelo token do link + data de nascimento)
 $router->get('/pre-consulta', [$preconsCtrl, 'patientPage']);
 $router->post('/pre-consulta/verificar', [$preconsCtrl, 'patientVerify']);
@@ -396,7 +542,26 @@ $router->post('/pre-consulta/salvar', [$preconsCtrl, 'patientSave']);
 $router->get('/pre-consulta/{token}', [$preconsCtrl, 'patientLink']);
 $router->get('/catalogo/alimentos/busca', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'search']));
 $router->get('/catalogo/alimentos/{id}/conversao', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'conversion']));
+// NI2-520 (v43): favorito da clínica e métrica de seleção (escolha e troca de escolha) no seletor de alimentos.
+$router->post('/catalogo/alimentos/selecao', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'selection']));
+$router->post('/catalogo/alimentos/{id}/favorito', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'favorite']));
+// NI2-519 / NI2-520 (v43): regras de equivalência da clínica e trocas sugeridas no editor de plano.
+$foodEqCtrl = new \ClyoNutri\Application\Controllers\FoodEquivalenceController();
+$router->get('/alimentos/equivalencias', $requireAuth([$foodEqCtrl, 'index']));
+$router->post('/alimentos/equivalencias', $requireAuth([$foodEqCtrl, 'create']));
+$router->post('/alimentos/equivalencias/{id}', $requireAuth([$foodEqCtrl, 'update']));
+$router->post('/alimentos/equivalencias/{id}/revisar', $requireAuth([$foodEqCtrl, 'review']));
+$router->post('/alimentos/equivalencias/{id}/arquivar', $requireAuth([$foodEqCtrl, 'archive']));
+$router->get('/planos/{planId}/itens/{itemId}/equivalentes', $requireAuth([$foodEqCtrl, 'suggestions']));
 $router->get('/alimentos', $requireAuth([$dashCtrl, 'foods']));
+$clinicMeasuresCtrl = new \ClyoNutri\Application\Controllers\ClinicMeasuresController();
+$router->get('/medidas-caseiras', $requireAuth([$clinicMeasuresCtrl, 'index']));
+$router->get('/medidas-caseiras/modelo.csv', $requireAuth([$clinicMeasuresCtrl, 'template']));
+$router->post('/medidas-caseiras', $requireAuth([$clinicMeasuresCtrl, 'save']));
+$router->post('/medidas-caseiras/importar', $requireAuth([$clinicMeasuresCtrl, 'import']));
+$router->post('/medidas-caseiras/{id}/remover', $requireAuth([$clinicMeasuresCtrl, 'remove']));
+// NI2-520 (v42): buscas sem resultado no catálogo (por clínica, últimos 30 dias).
+$router->get('/alimentos/buscas', $requireAuth([new \ClyoNutri\Application\Controllers\FoodSearchController(), 'zeroResultReport']));
 $router->get('/agenda', $requireAuth([$dashCtrl, 'agenda']));
 $router->post('/agenda', $requireAuth([$dashCtrl, 'saveAppointment']));
 $router->get('/agenda/{id}/reagendar', $requireAuth([$dashCtrl, 'rescheduleAppointmentForm'])); // UX-04 (v14)
@@ -407,6 +572,9 @@ $router->post('/agenda/pedidos-remarcacao/{id}/aceitar', $requireAuth([$changeRe
 $router->post('/agenda/pedidos-remarcacao/{id}/recusar', $requireAuth([$changeRequestCtrl, 'decline']));
 $router->post('/agenda/{id}/editar', $requireAuth([$dashCtrl, 'editAppointment']));
 $router->post('/agenda/{id}/status', $requireAuth([$dashCtrl, 'updateAppointmentStatus']));
+$router->get('/agenda/{id}/previa-confirmacao', $requireAuth([$dashCtrl, 'previewAppointmentConfirmation'])); // NI2-527
+$router->post('/agenda/{id}/confirmacao-autorizada', $requireAuth([$dashCtrl, 'sendAuthorizedAppointmentConfirmation'])); // NI2-527
+
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
 $router->get('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftGet']));   // UX-03 (v14)
@@ -444,20 +612,39 @@ $router->post('/teleconsulta/sala/{token}/midia', $requireTelehealth([$teleCtrl,
 // Sinalização WebRTC P2P (credencial de mídia no cabeçalho; revalidada a cada chamada)
 $router->post('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalSend']));
 $router->get('/teleconsulta/sinal/{room}', $requireTelehealth([$teleCtrl, 'signalPoll']));
-$router->get('/planos', $requireAuth([$dashCtrl, 'mealPlans']));
+$router->get('/planos', function ($params = []) use ($dashCtrl, $landingCtrl, $requireAuth) {
+    if (empty($_SESSION['user_id']) || empty($_SESSION['clinic_id'])) {
+        $landingCtrl->plans();
+        return;
+    }
+    $requireAuth([$dashCtrl, 'mealPlans'])($params);
+});
 $router->post('/planos/novo', $requireAuth([$dashCtrl, 'createMealPlan']));
 $router->get('/planos/{id}/imprimir', $requireAuth([$dashCtrl, 'printMealPlan']));
 $router->get('/planos/{id}/lista-compras', $requireAuth([$dashCtrl, 'shoppingList']));
 $router->get('/planos/{id}', $requireAuth([$dashCtrl, 'mealPlanEditor']));
 $router->post('/planos/{id}/refeicoes', $requireAuth([$dashCtrl, 'addMealToPlan']));
+$router->post('/planos/{id}/refeicoes/{mealId}/editar', $requireAuth([$dashCtrl, 'updateMealInPlan']));
 $router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl, 'deleteMealFromPlan']));
 $router->post('/planos/{id}/itens', $requireAuth([$dashCtrl, 'addItemToPlanMeal']));
 $router->post('/planos/{id}/itens/{itemId}/editar', $requireAuth([$dashCtrl, 'updatePlanItem']));
 $router->post('/planos/{id}/itens/{itemId}/remover', $requireAuth([$dashCtrl, 'deleteItemFromPlanMeal']));
 $router->post('/planos/{id}/substituicoes', $requireAuth([$dashCtrl, 'addSubstitutionToPlanItem']));
 $router->post('/planos/{id}/substituicoes/{subId}/remover', $requireAuth([$dashCtrl, 'deleteSubstitutionFromPlan']));
+$planEnergyCtrl = new \ClyoNutri\Application\Controllers\MealPlanEnergyController();
+$router->post('/planos/{id}/energia', $requireAuth([$planEnergyCtrl, 'saveEnergy']));
+$router->post('/planos/{id}/paciente', $requireAuth([$planEnergyCtrl, 'assignPatient']));
 $router->post('/planos/{id}/publicar', $requireAuth([$dashCtrl, 'publishMealPlan']));
 $router->post('/planos/{id}/duplicar', $requireAuth([$dashCtrl, 'duplicateMealPlan']));
+// NI2-519 (v42): modelos de plano da clínica.
+$planTemplateCtrl = new \ClyoNutri\Application\Controllers\MealPlanTemplateController();
+$router->post('/planos/{id}/salvar-como-modelo', $requireAuth([$planTemplateCtrl, 'saveFromPlan']));
+$router->get('/modelos', $requireAuth([$planTemplateCtrl, 'index']));
+$router->post('/modelos/{id}/usar', $requireAuth([$planTemplateCtrl, 'usePlan']));
+$router->post('/modelos/{id}/arquivar', $requireAuth([$planTemplateCtrl, 'archive']));
+$router->post('/modelos/{id}/padrao', $requireAuth([$planTemplateCtrl, 'setDefault']));
+$router->post('/modelos/{id}/aprovacao', $requireAuth([$planTemplateCtrl, 'setApproval']));
+$router->post('/modelos/{id}/visibilidade', $requireAuth([$planTemplateCtrl, 'setVisibility']));
 $router->get('/financeiro', $requireAuth([$dashCtrl, 'finance']));
 $router->post('/financeiro/recebiveis/novo', $requireAuth([$dashCtrl, 'createReceivableAction']));
 $router->post('/financeiro/recebiveis/{id}/pagar', $requireAuth([$dashCtrl, 'payReceivableAction']));
@@ -470,9 +657,35 @@ $router->post('/avisos/{id}/lida', $requireAuth([$noticesCtrl, 'markOne']));
 $router->get('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->post('/configuracoes', $requireAuth([$dashCtrl, 'settings']));
 $router->get('/configuracoes/assinatura', $requireAuth([$subCtrl, 'show']));
+// NI2-606: equipe da clínica (CSRF conferido no controller; permissão no TeamService)
+$teamCtrl = new \ClyoNutri\Application\Controllers\TeamController();
+$router->get('/configuracoes/equipe', $requireAuth([$teamCtrl, 'show']));
+$router->post('/configuracoes/equipe', $requireAuth([$teamCtrl, 'invite']));
+$router->post('/configuracoes/equipe/{userId}/papel', $requireAuth([$teamCtrl, 'changeRole']));
+$router->post('/configuracoes/equipe/{userId}/desativar', $requireAuth([$teamCtrl, 'deactivate']));
+$router->post('/configuracoes/equipe/{userId}/reativar', $requireAuth([$teamCtrl, 'reactivate']));
+$router->post('/configuracoes/equipe/{userId}/reenviar', $requireAuth([$teamCtrl, 'resend']));
 $router->post('/configuracoes/assinatura/cancelar', $requireAuth([$subCtrl, 'cancel']));
+$router->post('/configuracoes/assinatura/plano', $requireAuth([$subCtrl, 'changePlan']));
+$router->post('/configuracoes/conta/exclusao', $requireAuth([$subCtrl, 'requestAccountDeletion']));
+$router->post('/configuracoes/conta/exclusao/cancelar', $requireAuth([$subCtrl, 'cancelAccountDeletion']));
 $router->get('/api/v1/subscription', $requireAuth([$subCtrl, 'apiGet']));
 $router->post('/api/v1/subscription/cancel', $requireAuth([$subCtrl, 'apiCancel']));
+
+// Clyo Academy (NI2-663): Biblioteca Científica, Evidências e Publicações
+$academyCtrl = new \ClyoNutri\Application\Controllers\AcademyController($db);
+$router->get('/academy', $requireAuth([$academyCtrl, 'index']));
+$router->get('/academy/artigo/{id}', $requireAuth([$academyCtrl, 'articleDetail']));
+$router->post('/academy/artigo/{id}/favoritar', $requireAuth([$academyCtrl, 'toggleFavorite']));
+$router->get('/academy/evidencias', $requireAuth([$academyCtrl, 'evidenceDesk']));
+$router->get('/academy/colecao', $requireAuth([$academyCtrl, 'myCollection']));
+$router->get('/academy/publicacoes', $requireAuth([$academyCtrl, 'publications']));
+$router->get('/academy/publicacoes/nova', $requireAuth([$academyCtrl, 'newPublication']));
+$router->post('/academy/publicacoes', $requireAuth([$academyCtrl, 'savePublication']));
+$router->get('/academy/publicacoes/{id}', $requireAuth([$academyCtrl, 'publicationDetail']));
+$router->post('/academy/publicacoes/{id}/status', $requireAuth([$academyCtrl, 'updatePublicationStatus']));
+$router->get('/api/v1/academy/search', $requireAuth([$academyCtrl, 'searchApi']));
+$router->get('/api/v1/academy/protocols/{code}', $requireAuth([$academyCtrl, 'protocolEvidenceApi']));
 
 // 3.2 Central de Ajuda & Service Desk (NI2-195 a NI2-208)
 $router->get('/ajuda', $requireAuth([$helpCtrl, 'index']));
@@ -521,16 +734,35 @@ $router->get('/admin/metricas-adesao', $requireAuth([$adminCtrl, 'adherenceMetri
 $router->get('/admin/clinicas', $requireAuth([$adminCtrl, 'clinics']));
 $router->post('/admin/clinicas/{id}/status', $requireAuth([$adminCtrl, 'updateClinicStatus']));
 $router->get('/admin/usuarios', $requireAuth([$adminCtrl, 'users']));
+// v33: gestão de usuários. /novo precisa vir antes de /{id} (o roteador casa na ordem de registro).
+$router->get('/admin/usuarios/novo', $requireAuth([$adminCtrl, 'staffForm']));
+$router->post('/admin/usuarios', $requireAuth([$adminCtrl, 'staffCreate']));
+$router->get('/admin/usuarios/{id}', $requireAuth([$adminCtrl, 'userDetail']));
+$router->get('/admin/usuarios/{id}/acao/{acao}', $requireAuth([$adminCtrl, 'userActionForm']));
+$router->post('/admin/usuarios/{id}/acao/{acao}', $requireAuth([$adminCtrl, 'userActionExecute']));
 $router->post('/admin/usuarios/{id}/status', $requireAuth([$adminCtrl, 'updateUserStatus']));
 $router->post('/admin/usuarios/{id}/revogar-sessoes', $requireAuth([$adminCtrl, 'revokeUserSessions']));
 $router->get('/admin/servicedesk', $requireAuth([$adminCtrl, 'serviceDesk']));
 $router->get('/admin/comercial', $requireAuth([$adminCtrl, 'commercial']));
+$router->post('/admin/pedidos-exclusao/{id}/analise', $requireAuth([$adminCtrl, 'reviewDeletionRequest']));
+$router->post('/admin/pedidos-exclusao/{id}/encerrar', $requireAuth([$adminCtrl, 'resolveDeletionRequest']));
 $router->get('/admin/acessos', $requireAuth([$adminCtrl, 'accessControl']));
 $router->post('/admin/acessos/revogar-sessao', $requireAuth([$adminCtrl, 'revokeSession']));
 $router->get('/admin/auditoria', $requireAuth([$adminCtrl, 'auditLogs']));
 $router->get('/admin/configuracoes', $requireAuth([$adminCtrl, 'settings']));
 $router->post('/admin/configuracoes', $requireAuth([$adminCtrl, 'saveSettings']));
+// NI2-635: catálogo de protocolos clínicos (governança editorial)
+$router->get('/admin/protocolos', $requireAuth([$adminCtrl, 'protocols']));
+$router->post('/admin/protocolos', $requireAuth([$adminCtrl, 'protocolAction']));
+$router->get('/admin/protocolos/{id}', $requireAuth([$adminCtrl, 'protocolDetail']));
+$router->post('/admin/protocolos/{id}/{acao}', $requireAuth([$adminCtrl, 'protocolAction']));
 $router->get('/admin/busca', $requireAuth([$adminCtrl, 'search']));
+// v34: central de notificações da equipe. Rotas fixas antes de /{id}.
+$router->get('/admin/notificacoes', $requireAuth([$adminCtrl, 'notifications']));
+$router->get('/admin/notificacoes/preferencias', $requireAuth([$adminCtrl, 'notificationPrefs']));
+$router->post('/admin/notificacoes/preferencias', $requireAuth([$adminCtrl, 'notificationPrefsSave']));
+$router->post('/admin/notificacoes/lidas', $requireAuth([$adminCtrl, 'notificationMarkAll']));
+$router->post('/admin/notificacoes/{id}/lida', $requireAuth([$adminCtrl, 'notificationMarkOne']));
 
 // 4. API Móvel do Paciente (/api/v1/patient/...)
 $authenticatePatientApi = function() use ($db): array {
@@ -570,6 +802,26 @@ $authenticatePatientApi = function() use ($db): array {
     return $tokenRow;
 };
 
+// NI2-554: no public document tokens. Cookie/bearer authentication on every request.
+$rxPatientError = static function(\Throwable $e): void {
+    http_response_code($e instanceof \DomainException ? 404 : 503);
+    if (!$e instanceof \DomainException) error_log('PRESCRIPTION_PATIENT_FAILED '.get_class($e));
+    echo json_encode(['error'=>'Prescrição indisponível neste contexto.'], JSON_UNESCAPED_UNICODE);
+};
+$router->get('/api/v1/patient/prescriptions', function() use($authenticatePatientApi,$db,$rxPatientError) {
+    header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store, private');
+    $auth=$authenticatePatientApi();
+    try {echo json_encode(['prescriptions'=>(new \ClyoNutri\Domain\Prescription\PrescriptionService($db))->patientList((int)$auth['clinic_id'],(int)$auth['patient_id'])],JSON_UNESCAPED_UNICODE);}catch(\Throwable $e){$rxPatientError($e);}
+});
+$router->get('/api/v1/patient/prescriptions/{rxId}/{file}', function($params=[]) use($authenticatePatientApi,$db,$rxPatientError) {
+    $auth=$authenticatePatientApi();
+    try {\ClyoNutri\Application\Controllers\PrescriptionController::send((new \ClyoNutri\Domain\Prescription\PrescriptionService($db))->patientDownload((int)$auth['clinic_id'],(int)$auth['patient_id'],(int)$params['rxId'],($params['file']??'')==='assinatura'));}catch(\Throwable $e){$rxPatientError($e);}
+});
+$router->get('/paciente/prescricoes', function() use($authenticatePatientApi,$db,$rxPatientError) {
+    header('Cache-Control: no-store, private');$auth=$authenticatePatientApi();
+    try {$prescriptions=(new \ClyoNutri\Domain\Prescription\PrescriptionService($db))->patientList((int)$auth['clinic_id'],(int)$auth['patient_id']);require __DIR__.'/../views/prescriptions/patient.php';}catch(\Throwable $e){$rxPatientError($e);}
+});
+
 $getJsonInput = function(): array {
     if (!empty($GLOBALS['__TEST_JSON_INPUT__'])) {
         $decodedTest = json_decode((string)$GLOBALS['__TEST_JSON_INPUT__'], true);
@@ -599,7 +851,14 @@ foreach (['preview', 'complete'] as $operation) {
             if ($operation==='preview') {
                 if (!is_string($input['invitation_code']??null)) throw new \DomainException('Informe o código do convite.');
                 $result=$service->preview($input['invitation_code']);
-            } else { $result=$service->complete($input); }
+            } else {
+                // NI2-449: o aceite só é gravado quando o app envia terms_accepted (o app atual ainda não envia;
+                // nesse caso o paciente fica com o aceite pendente e confirma no próximo login pela web).
+                $acceptance = filter_var($input['terms_accepted'] ?? false, FILTER_VALIDATE_BOOL)
+                    ? ['channel' => 'app', 'ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''), 'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? '')]
+                    : null;
+                $result=$service->complete($input, $acceptance);
+            }
             if ($operation === 'complete') \ClyoNutri\Core\Auth\MobileWebSession::start($result['token'], $result['expires_at']);
             echo json_encode($result, JSON_UNESCAPED_UNICODE);
         } catch (\DomainException $e) {
@@ -1049,7 +1308,40 @@ $router->post('/api/v1/patient/checkin', function() use ($authenticatePatientApi
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
 });
 
+// Uses the existing Bearer/cookie authentication, expiry, Origin and web-header checks.
+$router->get('/api/v1/patient/booking/context', function() use ($authenticatePatientApi, $bookingCtrl) {
+    $authenticatePatientApi();
+    $bookingCtrl->patientBookingContext();
+});
+$router->post('/api/v1/patient/booking/confirm', function() use ($authenticatePatientApi, $bookingCtrl) {
+    $authenticatePatientApi();
+    $bookingCtrl->confirmAuthenticatedBooking();
+});
+
+$router->get('/api/v1/patient/waitlist', function() use ($authenticatePatientApi, $bookingCtrl) {
+    $authenticatePatientApi();
+    $bookingCtrl->waitlistApi('list');
+});
+$router->post('/api/v1/patient/waitlist', function() use ($authenticatePatientApi, $bookingCtrl) {
+    $authenticatePatientApi();
+    $bookingCtrl->waitlistApi('join');
+});
+$router->post('/api/v1/patient/waitlist/{id}/cancel', function($params = []) use ($authenticatePatientApi, $bookingCtrl) {
+    $authenticatePatientApi();
+    $bookingCtrl->waitlistApi('cancel', (int)($params['id'] ?? 0));
+});
+
 // Próxima consulta: ações da paciente (NI2-137). Tudo passa pelo motor da agenda e pela política da clínica.
+// NI2-433: patient-owned management; canonical appointments and the existing patient auth.
+$selfServiceCtrl = new \ClyoNutri\Application\Controllers\PatientSelfServiceController($db);
+$router->get('/paciente/consultas', function() use($authenticatePatientApi,$selfServiceCtrl){$authenticatePatientApi();$selfServiceCtrl->page();});
+$router->get('/api/v1/patient/appointments', function() use($authenticatePatientApi,$selfServiceCtrl){$authenticatePatientApi();$selfServiceCtrl->list();});
+$router->get('/api/v1/patient/appointments/{id}/self-service-slots', function($params=[]) use($authenticatePatientApi,$selfServiceCtrl){$authenticatePatientApi();$selfServiceCtrl->slots((int)($params['id']??0));});
+$router->post('/api/v1/patient/appointments/{id}/reschedule-now', function($params=[]) use($authenticatePatientApi,$selfServiceCtrl,$getJsonInput){$authenticatePatientApi();$selfServiceCtrl->reschedule((int)($params['id']??0),$getJsonInput());});
+$router->get('/api/v1/booking/catalog', [new \ClyoNutri\Application\Controllers\PatientSelfServiceController($db),'catalog']);
+$router->get('/api/booking/metrics', $requireAuth([$selfServiceCtrl,'metrics']));
+$router->get('/agenda/indicadores-autoagendamento', $requireAuth([$selfServiceCtrl,'metricsPage']));
+
 $patientAppointmentApi = static fn() => new \ClyoNutri\Application\Api\PatientAppointmentApiController($db);
 $router->post('/api/v1/patient/appointment/confirm', function() use ($authenticatePatientApi, $getJsonInput, $patientAppointmentApi) {
     header('Content-Type: application/json; charset=utf-8');
@@ -1267,6 +1559,66 @@ $router->get('/api/v1/chat/anexo/{token}', function($params = []) use ($chatApi)
     $api = $chatApi();
     if (!$api->enabled()) return;
     $api->downloadByToken((string)($params['token'] ?? ''));
+});
+
+// 4.1b Laudos de exames pelo app (v48, NI2-539). O envio da paciente entra "aguardando revisão" e não vira dado
+// clínico até a nutricionista aceitar. Arquivo inspecionado (tipo real, conteúdo ativo, antivírus se houver).
+$examResultApiError = static function (\Throwable $e): void {
+    $known = $e instanceof \DomainException || $e instanceof \InvalidArgumentException;
+    http_response_code($known ? 422 : 500);
+    if (!$known) { error_log('EXAM_RESULT_API_ERROR ' . get_class($e) . ': ' . $e->getMessage()); }
+    echo json_encode(['status' => 'error', 'error' => $known ? $e->getMessage() : 'Não foi possível concluir agora. Tente de novo.'], JSON_UNESCAPED_UNICODE);
+};
+$router->get('/api/v1/patient/exam-requests', function() use ($authenticatePatientApi, $db) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    $data = (new \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService($db))->patientOverview((int)$auth['patient_id'], (int)$auth['clinic_id']);
+    echo json_encode(['status' => 'success', 'exam_requests' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+});
+$router->post('/api/v1/patient/exam-requests/{id}/results', function($params = []) use ($authenticatePatientApi, $db, $examResultApiError) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    try {
+        $file = is_array($_FILES['file'] ?? null) ? $_FILES['file'] : ['error' => UPLOAD_ERR_NO_FILE, 'tmp_name' => '', 'name' => ''];
+        $s = static fn(string $k) => is_scalar($_POST[$k] ?? null) ? (string)$_POST[$k] : '';
+        $doc = (new \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService($db))->uploadByPatient((int)$auth['patient_id'], (int)($params['id'] ?? 0), $file,
+            ['laboratory_name' => $s('laboratory_name'), 'collected_at' => $s('collected_at'), 'notes' => $s('notes'),
+             'item_ids' => array_map('intval', array_filter((array)($_POST['item_ids'] ?? []), 'is_scalar'))]);
+        http_response_code(201);
+        echo json_encode(['status' => 'success', 'message' => 'Laudo enviado. Sua nutricionista vai revisar.', 'result' => [
+            'id' => (int)$doc['id'], 'status' => $doc['status'], 'status_label' => $doc['status_label'], 'original_name' => $doc['original_name']]], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        $examResultApiError($e);
+    }
+});
+$router->post('/api/v1/patient/exam-results/{id}/link', function($params = []) use ($authenticatePatientApi, $db, $examResultApiError) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $auth = $authenticatePatientApi();
+    try {
+        $token = (new \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService($db))->patientLink((int)($params['id'] ?? 0), (int)$auth['patient_id']);
+        echo json_encode(['status' => 'success', 'url' => '/api/v1/exames/laudo/' . $token, 'expires_in' => 120], JSON_UNESCAPED_SLASHES);
+    } catch (\Throwable $e) {
+        $examResultApiError($e);
+    }
+});
+// Link assinado e curto (2 min) para abrir o laudo no aparelho, sem levar o token de sessão (como no anexo do chat).
+$router->get('/api/v1/exames/laudo/{token}', function($params = []) use ($db) {
+    try {
+        $link = \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService::verifyLink((string)($params['token'] ?? ''));
+        if ($link['kind'] !== 'q') { throw new \DomainException('Link de laudo inválido.'); }
+        $file = (new \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService($db))->fileFor($link['document_id'], $link['clinic_id'], ['type' => 'patient', 'id' => $link['subject_id']]);
+    } catch (\Throwable $e) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo $e instanceof \DomainException ? $e->getMessage() : 'Laudo não encontrado.';
+        return;
+    }
+    \ClyoNutri\Domain\LaboratoryExam\ExamResultDocumentService::sendHeaders($file);
+    echo $file['bytes'];
 });
 
 // 4.2 Avisos da paciente (NI2-95): caixa de avisos e preferências por tipo de aviso e canal.
@@ -1553,7 +1905,14 @@ $router->post('/api/v1/professional/patients/{id}/app-invitation', function(arra
     $auth=$authenticateProfessionalApi();
     try {
         $result=(new \ClyoNutri\Domain\PatientPortal\PatientOnboardingService($db))->create((int)$auth['clinic_id'],(int)$auth['user_id'],(int)$params['id']);
-        echo json_encode($result);
+        // NI2-481: convite gerado e commitado -> envia o e-mail de primeiro acesso ao paciente.
+        // O token em texto puro não é persistido; a falha de e-mail não invalida o convite já criado.
+        $delivery=(new \ClyoNutri\Domain\PatientPortal\PatientInviteNotifier($db))->sendInvite(
+            (int)$auth['clinic_id'],(int)$params['id'],(string)$result['invitation_code'],(string)$result['expires_at'],(int)$auth['user_id']
+        );
+        // Mantém invitation_code (fallback: paciente sem e-mail, ou envio manual pelo profissional)
+        // e acrescenta o resultado do envio do e-mail (sent/skipped/failed).
+        echo json_encode($result + ['email_status'=>$delivery['status'],'email_reason'=>$delivery['reason']??null]);
     } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) { http_response_code(403); echo json_encode(['error'=>'Convite indisponível para este paciente.']); }
     catch (\DomainException $e) { http_response_code(422); echo json_encode(['error'=>$e->getMessage()], JSON_UNESCAPED_UNICODE); }
 });
@@ -1613,6 +1972,8 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
         echo json_encode(['error' => 'Conta sem autorização clínica ou profissional.']);
         return;
     }
+
+    (new \ClyoNutri\Core\Auth\LastLoginService($db))->record((int)$user['id']);
 
     $token = bin2hex(random_bytes(32));
     $hashed = hash('sha256', $token);
