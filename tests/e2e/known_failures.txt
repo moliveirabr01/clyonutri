@@ -1,0 +1,1 @@
+# Falhas já conhecidas (nome contagem  # motivo). Vazio desde a NI2-233: v47_ni2_537 era asserção obsoleta e foi corrigida.

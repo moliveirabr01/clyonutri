@@ -1,0 +1,19 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require('fs'),assert=require('assert');
+(async()=>{const f=JSON.parse(fs.readFileSync(process.env.ADAPTIVE_FIXTURE_FILE)),base=process.env.UX_BASE_URL,checks=[],b=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH}),p=await b.newPage();const check=(name,pass)=>{checks.push({name,pass:!!pass});assert(pass,name);};
+await p.goto(base+'/login');await p.locator('#email').fill(f.email);await p.locator('#password').fill('Synthetic-local-651!');await p.locator('button[type=submit]').click();await p.waitForLoadState();await p.goto(base+'/planos/'+f.quick_plan);await p.locator('#quick-meal-name').focus();
+await p.evaluate(()=>{
+ const original=document.createElement('div');original.id='test-original-inert';original.inert=true;document.body.append(original);
+ for(const [id,html] of [['component-first','<h2>Primeiro componente</h2><button id="nested-trigger">Abrir segundo</button><input aria-label="Campo"><details><summary id="last-summary">Resumo final</summary><button tabindex="-1">Fora do Tab</button></details>'],['component-second','<h2>Segundo componente</h2><button data-dialog-close>Fechar</button>'],['component-empty','<h2>Componente sem controles</h2>']]){
+  const d=document.createElement('div');d.id=id;d.dataset.dialog='modal';d.style.display='none';d.innerHTML=html;document.body.append(d);
+ }window.ClyoDialog.open('component-first');
+});await p.waitForTimeout(50);
+check('fundo inerte',await p.locator('.app-container').getAttribute('inert')!==null);
+await p.locator('#nested-trigger').focus();await p.evaluate(()=>window.ClyoDialog.open('component-second'));await p.waitForTimeout(50);
+check('segundo diálogo ativo não inerte',await p.locator('#component-second').evaluate(d=>!d.closest('[inert]')&&d.contains(document.activeElement)));
+check('primeiro diálogo inerte sob segundo',await p.locator('#component-first').getAttribute('inert')!==null);
+await p.keyboard.press('Escape');check('fechar segundo restaura primeiro',await p.locator('#component-first').evaluate(d=>!d.closest('[inert]')&&d.contains(document.activeElement)));check('fundo permanece inerte',await p.locator('.app-container').getAttribute('inert')!==null);
+await p.locator('#last-summary').focus();await p.keyboard.press('Tab');check('summary final volta ao primeiro tab stop',await p.locator('#nested-trigger').evaluate(d=>d===document.activeElement));
+await p.keyboard.press('Escape');check('último diálogo libera fundo',await p.locator('.app-container').getAttribute('inert')===null);check('inert original preservado',await p.locator('#test-original-inert').getAttribute('inert')!==null);check('foco retorna à origem',await p.locator('#quick-meal-name').evaluate(d=>d===document.activeElement));
+await p.evaluate(()=>window.ClyoDialog.open('component-empty'));await p.waitForTimeout(50);check('diálogo vazio recebe foco',await p.locator('#component-empty').evaluate(d=>d===document.activeElement));await p.keyboard.press('Tab');check('Tab não escapa de diálogo vazio',await p.locator('#component-empty').evaluate(d=>d===document.activeElement));await p.keyboard.press('Escape');
+await p.evaluate(()=>window.ClyoDialog.open('component-first'));await p.waitForTimeout(50);await p.locator('#component-first').evaluate(d=>d.remove());await p.waitForTimeout(50);check('remoção dinâmica libera fundo e restaura foco',await p.locator('.app-container').getAttribute('inert')===null&&await p.locator('#quick-meal-name').evaluate(d=>d===document.activeElement));
+await b.close();const result={issue:'NI2-630',synthetic_component_contract:true,no_clinical_data_mocked:true,checks};fs.writeFileSync(process.env.UX_OUTPUT_FILE,JSON.stringify(result,null,2));console.log(JSON.stringify({passed:checks.length}));})().catch(e=>{console.error(e);process.exit(1)});
