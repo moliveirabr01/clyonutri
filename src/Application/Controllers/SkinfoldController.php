@@ -192,7 +192,7 @@ class SkinfoldController
 
     private function redirect(string $to): void
     {
-        header('Location: ' . $to);
+        header(\ClyoNutri\Application\View\AttendanceContext::location('Location: ' . $to));
         exit;
     }
 }

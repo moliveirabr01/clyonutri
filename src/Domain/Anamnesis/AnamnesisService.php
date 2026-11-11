@@ -243,6 +243,16 @@ class AnamnesisService
             ");
             $checkDraft->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
             $existingDraft = $checkDraft->fetch();
+            if ($existingDraft) {
+                // v54.57 (UX-103): nunca sobrescrever um rascunho com campo cifrado ilegível; o conteúdo poderia ser
+                // recuperável com a chave certa. O nutricionista decide na tela (recoverUnreadableDraft).
+                $rawDraft = $this->db->prepare('SELECT * FROM anamneses WHERE id = :id AND clinic_id = :c');
+                $rawDraft->execute(['id' => (int)$existingDraft['id'], 'c' => $clinicId]);
+                $bad = ClinicalEncryptionService::unreadableAnamnesisFields($rawDraft->fetch(PDO::FETCH_ASSOC) ?: null);
+                if ($bad !== []) {
+                    throw new UnreadableAnamnesisDraftException($bad, $patientId);
+                }
+            }
 
             $createdAt = date('Y-m-d H:i:s');
             $hasStructured = $this->hasStructuredColumns();
@@ -550,6 +560,74 @@ class AnamnesisService
         $row = $stmt->fetch();
 
         return $row ? ClinicalEncryptionService::decryptAnamnesisRow($row) : null;
+    }
+
+    /** v54.57 (UX-103): rótulo em português de um campo cifrado da anamnese. */
+    public static function fieldLabel(string $field): string
+    {
+        return [
+            'objectives' => 'Objetivos', 'routine' => 'Rotina', 'food_preferences' => 'Preferências alimentares',
+            'restrictions' => 'Restrições', 'allergies' => 'Alergias', 'symptoms' => 'Sintomas', 'habits' => 'Hábitos',
+            'clinical_history' => 'Histórico clínico', 'notes' => 'Observações', 'structured_data_json' => 'Respostas estruturadas',
+        ][$field] ?? $field;
+    }
+
+    /**
+     * v54.57 (UX-103): campos ilegíveis do rascunho em andamento (vazio quando o rascunho está íntegro ou não existe).
+     * @return array{id:int,version:int,fields:list<string>}|null
+     */
+    public function unreadableDraft(int $patientId): ?array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        if (!$this->hasColumn('is_draft')) {
+            return null;
+        }
+        $st = $this->db->prepare('SELECT * FROM anamneses WHERE patient_id = :p AND clinic_id = :c AND is_draft = 1 ORDER BY id DESC LIMIT 1');
+        $st->execute(['p' => $patientId, 'c' => $clinicId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        $bad = ClinicalEncryptionService::unreadableAnamnesisFields($row);
+        return $bad === [] ? null : ['id' => (int)$row['id'], 'version' => (int)$row['version'], 'fields' => $bad];
+    }
+
+    /**
+     * v54.57 (UX-103): recupera o rascunho em andamento. Mantém tudo o que está legível e esvazia SÓ os campos
+     * ilegíveis. O conteúdo cifrado descartado fica guardado na auditoria (ANAMNESIS_DRAFT_UNREADABLE_DISCARDED), ainda
+     * cifrado, para uma eventual recuperação com a chave correta. Versões concluídas nunca são tocadas.
+     * @return list<string> campos descartados (vazio = nada a recuperar)
+     */
+    public function recoverUnreadableDraft(int $patientId, int $professionalId): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+        $info = $this->unreadableDraft($patientId);
+        if ($info === null) {
+            return [];
+        }
+        $st = $this->db->prepare('SELECT * FROM anamneses WHERE id = :id AND clinic_id = :c AND is_draft = 1');
+        $st->execute(['id' => $info['id'], 'c' => $clinicId]);
+        $raw = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $quarantine = [];
+        $sets = [];
+        foreach ($info['fields'] as $f) {
+            $quarantine[$f] = ['sha256' => hash('sha256', (string)$raw[$f]), 'length' => strlen((string)$raw[$f]), 'ciphertext' => (string)$raw[$f]];
+            $sets[] = "{$f} = NULL"; // nomes vêm da lista fixa ANAMNESIS_ENCRYPTED_FIELDS
+        }
+        $own = !$this->db->inTransaction();
+        if ($own) $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE anamneses SET ' . implode(', ', $sets) . ' WHERE id = :id AND clinic_id = :c AND is_draft = 1')
+                ->execute(['id' => $info['id'], 'c' => $clinicId]);
+            $this->logAudit($clinicId, $patientId, 'ANAMNESIS_DRAFT_UNREADABLE_DISCARDED', (string)$info['id'], [
+                'version' => $info['version'], 'fields' => $info['fields'], 'professional_id' => $professionalId, 'quarantine' => $quarantine,
+            ]);
+            if ($own) $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($own && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+        return $info['fields'];
     }
 
     /**

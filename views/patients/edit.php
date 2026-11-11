@@ -24,6 +24,18 @@
 </select>
 <small id="edit_gender_help" class="u-block u-text-caption u-color-neutral-gray-500 u-mt-1">O parâmetro usado nas equações não define a identidade de gênero. Quando confirmado pelo profissional, pode ser usado na classificação da RCQ e na elegibilidade de protocolos de dobras, junto com a idade. Sem os dados exigidos, a classificação ou equação fica indisponível; confirme o parâmetro no contexto da avaliação. Não o deduza da identidade de gênero.</small>
 </div>
+<?php if (!empty($anamnesisAllergy)): // v54.57 (UX-108): fonte única = anamnese concluída ?>
+<?php
+  $aa = $anamnesisAllergy;
+  $aaText = !empty($aa['unreadable']) ? 'Não foi possível ler a alergia registrada na anamnese. Abra a anamnese para conferir.' : ($aa['allergies'] !== '' ? $aa['allergies'] : ($aa['assessment'] === 'denied' ? 'Nega alergias alimentares conhecidas' : 'Não informado na anamnese'));
+  $aaWhen = \ClyoNutri\Core\I18n\LocalTime::local($aa['recorded_at'], 'd/m/Y');
+?>
+<div class="form-group" data-testid="edit-allergy-source">
+<p class="form-label u-mb-1" id="edit_allergies_label">Alergias e intolerâncias alimentares</p>
+<p class="u-m-0" aria-labelledby="edit_allergies_label"><strong><?= $escape($aaText) ?></strong></p>
+<small class="u-block u-text-caption u-color-neutral-gray-500 u-mt-1">Origem: anamnese v<?= (int)$aa['version'] ?><?= $aaWhen !== '' ? ', ' . $escape($aaWhen) : '' ?><?= $aa['author'] !== '' ? ', por ' . $escape($aa['author']) : '' ?>. A alergia fica em um lugar só para o selo do perfil, o editor do plano e a trava de alérgenos lerem o mesmo dado. <a href="<?= $escape($aa['url']) ?>">Editar na anamnese</a></small>
+</div>
+<?php else: ?>
 <div class="form-group">
 <label class="form-label" for="edit_allergies">Alergias e intolerâncias alimentares</label>
 <input class="form-control" id="edit_allergies" name="allergies" type="text" value="<?= $escape($patient['allergies'] ?? '') ?>" placeholder="Ex: amendoim, glúten, leite, frutos do mar...">
@@ -32,6 +44,7 @@
   <span>Nega alergias alimentares conhecidas</span>
 </label>
 </div>
+<?php endif; ?>
 <div class="form-group">
 <label class="form-label" for="edit_notes">Observações</label>
 <textarea class="form-control" id="edit_notes" name="notes" rows="4"><?= $escape($patient['notes']) ?></textarea>

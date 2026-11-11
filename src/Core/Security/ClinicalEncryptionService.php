@@ -218,13 +218,56 @@ final class ClinicalEncryptionService
             return null;
         }
 
+        // v54.57 (UX-103): um campo cifrado ilegível (payload corrompido ou chave trocada) não derruba mais a tela
+        // inteira. O campo volta vazio, a linha leva a lista em "_unreadable_fields" e o fato vai para o log
+        // (sem conteúdo clínico). Quem grava por cima de uma linha assim precisa tratar isso explicitamente
+        // (AnamnesisService recusa sobrescrever um rascunho ilegível sem o descarte auditado).
+        $unreadable = [];
         foreach (self::ANAMNESIS_ENCRYPTED_FIELDS as $field) {
             if (array_key_exists($field, $row) && is_string($row[$field])) {
-                $row[$field] = self::decrypt($row[$field]);
+                try {
+                    $row[$field] = self::decrypt($row[$field]);
+                } catch (RuntimeException $e) {
+                    $row[$field] = null;
+                    $unreadable[] = $field;
+                }
             }
+        }
+        if ($unreadable !== []) {
+            $row['_unreadable_fields'] = $unreadable;
+            error_log((string)json_encode([
+                'event' => 'ANAMNESIS_FIELD_UNREADABLE',
+                'anamnesis_id' => isset($row['id']) ? (int)$row['id'] : null,
+                'clinic_id' => isset($row['clinic_id']) ? (int)$row['clinic_id'] : null,
+                'patient_id' => isset($row['patient_id']) ? (int)$row['patient_id'] : null,
+                'is_draft' => isset($row['is_draft']) ? (int)$row['is_draft'] : null,
+                'fields' => $unreadable,
+            ]));
         }
 
         return $row;
+    }
+
+    /**
+     * v54.57 (UX-103): campos cifrados de uma linha crua que não podem ser lidos com a chave atual.
+     * @return list<string>
+     */
+    public static function unreadableAnamnesisFields(?array $row): array
+    {
+        if ($row === null) {
+            return [];
+        }
+        $out = [];
+        foreach (self::ANAMNESIS_ENCRYPTED_FIELDS as $field) {
+            if (isset($row[$field]) && is_string($row[$field]) && self::isEncrypted($row[$field])) {
+                try {
+                    self::decrypt($row[$field]);
+                } catch (RuntimeException $e) {
+                    $out[] = $field;
+                }
+            }
+        }
+        return $out;
     }
 
     /**

@@ -283,9 +283,30 @@ $requireAuth = function (callable $action) use ($db, $sessionReturnPath) {
         try {
             \ClyoNutri\Core\Security\ClinicalAuthorization::assertWebAccess($actor, parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', $_SERVER['REQUEST_METHOD'], $db);
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            // v54.57 (UX-104): navegação no navegador recebe a página de erro com o layout e um caminho permitido.
+            if (!$wantsJsonAuthError && \ClyoNutri\Core\Http\ErrorPage::wantsHtml()) {
+                \ClyoNutri\Core\Http\ErrorPage::render(403, 'Acesso não permitido para o seu perfil', 'Esta página tem dados clínicos ou de gestão que o seu perfil nesta clínica não acessa. Nada foi alterado. Use um dos caminhos abaixo.');
+                return;
+            }
             http_response_code(403);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Acesso não autorizado para este perfil.']);
+            return;
+        }
+        // UX-002: validate explicit consultation context before the controller can read/write.
+        try {
+            \ClyoNutri\Application\View\AttendanceContext::begin($db);
+        } catch (\DomainException $e) {
+            http_response_code(403);
+            $contextMessage='Atendimento não disponível para este paciente e perfil. Reabra a consulta pela agenda.';
+            if ($wantsJsonAuthError) { header('Content-Type: application/json; charset=utf-8'); echo json_encode(['error'=>$contextMessage]); }
+            else \ClyoNutri\Core\Http\ErrorPage::render(403, 'Atendimento não disponível', $contextMessage, [['Abrir a agenda', '/agenda'], ['Ver pacientes', '/pacientes']]); // v54.57 (R55-01)
+            return;
+        } catch (\Throwable $e) {
+            http_response_code(503);
+            $contextMessage='Não foi possível conferir o atendimento. Tente novamente antes de salvar.';
+            if ($wantsJsonAuthError) { header('Content-Type: application/json; charset=utf-8'); echo json_encode(['error'=>$contextMessage]); }
+            else \ClyoNutri\Core\Http\ErrorPage::render(503, 'Não foi possível conferir o atendimento', $contextMessage, [['Abrir a agenda', '/agenda']]); // v54.57 (R55-01)
             return;
         }
         // CSRF + Origin/Referer para mutações /api/ autenticadas por cookie de sessão (auditoria 14/10/2026).
@@ -373,6 +394,10 @@ $router->get('/paciente/app', [$patientAppCtrl, 'index']);
 $router->post('/paciente/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
 $router->post('/paciente/app/login', [$patientAppCtrl, 'login']);
 $router->post('/paciente/app/aceite-termos', [$patientAppCtrl, 'acceptTerms']); // NI2-449
+// v54.57 (UX-102): portal web com sessão real (cookie HttpOnly do login): plano em leitura, água e sair.
+$router->get('/paciente/plano', [$patientAppCtrl, 'plan']);
+$router->post('/paciente/hidratacao', [$patientAppCtrl, 'logWater']);
+$router->post('/paciente/app/sair', [$patientAppCtrl, 'logout']);
 $router->get('/app', [$patientAppCtrl, 'index']);
 $router->post('/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
 $router->post('/app/login', [$patientAppCtrl, 'login']);
@@ -464,6 +489,7 @@ $router->get('/pacientes/{id}/prontuario/exportar', $requireAuth([$dashCtrl, 'ex
 $router->get('/pacientes/{id}/prontuario/imprimir', $requireAuth([$dashCtrl, 'printMedicalRecord']));
 $router->get('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'patientAnamnesis']));
 $router->post('/pacientes/{id}/anamnese', $requireAuth([$dashCtrl, 'savePatientAnamnesis']));
+$router->post('/pacientes/{id}/anamnese/recuperar-rascunho', $requireAuth([$dashCtrl, 'recoverAnamnesisDraft'])); // v54.57 (UX-103)
 $router->post('/pacientes/{id}/alergias/revisao', $requireAuth([$dashCtrl, 'dismissAllergyHistory'])); // NI2-624
 // NI2-626/631: authenticated canonical draft mutations (session + CSRF).
 $workflowCtrl = new \ClyoNutri\Application\Controllers\WorkflowController($db);
@@ -847,6 +873,20 @@ $router->post('/admin/notificacoes/{id}/lida', $requireAuth([$adminCtrl, 'notifi
 // 4. API Móvel do Paciente (/api/v1/patient/...)
 $authenticatePatientApi = function() use ($db): array {
     $plainToken = \ClyoNutri\Core\Auth\MobileWebSession::token();
+    // v54.57 (UX-102): página do portal (/paciente/...) aberta no navegador sem sessão válida volta ao login do portal
+    // com explicação, em vez de JSON 401. A API (/api/v1/...) e chamadas fetch continuam recebendo JSON.
+    $portalPage = static function () use ($db, $plainToken): bool {
+        $p = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        if (!str_starts_with($p, '/paciente/') || !in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) || !\ClyoNutri\Core\Http\ErrorPage::wantsHtml()) return false;
+        if ($plainToken) {
+            $st = $db->prepare("SELECT 1 FROM personal_access_tokens WHERE tokenable_type = 'patient' AND token = ? AND expires_at IS NOT NULL AND expires_at > CURRENT_TIMESTAMP");
+            $st->execute([hash('sha256', $plainToken)]);
+            if ($st->fetchColumn()) return false;
+        }
+        header('Location: /paciente/app?sessao=1', true, 303);
+        return true;
+    };
+    if ($portalPage()) exit;
     if (!$plainToken) {
         http_response_code(401);
         echo json_encode(['error' => 'Não autorizado. Token Bearer ausente ou inválido.']);

@@ -52,80 +52,19 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
     <?php if (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($app['type'] ?? null)): /* NI2-221 F19: só consulta online */ ?>
       <a href="/teleconsulta/sessao-agenda/<?= (int)$app['id'] ?>" class="btn btn-primary"><span>Consultório online</span></a>
     <?php endif; ?>
-    <a href="/pacientes/<?= $pid ?>" class="btn btn-secondary">Ver perfil do paciente</a>
+    <a href="/pacientes/<?= $pid ?>" class="cr-profile-link">Ver perfil do paciente</a>
   </div>
 </div>
 <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), $pid, 'atendimento', null, ['state'=>'continue','appointment'=>$app], null, null, false, 'context') // NI2-623/629 ?>
 
-<?php $examPatientId=$pid;$examAppointmentId=(int)$id;require __DIR__.'/../patients/partials/exam_context.php'; ?>
+<details class="ux52-exam-context"><summary>Exames desta consulta</summary><?php $examPatientId=$pid;$examAppointmentId=(int)$id;require __DIR__.'/../patients/partials/exam_context.php'; ?></details>
 <div class="consultation-room-layout">
-  <div class="cr-stack">
-    <section class="card cr-context" aria-labelledby="cr-ctx-title">
-      <div class="cr-card__head"><h3 id="cr-ctx-title">Contexto do Paciente</h3></div>
-      <p><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
-      <p><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
-      <p><strong>Nascimento:</strong> <?= !empty($p['birth_date']) ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
-      <p><strong>Sexo registrado para referências clínicas:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
-      <?php if (!empty($app['notes'])): ?>
-        <div class="cr-note">
-          <strong>Observações do Agendamento:</strong>
-          <p><?= nl2br(htmlspecialchars($app['notes'])) ?></p>
-        </div>
-      <?php endif; ?>
-    </section>
-
-    <section class="card" aria-labelledby="cr-measures-title">
-      <div class="cr-card__head">
-        <h3 id="cr-measures-title">Últimas medidas</h3>
-        <a href="/pacientes/<?= $pid ?>/antropometria?atendimento=<?= (int)$id ?>" class="btn btn-secondary cr-btn--compact">Avaliações</a>
-      </div>
-      <?php if (empty($profile['assessments'])): ?>
-        <p class="cr-muted">Nenhuma avaliação antropométrica registrada ainda.</p>
-      <?php else: ?>
-        <?php $lastAssessment = $profile['assessments'][0]; ?>
-        <div class="cr-metrics">
-          <div class="cr-metric"><span>Peso</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['weight_kg'] ?? null, 1, 'kg')) ?></strong></div>
-          <div class="cr-metric"><span>Altura</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['height_cm'] ?? null, 1, 'cm')) ?></strong></div>
-          <div class="cr-metric"><span>IMC</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['bmi'] ?? null, 2)) ?></strong></div>
-        </div>
-        <small class="cr-caption">Registrado em: <?= date('d/m/Y', strtotime($lastAssessment['assessed_at'])) ?></small>
-      <?php endif; ?>
-    </section>
-
-    <section class="card" aria-labelledby="cr-plan-title">
-      <div class="cr-card__head">
-        <h3 id="cr-plan-title">Prescrição alimentar</h3>
-        <a href="/planos" target="_blank" rel="noopener" class="btn btn-secondary cr-btn--compact">Todos os Planos</a>
-      </div>
-      <?php if (empty($profile['meal_plans'])): ?>
-        <p class="cr-muted">Nenhum plano prescrito ainda. Inicie a prescrição desta consulta.</p>
-        <a href="/pacientes/<?= $pid ?>/plano?atendimento=<?= (int)$id ?>" class="btn btn-primary cr-btn--compact">+ Prescrever plano</a>
-      <?php else: ?>
-        <?php $plan = $profile['meal_plans'][0]; ?>
-        <div class="cr-inline">
-          <strong><?= htmlspecialchars($plan['title']) ?> (v<?= (int)$plan['version'] ?>)</strong>
-          <?= LabelMap::mealPlanStatusBadge($plan['status'] ?? '') ?>
-        </div>
-        <a href="/planos/<?= (int)$plan['id'] ?>?atendimento=<?= (int)$id ?>" class="btn btn-outline cr-btn--compact">Abrir editor da prescrição</a>
-      <?php endif; ?>
-    </section>
-
-    <section class="card" aria-labelledby="cr-an-title">
-      <div class="cr-card__head">
-        <h3 id="cr-an-title">Anamnese nutricional</h3>
-        <a href="/pacientes/<?= $pid ?>/anamnese?atendimento=<?= (int)$id ?>" class="btn btn-secondary cr-btn--compact">Abrir anamnese</a>
-      </div>
-      <p class="cr-muted">Consulte ou atualize o histórico clínico, alergias e rotina do paciente.</p>
-      <a href="/pacientes/<?= $pid ?>/anamnese?atendimento=<?= (int)$id ?>" class="btn btn-outline cr-btn--compact">Ver / preencher anamnese estruturada</a>
-    </section>
-  </div>
-
   <div>
     <section class="card" aria-labelledby="cr-evol-title">
       <div class="cr-card__head">
         <div>
-          <h3 id="cr-evol-title">Evolução clínica e conduta do atendimento</h3>
-          <p class="cr-card__lead">Ao concluir a consulta, a evolução é registrada no prontuário eletrônico do paciente com data, hora e autor (quem conclui, com CRN), e encadeada por código de integridade. Não há assinatura digital (ICP-Brasil).</p>
+          <h3 id="cr-evol-title">Evolução e conduta</h3>
+          <p class="cr-card__lead">Revise a evolução antes de concluir. O registro será incluído no prontuário com data, hora e autoria profissional.</p>
         </div>
       </div>
 
@@ -226,5 +165,67 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
       </section>
     <?php endif; ?>
   </div>
+
+  <div class="cr-stack">
+    <section class="card cr-context" aria-labelledby="cr-ctx-title">
+      <div class="cr-card__head"><h3 id="cr-ctx-title">Contexto do Paciente</h3></div>
+      <p><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
+      <p><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
+      <p><strong>Nascimento:</strong> <?= !empty($p['birth_date']) ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
+      <p><strong>Sexo registrado para referências clínicas:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
+      <?php if (!empty($app['notes'])): ?>
+        <div class="cr-note">
+          <strong>Observações do Agendamento:</strong>
+          <p><?= nl2br(htmlspecialchars($app['notes'])) ?></p>
+        </div>
+      <?php endif; ?>
+    </section>
+
+    <section class="card" aria-labelledby="cr-measures-title">
+      <div class="cr-card__head">
+        <h3 id="cr-measures-title">Últimas medidas</h3>
+        <a href="/pacientes/<?= $pid ?>/antropometria?atendimento=<?= (int)$id ?>" class="btn btn-secondary cr-btn--compact">Avaliações</a>
+      </div>
+      <?php if (empty($profile['assessments'])): ?>
+        <p class="cr-muted">Nenhuma avaliação antropométrica registrada ainda.</p>
+      <?php else: ?>
+        <?php $lastAssessment = $profile['assessments'][0]; ?>
+        <div class="cr-metrics">
+          <div class="cr-metric"><span>Peso</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['weight_kg'] ?? null, 1, 'kg')) ?></strong></div>
+          <div class="cr-metric"><span>Altura</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['height_cm'] ?? null, 1, 'cm')) ?></strong></div>
+          <div class="cr-metric"><span>IMC</span><strong><?= htmlspecialchars(LabelMap::num($lastAssessment['bmi'] ?? null, 2)) ?></strong></div>
+        </div>
+        <small class="cr-caption">Registrado em: <?= date('d/m/Y', strtotime($lastAssessment['assessed_at'])) ?></small>
+      <?php endif; ?>
+    </section>
+
+    <section class="card" aria-labelledby="cr-plan-title">
+      <div class="cr-card__head">
+        <h3 id="cr-plan-title">Prescrição alimentar</h3>
+        <a href="/planos" target="_blank" rel="noopener" class="btn btn-secondary cr-btn--compact">Todos os Planos</a>
+      </div>
+      <?php if (empty($profile['meal_plans'])): ?>
+        <p class="cr-muted">Nenhum plano prescrito ainda. Inicie a prescrição desta consulta.</p>
+        <a href="/pacientes/<?= $pid ?>/plano?atendimento=<?= (int)$id ?>" class="btn btn-primary cr-btn--compact">+ Prescrever plano</a>
+      <?php else: ?>
+        <?php $plan = $profile['meal_plans'][0]; ?>
+        <div class="cr-inline">
+          <strong><?= htmlspecialchars($plan['title']) ?> (v<?= (int)$plan['version'] ?>)</strong>
+          <?= LabelMap::mealPlanStatusBadge($plan['status'] ?? '') ?>
+        </div>
+        <a href="/planos/<?= (int)$plan['id'] ?>?atendimento=<?= (int)$id ?>" class="btn btn-outline cr-btn--compact">Abrir editor da prescrição</a>
+      <?php endif; ?>
+    </section>
+
+    <section class="card" aria-labelledby="cr-an-title">
+      <div class="cr-card__head">
+        <h3 id="cr-an-title">Anamnese nutricional</h3>
+        <a href="/pacientes/<?= $pid ?>/anamnese?atendimento=<?= (int)$id ?>" class="btn btn-secondary cr-btn--compact"><?= !empty($clinicalSummary['draft_in_progress']) || !empty($profile['anamneses'][0]['is_draft']) ? 'Continuar anamnese' : 'Abrir anamnese' ?></a>
+      </div>
+      <p class="cr-muted">Consulte ou atualize o histórico clínico, alergias e rotina do paciente.</p>
+
+    </section>
+  </div>
+
 </div>
 </div>

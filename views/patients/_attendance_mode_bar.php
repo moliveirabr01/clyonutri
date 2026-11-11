@@ -15,6 +15,8 @@ $flow = (isset($careFlow) && is_array($careFlow) && (int)($careFlow['appointment
 $stateLabels = \ClyoNutri\Domain\Appointment\CareWorkflow::LABELS;
 ?>
 <aside class="attendance-mode" data-testid="attendance-mode" data-appointment="<?= $aid ?>" aria-label="Modo Atendimento">
+  <a class="btn btn-secondary btn-sm" href="/consulta/<?= $aid ?>" data-testid="attendance-hub">Voltar ao atendimento #<?= $aid ?></a>
+  <details class="ux52-attendance-tools"><summary>Etapas e ferramentas do atendimento</summary>
   <div class="attendance-mode__main">
     <strong class="attendance-mode__badge">Modo Atendimento · em andamento</strong>
     <span class="attendance-mode__meta">Consulta #<?= $aid ?><?= $when !== '' ? ' · ' . $e($when) : '' ?></span>
@@ -38,9 +40,10 @@ $stateLabels = \ClyoNutri\Domain\Appointment\CareWorkflow::LABELS;
     <a class="btn btn-primary btn-sm" href="<?= $e($flow['next']['url']) ?>" data-testid="attendance-resume">Próxima ação: <?= $e($flow['next']['action'] ?? ('Continuar ' . $flow['next']['label'])) ?></a>
   <?php endif; ?>
   <nav class="attendance-mode__nav" aria-label="Ferramentas do atendimento">
-    <a class="btn btn-secondary btn-sm" href="/consulta/<?= $aid ?>" data-testid="attendance-hub">Hub da consulta</a>
+
     <a class="btn btn-secondary btn-sm" href="/pacientes/<?= $pid ?>/anamnese?<?= $q ?>">Anamnese</a>
     <a class="btn btn-secondary btn-sm" href="/pacientes/<?= $pid ?>/antropometria?<?= $q ?>">Avaliações</a>
     <a class="btn btn-secondary btn-sm" href="/pacientes/<?= $pid ?>/plano?<?= $q ?>">Plano</a>
   </nav>
+  </details>
 </aside>

@@ -17,7 +17,10 @@
 
   document.addEventListener('submit', function (ev) {
     var form = ev.target;
-    var action = form.getAttribute('action') || '';
+    if (!(form instanceof HTMLFormElement)) return;
+    var action;
+    try { action = new URL(form.action, document.baseURI).pathname; }
+    catch (_) { return; }
     if (/\/antropometria\/\d+\/compartilhar$/.test(action)) {
       var sh = form.querySelector('input[name="is_shared"]');
       var liberar = sh && sh.value === '1';

@@ -39,6 +39,8 @@ final class PatientHeader
             $context=ClinicalContext::read($db,$patientId);
             $clinicalSummary=$context['summary'];
 
+            $selectedAttendance=AttendanceContext::selected($patientId);
+            if ($selectedAttendance) $careStep=['state'=>$selectedAttendance['status']==='in_progress'?'continue':'selected','appointment'=>$selectedAttendance];
             if ($careStep === null) {
                 try {
                     if (self::$careStepResolver !== null) {
@@ -81,10 +83,13 @@ final class PatientHeader
                 $pid = $patientId;
                 ob_start();
                 echo '<div class="patient-context-only" data-testid="patient-context-only">';
+                require __DIR__ . '/../../../views/patients/_allergy_badge.php';
+                echo '<details class="ux52-context-tools"><summary>Contexto clínico e etapas do atendimento</summary>';
                 if (!empty($careFlow)) {
                     require __DIR__ . '/../../../views/patients/_care_workflow.php';
                 }
                 echo ClinicalContext::renderData($db,$context);
+                echo '</details>';
 
                 echo '</div>';
                 return (string)ob_get_clean();
@@ -94,7 +99,19 @@ final class PatientHeader
             $profileBadgeHtml = (string)ob_get_clean();
             ob_start();
             require __DIR__ . '/../../../views/patients/_profile_header.php';
+            echo '<div class="ux52-clinical-tools">';
+            if (in_array($careStep['state'] ?? '', ['continue','selected'], true) && !empty($careStep['appointment'])) {
+                echo '<a class="btn btn-secondary btn-sm" data-testid="attendance-hub" href="/consulta/'.(int)$careStep['appointment']['id'].'">Voltar ao atendimento #'.(int)$careStep['appointment']['id'].'</a>';
+            }
+            echo '<details class="ux52-context-tools"><summary>Contexto clínico e etapas</summary>';
+            if (!empty($careFlow)) {
+                require __DIR__ . '/../../../views/patients/_care_workflow.php';
+                // The visible return link above is unique; secondary tools are inside the disclosure.
+                ob_start(); require __DIR__ . '/../../../views/patients/_attendance_mode_bar.php';
+                echo str_replace('data-testid="attendance-hub"', 'data-testid="attendance-hub-secondary"', (string)ob_get_clean());
+            }
             echo ClinicalContext::renderData($db,$context);
+            echo '</details></div>';
 
             return (string)ob_get_clean();
         } catch (\DomainException|\ClyoNutri\Core\Security\TenantSecurityException $e) {

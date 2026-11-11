@@ -30,6 +30,7 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
   <a class="skip-link skip-clinical-content" href="#clinical-main-content">Pular para o conteúdo principal</a>
   <div class="app-container">
     <!-- Sidebar Navegação Profissional -->
+    <?php ob_start(); // v54.57 (UX-104): o menu só oferece destinos que o perfil pode abrir ?>
     <aside class="app-sidebar">
       <div class="app-sidebar__logo">
         <img src="/assets/clyonutri-logo-dark.svg?v=botanical-v54-9" alt="Clyo Nutri" width="260" height="64">
@@ -47,6 +48,7 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
       </div>
       <button type="button" class="cn58-nav-backdrop" data-nav-backdrop aria-label="Fechar menu" tabindex="-1" hidden></button>
     </aside>
+    <?= \ClyoNutri\Application\View\RoleNav::filter((string)ob_get_clean()) ?>
 
     <!-- Main Content Area -->
     <main class="app-main">
@@ -55,14 +57,6 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="u-color-botanical-copper-600"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           <span class="app-header__tenant-name" title="<?= htmlspecialchars($clinicName ?? 'Clínica principal', ENT_QUOTES) ?>"><?= htmlspecialchars($clinicName ?? 'Clínica principal') ?></span>
         </div>
-        <?php if (\ClyoNutri\Application\Controllers\AcademyController::enabled()): // v54.23: busca da Clyo Academy (artigos e lâminas) no topo ?>
-        <form method="GET" action="/academy" class="app-header__search" role="search" data-testid="header-academy-search">
-          <label for="header-academy-q" class="sr-only">Buscar na Clyo Academy</label>
-          <?= \ClyoNutri\Application\View\Icon::svg('search', 16) ?>
-          <input type="search" id="header-academy-q" name="q" class="form-control" maxlength="200" placeholder="Buscar na Clyo Academy" autocomplete="off">
-          <button type="submit" class="btn btn-secondary">Buscar</button>
-        </form>
-        <?php endif; ?>
         <div class="app-header__user">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="u-color-neutral-gray-500"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
           <span title="<?= htmlspecialchars($userName ?? 'Nutricionista', ENT_QUOTES) ?>">Olá, <strong><?= htmlspecialchars($shellFirstName) ?></strong></span>
@@ -77,7 +71,7 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
       </header>
 
       <section class="app-content" id="clinical-main-content" tabindex="-1">
-        <?= $content ?? '' ?>
+        <?= \ClyoNutri\Application\View\RoleNav::unlinkForbidden(\ClyoNutri\Application\View\AttendanceContext::navigation($content ?? '')) // v54.57 (UX-104) ?>
       </section>
     </main>
   </div>
@@ -87,7 +81,7 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
 <script src="/assets/js/validacao-ptbr.js" defer></script>
 <script src="/assets/js/clinical-journeys.js?v=v54-58" defer></script>
 <script src="/assets/js/session-timeout.js?v=v54-30" defer></script>
-<script src="/assets/js/avaliacao-confirmacoes.js" defer></script>
+<script src="/assets/js/avaliacao-confirmacoes.js?v=v54-54" defer></script>
 <script src="/assets/js/clinical-context.js?v=v54-26" defer></script>
 <script src="/assets/js/operational-ui.js?v=v54-57" defer></script>
 <script src="/assets/js/workflow-drafts.js?v=v54-57" defer></script>

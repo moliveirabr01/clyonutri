@@ -7,7 +7,17 @@ $plans = $profile['meal_plans'] ?? [];
 <section class="card" id="secao-planos" data-testid="plans-page" aria-labelledby="plans-title">
   <div class="card__header u-flex u-justify-between u-items-center u-mb-3">
     <h2 id="plans-title" class="u-m-0">Planos alimentares (<?= count($plans) ?>)</h2>
-    <button type="button" class="btn btn-secondary u-text-compact u-py-1 u-px-2" data-show="modal-new-plan-tab">+ Novo Plano</button>
+    <div class="u-flex u-gap-2 u-wrap">
+      <?php
+        // v54.57 (UX-115): entrada visível para a comparação quando há 2+ versões publicadas
+        $publishedCount = 0;
+        try { $publishedCount = count((new \ClyoNutri\Domain\MealPlan\MealPlanVersionDiffService(\ClyoNutri\Core\Database\Connection::getInstance()))->listPublishedVersions($pid)); } catch (\Throwable $x) { $publishedCount = 0; }
+      ?>
+      <?php if ($publishedCount >= 2): ?>
+        <a href="/pacientes/<?= $pid ?>/planos/comparar" class="btn btn-outline u-text-compact u-py-1 u-px-2" data-testid="plans-compare-link">Comparar com a versão anterior</a>
+      <?php endif; ?>
+      <button type="button" class="btn btn-secondary u-text-compact u-py-1 u-px-2" data-show="modal-new-plan-tab">+ Novo Plano</button>
+    </div>
   </div>
   <?php if (!$plans): ?>
     <p class="u-color-neutral-gray-500">Nenhum plano alimentar prescrito ainda para este paciente.</p>

@@ -363,41 +363,63 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </form>
 
       <?php elseif ($step === 'logged_in'): ?>
-        <p><a href="/paciente/consultas">Agendar e gerenciar minhas consultas</a></p>
-        <p><a href="/paciente/prescricoes">Minhas prescrições de manipulados e suplementação</a></p>
-        <p><a href="/paciente/materiais" data-testid="patient-materials-link">Meus materiais (orientações, receitas e listas)</a></p>
-        <!-- Painel Rápido do Paciente Autenticado -->
-        <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="font-size: 1.4rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 6px 0;">
-            Área do Paciente
-          </h1>
-          <p style="color: var(--neutral-gray-500, #667085); font-size: 0.9rem; margin: 0;">
-            Acesso conectado ao Clyo Nutri
-          </p>
+        <?php
+        // v54.57 (UX-102): área logada com dados reais da sessão do portal. Sem sessão (logo após o login pela API
+        // antiga), mostra só os atalhos.
+        $portal = $portal ?? null;
+        $fmtDate = static function (?string $iso): string {
+            if (!$iso) return '';
+            try { $d = new DateTimeImmutable($iso); $d = $d->setTimezone(new DateTimeZone(date_default_timezone_get())); return $d->format('d/m/Y \à\s H:i'); } catch (\Throwable $e) { return ''; }
+        };
+        ?>
+        <link rel="stylesheet" href="/assets/css/patient-portal-v54-57.css?v=v54-57">
+        <div class="pp-head">
+          <h1 class="pp-title">Olá<?= $portal ? ', ' . htmlspecialchars(explode(' ', trim($portal['patient_name']))[0]) : '' ?></h1>
+          <p class="pp-muted"><?= $portal ? 'Seu acompanhamento com ' . htmlspecialchars($portal['clinic_name']) : 'Acesso conectado ao Clyo Nutri' ?></p>
         </div>
-
-        <div class="feature-list" style="margin-bottom: 24px;">
-          <div class="feature-item">
-            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Plano alimentar</strong>
-            Consulte suas refeições prescritas, gramas e opções de substituição.
-          </div>
-          <div class="feature-item">
-            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Hidratação e diário</strong>
-            Registre água e acompanhe seu consumo ao longo do dia.
-          </div>
-          <div class="feature-item">
-            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Teleconsultas</strong>
-            Acesse a sala virtual sem instalar nada.
-          </div>
-          <div class="feature-item">
-            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Chat com o nutricionista</strong>
-            Envie dúvidas e compartilhe sua rotina.
-          </div>
-        </div>
-
-        <div style="text-align: center;">
-          <a href="/paciente/app" style="color: var(--brand-copper-600); font-size: 0.85rem; font-weight: 600;">Sessão ativa · Atualizar página</a>
-        </div>
+        <?php if (!empty($portalNotice)): ?><div class="op-message op-message--info" role="status" data-testid="portal-notice"><?= htmlspecialchars($portalNotice) ?></div><?php endif; ?>
+        <nav class="pp-cards" aria-label="Seu acompanhamento" data-testid="portal-cards">
+          <a class="pp-card" href="/paciente/plano" data-testid="portal-card-plano">
+            <strong>Plano alimentar</strong>
+            <?php if ($portal && $portal['plan']): ?>
+              <span>Versão <?= (int)($portal['plan']['version_number'] ?? 1) ?><?php $pub = $fmtDate($portal['plan']['published_at'] ?? null); if ($pub): ?>, publicada em <?= htmlspecialchars($pub) ?><?php endif; ?> · <?= count($portal['plan']['meals'] ?? []) ?> refeições</span>
+            <?php else: ?>
+              <span>Seu nutricionista ainda não publicou um plano.</span>
+            <?php endif; ?>
+          </a>
+          <a class="pp-card" href="/paciente/consultas" data-testid="portal-card-consultas">
+            <strong>Minhas consultas</strong>
+            <?php if ($portal && $portal['next']): ?>
+              <span>Próxima: <?= htmlspecialchars($fmtDate($portal['next']['scheduled_at_iso'] ?? null)) ?> · <?= htmlspecialchars((string)($portal['next']['modality_label'] ?? '')) ?> · <?= htmlspecialchars((string)($portal['next']['status_label'] ?? '')) ?>. Confirmar, reagendar ou cancelar.</span>
+            <?php else: ?>
+              <span>Nenhuma consulta marcada. Veja o histórico e agende.</span>
+            <?php endif; ?>
+          </a>
+          <?php if ($portal && !empty($portal['next']['meeting_url'])): ?>
+          <a class="pp-card" href="<?= htmlspecialchars((string)$portal['next']['meeting_url']) ?>" data-testid="portal-card-tele">
+            <strong>Entrar na teleconsulta</strong><span>A sala da sua próxima consulta online já está aberta.</span>
+          </a>
+          <?php endif; ?>
+          <a class="pp-card" href="/paciente/prescricoes"><strong>Prescrições</strong><span>Manipulados e suplementação, com o PDF assinado.</span></a>
+          <a class="pp-card" href="/paciente/materiais" data-testid="patient-materials-link"><strong>Materiais</strong><span>Orientações, receitas e listas enviadas para você.</span></a>
+        </nav>
+        <?php if ($portal): ?>
+        <section class="pp-water" id="agua" aria-labelledby="pp-water-title" data-testid="portal-agua">
+          <h2 id="pp-water-title">Água de hoje</h2>
+          <p><strong data-testid="portal-agua-total"><?= number_format((int)$portal['water_today'], 0, ',', '.') ?> ml</strong><?php if ($portal['water_goal']): ?> de <?= number_format((int)$portal['water_goal'], 0, ',', '.') ?> ml (meta do seu nutricionista)<?php endif; ?></p>
+          <form method="post" action="/paciente/hidratacao" class="pp-water__form">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
+            <input type="hidden" name="idempotency_key" value="<?= bin2hex(random_bytes(16)) ?>">
+            <?php foreach ([200, 300, 500] as $ml): ?>
+              <button type="submit" name="amount_ml" value="<?= $ml ?>" class="btn-submit pp-water__btn">Registrar <?= $ml ?> ml</button>
+            <?php endforeach; ?>
+          </form>
+        </section>
+        <form method="post" action="/paciente/app/sair" class="pp-logout">
+          <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
+          <button type="submit" class="pp-link-btn" data-testid="portal-sair">Sair do portal</button>
+        </form>
+        <?php endif; ?>
 
       <?php else: ?>
         <!-- Tela Inicial: Abas Primeiro Acesso e Login -->

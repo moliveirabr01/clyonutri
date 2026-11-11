@@ -122,10 +122,11 @@ class OnboardingController
             </div>
           </div>
 
+          <p class="op-message op-message--info" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong>. As preferências podem ser revisadas independentemente deste estado.</p>
           <!-- Barra de Progresso e Stepper Visual (Design System) -->
           <div class="card" style="padding: var(--space-5); margin-bottom: var(--space-6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
-              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);">Progresso de Ativação</span>
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);">Checklist de prontidão (não é o roteiro de preferências)</span>
               <span style="font-size: 0.85rem; font-weight: 700; color: var(--brand-copper-600);"><?= (int)$progress['progress_pct'] ?>% Concluído</span>
             </div>
             <!-- Progress Bar -->

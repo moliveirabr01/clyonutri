@@ -24,6 +24,21 @@ final class PatientAppController
         $error = null;
         $step = 'landing';
 
+        // v54.57 (UX-102): com a sessão do portal (cookie HttpOnly do login web), a página abre a área logada com o
+        // plano publicado, a próxima consulta e a água de hoje, em vez de voltar ao formulário de entrada.
+        if ($code === '' && ($session = self::portalSession($db)) !== null) {
+            $step = 'logged_in';
+            $portal = self::portalData($db, $session);
+            if (isset($_GET['agua']) && is_string($_GET['agua'])) {
+                $portalNotice = $_GET['agua'] === 'ok' ? 'Água registrada.' : 'Não foi possível registrar a água. Tente de novo.';
+            }
+            require __DIR__ . '/../../../views/patient/app.php';
+            return;
+        }
+        if (isset($_GET['sessao']) && $code === '') {
+            $error = 'Entre no portal para ver esta página. Sua sessão terminou ou ainda não foi iniciada neste navegador.';
+        }
+
         if ($code !== '') {
             $step = 'first_access';
             try {
@@ -86,8 +101,8 @@ final class PatientAppController
                     'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
                 ]);
 
-                // Inicia sessão web mobile segura
-                MobileWebSession::start($result['token'], $result['expires_at']);
+                // Inicia sessão web segura (v54.57 / UX-102: formulário HTML grava o cookie do portal também)
+                self::startWebSession($result['token'], $result['expires_at']);
 
                 $step = 'activated';
                 $patient = $result['patient'];
@@ -176,7 +191,7 @@ final class PatientAppController
             VALUES('patient', ?, ?, 'mobile_web', ?, ?)
         ")->execute([$patient['id'], $patient['clinic_id'], hash('sha256', $token), $expires]);
 
-        MobileWebSession::start($token, $expires);
+        self::startWebSession($token, $expires);
 
         // NI2-449: sem aceite da versão vigente dos Termos/Política, a paciente confirma antes de seguir.
         $pendingLegal = $this->pendingLegal($db, (int)$patient['id'], (int)$patient['clinic_id']);
@@ -192,7 +207,119 @@ final class PatientAppController
             }
             $_SESSION[self::LEGAL_SESSION] = ['patient_id' => (int)$patient['id'], 'clinic_id' => (int)$patient['clinic_id'], 'until' => time() + 900];
         }
+        if ($step === 'logged_in' && !headers_sent() && ($_SERVER['HTTP_X_CLYONUTRI_WEB'] ?? '') !== '1') {
+            header('Location: /paciente/app', true, 303); // v54.57: PRG; a área logada lê a sessão do cookie
+            return;
+        }
         require __DIR__ . '/../../../views/patient/app.php';
+    }
+
+    /**
+     * v54.57 (UX-102): o login e o primeiro acesso do portal são formulários HTML (CSRF de sessão já validado no
+     * roteador). Antes só o cliente da API (cabeçalho X-ClyoNutri-Web) recebia o cookie, e o portal web ficava sem
+     * sessão: "Minhas consultas" respondia 401 em JSON.
+     */
+    private static function startWebSession(string $token, string $expiresAt): void
+    {
+        if (($_SERVER['HTTP_X_CLYONUTRI_WEB'] ?? '') === '1') {
+            MobileWebSession::start($token, $expiresAt);
+            return;
+        }
+        try {
+            MobileWebSession::startFromPortal($token, $expiresAt);
+        } catch (\DomainException $e) {
+            error_log('[portal] cookie do portal não gravado: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * v54.57 (UX-102): paciente da sessão do portal (cookie), com as mesmas regras do token da API: token de
+     * paciente, não expirado, paciente e clínica ativos. Define o TenantContext da paciente.
+     */
+    public static function portalSession(\PDO $db): ?array
+    {
+        $plain = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? MobileWebSession::portalFormToken() : MobileWebSession::token();
+        if ($plain === null) {
+            return null;
+        }
+        $st = $db->prepare("SELECT t.id AS token_id, p.id AS patient_id, p.clinic_id, p.name AS patient_name, c.name AS clinic_name
+            FROM personal_access_tokens t JOIN patients p ON p.id = t.tokenable_id JOIN clinics c ON c.id = p.clinic_id
+            WHERE t.tokenable_type = 'patient' AND t.clinic_id = p.clinic_id AND p.status = 'active' AND c.status = 'active'
+              AND t.token = :h AND t.expires_at IS NOT NULL AND t.expires_at > CURRENT_TIMESTAMP LIMIT 1");
+        $st->execute(['h' => hash('sha256', $plain)]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        \ClyoNutri\Core\Auth\TenantContext::set((int)$row['clinic_id'], ['id' => (int)$row['patient_id'], 'role' => 'patient', 'name' => $row['patient_name']]);
+        return $row;
+    }
+
+    /** v54.57 (UX-102): dados reais da área logada (plano publicado, próxima consulta, água de hoje e meta). */
+    private static function portalData(\PDO $db, array $session): array
+    {
+        $pid = (int)$session['patient_id'];
+        $api = new \ClyoNutri\Application\Api\PatientApiController($db);
+        $out = ['patient_name' => (string)$session['patient_name'], 'clinic_name' => (string)$session['clinic_name'], 'plan' => null, 'next' => null, 'water_today' => 0, 'water_goal' => null];
+        try { $out['plan'] = $api->getDailyMealPlan($pid); } catch (\Throwable $e) { error_log('[portal] plano: ' . get_class($e)); }
+        try { $out['next'] = $api->portal()->getNextAppointment($pid); } catch (\Throwable $e) { error_log('[portal] consulta: ' . get_class($e)); }
+        try { $out['water_today'] = $api->getHydrationTodayTotal($pid); $out['water_goal'] = $api->getPrescribedWaterGoal($pid); } catch (\Throwable $e) { error_log('[portal] água: ' . get_class($e)); }
+        return $out;
+    }
+
+    /** v54.57 (UX-102): plano alimentar publicado, em leitura, no portal web. */
+    public function plan(array $params = []): void
+    {
+        header('Cache-Control: no-store, private');
+        $db = Connection::getInstance();
+        $session = self::portalSession($db);
+        if ($session === null) {
+            header('Location: /paciente/app?sessao=1', true, 303);
+            return;
+        }
+        $portal = self::portalData($db, $session);
+        if ($portal['plan'] !== null) {
+            (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::PLAN_VIEWED, (int)$session['clinic_id'], (int)$session['patient_id']);
+        }
+        require __DIR__ . '/../../../views/patient/portal_plan.php';
+    }
+
+    /** v54.57 (UX-102): registro de água pelo portal web (mesmo serviço e regras da API; CSRF de sessão no roteador). */
+    public function logWater(array $params = []): void
+    {
+        header('Cache-Control: no-store, private');
+        $db = Connection::getInstance();
+        $session = self::portalSession($db);
+        if ($session === null) {
+            header('Location: /paciente/app?sessao=1', true, 303);
+            return;
+        }
+        $amount = $_POST['amount_ml'] ?? null;
+        $ok = false;
+        try {
+            (new \ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter($db))->hit('hydration_write', 'patient:' . (int)$session['clinic_id'] . ':' . (int)$session['patient_id'], 30, 60);
+            $key = is_string($_POST['idempotency_key'] ?? null) && preg_match('/^[a-f0-9]{32}$/D', $_POST['idempotency_key']) ? $_POST['idempotency_key'] : null;
+            $res = (new \ClyoNutri\Application\Api\PatientApiController($db))->logHydration((int)$session['patient_id'], is_string($amount) && ctype_digit($amount) ? (int)$amount : $amount, ['idempotency_key' => $key, 'source' => 'app']);
+            if (empty($res['idempotent_replay'])) {
+                (new \ClyoNutri\Domain\Analytics\AdherenceAnalytics($db))->record(\ClyoNutri\Domain\Analytics\AdherenceAnalytics::HYDRATION_LOGGED, (int)$session['clinic_id'], (int)$session['patient_id']);
+            }
+            $ok = true;
+        } catch (\Throwable $e) {
+            error_log('[portal] água não registrada: ' . get_class($e));
+        }
+        header('Location: /paciente/app?agua=' . ($ok ? 'ok' : 'erro') . '#agua', true, 303);
+    }
+
+    /** v54.57 (UX-102): sair do portal web (revoga o token e apaga os cookies). */
+    public function logout(array $params = []): void
+    {
+        $db = Connection::getInstance();
+        $plain = MobileWebSession::portalFormToken();
+        if ($plain !== null) {
+            $db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND token = ?")->execute([hash('sha256', $plain)]);
+        }
+        MobileWebSession::clear();
+        header('Location: /paciente/app', true, 303);
     }
 
     /** NI2-449: grava o aceite da paciente logada (sessão web do app) e segue para a área logada. */

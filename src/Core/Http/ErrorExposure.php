@@ -51,7 +51,7 @@ final class ErrorExposure
             $id = \ClyoNutri\Core\Observability\StructuredLogger::requestId(); // CR-NI2-010: mesmo id do log estruturado
             error_log(json_encode(['request_id' => $id, 'exception' => get_class($e),
                 'file' => basename($e->getFile()), 'line' => $e->getLine(), 'message' => $e->getMessage()]));
-            self::renderGeneric500($id);
+            self::renderGeneric500($id, true);
         });
         register_shutdown_function(static function (): void {
             $err = error_get_last();
@@ -63,10 +63,22 @@ final class ErrorExposure
         });
     }
 
-    public static function renderGeneric500(string $id): void
+    public static function renderGeneric500(string $id, bool $withLayout = false): void
     {
         while (ob_get_level() > 0) {
             @ob_end_clean();
+        }
+        // v54.57 (UX-103/UX-111): página de erro com layout e caminho de volta (com o mesmo código de suporte).
+        // API/XHR continua com a resposta simples. Erro fatal (shutdown) não tenta montar o layout.
+        if (ErrorPage::wantsHtml()) {
+            try {
+                ErrorPage::render(500, 'Não foi possível concluir a solicitação.', 'Tente novamente em instantes. Nada foi alterado por esta tela. Se o problema continuar, informe o código abaixo ao suporte.', [], $id, $withLayout);
+                return;
+            } catch (\Throwable $e) {
+                while (ob_get_level() > 0) {
+                    @ob_end_clean();
+                }
+            }
         }
         if (!headers_sent()) {
             http_response_code(500);

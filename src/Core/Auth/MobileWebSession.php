@@ -94,6 +94,19 @@ final class MobileWebSession
         return $token;
     }
 
+    /**
+     * v54.57 (UX-102): token do cookie do portal para um formulário HTML do próprio portal (POST com o CSRF de sessão,
+     * já conferido pelo roteador, e Origin, quando presente, da mesma origem). Não aceita cabeçalho Authorization.
+     */
+    public static function portalFormToken(): ?string
+    {
+        if (!\ClyoNutri\Core\Security\Csrf::validate($_POST['_csrf_token'] ?? null)) return null;
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if ($origin !== '' && !self::allowedOrigin($origin)) return null;
+        $token = $_COOKIE[self::PORTAL_COOKIE] ?? null;
+        return is_string($token) && preg_match('/^[a-f0-9]{64}$/D', $token) ? $token : null;
+    }
+
     public static function start(string $token, string $expiresAt): void
     {
         if (($_SERVER['HTTP_X_CLYONUTRI_WEB'] ?? '') !== '1') return;

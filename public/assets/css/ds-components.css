@@ -186,8 +186,8 @@
 .ds-is-archived { opacity: .7; }
 
 /* Variação clínica (sobe/desce): cor + sinal no texto */
-.ds-delta--down { color: var(--semantic-success); }
-.ds-delta--up { color: var(--botanical-copper-600); }
+.ds-delta--down { color: var(--neutral-gray-700); }
+.ds-delta--up { color: var(--neutral-gray-700); }
 .ds-delta--flat { color: var(--neutral-gray-600); }
 .ds-tone-ok { color: var(--semantic-success-text); }
 .ds-tone-copper { color: var(--botanical-copper-700); }

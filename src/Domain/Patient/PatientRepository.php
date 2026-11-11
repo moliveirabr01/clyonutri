@@ -316,13 +316,32 @@ class PatientRepository
         }
         unset($receivable);
         $timeline = [];
-        foreach ([['Consulta',$appointments,'scheduled_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
-                  ['Prontuário',$clinicalRecords,'created_at'], ['Anamnese',$anamneses,'created_at'], ['Avaliação',$assessments,'assessed_at'], ['Plano alimentar',$mealPlans,'created_at']] as [$type,$rows,$dateField]) {
+        $sources = [['Consulta',$appointments,'scheduled_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
+            ['Prontuário',$clinicalRecords,'created_at'], ['Anamnese',$anamneses,'created_at'], ['Avaliação',$assessments,'assessed_at'], ['Plano alimentar',$mealPlans,'created_at']];
+        foreach ($sources as [$type,$rows,$dateField]) {
             foreach (array_slice($rows,0,20) as $row) {
-                $timeline[] = ['type'=>$type, 'date'=>$row[$dateField], 'title'=>$row['title'] ?? $row['description'] ?? $type];
+                $rid=(int)$row['id']; $base='/pacientes/'.$id;
+                $url=match($type) {
+                    'Consulta'=>'/consulta/'.$rid,
+                    'Prontuário'=>$base.'/prontuario#registro-'.$rid,
+                    'Anamnese'=>$base.'/anamnese?version='.(int)$row['version'],
+                    'Avaliação'=>$base.'/antropometria#avaliacao-'.$rid,
+                    'Plano alimentar'=>'/planos/'.$rid,
+                    'Check-in'=>$base.'#checkin-'.$rid,
+                    'Cobrança'=>$base.'#cobranca-'.$rid,
+                };
+                $state=match($type) {
+                    'Anamnese'=>!empty($row['is_draft'])?'Rascunho':'Concluída',
+                    'Plano alimentar'=>\ClyoNutri\Core\I18n\LabelMap::mealPlanStatus($row['status']??''),
+                    'Consulta'=>\ClyoNutri\Core\I18n\LabelMap::appointmentStatus($row['status']??''),
+                    'Prontuário'=>!empty($row['is_retracted'])?'Retificado':'Registrado',
+                    default=>'Registrado',
+                };
+                $timeline[]=['id'=>$rid,'type'=>$type,'date'=>$row[$dateField], 'title'=>$row['title']??$row['description']??$type,
+                    'url'=>$url,'state'=>$state,'version'=>(int)($row['version']??0)];
             }
         }
-        usort($timeline, static fn($a,$b) => strcmp($b['date'],$a['date']));
+        usort($timeline, static fn($a,$b) => strcmp($b['date'],$a['date']) ?: ($b['id']<=>$a['id']));
         $requests = $this->relatedRows('data_subject_requests', $id, 'created_at');
 
         return [
@@ -332,7 +351,7 @@ class PatientRepository
             'meal_plans' => $mealPlans,
             'clinical_records' => $clinicalRecords,
             'appointments'=>$appointments, 'checkins'=>$checkins, 'receivables'=>$receivables,
-            'timeline'=>array_slice($timeline,0,50), 'privacy_requests'=>$requests,
+            'timeline'=>$timeline, 'privacy_requests'=>$requests,
         ];
     }
     private function relatedRows(string $table, int $id, string $order): array

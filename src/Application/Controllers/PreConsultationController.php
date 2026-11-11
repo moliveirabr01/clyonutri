@@ -508,7 +508,7 @@ class PreConsultationController
 
     private function redirect(string $to): never
     {
-        header('Location: ' . $to, true, 303);
+        header(\ClyoNutri\Application\View\AttendanceContext::location('Location: ' . $to), true, 303);
         exit;
     }
 }

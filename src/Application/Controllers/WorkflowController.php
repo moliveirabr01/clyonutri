@@ -23,7 +23,7 @@ final class WorkflowController
         try{
             $ws=new WorkflowWrites($this->db);
             if(!$write){echo json_encode(['workflow'=>$ws->state($kind,$id,$patient)]);return;}
-            $payload=$_POST;unset($payload['_csrf_token'],$payload['_request_key'],$payload['_base_revision']);
+            $payload=$_POST;unset($payload['_csrf_token'],$payload['_request_key'],$payload['_base_revision'],$payload['atendimento']);
             $key=is_string($_POST['_request_key']??null)?$_POST['_request_key']:'';$base=is_string($_POST['_base_revision']??null)?$_POST['_base_revision']:'';
             $result=$ws->write($kind,$id,$patient,$key,$base,$payload,function()use($kind,$id,$patient,$payload){
                 if($kind==='anamnesis'){

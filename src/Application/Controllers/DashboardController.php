@@ -27,7 +27,7 @@ use ClyoNutri\Domain\Patient\PatientRepository;
 class DashboardController
 {
     /** Quantidade máxima de itens exibidos na lista "Pacientes & Prioridades" do Dashboard. */
-    private const DASHBOARD_ATTENTION_LIMIT = 5;
+    private const DASHBOARD_ATTENTION_LIMIT = 4; // v54.56: 4 itens visíveis + "Ver todos"
 
     /** Total de passos do onboarding (OnboardingService: progress_pct = passos concluídos × 20). */
     private const ONBOARDING_TOTAL_STEPS = 5;
@@ -112,6 +112,9 @@ class DashboardController
             return;
         }
         $errors = [];
+        // v54.57 (UX-108): com anamnese concluída, a alergia tem uma fonte só (a anamnese). O cadastro mostra em leitura
+        // com a origem e o link para editar na anamnese, e o salvamento do cadastro não grava alergia paralela.
+        $anamnesisAllergy = $this->anamnesisAllergySource((int)$patient['id']);
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
                 http_response_code(403);
@@ -131,6 +134,7 @@ class DashboardController
             } else {
                 $data['allergy_assessment'] = null;
             }
+            if ($anamnesisAllergy !== null) unset($data['allergies'], $data['allergy_assessment']);
             if (mb_strlen($data['name']) > 150) $errors[] = 'O nome deve ter até 150 caracteres.';
             if ($data['name'] === '') $errors[] = 'Informe o nome completo.';
             if ($data['email'] !== null && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Informe um e-mail válido.';
@@ -165,6 +169,33 @@ class DashboardController
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
+    /**
+     * v54.57 (UX-108): alergia da última anamnese CONCLUÍDA (fonte de verdade), com versão, data e autor.
+     * Sem anamnese concluída devolve null e o cadastro continua sendo onde se informa a alergia.
+     * @return array{allergies: string, assessment: string, version: int, recorded_at: string, author: string, url: string}|null
+     */
+    private function anamnesisAllergySource(int $patientId): ?array
+    {
+        try {
+            $db = Connection::getInstance();
+            $v = \ClyoNutri\Domain\Anamnesis\AnamnesisVersions::pick($db, (int)TenantContext::getClinicId(), $patientId, 'a.*, u.name AS professional_name',
+                'LEFT JOIN professionals p ON p.id = a.professional_id LEFT JOIN users u ON u.id = p.user_id');
+            $c = $v['concluded'];
+            if ($c === null) return null;
+            return [
+                'allergies' => trim((string)($c['allergies'] ?? '')),
+                'assessment' => trim((string)($c['allergy_assessment'] ?? '')),
+                'version' => (int)($c['version'] ?? 1),
+                'recorded_at' => (string)($c['created_at'] ?? ''),
+                'author' => (string)($c['professional_name'] ?? ''),
+                'url' => '/pacientes/' . $patientId . '/anamnese',
+                'unreadable' => in_array('allergies', $c['_unreadable_fields'] ?? [], true),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function patientStatus(array $params): void
     {
         if (!$this->canEditPlanItems(Connection::getInstance()) || !Csrf::validate($_POST['_csrf_token'] ?? '')) { http_response_code(403); echo 'Ação não autorizada.'; return; }
@@ -174,7 +205,7 @@ class DashboardController
         try {
             if (($_POST['confirm_status'] ?? '') !== 'yes') throw new \InvalidArgumentException('Confirme a alteração de status.');
             $repo->setStatus($id, is_string($_POST['status'] ?? null) ? $_POST['status'] : '');
-            header('Location: /pacientes/'.$id.'/editar?success=status');
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/'.$id.'/editar?success=status'));
         } catch (\InvalidArgumentException $e) { http_response_code(422); echo htmlspecialchars($e->getMessage()); }
         catch (\Throwable $e) { http_response_code(500); echo 'Não foi possível alterar o status. Tente novamente.'; }
     }
@@ -190,7 +221,7 @@ class DashboardController
             $reason = is_string($_POST['reason'] ?? null) ? trim($_POST['reason']) : '';
             if ($purpose === '' || $reason === '' || mb_strlen($reason) > 1000 || ($_POST['confirm_revoke'] ?? '') !== 'yes') throw new \InvalidArgumentException('Informe a finalidade, o motivo e confirme a retirada.');
             $service->revokeConsent($id, $purpose, $reason);
-            header('Location: /pacientes/'.$id.'?success=consentimento');
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/'.$id.'?success=consentimento'));
         } catch (\InvalidArgumentException $e) { http_response_code(422); echo htmlspecialchars($e->getMessage()); }
         catch (\Throwable $e) { http_response_code(500); echo 'Não foi possível retirar o consentimento. Tente novamente.'; }
     }
@@ -218,7 +249,7 @@ class DashboardController
                 echo $json; return;
             }
             // Exclusão segue para a fila da clínica (/privacidade/pedidos), processada pela gestão.
-            header('Location: /pacientes/'.$id.'?success=' . ($request['already_open'] ? 'privacidade-ja-aberto' : 'privacidade'));
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/'.$id.'?success=' . ($request['already_open'] ? 'privacidade-ja-aberto' : 'privacidade')));
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             if ($db->inTransaction()) $db->rollBack();
             http_response_code(403); echo 'Ação não autorizada.';
@@ -259,7 +290,7 @@ class DashboardController
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
         $latestAnamnesis = $anamnesisService->getEffectiveAnamnesis($id); // NI2-605: a concluída vale; o rascunho novo é "em andamento"
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
-        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $careStep = $this->patientCareStep($id);
         // NI2-135: autorrelatos, medidas liberadas e metas do app da paciente.
         $appEvolution = (new \ClyoNutri\Domain\Evolution\PatientEvolutionService())->professionalPanel($id);
         $canEditAppEvolution = $this->canEditPlanItems(Connection::getInstance());
@@ -321,7 +352,7 @@ class DashboardController
           } catch (\Throwable $e) { $pendingExamCount = 0; }
           $lastCompleted = null;
           try {
-              $lc = Connection::getInstance()->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY COALESCE(completed_at, scheduled_at) DESC, id DESC LIMIT 1");
+              $lc = Connection::getInstance()->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY scheduled_at DESC, id DESC LIMIT 1"); // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
               $lc->execute([(int)\ClyoNutri\Core\Auth\TenantContext::getClinicId(), (int)$p['id']]);
               $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
           } catch (\Throwable $e) { $lastCompleted = null; }
@@ -345,6 +376,7 @@ class DashboardController
           }
         ?>
         <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$p['id'], 'resumo', $p, $careStep, $clinicalSummary, $activePlan, true) // NI2-622/661 ?>
+        <?php require __DIR__ . '/../../../views/patients/timeline.php'; ?>
         <?php /* NI2-624: alergia de versão anterior (ou do cadastro) que a vigente não confirma: revisão clínica, sem descartar o risco. */ ?>
         <?php $allergyReview = $clinicalSummary['allergy_review'] ?? []; ?>
         <?php if (!empty($_GET['alergia_revisada'])): ?>
@@ -684,7 +716,7 @@ class DashboardController
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
-                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
+                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required<?= \ClyoNutri\Application\View\LastHeight::attrs($anthroPatientId) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint($anthroPatientId) ?>
                   </div>
                 </div>
 
@@ -968,7 +1000,7 @@ class DashboardController
                 </thead>
                 <tbody>
                   <?php foreach ($series as $pnt): ?>
-                    <tr>
+                    <tr id="avaliacao-<?= (int)$pnt['assessment_id'] ?>">
                       <td class="u-font-semibold u-color-botanical-forest-900"><?= $pnt['formatted_date'] ?></td>
                       <td class="tabular-nums u-font-bold u-text-body u-color-botanical-forest-900"><?= number_format((float)$pnt['value'], 2, ',', '.') ?></td>
                       <td class="tabular-nums">
@@ -1116,9 +1148,9 @@ class DashboardController
                       </td>
                       <td>
                         <?php if ($mRow['trend'] === 'decrease'): ?>
-                          <span class="u-color-semantic-success u-font-bold">↓ Redução</span>
+                          <span class="u-color-neutral-gray-700 u-font-bold">↓ Redução</span>
                         <?php elseif ($mRow['trend'] === 'increase'): ?>
-                          <span class="u-color-botanical-copper-600 u-font-bold">↑ Aumento</span>
+                          <span class="u-color-neutral-gray-700 u-font-bold">↑ Aumento</span>
                         <?php elseif ($mRow['trend'] === 'stable'): ?>
                           <span class="u-color-neutral-gray-500">↔ Estável</span>
                         <?php else: ?>
@@ -1179,7 +1211,7 @@ class DashboardController
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
-                      <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
+                      <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required<?= \ClyoNutri\Application\View\LastHeight::attrs((int)$patient['id']) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint((int)$patient['id']) ?>
                     </div>
                   </div>
 
@@ -1329,7 +1361,7 @@ class DashboardController
         $token = $_POST['_csrf_token'] ?? '';
         if (!Csrf::validate($token)) {
             $patientId = (int)($params['id'] ?? $_POST['patient_id'] ?? 0);
-            header("Location: /pacientes/{$patientId}/antropometria?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?error=csrf"));
             exit;
         }
 
@@ -1361,14 +1393,15 @@ class DashboardController
         try {
             $saved = $service->recordAssessment($patientId, $profId, $_POST, $userId);
             \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'antropometria');
-            header("Location: /pacientes/{$patientId}/antropometria?success=" . (!empty($saved['duplicate']) ? 'avaliacao_ja_registrada' : 'avaliacao_registrada'));
+            \ClyoNutri\Application\View\AttendanceContext::confirmSteps($patientId, ['avaliacao']); // v54.57 (UX-101)
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?success=" . (!empty($saved['duplicate']) ? 'avaliacao_ja_registrada' : 'avaliacao_registrada')));
             exit;
         } catch (InvalidAnthropometricDataException $e) {
-            header("Location: /pacientes/{$patientId}/antropometria?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?error=dados_invalidos&msg=" . urlencode($e->getMessage())));
             exit;
         } catch (\Throwable $e) {
             error_log('[antropometria] falha ao salvar: ' . get_class($e) . ' em ' . basename($e->getFile()) . ':' . $e->getLine());
-            header("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?error=erro_interno&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.')));
             exit;
         }
     }
@@ -1380,7 +1413,7 @@ class DashboardController
         $evalId = (int)($params['evalId'] ?? 0);
 
         if (!Csrf::validate($token)) {
-            header("Location: /pacientes/{$patientId}/antropometria?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?error=csrf"));
             exit;
         }
 
@@ -1391,10 +1424,10 @@ class DashboardController
         $service = new AnthropometryService();
         try {
             $service->shareAssessment($evalId, $isShared, $userId, $reason);
-            header("Location: /pacientes/{$patientId}/antropometria?success=compartilhamento_atualizado");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?success=compartilhamento_atualizado"));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/antropometria?error=falha_compartilhar&msg=" . urlencode($this->userFacingError('antropometria compartilhar', $e)));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/antropometria?error=falha_compartilhar&msg=" . urlencode($this->userFacingError('antropometria compartilhar', $e))));
             exit;
         }
     }
@@ -1471,7 +1504,7 @@ class DashboardController
         $patientId = (int)($params['id'] ?? 0);
 
         if (!Csrf::validate($token)) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=csrf"));
             exit;
         }
 
@@ -1480,28 +1513,28 @@ class DashboardController
         $category = trim((string)($_POST['category'] ?? 'observacao'));
 
         if ($title === '' || $text === '') {
-            header("Location: /pacientes/{$patientId}/prontuario?error=campos_obrigatorios&msg=" . urlencode("Título e conteúdo são obrigatórios."));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=campos_obrigatorios&msg=" . urlencode("Título e conteúdo são obrigatórios.")));
             exit;
         }
 
         $profId = $this->clinicalAuthorProfessionalId();
         if ($profId === null) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG)));
             exit;
         }
         $clinicalService = new ClinicalRecordService();
 
         try {
             $clinicalService->addClinicalObservation($patientId, $profId, $title, $text, $category);
-            header("Location: /pacientes/{$patientId}/prontuario?success=registro_adicionado");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?success=registro_adicionado"));
             exit;
         } catch (\InvalidArgumentException $e) {
             // Regra de negócio com texto escrito para a pessoa (limite de tamanho, campo vazio).
-            header("Location: /pacientes/{$patientId}/prontuario?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=dados_invalidos&msg=" . urlencode($e->getMessage())));
             exit;
         } catch (\Throwable $e) {
             $ref = $this->logClinicalFailure('prontuario.registrar', $e);
-            header("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}"));
             exit;
         }
     }
@@ -1513,7 +1546,7 @@ class DashboardController
         $recId = (int)($params['recId'] ?? 0);
 
         if (!Csrf::validate($token)) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=csrf"));
             exit;
         }
 
@@ -1521,13 +1554,13 @@ class DashboardController
         $revisedText = trim((string)($_POST['revised_text'] ?? ''));
 
         if (mb_strlen($reason, 'UTF-8') < 10) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=motivo_curto&msg=" . urlencode("A justificativa de retificação deve conter no mínimo 10 caracteres."));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=motivo_curto&msg=" . urlencode("A justificativa de retificação deve conter no mínimo 10 caracteres.")));
             exit;
         }
 
         $profId = $this->clinicalAuthorProfessionalId();
         if ($profId === null) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG)));
             exit;
         }
         $clinicalService = new ClinicalRecordService();
@@ -1543,14 +1576,14 @@ class DashboardController
                 $revised['goals'] = trim((string)$_POST['revised_goals']);
             }
             $clinicalService->reviseRecord($recId, $patientId, $profId, $reason, $revised);
-            header("Location: /pacientes/{$patientId}/prontuario?success=registro_retificado");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?success=registro_retificado"));
             exit;
         } catch (\InvalidArgumentException $e) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage())));
             exit;
         } catch (\Throwable $e) {
             $ref = $this->logClinicalFailure('prontuario.retificar', $e);
-            header("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}"));
             exit;
         }
     }
@@ -1722,7 +1755,7 @@ class DashboardController
                 $query = $_GET;
                 $query['version'] = $query['view_version'];
                 unset($query['view_version']);
-                header('Location: /pacientes/' . $id . '/anamnese?' . http_build_query($query));
+                header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '/anamnese?' . http_build_query($query)));
                 return;
             }
             if (isset($_GET['version'], $_GET['revision_from'])) {
@@ -1731,6 +1764,7 @@ class DashboardController
             }
             $latest = $anamnesisService->getLatestAnamnesis($id);
             $history = $anamnesisService->getAnamnesisHistory($id);
+            $unreadableDraft = $anamnesisService->unreadableDraft($id); // v54.57 (UX-103)
             if (isset($_GET['version'])) {
                 $selectedVersion = $anamnesisService->getAnamnesisVersion($id, (int)$_GET['version']);
                 if (!$selectedVersion) {
@@ -1810,7 +1844,7 @@ class DashboardController
         $patientId = (int)($params['id'] ?? 0);
 
         if (!Csrf::validate($token)) {
-            header("Location: /pacientes/{$patientId}/anamnese?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=csrf"));
             exit;
         }
 
@@ -1834,7 +1868,7 @@ class DashboardController
         $wfRevision = $_POST['_workflow_revision'] ?? null;
         $wfKey = $_POST['_final_request_key'] ?? null;
         if (!is_string($wfRevision) || !is_string($wfKey) || $wfRevision === '' || $wfKey === '') {
-            header("Location: /pacientes/{$patientId}/anamnese?error=conflict&msg=" . urlencode('Não foi possível confirmar qual versão da anamnese estava aberta. Nada foi gravado; recarregue a página e tente de novo.'));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=conflict&msg=" . urlencode('Não foi possível confirmar qual versão da anamnese estava aberta. Nada foi gravado; recarregue a página e tente de novo.')));
             exit;
         }
         unset($_SESSION['anamnesis_field_errors'][$patientId]);
@@ -1842,30 +1876,65 @@ class DashboardController
         try {
             (new \ClyoNutri\Domain\Clinical\WorkflowWrites(Connection::getInstance()))->write('anamnesis',$patientId,0,$wfKey,$wfRevision,$_POST,function()use($anamnesisService,$patientId,$profId,$isDraft){$saved=$anamnesisService->saveAnamnesis($patientId,$profId,$_POST,$isDraft);return ['resource_id'=>$patientId,'record_id'=>(int)$saved['id']];});
             \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'anamnese');
+            if (!$isDraft) \ClyoNutri\Application\View\AttendanceContext::confirmSteps($patientId, ['anamnese']); // v54.57 (UX-101)
             $successParam = $isDraft ? 'rascunho_salvo' : 'anamnese_concluida';
-            header("Location: /pacientes/{$patientId}/anamnese?success={$successParam}");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?success={$successParam}"));
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
             return;
         } catch (\ClyoNutri\Domain\Clinical\WorkflowConflict $e) {
-            header('Location: /pacientes/'.$patientId.'/anamnese?error=conflict&msg='.urlencode($e->getMessage())); return;
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/'.$patientId.'/anamnese?error=conflict&msg='.urlencode($e->getMessage()))); return;
+        } catch (\ClyoNutri\Domain\Anamnesis\UnreadableAnamnesisDraftException $e) {
+            // v54.57 (UX-103): nada foi gravado por cima do rascunho ilegível; a tela mostra a recuperação.
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/'.$patientId.'/anamnese?error=rascunho_ilegivel&msg='.urlencode($e->getMessage()))); exit;
         } catch (\PDOException $e) {
             $this->anamnesisError(503, 'Não foi possível salvar a nova revisão. O preenchimento foi mantido nesta sessão por uma hora. Volte à coleta atual e tente novamente.');
             return;
         } catch (\ClyoNutri\Domain\Clinical\ClinicalInputException $e) {
             // NI2-220 (B3): erros por campo voltam para a tela; nada foi gravado.
             $_SESSION['anamnesis_field_errors'][$patientId] = $e->fieldErrors();
-            header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage())));
             exit;
         } catch (\InvalidArgumentException $e) {
-            header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage())));
             exit;
         } catch (\Throwable $e) {
             $ref = $this->logClinicalFailure('anamnese.salvar', $e);
-            header("Location: /pacientes/{$patientId}/anamnese?error=falha&ref={$ref}&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=falha&ref={$ref}&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.')));
             exit;
         }
+    }
+
+    /** v54.57 (UX-103): recupera o rascunho com campo cifrado ilegível (mantém o legível; descarte auditado do resto). */
+    public function recoverAnamnesisDraft(array $params): void
+    {
+        $profId = $this->anamnesisProfessional();
+        if ($profId === null) {
+            return;
+        }
+        $patientId = (int)($params['id'] ?? 0);
+        if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=csrf"));
+            exit;
+        }
+        if (!(new PatientRepository())->findById($patientId)) {
+            $this->anamnesisError(404, 'Paciente não encontrado.');
+            return;
+        }
+        try {
+            $fields = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService())->recoverUnreadableDraft($patientId, $profId);
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            $this->anamnesisError(404, 'Paciente não encontrado.');
+            return;
+        } catch (\Throwable $e) {
+            $ref = $this->logClinicalFailure('anamnese.recuperar', $e);
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?error=falha&ref={$ref}&msg=" . urlencode('Não foi possível recuperar o rascunho. Nada foi alterado.')));
+            exit;
+        }
+        $q = $fields === [] ? 'success=rascunho_salvo' : 'success=rascunho_recuperado';
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}/anamnese?{$q}"));
+        exit;
     }
 
     public function prescriptionSummary(array $params): void
@@ -1931,6 +2000,14 @@ class DashboardController
             error_log('[agenda] próximo horário indisponível: ' . get_class($e));
         }
         return null;
+    }
+
+    /** UX-002: every operational CTA uses the same validated consultation as the header. */
+    private function patientCareStep(int $patientId): array
+    {
+        $selected=\ClyoNutri\Application\View\AttendanceContext::selected($patientId);
+        return $selected ? ['state'=>$selected['status']==='in_progress'?'continue':'selected','appointment'=>$selected]
+            : (new AppointmentService())->careStepForPatient($patientId);
     }
 
     private function getActiveProfessionalId(): int
@@ -2010,7 +2087,7 @@ class DashboardController
             $targetDate = date('Y-m-d', strtotime($scheduledAt));
             // NI2-707: agendado a partir do perfil do paciente, volta para o perfil.
             if (($_POST['return_to'] ?? '') === 'patient' && $patientId > 0) {
-                header("Location: /pacientes/{$patientId}?success=agendado");
+                header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$patientId}?success=agendado"));
                 exit;
             }
             header("Location: /agenda?date={$targetDate}&success=agendado");
@@ -2162,7 +2239,7 @@ class DashboardController
             $updated = $service->edit($id, $data, $allowConflict);
             $targetDate = date('Y-m-d', strtotime($updated['scheduled_at']));
             if ($isReschedule && ($_POST['de'] ?? '') === 'paciente') {
-                header('Location: /pacientes/' . (int)$updated['patient_id'] . '?success=reagendado');
+                header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . (int)$updated['patient_id'] . '?success=reagendado'));
                 exit;
             }
             header("Location: /agenda?date={$targetDate}&success=" . ($isReschedule ? 'reagendado' : 'editado'));
@@ -2234,7 +2311,7 @@ class DashboardController
     {
         $pid = (int)($params['id'] ?? 0);
         if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
-            header("Location: /pacientes/{$pid}?error=csrf");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$pid}?error=csrf"));
             exit;
         }
         $clinicId = (int)TenantContext::getClinicId();
@@ -2244,14 +2321,14 @@ class DashboardController
         $st->execute([$userId]);
         $profId = (int)($st->fetchColumn() ?: 0);
         if ($profId <= 0) {
-            header("Location: /pacientes/{$pid}?error=sem_profissional");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$pid}?error=sem_profissional"));
             exit;
         }
         try {
             $r = (new AppointmentService())->startNow($pid, $profId, $userId);
         } catch (\Throwable $e) {
             $this->logClinicalFailure('consulta.iniciar_agora', $e);
-            header("Location: /pacientes/{$pid}?error=iniciar_agora");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$pid}?error=iniciar_agora"));
             exit;
         }
         header('Location: /consulta/' . (int)$r['id']);
@@ -2276,7 +2353,7 @@ class DashboardController
         $csrfToken = Csrf::token();
         $clinicId = (int)TenantContext::getClinicId();
         $db = Connection::getInstance();
-        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $careStep = $this->patientCareStep($id);
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
         $latestAnamnesis = $anamnesisService->getEffectiveAnamnesis($id);
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
@@ -2296,7 +2373,7 @@ class DashboardController
         } catch (\Throwable $e) { $pendingExamCount = 0; }
         $lastCompleted = null;
         try {
-            $lc = $db->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY COALESCE(completed_at, scheduled_at) DESC, id DESC LIMIT 1");
+            $lc = $db->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY scheduled_at DESC, id DESC LIMIT 1"); // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
             $lc->execute([$clinicId, $id]);
             $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Throwable $e) { $lastCompleted = null; }
@@ -2324,7 +2401,7 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? 'Nutricionista';
         $csrfToken = Csrf::token();
         $db = Connection::getInstance();
-        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $careStep = $this->patientCareStep($id);
         $clinicalSummary = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService())->getClinicalSummaryForPrescription($id);
         $activePlan = null;
         if (!empty($profile['meal_plans'])) {
@@ -2357,7 +2434,7 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? 'Nutricionista';
         $csrfToken = Csrf::token();
         $db = Connection::getInstance();
-        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $careStep = $this->patientCareStep($id);
         $clinicalSummary = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService())->getClinicalSummaryForPrescription($id);
         $activePlan = null;
         if (!empty($profile['meal_plans'])) {
@@ -2676,7 +2753,7 @@ class DashboardController
             error_log('[consulta] rascunho não apagado: ' . get_class($e));
         }
 
-        header("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8) . ($measuresWarning ? '&aviso=medidas' : ''));
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8) . ($measuresWarning ? '&aviso=medidas' : '')));
         exit;
     }
 
@@ -3535,7 +3612,7 @@ class DashboardController
                 $r = (new \ClyoNutri\Domain\MealPlan\MealPlanTemplateService($db))->createPlanFromTemplate($templateId, $professionalId, $patientId > 0 ? $patientId : null, $title, $notes);
                 $_SESSION['feedback_message'] = \ClyoNutri\Application\Controllers\MealPlanTemplateController::usedMessage($r)
                     . ($patientId > 0 ? '' : ' O plano está sem paciente: atribua antes de publicar.');
-                header("Location: /planos/" . (int)$r['plan_id']);
+                header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/" . (int)$r['plan_id']));
                 exit;
             } catch (\InvalidArgumentException | \DomainException | \ClyoNutri\Core\Security\TenantSecurityException $e) {
                 $_SESSION['error_message'] = 'Não foi possível usar o modelo: ' . $e->getMessage();
@@ -3556,7 +3633,7 @@ class DashboardController
             $_SESSION['feedback_message'] = $patientId > 0
                 ? "Plano alimentar '{$title}' criado. Agora é só montar as refeições."
                 : "Plano alimentar '{$title}' criado sem paciente. Monte a prescrição e atribua o paciente antes de publicar.";
-            header("Location: /planos/" . $created['plan_id']);
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/" . $created['plan_id']));
             exit;
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro ao criar plano: " . $this->userFacingError('Erro ao criar plano', $e);
@@ -3640,6 +3717,7 @@ class DashboardController
         ob_start();
         ?>
         <?php if ($planHasPatient): ?><?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$plan['patient_id'], 'plano') // NI2-629/661 ?><?php endif; ?>
+        <?php if ($isDraft && $canEditItems) require __DIR__ . '/../../../views/meal_plans/_quick_editor.php'; ?>
         <div class="u-flex u-justify-between u-items-start u-mb-6 u-wrap u-gap-4">
           <div>
             <div class="u-flex u-items-center u-gap-2 u-mb-1">
@@ -3837,7 +3915,7 @@ class DashboardController
 
         <?php (static function (array $v): void { extract($v, EXTR_SKIP); require __DIR__ . '/../../../views/meal_plans/_energy_card.php'; })(compact('planId', 'plan', 'isDraft', 'canEditItems', 'csrfToken', 'energyTarget', 'energySuggest', 'energyCompare', 'energyOld')); ?>
 
-        <?php if ($isDraft && $canEditItems) require __DIR__ . '/../../../views/meal_plans/_quick_editor.php'; ?>
+        
         <div id="plan-live-meals" data-live-swap>
         <?php
           // NI2-521 (v42): barra fixa com o total do plano e a meta gravada. Tolerância de adequação pendente de revisão clínica.
@@ -4436,8 +4514,8 @@ class DashboardController
 
         <script src="/assets/js/food-picker.js?v=v54-30" defer></script>
         <script src="/assets/js/unit-check.js?v=v54-5" defer></script>
-        <script src="/assets/js/quick-plan.js?v=v54-26" defer></script>
-        <script src="/assets/js/plan-live.js?v=v54-26" defer></script>
+        <script src="/assets/js/quick-plan.js?v=v54-57" defer></script>
+        <script src="/assets/js/plan-live.js?v=v54-57" defer></script>
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
@@ -4545,7 +4623,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao adicionar refeição: " . $this->userFacingError('Erro ao adicionar refeição', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4571,7 +4649,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao atualizar refeição: " . $this->userFacingError('Erro ao atualizar refeição', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4593,7 +4671,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao remover refeição: " . $this->userFacingError('Erro ao remover refeição', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4630,7 +4708,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $this->userFacingError('Erro ao adicionar alimento', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4639,7 +4717,7 @@ class DashboardController
     {
         $id = (int)($params['id'] ?? 0);
         if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
-            header('Location: /pacientes/' . $id . '?error=csrf');
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '?error=csrf'));
             exit;
         }
         $db = Connection::getInstance();
@@ -4657,9 +4735,9 @@ class DashboardController
                 throw new \InvalidArgumentException('Esta alergia não está mais em revisão.');
             }
             (new \ClyoNutri\Domain\Clinical\AllergyHistoryReview($db))->dismiss($clinicId, $id, $group, (int)TenantContext::getUserId(), $reason);
-            header('Location: /pacientes/' . $id . '?alergia_revisada=1');
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '?alergia_revisada=1'));
         } catch (\InvalidArgumentException $e) {
-            header('Location: /pacientes/' . $id . '?error=1&msg=' . rawurlencode($e->getMessage()) . '#alergia-revisao');
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '?error=1&msg=' . rawurlencode($e->getMessage()) . '#alergia-revisao'));
         }
         exit;
     }
@@ -4717,7 +4795,7 @@ class DashboardController
             error_log('NI2-310 update item failed: ' . $e->getMessage());
             $_SESSION['error_message'] = 'Não foi possível salvar o item. Nenhuma alteração foi gravada. Tente novamente.';
         }
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4739,7 +4817,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao remover alimento: " . $this->userFacingError('Erro ao remover alimento', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4776,7 +4854,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao cadastrar substituição: " . $this->userFacingError('Erro ao cadastrar substituição', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4805,7 +4883,7 @@ class DashboardController
             error_log('NI2-521 update substitution failed: ' . $e->getMessage());
             $_SESSION['error_message'] = 'Não foi possível salvar a substituição. Tente novamente.';
         }
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4827,7 +4905,7 @@ class DashboardController
             $_SESSION['error_message'] = "Erro ao remover substituição: " . $this->userFacingError('Erro ao remover substituição', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4849,11 +4927,14 @@ class DashboardController
         try {
             $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason, $allowAdequacyOverride, $adequacyOverrideReason);
             $_SESSION['feedback_message'] = "Plano publicado como versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
+            $planPatient = $db->prepare('SELECT patient_id FROM meal_plans WHERE id = ? AND clinic_id = ?');
+            $planPatient->execute([$planId, TenantContext::getClinicId()]);
+            if (($pp = (int)$planPatient->fetchColumn()) > 0) \ClyoNutri\Application\View\AttendanceContext::confirmSteps($pp, ['plano', 'revisao']); // v54.57 (UX-101)
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro na publicação: " . $this->userFacingError('Erro na publicação', $e);
         }
 
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 
@@ -4871,11 +4952,11 @@ class DashboardController
         try {
             $res = $service->duplicatePlan($planId);
             $_SESSION['feedback_message'] = "Plano duplicado. A cópia é um rascunho novo e pode ser editada à parte.";
-            header("Location: /planos/" . $res['plan_id']);
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/" . $res['plan_id']));
             exit;
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro ao duplicar plano: " . $this->userFacingError('Erro ao duplicar plano', $e);
-            header("Location: /planos/{$planId}");
+            header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
             exit;
         }
     }

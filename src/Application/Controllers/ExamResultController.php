@@ -203,7 +203,7 @@ class ExamResultController
     private function redirect(string $to): void
     {
         if (!headers_sent()) {
-            header('Location: ' . $to, true, 303);
+            header(\ClyoNutri\Application\View\AttendanceContext::location('Location: ' . $to), true, 303);
         }
         if (!defined('CLYONUTRI_TESTING')) {
             exit;

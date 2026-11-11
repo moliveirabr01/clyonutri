@@ -262,7 +262,7 @@ class ClinicalProtocolController
 
     private function back(int $pid): string
     {
-        return '/pacientes/' . $pid . '/anamnese#anamnese-adaptativa';
+        return \ClyoNutri\Application\View\AttendanceContext::url('/pacientes/' . $pid . '/anamnese#anamnese-adaptativa');
     }
 
     private function str(string $k): string

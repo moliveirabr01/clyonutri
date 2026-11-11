@@ -471,6 +471,7 @@ body:has(#secao-documentos) main section[id], body:has(#secao-documentos) main h
 
 .nutri-dir-search {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   background: var(--neutral-white);
@@ -506,6 +507,7 @@ body:has(#secao-documentos) main section[id], body:has(#secao-documentos) main h
 }
 
 .nutri-dir-search__btn {
+  flex-shrink: 0;
   border: 0;
   background: transparent;
   color: var(--botanical-green-700);
@@ -531,6 +533,10 @@ body:has(#secao-documentos) main section[id], body:has(#secao-documentos) main h
 }
 
 .nutri-dir-banner__link {
+  /* v54.57 UX-121: alvo de toque ≥ 24 px (WCAG 2.5.8) */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   color: var(--botanical-sage-200);
   text-decoration: none;
   font-weight: var(--font-weight-semibold);

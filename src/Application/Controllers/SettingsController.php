@@ -162,7 +162,7 @@ final class SettingsController
                 }
                 else throw new \InvalidArgumentException('Selecione uma seção válida.');
 
-                $savedToken=\ClyoNutri\Domain\Settings\SettingsSaveFeedback::issue($section);
+                $savedToken=\ClyoNutri\Domain\Settings\SettingsSaveFeedback::issue($section==='profile' ? 'profile_'.(is_string($_POST['public_profile_action']??null)?$_POST['public_profile_action']:'keep') : $section);
                 header("Location: /configuracoes?tab={$postedTab}&saved={$savedToken}" . ($postedTab === 'agenda' ? '&secao=' . self::agendaSection('', (string)$section) : '') . ($postedTab==='paciente-app'?'&secao='.urlencode($section).'#task-'.urlencode($section):''));
                 return;
             }
@@ -178,6 +178,9 @@ final class SettingsController
                 $activeTab = $postedTab;
             }
         }
+        $publicProfileAction='keep';
+        if ($error && ($_POST['section']??'')==='profile' && is_string($_POST['public_profile_action']??null)
+            && in_array($_POST['public_profile_action'],['keep','publish','hide'],true)) $publicProfileAction=$_POST['public_profile_action'];
         $values=$profile;
         if($error)foreach(['name','clinic_name','specialty','bio','email','phone','crn','crn_region','clinic_email','clinic_document','clinic_phone','clinic_address_street','clinic_address_number','clinic_address_complement','clinic_address_neighborhood','clinic_address_city','clinic_address_state','clinic_address_zip'] as $field)if(is_string($_POST[$field]??null))$values[$field]=$_POST[$field];
         $preferences=json_decode($profile['practice_preferences'],true)?:[];
@@ -199,8 +202,11 @@ final class SettingsController
         $successMessage=null;
         if($success){
             $messages=['availability'=>'Horários de atendimento atualizados.','profile'=>'Dados cadastrais e profissionais atualizados.','booking'=>'Agendamento online atualizado.','patient_actions'=>'Regras de consulta no aplicativo atualizadas.','chat'=>'Regras do chat atualizadas.','notifications'=>'Avisos atualizados.','reminders'=>'Lembrete de consulta atualizado.','self_service'=>'Regras de remarcação atualizadas.'];
-            $successMessage=str_starts_with($lastSec,'calendar_')?'Calendário atualizado. Confira as datas e os períodos na agenda.':($messages[$lastSec]??'Configurações salvas.');
+            $profileMessages=['profile_publish'=>'Perfil salvo. Especialidade e apresentação revisadas foram confirmadas para publicação no diretório quando o agendamento estiver ativo.','profile_hide'=>'Perfil salvo. Especialidade e apresentação foram retiradas do diretório.','profile_keep'=>'Dados do perfil salvos. A publicação não foi solicitada; alterações de especialidade ou apresentação exigem nova confirmação.'];
+            if (isset($profileMessages[$lastSec])) $successMessage=$profileMessages[$lastSec];
+            else $successMessage=str_starts_with($lastSec,'calendar_')?'Calendário atualizado. Confira as datas e os períodos na agenda.':($messages[$lastSec]??'Configurações salvas.');
         }
+        if($success&&str_starts_with($lastSec,'profile_'))$lastSec='profile';
         if($success&&$lastSec==='availability'&&is_array($_SESSION['availability_dropped_breaks']??null)){$successMessage=($successMessage??'Configurações salvas.').' A pausa de '.implode(', ',$_SESSION['availability_dropped_breaks']).' ficava fora do horário de atendimento e foi removida.';unset($_SESSION['availability_dropped_breaks']);}
         if($success&&$lastSec==='calendar_import'&&is_array($_SESSION['calendar_import_result']??null)){[$impN,$impS]=$_SESSION['calendar_import_result'];$successMessage=($impN===1?'1 feriado nacional importado':$impN.' feriados nacionais importados').($impS>0?'; '.$impS.' já estava'.($impS===1?'':'m').' cadastrado'.($impS===1?'':'s').' e não foi'.($impS===1?'':'ram').' duplicado'.($impS===1?'':'s'):'').'.';}
         $bookingSettings=(new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());

@@ -116,7 +116,7 @@ $src = $clinicalSummary['source'] ?? null;
   <?php else: ?>
     <ol class="cr-timeline">
       <?php foreach (array_reverse($timeline) as $rec): ?>
-        <li class="cr-entry<?= $rec['is_retracted'] ? ' cr-entry--retracted' : '' ?>">
+        <li id="registro-<?= (int)$rec['id'] ?>" class="cr-entry<?= $rec['is_retracted'] ? ' cr-entry--retracted' : '' ?>">
           <div class="cr-entry__head">
             <div>
               <div class="cr-entry__title">

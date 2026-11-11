@@ -36,17 +36,23 @@ $tabs = [
       <p class="patient-header__meta">
         <span><?= $e($age) ?></span><span aria-hidden="true">·</span><span><?= $e(\ClyoNutri\Core\I18n\LabelMap::patientGender($p['gender'] ?? null)) ?></span><span aria-hidden="true">·</span>
         <span data-testid="patient-care-context">
-          <?php if ($stepState === 'continue'): ?>Atendimento em andamento (agendado para <?= $e($stepWhen) ?>)
+          <?php if ($stepState === 'continue'): ?><?= $e(\ClyoNutri\Application\View\AttendanceContext::label($stepApp)) ?><?= \ClyoNutri\Application\View\AttendanceContext::selected($pid) ? ' · contexto selecionado' : ' · seleção automática: mais recente em andamento' ?>
+          <?php elseif ($stepState === 'selected'): ?><?= $e(\ClyoNutri\Application\View\AttendanceContext::label($stepApp)) // v54.57 (UX-119): tipo, data e hora ?>
           <?php elseif ($stepState === 'start_today'): ?>Consulta hoje às <?= $e(date('H:i', strtotime($stepApp['scheduled_at']))) ?>
           <?php elseif ($stepState === 'upcoming'): ?>Próxima consulta: <?= $e($stepWhen) ?>
           <?php elseif ($stepState === 'unavailable'): ?>Agenda temporariamente indisponível
           <?php else: ?>Nenhuma consulta agendada<?php endif; ?>
         </span>
       </p>
+      <?php if (in_array($stepState, ['continue', 'selected'], true)): // v54.57 (UX-105): etapas navegáveis sem voltar à sala ?>
+        <?= \ClyoNutri\Application\View\AttendanceContext::stepsNav($stepApp) ?>
+      <?php endif; ?>
     </div>
     <div class="patient-header__actions" data-testid="care-next-step" data-state="<?= $e($stepState) ?>">
       <?php if ($stepState === 'continue'): ?>
         <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>" data-testid="care-continue">Continuar atendimento</a>
+      <?php elseif ($stepState === 'selected'): ?>
+        <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>">Ver consulta selecionada</a>
       <?php elseif ($stepState === 'start_today'): ?>
         <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" class="u-m-0" data-no-dirty data-confirm="<?= $e('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?') ?>">
           <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
@@ -101,7 +107,5 @@ $tabs = [
       <?php endforeach; ?>
     </ul>
   </nav>
-  <?php $pid = (int)$p['id']; $attendanceBarPrimary = ($careStep['state'] ?? '') === 'continue' && !empty($careFlow['next']); /* v54.47 V01: uma ação primária por contexto */ if (!empty($careFlow)) { require __DIR__ . '/_care_workflow.php'; } // NI2-623 ?>
 
 </header>
-<?php if (($careStep['state'] ?? '') === 'continue') { require __DIR__ . '/_attendance_mode_bar.php'; } // NI2-714: fora do header (uma ação principal) ?>

@@ -21,6 +21,22 @@
 <div class="form-group"><label class="form-label" for="profile-<?= $field ?>"><?= $label ?></label><input class="form-control" id="profile-<?= $field ?>" name="<?= $field ?>" type="<?= $type ?>" maxlength="<?= $max ?>" value="<?= htmlspecialchars($values[$field]??'',ENT_QUOTES) ?>" <?= in_array($field,['name','email','clinic_name'])?'required':'' ?> <?= $field==='clinic_name'&&!in_array($profile['member_role'],['owner','admin'],true)?'readonly':'' ?>></div>
 <?php endforeach; ?>
 <label class="form-label" for="profile-bio">Apresentação profissional</label><textarea class="form-control" id="profile-bio" name="bio" maxlength="2000" rows="4"><?= htmlspecialchars($values['bio']??'') ?></textarea>
+<?php $publicPrefs=json_decode($profile['practice_preferences']??'{}',true)?:[]; $publicConfirmed=\ClyoNutri\Domain\Settings\PublicProfileConfirmation::isConfirmed($profile,$publicPrefs); ?>
+<fieldset class="ux52-public-review" data-public-review>
+<legend>Apresentação no diretório público</legend>
+<p><?= $publicConfirmed ? 'O texto salvo foi confirmado por você. Alterar especialidade ou apresentação retira essa confirmação até nova revisão.' : 'Sua especialidade e apresentação ainda não foram confirmadas para publicação.' ?> Nome e registro continuam identificando o perfil quando o agendamento está ativo.</p>
+<section class="card" aria-labelledby="public-preview-title">
+<h3 id="public-preview-title">Prévia antes de publicar</h3>
+<strong data-public-preview-name><?= htmlspecialchars($values['name']??'',ENT_QUOTES,'UTF-8') ?></strong>
+<p data-public-preview-specialty><?= htmlspecialchars(trim((string)($values['specialty']??''))?:'Área de atuação não informada',ENT_QUOTES,'UTF-8') ?></p>
+<p data-public-preview-bio><?= htmlspecialchars(trim((string)($values['bio']??''))?:'Apresentação profissional ainda não confirmada. Consulte o profissional para conhecer sua atuação.',ENT_QUOTES,'UTF-8') ?></p>
+</section>
+<label for="public-profile-action" class="form-label">O que fazer com a apresentação pública?</label>
+<select class="form-control" id="public-profile-action" name="public_profile_action"><option value="keep" <?= ($publicProfileAction??'keep')==='keep'?'selected':'' ?>>Manter estado atual (alterações de texto exigem nova confirmação)</option><option value="publish" <?= ($publicProfileAction??'keep')==='publish'?'selected':'' ?>>Publicar o texto revisado nesta prévia</option><option value="hide" <?= ($publicProfileAction??'keep')==='hide'?'selected':'' ?>>Retirar especialidade e apresentação do diretório</option></select>
+<label class="cn-check-row"><input type="checkbox" name="confirm_public_profile" value="1" data-public-confirm> Revisei a prévia e confirmo que estas informações podem ser publicadas.</label>
+<p>Somente áreas declaradas e confirmadas entram nos filtros. Não preenchemos biografia com notas internas ou textos automáticos.</p>
+</fieldset>
+<script src="/assets/js/public-profile-preview.js?v=v54-52" defer></script>
 <fieldset class="u-border-0 u-p-0 u-my-6 u-mx-0" id="dados-cobranca" <?= !in_array($profile['member_role'],['owner','admin'],true)?'disabled':'' ?>>
 <legend class="u-text-card-title u-font-bold u-mb-4">Dados do consultório para cobrança</legend>
 <p>Usados para identificar o consultório no checkout do Asaas. Para assinar, preencha CPF/CNPJ, e-mail, telefone e endereço completo; complemento é opcional.</p>

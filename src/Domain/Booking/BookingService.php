@@ -497,6 +497,7 @@ class BookingService
                 }
             }
         } catch (\Throwable $e) {
+            $prefs = [];
             $defaultPrice = null;
         }
 
@@ -609,6 +610,7 @@ class BookingService
             }
 
             // Read onboarding preferences & focus objectives
+            $prefs = [];
             $defaultPrice = null;
             $focusTags = [];
             $contextualNotes = '';
@@ -634,8 +636,11 @@ class BookingService
             } catch (\Throwable) {
             }
 
+            // v54.59: especialidade/temas só aparecem no diretório público após confirmação
+            // explícita do perfil (regra da v54.52); sem etiquetas genéricas inventadas.
+            $confirmed = \ClyoNutri\Domain\Settings\PublicProfileConfirmation::isConfirmed($row, $prefs ?? []);
             $tags = [];
-            $specialty = trim((string)($row['specialty'] ?? ''));
+            $specialty = $confirmed ? trim((string)($row['specialty'] ?? '')) : '';
             if ($specialty !== '') {
                 foreach (preg_split('/[,;\/]+|\s+e\s+/iu', $specialty) ?: [] as $part) {
                     $part = trim($part);
@@ -644,11 +649,10 @@ class BookingService
                     }
                 }
             }
-            foreach ($focusTags as $ft) {
-                $tags[] = $ft;
-            }
-            if ($tags === []) {
-                $tags = ['Nutrição Clínica', 'Reeducação Alimentar', 'Emagrecimento', 'Saúde e Bem-Estar'];
+            if ($confirmed) {
+                foreach ($focusTags as $ft) {
+                    $tags[] = $ft;
+                }
             }
             if (!empty($row['allow_telehealth'])) {
                 $tags[] = 'Teleconsulta';
@@ -665,14 +669,7 @@ class BookingService
             }
             $tags = array_values($uniqueTags);
 
-            $bio = trim((string)($row['bio'] ?? ''));
-            if ($bio === '' && $contextualNotes !== '') {
-                $bio = $contextualNotes;
-            }
-            if ($bio === '') {
-                $specText = $specialty !== '' ? " com foco em {$specialty}" : ' com foco em nutrição clínica e acompanhamento individualizado';
-                $bio = "Atendimento nutricional humanizado e baseado em evidências{$specText}. Planejamento alimentar adaptado à sua rotina, preferências e objetivos de saúde na clínica {$row['clinic_name']}.";
-            }
+            $bio = $confirmed ? trim((string)($row['bio'] ?? '')) : '';
 
             // Filter by search query and topic
             $haystack = $norm(implode(' ', [$name, $crnDisplay, (string)$row['clinic_name'], $specialty, $bio, implode(' ', $tags), (string)($row['address_city'] ?? ''), (string)($row['address_state'] ?? '')]));

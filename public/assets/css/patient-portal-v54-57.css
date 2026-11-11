@@ -1,0 +1,19 @@
+/* v54.57 (UX-102): área logada do portal web do paciente. Tokens do DS com fallback. */
+.pp-head{text-align:center;margin-bottom:var(--space-5,1.25rem)}
+.pp-title{font-size:1.4rem;font-weight:700;color:var(--botanical-forest-900,#0F3E17);margin:0 0 .35rem}
+.pp-muted{color:var(--neutral-gray-600,#475467);font-size:.9rem;margin:0}
+.pp-cards{display:grid;gap:.75rem;margin-bottom:1.5rem}
+.pp-card{display:block;min-height:44px;padding:.9rem 1rem;border-radius:12px;background:var(--botanical-sage-100,#E5F0E5);border:1px solid var(--botanical-sage-200,#D3E5D5);color:var(--botanical-forest-900,#0F3E17);text-decoration:none}
+.pp-card strong{display:block;margin-bottom:.25rem}
+.pp-card span{display:block;font-size:.88rem;color:var(--neutral-gray-600,#475467)}
+.pp-card:hover,.pp-card:focus-visible{border-color:var(--botanical-green-600,#39734A);outline:2px solid transparent;box-shadow:0 0 0 3px var(--botanical-green-600,#39734A)}
+.pp-water{border:1px solid var(--neutral-gray-200,#E5E7EB);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.pp-water h2{font-size:1rem;margin:0 0 .5rem}
+.pp-water__form{display:flex;gap:.5rem;flex-wrap:wrap}
+.pp-water__btn{flex:1 1 6rem;min-height:44px;width:auto}
+.pp-logout{text-align:center}
+.pp-link-btn{background:none;border:0;color:var(--botanical-copper-600,#B04A1B);font-weight:600;text-decoration:underline;min-height:44px;cursor:pointer;font:inherit}
+.pp-plan h2{font-size:1.05rem;margin:1.25rem 0 .5rem}
+.pp-plan ul{margin:0;padding-left:1.1rem}
+.pp-plan li{margin-bottom:.35rem}
+.pp-plan .pp-sub{font-size:.85rem;color:var(--neutral-gray-600,#475467)}

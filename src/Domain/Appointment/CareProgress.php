@@ -47,6 +47,8 @@ final class CareProgress
             $state=$waived?'not_applicable':($verified?'done':(($drafting||($key==='plano'&&($plan['status']??'')==='draft'))?'in_progress':($ev?'review':'pending')));
             $source=$ev?' · Registro #'.(int)$ev['id'].(isset($ev['version'])?' · v'.(int)$ev['version']:'').(isset($ev['version_number'])?' · v'.(int)$ev['version_number']:''):'';
             $detail=$waived?self::REASONS[$p['reason_code']]:($verified?'Registro persistido vinculado a este atendimento':($ev?'Há registro persistido; confirme sua aplicação a este atendimento':'Nenhum registro persistido disponível'));
+            // v54.57 (UX-101): vínculo gravado ao concluir o registro dentro do atendimento mostra quando aconteceu.
+            if($verified&&str_starts_with((string)$confirmed[$key]['request_key'],'ctx-')){$t=strtotime((string)$confirmed[$key]['created_at']);$detail='Concluída neste atendimento'.($t?' em '.date('d/m/Y H:i',$t):'');}
             if($drafting)$detail='Rascunho v'.(int)$draft['version'].' persistido; a versão concluída permanece vigente';
             if($key==='plano'&&$state==='in_progress')$detail='Plano alimentar em rascunho; continuar edição e revisar antes de publicar';
             $required=($p['decision']??'')==='required';if($required){$total++;if($verified)$done++;}
@@ -57,7 +59,31 @@ final class CareProgress
         if($next)$next['action']=(['in_progress'=>'Continuar','review'=>'Revisar','pending'=>'Registrar'][$next['state']]).' '.mb_strtolower($next['label'],'UTF-8');
         // Última etapa efetivamente persistida (maior data de registro entre as evidências).
         $last=null;$lastAt='';foreach($steps as $st){$ev=$evidence[$st['key']];if($st['key']==='anamnese'&&$draft&&(!$an||(int)$draft['version']>(int)$an['version']))$ev=$draft;$at=$ev?(string)($ev['updated_at']??$ev['published_at']??$ev['assessed_at']??$ev['created_at']??''):'';if($at!==''&&$at>$lastAt){$lastAt=$at;$last=['key'=>$st['key'],'label'=>$st['label'],'at'=>$at];}}
-        return ['appointment_id'=>$id,'patient_id'=>$patient,'steps'=>$steps,'next'=>$next,'done'=>$done,'total'=>$total,'remaining_required'=>$total-$done,'last_saved'=>$last,'quantitative'=>$configured&&$total>0,'revision'=>hash('sha256',json_encode([$a['status'],$a['type'],$template['revision'],$events,$evidence,$draft],JSON_UNESCAPED_UNICODE))];
+        $linked=count(array_filter($steps,fn($st)=>$st['state']==='done'));$applicable=count(array_filter($steps,fn($st)=>$st['state']!=='not_applicable'));
+        return ['appointment_id'=>$id,'patient_id'=>$patient,'steps'=>$steps,'linked'=>$linked,'applicable'=>$applicable,'next'=>$next,'done'=>$done,'total'=>$total,'remaining_required'=>$total-$done,'last_saved'=>$last,'quantitative'=>$configured&&$total>0,'revision'=>hash('sha256',json_encode([$a['status'],$a['type'],$template['revision'],$events,$evidence,$draft],JSON_UNESCAPED_UNICODE))];
+    }
+    /**
+     * v54.57 (UX-101): registro concluído DENTRO do atendimento (pedido com ?atendimento=ID já validado pelo
+     * AttendanceContext, consulta em andamento, mesmo paciente) é vinculado a ele explicitamente: grava o mesmo
+     * evento "confirm" da confirmação manual, com o hash da evidência e o autor. Registro feito fora do atendimento
+     * continua pedindo revisão. Devolve as etapas confirmadas.
+     * @param list<string> $keys
+     * @return list<string>
+     */
+    public function confirmFromAttendance(int $clinic,int $patient,int $id,array $keys): array
+    {
+        $a=$this->appointment($clinic,$patient,$id);
+        if(($a['status']??'')!=='in_progress')return [];
+        $out=[];
+        foreach($keys as $key){
+            if(!isset(self::STEPS[$key]))continue;
+            $snap=$this->snapshot($clinic,$patient,$id);
+            $step=array_values(array_filter($snap['steps'],fn($s)=>$s['key']===$key))[0]??null;
+            if(!$step||$step['state']!=='review'||!$step['can_confirm'])continue;
+            $this->decide($clinic,$patient,$id,$key,'confirm','',$step['evidence'],$snap['revision'],'ctx-'.bin2hex(random_bytes(12)));
+            $out[]=$key;
+        }
+        return $out;
     }
     public function decide(int $clinic,int $patient,int $id,string $step,string $decision,string $reason,string $evidence,string $base,string $key): void
     {

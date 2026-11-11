@@ -3,7 +3,7 @@ $oqe=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
 $workflow=(new \ClyoNutri\Domain\Clinical\WorkflowWrites($db))->state('plan',$planId);
 ?>
 <section class="card" id="quick-plan-editor" data-quick-plan data-endpoint="/api/workflow/plan/<?= (int)$planId ?>" data-revision="<?= $oqe($workflow['revision']) ?>">
- <h2>Montar refeições</h2><p>Adicione refeições e alimentos aqui. Cada confirmação grava no servidor; o plano permanece em rascunho até a publicação.</p>
+ <h2>Montar refeições</h2><p><?= $oqe($plan['title']) ?> · Rascunho v<?= (int)$plan['version'] ?>. Publicação exige revisão.</p>
  <?= \ClyoNutri\Application\View\OperationalUI::state($workflow['state'],$workflow['saved_at'],$workflow['resume_url']) ?>
  <p class="op-message op-message--error op-error" role="alert" data-quick-error hidden></p>
  <button type="button" class="op-button op-button--secondary" data-quick-retry hidden>Conferir e repetir a mesma operação</button>

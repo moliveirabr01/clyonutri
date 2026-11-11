@@ -46,6 +46,25 @@ class Router
         $isPatient = $isPublicPatientPath || $path === '/app' || str_starts_with($path, '/app/');
         $backUrl = $isPublicPatientPath ? '/paciente/app' : ($isPatient ? '/app' : '/dashboard');
         $backLabel = $isPatient ? 'Voltar ao app do paciente' : 'Voltar ao painel';
+        // UX-002: reopening is a GET; authorization and the consultation/patient relationship
+        // are checked again there. An expired POST remains blocked and is never replayed.
+        if (preg_match('~^/pacientes/([1-9][0-9]*)/(?:condicoes|protocolos)(?:/.*)?$~D', $path, $match)) {
+            $origin=$_GET['atendimento']??$_POST['atendimento']??null;
+            $unambiguous=!isset($_GET['atendimento'],$_POST['atendimento']) || $_GET['atendimento']===$_POST['atendimento'];
+            if (is_string($origin) && preg_match('/^[1-9][0-9]{0,17}$/D',$origin) && $unambiguous) {
+                $backUrl='/pacientes/'.$match[1].'/anamnese?atendimento='.$origin.'#anamnese-adaptativa';
+                $backLabel='Reabrir a anamnese';
+            }
+        }
+        // The professional pre-consultation list/detail is also a safe GET recovery target.
+        if (preg_match('~^/pacientes/([1-9][0-9]*)/pre-consulta(?:/([1-9][0-9]*)(?:/[^?#]*)?)?$~D', $path, $match)) {
+            $origin=$_GET['atendimento']??$_POST['atendimento']??null;
+            $unambiguous=!isset($_GET['atendimento'],$_POST['atendimento']) || $_GET['atendimento']===$_POST['atendimento'];
+            if (is_string($origin) && preg_match('/^[1-9][0-9]{0,17}$/D',$origin) && $unambiguous) {
+                $backUrl='/pacientes/'.$match[1].'/pre-consulta'.(isset($match[2])?'/'.$match[2]:'').'?atendimento='.$origin;
+                $backLabel='Reabrir a pré-consulta';
+            }
+        }
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -107,6 +126,11 @@ class Router
             }
         }
 
+        // v54.57 (UX-111): navegação no navegador recebe a página 404 com layout e caminho de volta; API/XHR, JSON.
+        if (ErrorPage::wantsHtml()) {
+            ErrorPage::render(404);
+            return;
+        }
         http_response_code(404);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['error' => 'Rota não encontrada', 'path' => $path]);

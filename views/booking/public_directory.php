@@ -23,7 +23,7 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
   <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
   <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-47">
-  <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-51">
+  <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-53">
 </head>
 <body class="nutri-directory-body">
   <a class="skip-link" href="#directory-main">Pular para a lista de nutricionistas</a>
@@ -70,7 +70,7 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
       </div>
       <p class="nutri-dir-tz">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-        <span>Horários no seu fuso (<?= $e($timezoneName ?? 'America/Sao_Paulo') ?> · GMT-3)</span>
+        <span>Horários do agendamento em <?= $e($timezoneName ?? 'America/Sao_Paulo') ?>. O fuso e a data são confirmados ao escolher o horário.</span>
       </p>
     </section>
 
@@ -112,14 +112,14 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
           $tags = is_array($prof['tags'] ?? null) ? $prof['tags'] : [];
           $visibleTags = array_slice($tags, 0, 7);
           $extraTagsCount = max(0, count($tags) - count($visibleTags));
-          $bio = (string)($prof['bio'] ?? '');
+          $bio = trim((string)($prof['bio'] ?? '')) ?: 'Apresentação profissional ainda não confirmada. Consulte o profissional para conhecer sua atuação.';
           $bioPreview = mb_strlen($bio, 'UTF-8') > 230 ? rtrim(mb_substr($bio, 0, 230, 'UTF-8')) . '…' : $bio;
           $hasLongBio = mb_strlen($bio, 'UTF-8') > 230;
           $price = $prof['default_price'] ?? null;
           $duration = (int)($prof['duration_minutes'] ?? 60);
           $nextSlot = $prof['next_slot_label'] ?? null;
           $bookingUrl = (string)($prof['booking_url'] ?? '/agendar');
-          $chatUrl = (string)($prof['whatsapp_url'] ?? $bookingUrl);
+          $chatUrl = (string)($prof['whatsapp_url'] ?? '');
           $isExternalChat = !empty($prof['whatsapp_url']);
         ?>
           <article class="nutri-dir-card" data-testid="nutritionist-directory-card">
@@ -162,7 +162,7 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
             <div class="nutri-dir-card__meta">
               <div>
                 <span class="nutri-dir-card__price">
-                  <?= ($price !== null && (float)$price > 0) ? 'R$ ' . number_format((float)$price, 0, ',', '.') : 'A combinar' ?>
+                  <?= ($price !== null && (float)$price > 0) ? 'R$ ' . number_format((float)$price, 2, ',', '.') : 'A combinar' ?>
                 </span>
                 <span class="nutri-dir-card__duration">· <?= $duration ?> min</span>
               </div>
@@ -174,15 +174,15 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
             </div>
 
             <div class="nutri-dir-card__actions">
-              <a
+              <?php if ($isExternalChat): ?><a
                 href="<?= $e($chatUrl) ?>"
                 class="nutri-dir-btn nutri-dir-btn--secondary"
                 <?= $isExternalChat ? 'target="_blank" rel="noopener noreferrer"' : '' ?>
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-                <span>Conversar</span>
+                <span>Conversar pelo WhatsApp (abre outro site)</span>
               </a>
-              <a href="<?= $e($bookingUrl) ?>" class="nutri-dir-btn nutri-dir-btn--primary" data-testid="directory-book-now">
+              <?php endif; ?><a href="<?= $e($bookingUrl) ?>" class="nutri-dir-btn nutri-dir-btn--primary" data-testid="directory-book-now">
                 <span>Agendar agora</span>
               </a>
             </div>

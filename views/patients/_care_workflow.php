@@ -2,6 +2,9 @@
 $ef=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
 $progressBase='/consulta/'.(int)$careFlow['appointment_id'].'/progresso';
 ?>
+<?php // v54.57 (UX-101): o resumo mostra o estado real de cada etapa (✓ concluída neste atendimento), sem abrir o bloco.
+$stepMarks=[];foreach($careFlow['steps'] as $s){$stepMarks[]=$s['label'].' '.(['done'=>'✓','not_applicable'=>'—','in_progress'=>'…','review'=>'revisar','pending'=>'a fazer','blocked'=>'bloqueada'][$s['state']]??'');} ?>
+<details class="ux52-progress" data-testid="care-flow-summary"><summary>Progresso do atendimento · <?= (int)($careFlow['linked'] ?? 0) ?> de <?= (int)($careFlow['applicable'] ?? count($careFlow['steps'])) ?> etapas concluídas<span class="sr-only">:</span> <span class="care-flow__marks"><?= $ef(implode(' · ', $stepMarks)) ?></span> — ver decisões</summary>
 <section class="care-flow" id="care-progress" aria-label="Progresso deste atendimento" data-testid="care-flow">
 <h2 class="care-flow__title">Progresso do atendimento</h2>
 <?php if(!empty($careFlow['quantitative'])): ?>
@@ -21,3 +24,4 @@ $progressBase='/consulta/'.(int)$careFlow['appointment_id'].'/progresso';
 </form></details></li>
 <?php endforeach; ?></ol>
 </section>
+</details>

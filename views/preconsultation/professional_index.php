@@ -59,7 +59,7 @@ $pid = (int)$patient['id'];
   <?php else: ?>
     <div class="table-responsive">
       <table class="table" style="width: 100%;">
-        <thead><tr><th scope="col">Criado em</th><th scope="col">Objetivos</th><th scope="col">Perguntas</th><th scope="col">Situação</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+        <thead><tr><th scope="col">Criado em</th><th scope="col">Objetivos</th><th scope="col">Perguntas</th><th scope="col">Situação</th><th scope="col" style="position: relative;"><span class="sr-only">Ações</span></th></tr></thead>
         <tbody>
           <?php foreach ($list as $q): ?>
             <tr>

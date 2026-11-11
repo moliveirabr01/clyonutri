@@ -14,21 +14,15 @@ $pid = (int)$p['id'];
 <section class="card u-mt-6" aria-labelledby="patient-checkins">
 <h2 id="patient-checkins">Check-ins recentes</h2>
 <?php if (!$profile['checkins']): ?><p>Nenhum check-in registrado.</p><?php else: ?>
-<ul class="cn-profile-list" data-testid="profile-checkins"><?php foreach ($profile['checkins'] as $row): ?><li><strong><?= $escape(date('d/m/Y',strtotime($row['checkin_date']))) ?></strong> <span>Adesão: <?= $row['meal_adherence_pct'] === null ? 'Não informada' : $escape($row['meal_adherence_pct']).'%' ?>; energia: <?= $escape($row['energy_level'] ?? 'Não informada') ?>; fome: <?= $escape($row['hunger_level'] ?? 'Não informada') ?></span>
+<ul class="cn-profile-list" data-testid="profile-checkins"><?php foreach ($profile['checkins'] as $row): ?><li id="checkin-<?= (int)$row['id'] ?>"><strong><?= $escape(date('d/m/Y',strtotime($row['checkin_date']))) ?></strong> <span>Adesão: <?= $row['meal_adherence_pct'] === null ? 'Não informada' : $escape($row['meal_adherence_pct']).'%' ?>; energia: <?= $escape($row['energy_level'] ?? 'Não informada') ?>; fome: <?= $escape($row['hunger_level'] ?? 'Não informada') ?></span>
 <?php if ($row['notes']): ?><p class="cn-profile-list__note"><?= nl2br($escape($row['notes'])) ?></p><?php endif; ?></li><?php endforeach; ?></ul><p class="cn-profile-note"><a href="/privacidade/pedidos">Ver todos os pedidos LGPD da clínica</a></p><?php endif; ?>
 </section>
 <section class="card u-mt-6" aria-labelledby="patient-finance">
 <div class="cn-profile-head"><h2 id="patient-finance">Financeiro do paciente</h2><a class="btn btn-secondary" href="/financeiro">Abrir financeiro</a></div>
 <?php if (!$profile['receivables']): ?><p>Nenhuma cobrança registrada.</p><?php else: ?>
 <div class="table-responsive" tabindex="0" role="region" aria-labelledby="patient-finance"><table class="table"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Pago</th><th>Status</th></tr></thead><tbody>
-<?php foreach ($profile['receivables'] as $row): ?><tr><td><?= $escape($row['description']) ?></td><td><?= $escape(date('d/m/Y',strtotime($row['due_date']))) ?></td><td>R$ <?= number_format($row['amount_cents']/100,2,',','.') ?></td><td>R$ <?= number_format($row['paid_cents']/100,2,',','.') ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::receivableStatus($row['status'],$row['due_date'])) ?></td></tr><?php endforeach; ?>
+<?php foreach ($profile['receivables'] as $row): ?><tr id="cobranca-<?= (int)$row['id'] ?>"><td><?= $escape($row['description']) ?></td><td><?= $escape(date('d/m/Y',strtotime($row['due_date']))) ?></td><td>R$ <?= number_format($row['amount_cents']/100,2,',','.') ?></td><td>R$ <?= number_format($row['paid_cents']/100,2,',','.') ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::receivableStatus($row['status'],$row['due_date'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?>
-</section>
-<section class="card u-mt-6" aria-labelledby="patient-timeline">
-<h2 id="patient-timeline">Linha do tempo</h2><p class="cn-profile-note">Últimos 50 eventos de consultas, check-ins, prontuário, anamnese, avaliações, planos e cobranças.</p>
-<?php if (!$profile['timeline']): ?><p>Nenhum evento registrado.</p><?php else: ?><ol class="cn-profile-timeline" data-testid="profile-timeline">
-<?php foreach ($profile['timeline'] as $event): ?><li><span class="ds-pill ds-pill--neutral"><?= $escape($event['type']) ?></span> <time><?= $escape(date('d/m/Y H:i',strtotime($event['date']))) ?></time> <span><?= $escape($event['title']) ?></span></li><?php endforeach; ?>
-</ol><?php endif; ?>
 </section>
 <section class="card u-mt-6" aria-labelledby="patient-consents">
 <h2 id="patient-consents">Consentimentos e privacidade</h2>

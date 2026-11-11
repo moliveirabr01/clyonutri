@@ -8,7 +8,7 @@ final class OperationalUI
     public static function escape(mixed $v): string{return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}
     public static function state(string $key,?string $savedAt=null,?string $resume=null): string
     {
-        $e=[self::class,'escape'];$out='<div class="op-state" data-workflow-state data-state="'.$e($key).'" role="status" aria-live="polite" aria-atomic="true"><strong data-state-label>'.$e(WorkflowState::label($key)).'</strong><span data-state-time>'.($savedAt?' · '.$e($savedAt):'').'</span>';
+        $e=[self::class,'escape'];$out='<div class="op-state" data-workflow-state data-state="'.$e($key).'" role="status" aria-live="polite" aria-atomic="true"><strong data-state-label>'.$e(WorkflowState::label($key)).'</strong><span data-state-time>'.($savedAt?' · '.$e(\ClyoNutri\Core\I18n\LocalTime::local($savedAt)):'').'</span>';
         if($resume)$out.=' <a href="'.$e($resume).'" data-resume'.($key==='not_started'?' hidden':'').'>Retomar o salvo</a>';
         return $out.'</div>';
     }

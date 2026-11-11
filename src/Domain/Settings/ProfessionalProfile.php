@@ -75,6 +75,14 @@ final class ProfessionalProfile
             $changedIdentity=$data['email']!==strtolower($current['email'])||$data['crn']!==$current['crn']||$data['crn_region']!==$current['crn_region'];
             $this->db->prepare('UPDATE users SET name=?,email=?,phone=?,is_verified=CASE WHEN ?=1 THEN 0 ELSE is_verified END,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['name'],$data['email'],$data['phone'],(int)$changedIdentity,TenantContext::getUserId()]);
             $this->db->prepare('UPDATE professionals SET specialty=?,bio=?,crn=?,crn_region=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?')->execute([$data['specialty'],$data['bio'],$data['crn'],$data['crn_region'],TenantContext::getUserId()]);
+            $prefs = json_decode($current['practice_preferences'], true) ?: [];
+            $prefs = PublicProfileConfirmation::revise($prefs, $data, $input, (int)TenantContext::getUserId());
+            $progress = (new \ClyoNutri\Domain\Onboarding\OnboardingService($this->db))->getOrCreateProgress((int)TenantContext::getUserId(), TenantContext::getClinicId());
+            $this->db->prepare('UPDATE onboarding_progress SET practice_preferences=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=? AND user_id=?')->execute([json_encode($prefs, JSON_THROW_ON_ERROR),$progress['id'],TenantContext::getClinicId(),TenantContext::getUserId()]);
+            if (($input['public_profile_action'] ?? 'keep') !== 'keep') {
+                $this->db->prepare("INSERT INTO audit_logs(clinic_id,user_id,action,resource,resource_id,details) VALUES(?,?,'PUBLIC_PROFILE_REVIEWED','users',?,?)")->execute([TenantContext::getClinicId(),TenantContext::getUserId(),(string)TenantContext::getUserId(),json_encode(['action'=>$input['public_profile_action'],'digest'=>PublicProfileConfirmation::digest($data)],JSON_THROW_ON_ERROR)]);
+            }
+
             $this->db->prepare('UPDATE clinics SET name=?,email=?,document=?,phone=?,address_street=?,address_number=?,address_complement=?,address_neighborhood=?,address_city=?,address_state=?,address_zip=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['clinic_name'],$data['clinic_email'],$data['clinic_document'],$data['clinic_phone']!==''?$data['clinic_phone']:($canManageClinic?$data['phone']:''),$data['clinic_address_street'],$data['clinic_address_number'],$data['clinic_address_complement'],$data['clinic_address_neighborhood'],$data['clinic_address_city'],$data['clinic_address_state'],$data['clinic_address_zip'],TenantContext::getClinicId()]);
             $this->db->prepare("INSERT INTO audit_logs(clinic_id,user_id,action,resource,resource_id,details) VALUES(?,?,'PROFESSIONAL_PROFILE_UPDATED','users',?,'{}')")->execute([TenantContext::getClinicId(),TenantContext::getUserId(),(string)TenantContext::getUserId()]);
             $this->db->commit();$_SESSION['user_email']=$data['email'];$_SESSION['user_name']=$data['name'];$_SESSION['clinic_name']=$data['clinic_name'];

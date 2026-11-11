@@ -126,7 +126,7 @@
         <div>
           Lembrou sua senha? <a href="/login">Voltar ao Login</a>
         </div>
-        <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-400);">
+        <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-600);">
           Precisa de suporte com seu acesso? Fale com <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" style="color: var(--neutral-gray-500); text-decoration: underline;"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>
         </div>
       </div>

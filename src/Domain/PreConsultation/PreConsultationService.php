@@ -8,6 +8,7 @@ use ClyoNutri\Core\Audit\AuditLogger;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\TenantGuard;
+use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Domain\Anamnesis\AnamnesisService;
 use PDO;
 
@@ -203,7 +204,7 @@ class PreConsultationService
 
         $draft = $this->db->prepare('SELECT * FROM anamneses WHERE patient_id = :p AND clinic_id = :c AND is_draft = 1 ORDER BY id DESC LIMIT 1');
         $draft->execute(['p' => $patientId, 'c' => TenantContext::getClinicId()]);
-        $existing = $draft->fetch(PDO::FETCH_ASSOC) ?: [];
+        $existing = ClinicalEncryptionService::decryptAnamnesisRow($draft->fetch(PDO::FETCH_ASSOC) ?: null) ?: [];
 
         $data = [];
         foreach (['objectives', 'routine', 'food_preferences', 'restrictions', 'allergies', 'symptoms', 'habits', 'clinical_history', 'notes'] as $field) {

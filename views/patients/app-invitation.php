@@ -86,7 +86,8 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
             ✓ Convite Ativo (Válido por 48 horas)
           </span>
           <div class="u-text-caption u-color-neutral-gray-500 u-mt-1">
-            Expira em: <?= htmlspecialchars($invitation['expires_at'] ?? '48h') ?>
+            <?php // v54.57 (UX-106): expiração gravada em UTC, mostrada no fuso do consultório ?>
+            Válido até <?= htmlspecialchars(isset($invitation['expires_at']) ? \ClyoNutri\Core\I18n\LocalTime::fromUtc((string)$invitation['expires_at']) . ' (' . \ClyoNutri\Core\I18n\LocalTime::zoneLabel() . ')' : '48h') ?>
           </div>
         </div>
       </div>

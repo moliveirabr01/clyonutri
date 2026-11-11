@@ -44,7 +44,7 @@ $pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_sta
             <td class="text-right">
               <form method="POST" action="/exames/catalogo/favoritos/<?= $id ?>" data-no-dirty>
                 <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
-                <button type="submit" class="btn btn-outline ex-fav-btn" aria-pressed="<?= $isFav ? 'true' : 'false' ?>" aria-label="<?= $isFav ? 'Retirar dos favoritos' : 'Marcar como favorito' ?>: <?= $e($x['canonical_name']) ?>"<?= $eligibilityError ? ' disabled' : '' ?>><?= $isFav ? '★ Favorito' : 'Favoritar' ?></button>
+                <button type="submit" class="btn btn-outline ex-fav-btn" aria-pressed="<?= $isFav ? 'true' : 'false' ?>" aria-label="<?= $isFav ? 'Favorito — retirar dos favoritos' : 'Favoritar' ?>: <?= $e($x['canonical_name']) ?>"<?= $eligibilityError ? ' disabled' : '' ?>><?= $isFav ? '★ Favorito' : 'Favoritar' ?></button>
               </form>
             </td>
           </tr>

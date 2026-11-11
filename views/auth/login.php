@@ -119,7 +119,7 @@
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
             <label class="form-label" for="password" style="margin-bottom: 0;">Senha de acesso</label>
-            <a href="/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600); text-decoration: none; font-weight: 500;">Esqueci minha senha</a>
+            <a href="/recuperar-senha" style="display: inline-flex; align-items: center; min-height: 24px; font-size: 0.8rem; color: var(--brand-copper-600); text-decoration: none; font-weight: 500;">Esqueci minha senha</a>
           </div>
           <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" autocomplete="current-password" data-password-toggle required>
         </div>
@@ -140,7 +140,7 @@
 
       <div class="auth-footer" style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: var(--border-default);">
         <div>Ainda não tem conta? <a href="/cadastro">Cadastre-se</a></div>
-        <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-400);">
+        <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-600);">
           Precisa de suporte? <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" style="color: var(--neutral-gray-500); text-decoration: underline;"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>
         </div>
       </div>

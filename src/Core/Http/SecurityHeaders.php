@@ -228,7 +228,7 @@ final class SecurityHeaders
         header('X-Content-Type-Options: nosniff', true);
         header('X-Frame-Options: DENY', true);
         header('Referrer-Policy: strict-origin-when-cross-origin', true);
-        header('Permissions-Policy: camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()', true);
+        header('Permissions-Policy: camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), geolocation=(), payment=(), usb=(), serial=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()', true);
         header('Cross-Origin-Opener-Policy: same-origin', true);
         header('Cross-Origin-Resource-Policy: same-origin', true);
         $coep = self::coepValue();
@@ -294,7 +294,7 @@ final class SecurityHeaders
         self::$extraFrame[] = $origin;
         if (self::$browserSent && !headers_sent()) {
             $o = '"' . $origin . '"';
-            header("Permissions-Policy: camera=(self {$o}), microphone=(self {$o}), display-capture=(self {$o}), fullscreen=(self {$o}), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()", true);
+            header("Permissions-Policy: camera=(self {$o}), microphone=(self {$o}), display-capture=(self {$o}), fullscreen=(self {$o}), geolocation=(), payment=(), usb=(), serial=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()", true);
             self::emitCsp();
         }
         return $origin;

@@ -61,6 +61,36 @@ $showIf = static function (string $field, array $values) use ($answer): string {
   </div>
 <?php endif; ?>
 
+<?php
+// v54.57 (UX-103): rascunho com campo cifrado ilegível. A tela abre normalmente; o aviso explica e oferece a
+// recuperação auditada (mantém o legível, descarta só o corrompido). Versões concluídas nunca são alteradas.
+$unreadableDraft = $unreadableDraft ?? null;
+$unreadableConcluded = [];
+foreach ($history as $h) {
+    if (!empty($h['_unreadable_fields']) && empty($h['is_draft'])) { $unreadableConcluded[] = (int)$h['version']; }
+}
+?>
+<?php if ($unreadableDraft): ?>
+  <div class="op-message op-message--error" role="alert" data-testid="anamnese-rascunho-ilegivel">
+    <strong>O rascunho em andamento (v<?= (int)$unreadableDraft['version'] ?>) tem campos que não puderam ser lidos:</strong>
+    <?= htmlspecialchars(implode(', ', array_map([\ClyoNutri\Domain\Anamnesis\AnamnesisService::class, 'fieldLabel'], $unreadableDraft['fields']))) ?>.
+    Os demais campos e as versões concluídas estão preservados. Para continuar, recupere o rascunho: o que está legível é mantido e só os campos corrompidos são esvaziados (o conteúdo original fica guardado na auditoria).
+    <form method="post" action="/pacientes/<?= $pid ?>/anamnese/recuperar-rascunho" class="cr-inline-form">
+      <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+      <button type="submit" class="btn btn-primary" data-testid="anamnese-recuperar-rascunho">Recuperar rascunho</button>
+    </form>
+  </div>
+<?php endif; ?>
+<?php if (($_GET['success'] ?? '') === 'rascunho_recuperado'): ?>
+  <div class="op-message op-message--success" role="status" aria-live="polite" data-testid="anamnese-rascunho-recuperado">
+    Rascunho recuperado. O que estava legível foi mantido; os campos corrompidos foram esvaziados e o conteúdo original ficou guardado na auditoria. Revise e complete antes de concluir.
+  </div>
+<?php endif; ?>
+<?php if ($unreadableConcluded): ?>
+  <div class="op-message op-message--warning" role="status" data-testid="anamnese-versao-ilegivel">
+    Parte do conteúdo da(s) versão(ões) concluída(s) v<?= htmlspecialchars(implode(', v', $unreadableConcluded)) ?> não pôde ser lida com a chave atual e aparece em branco. A versão não foi alterada. Informe o suporte para conferir a chave de criptografia.
+  </div>
+<?php endif; ?>
 <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), $pid, 'anamnese') // NI2-661 ?>
 <div class="cr-head">
   <div>

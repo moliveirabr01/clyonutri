@@ -84,7 +84,7 @@
       else {const fresh=[...document.forms].find(f=>f.action===form.action);if(fresh){let node=fresh.parentElement;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}const target=fresh.elements[focusedName]||fresh.querySelector('input:not([type=hidden]),button');target?.focus();}else root.querySelector('input:not([type=hidden])')?.focus();}
       const freshRoot=doc.querySelector('[data-quick-plan]');if(freshRoot){root.dataset.revision=freshRoot.dataset.revision;for(const selector of ['#quick-meal-select','[data-copy-meals]']){const local=root.querySelector(selector),fresh=freshRoot.querySelector(selector),value=local.value;local.replaceChildren(...[...fresh.options].map(o=>o.cloneNode(true)));local.value=value;}}
       window.ClyoWorkflow?.set(root,window.ClyoForms?.dirtyForms().some(f=>root.contains(f))?'editing':'saved',j.workflow.saved_at);announce('Salvo como rascunho.');
-    }catch(err){showFormError(form,err.message);if(confirmed){root.dataset.needsReload='1';window.ClyoWorkflow?.set(root,'saved');}}finally{restoreButtons(form);}
+    }catch(err){showFormError(form,window.ClyoWorkflow?.netMessage?.(err)??err.message);if(confirmed){root.dataset.needsReload='1';window.ClyoWorkflow?.set(root,'saved');}}finally{restoreButtons(form);}
   });
 
   // Sugestão pela mesma energia (substituição).

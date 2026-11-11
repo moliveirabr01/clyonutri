@@ -76,7 +76,7 @@ class MealPlanEnergyController
             error_log('NI2-514 energy save failed: ' . $e->getMessage());
             $_SESSION['error_message'] = 'Não foi possível gravar a meta. Nenhuma alteração foi feita. Tente novamente.';
         }
-        header("Location: /planos/{$planId}#energia");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}#energia"));
         exit;
     }
 
@@ -101,7 +101,7 @@ class MealPlanEnergyController
             error_log('NI2-514 assign patient failed: ' . $e->getMessage());
             $_SESSION['error_message'] = 'Não foi possível atribuir o paciente. Tente novamente.';
         }
-        header("Location: /planos/{$planId}");
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
         exit;
     }
 }

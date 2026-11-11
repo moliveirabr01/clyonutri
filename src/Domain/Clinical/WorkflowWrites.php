@@ -35,7 +35,8 @@ final class WorkflowWrites
             $status=!$row?'not_started':(['draft'=>'saved','review'=>'review','issued'=>'issued','cancelled'=>'completed'][$row['status']]??'not_started');
             $url='/pacientes/'.$patient.'/exames'.($id?'/'.$id.'/editar':'/novo');
         } else throw new \InvalidArgumentException('Recurso inválido.');
-        return ['kind'=>$kind,'id'=>$id,'revision'=>hash('sha256',json_encode($data,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION)), 'state'=>$status,'label'=>WorkflowState::label($status),'saved_at'=>$row['updated_at']??$row['created_at']??null,'resume_url'=>$url];
+        return ['kind'=>$kind,'id'=>$id,'revision'=>hash('sha256',json_encode($data,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION)), 'state'=>$status,'label'=>WorkflowState::label($status),'saved_at'=>(($sa=$row['updated_at']??$row['created_at']??null)!==null?\ClyoNutri\Core\I18n\LocalTime::local((string)$sa):null), // v54.57 (UX-106)
+            'resume_url'=>$url];
     }
 
     public function write(string $kind,int $id,int $patient,string $key,string $base,array $payload,callable $operation,?callable $beforeCheck=null): array

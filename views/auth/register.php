@@ -155,7 +155,7 @@
 
         <div class="form-group" style="margin-top: var(--space-4);">
           <label for="terms_accepted" class="tap-target" style="display: flex; align-items: flex-start; justify-content: flex-start; gap: 12px; min-height: 44px; font-size: 0.875rem; color: var(--neutral-gray-700); cursor: pointer; padding: 4px 0;">
-            <input type="checkbox" id="terms_accepted" name="terms_accepted" value="1" required style="width: 20px; height: 20px; min-width: 20px; min-height: 20px; margin-top: 2px; accent-color: var(--botanical-green-600); cursor: pointer;">
+            <input type="checkbox" id="terms_accepted" name="terms_accepted" value="1" required style="width: 24px; height: 24px; min-width: 24px; min-height: 24px; margin-top: 2px; accent-color: var(--botanical-green-600); cursor: pointer;">
             <span>
               Li e concordo com os <a href="/termos" target="_blank" rel="noopener" style="color: var(--brand-copper-600); text-decoration: underline;">Termos de Uso<span class="sr-only"> (abre em nova aba)</span></a> (versão <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::TERMS_VERSION) ?>) e a <a href="/privacidade" target="_blank" rel="noopener" style="color: var(--brand-copper-600); text-decoration: underline;">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></a> (versão <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::PRIVACY_VERSION) ?>).
             </span>
