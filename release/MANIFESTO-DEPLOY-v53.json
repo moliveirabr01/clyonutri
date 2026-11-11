@@ -1,0 +1,21 @@
+{
+  "pacote": "pacote-deploy-hostgator-v53-consolidado.zip",
+  "versao": "v53-consolidado",
+  "data_geracao": "2026-11-01T18:32:00-03:00",
+  "escopo_unificado": [
+    "NI2-567: Remediações UX-001 a UX-015 (Ações do paciente com persistência, âncoras/índice acessível, feedback da agenda, seletores acessíveis)",
+    "NI2-554: Prescrições Nutricionais, Fitoterápicos, Manipulados e Assinaturas Digitais (Migração 71)",
+    "NI2-433: Autoagendamento Completo e Gestão de Consultas pelo Paciente (Migração 72)",
+    "v50 Fila: Processador Delimitado e Resumível da Fila de Espera (Migração 70)",
+    "NI2-223: Anamnese Estruturada com 12 Seções e Condicionais Clínicos (Migração 73)",
+    "NI2-523: Alertas Clínicos Energéticos para Gestantes, Adolescentes em Cunningham e Idosos",
+    "NI2-514 / NI2-519 / NI2-520: Equivalências Alimentares, Modelos com Governança A3, Importação CSV e Medidas Caseiras",
+    "v50 Agenda: Calendário Clínico, Feriados Parciais/Totais, Bloqueios e Buffers de Resguardo (Migração 69)"
+  ],
+  "arquivos_sql_manuais": [
+    "database/manual/atualizacao-v53-consolidada-preflight.sql",
+    "database/manual/atualizacao-v53-consolidada-completa.sql",
+    "database/manual/atualizacao-v53-consolidada-verificacao.sql"
+  ],
+  "checksum_aplicacao_zip": "c4dd64b0964c8030b423e6c35bfe7c21b6587f7b7169c7cd8c815a00a0db783a"
+}

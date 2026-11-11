@@ -1,0 +1,162 @@
+TESTE DE FUMAÇA v45 — MySQL 5.7.44, servidor PHP 8.4 embutido, dados TESTE (nada de produção)
+Data: 29/10/2026 03:57 (horário de Brasília, UTC-3)
+
+Banco montado como a produção: instalador v42 + TACO + SQL v43 + migração 64 da u3 (liberação 1,1 sem registro), depois o SQL v45 do zip.
+
+== liberacao-antes
++--------------+----------------+----------------------+-------------------+
+| momento      | policy_version | is_approved_clinical | is_approved_legal |
++--------------+----------------+----------------------+-------------------+
+| antes da v45 | 2026.1         |                    1 |                 1 |
++--------------+----------------+----------------------+-------------------+
+
+== v45-preflight
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
+| situacao                                                                        | tabelas_exames_de_5 | colunas_da_65_de_8 | migracao_63 | migracao_64 | migracao_65 |
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
+| OK: migração 64 já aplicada (como em produção); a completa acrescenta a 65      |                   5 |                  0 |           1 |           1 |           0 |
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
++----------------+----------------------+-------------------+---------------------------------------------+
+| policy_version | is_approved_clinical | is_approved_legal | liberacao                                   |
++----------------+----------------------+-------------------+---------------------------------------------+
+| 2026.1         |                    1 |                 1 | ABERTA SEM REGISTRO (a completa vai fechar) |
++----------------+----------------------+-------------------+---------------------------------------------+
+
+== v45-completa-1
++-------------------------------------------------------------------------------------------------+---------------------+--------------------+-----------------------------+
+| liberacao                                                                                       | tabelas_exames_de_5 | exames_no_catalogo | migracoes_64_65_registradas |
++-------------------------------------------------------------------------------------------------+---------------------+--------------------+-----------------------------+
+| OK: liberação fechada agora em 1 política(s) que estavam abertas sem registro de aprovação      |                   5 |                 22 |                           2 |
++-------------------------------------------------------------------------------------------------+---------------------+--------------------+-----------------------------+
+
+== v45-completa-2
++----------------------------------------+---------------------+--------------------+-----------------------------+
+| liberacao                              | tabelas_exames_de_5 | exames_no_catalogo | migracoes_64_65_registradas |
++----------------------------------------+---------------------+--------------------+-----------------------------+
+| OK: liberação fechada (nada a mudar)   |                   5 |                 22 |                           2 |
++----------------------------------------+---------------------+--------------------+-----------------------------+
+
+== v45-verificacao
++--------------------------------------------------------+-----------+
+| item                                                   | resultado |
++--------------------------------------------------------+-----------+
+| tabelas de exames                                      | OK        |
+| colunas da migração 65                                 | OK        |
+| padrão 0 nas aprovações e na ciência do aviso          | OK        |
+| índice idx_exam_audit_entity                           | OK        |
+| política 2026.1                                        | OK        |
+| nenhuma liberação aberta sem registro de aprovação     | OK        |
+| catálogo com os 22 exames                              | OK        |
+| migração 64 registrada uma vez                         | OK        |
+| migração 65 registrada uma vez                         | OK        |
+| sem chave estrangeira nas tabelas de exames            | OK        |
++--------------------------------------------------------+-----------+
++----------------+----------------------+-------------------+---------------------+-------------+--------------------+-----------+
+| policy_version | is_approved_clinical | is_approved_legal | approved_by_user_id | approved_at | approval_reference | liberacao |
++----------------+----------------------+-------------------+---------------------+-------------+--------------------+-----------+
+| 2026.1         |                    0 |                 0 |                NULL | NULL        | NULL               | FECHADA   |
++----------------+----------------------+-------------------+---------------------+-------------+--------------------+-----------+
+
+== smoke45.py (HTTP)
+catálogo {'FERRITINA_SERICA': '6', 'GLICEMIA_JEJUM': '2', 'HEMOGRAMA_COMPLETO': '1', 'TSH_T4_LIVRE': '21'}
+== SEM SESSÃO
+  [OK]   GET /pacientes/1/exames sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/novo sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1 sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/imprimir sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/pdf sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/editar sem sessão → login (302)
+  [OK]   POST /pacientes/1/exames sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/revisar sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/emitir sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/cancelar sem sessão bloqueado (403)
+  [OK]   API de busca sem sessão → 401 sem dados
+  [OK]   login smoke_nutri@teste.invalid
+  [OK]   login smoke_owner@teste.invalid
+  [OK]   login smoke_recep@teste.invalid
+  [OK]   login smoke_owner2@teste.invalid
+== LIBERAÇÃO FECHADA (como fica depois do SQL v45)
+  [OK]   exam_gate status: emissão bloqueada
+  [OK]   lista de pedidos abre limpa, sem texto de revisão
+  [OK]   tela de novo pedido limpa (sem script inline) com aviso de cobertura
+  [OK]   novo pedido sem 'vinculada ao prontuário' nem texto de revisão
+  [OK]   novo pedido não pede CPF
+  [OK]   busca 'acucar no sangue' (sem acento) acha a glicemia
+  [OK]   busca 'FERRO' acha a ferritina
+    sinônimo devolvido para FERRO: reserva de ferro
+  [OK]   recepção não cria pedido (403)
+  [OK]   CRN curto demais no perfil ('CRN-3 1' da massa de teste): recusa com link para Configurações
+  [OK]   rascunho salvo (303, pedido 1)
+  [OK]   3 exames no rascunho
+  [OK]   sinônimo usado gravado no item
+  [OK]   rascunho não imprime (volta para o pedido)
+  [OK]   tela do pedido limpa; modal de cancelamento sem onclick
+  [OK]   rascunho → revisão
+  [OK]   liberação fechada: emitir bloqueado, pedido continua em revisão, sem PDF
+  [OK]   mensagem de liberação fechada aparece para a nutricionista
+  [OK]   nenhum PDF gravado com a liberação fechada
+== APROVAÇÃO PELA LINHA DE COMANDO
+  [OK]   approve em nome de quem não é superadmin: recusado
+  [OK]   approve com referência curta (menos de 10 caracteres): recusado
+  [OK]   approve sem --confirm: recusado
+  [OK]   superadmin com parecer e --confirm: liberada com quem/quando/parecer
+== EMISSÃO E PDF
+  [OK]   emitir sem a ciência do aviso: recusado
+  [OK]   emitido com ciência real e quem emitiu (issued)
+  [OK]   PDF gravado em storage/app/exam_requests/<clínica>/, fora de public/
+  [OK]   SHA-256 e tamanho do arquivo conferem com o registrado
+  [OK]   arquivo 0640 e .htaccess de bloqueio na pasta
+  [OK]   download autenticado do PDF confere com o hash
+  [OK]   PDF traz 'TESTE Clínica Aurora Nutrição'
+  [OK]   PDF traz 'Paciente TESTE 1'
+  [OK]   PDF traz 'TESTE Nutri Aurora'
+  [OK]   PDF traz 'CRN-3'
+  [OK]   PDF traz 'Ferritina'
+  [OK]   PDF traz 'Glicemia'
+  [OK]   PDF traz 'TSH'
+  [OK]   PDF traz 'avaliar reservas de ferro'
+  [OK]   PDF sem CPF e sem texto de revisão
+  [OK]   PDF traz a linha de assinatura e carimbo (assinatura digital fica para a NI2-535)
+  [OK]   outra clínica: PDF 404 (404)
+  [OK]   outra clínica com o próprio paciente e o id do pedido: sem PDF (303)
+  [OK]   outra clínica: impressão 404
+  [OK]   sem sessão: PDF vai para o login
+  [OK]   o PDF não é servido por URL direta
+== IMPRESSÃO
+  [OK]   página de impressão abre limpa (sem onclick, sem script inline)
+  [OK]   botão Imprimir ligado pelo prontuario-impressao.js
+  [OK]   impressão traz 'TESTE Clínica Aurora Nutrição'
+  [OK]   impressão traz 'Paciente TESTE 1'
+  [OK]   impressão traz 'CRN-3'
+  [OK]   impressão traz 'Ferritina'
+  [OK]   impressão traz 'avaliar reservas de ferro'
+  [OK]   impressão sem CPF e sem texto de revisão
+  [OK]   CSP com script-src-attr 'none' continua ativa
+  [OK]   pedido emitido mostra Imprimir e Baixar PDF
+  [OK]   pedido emitido não edita
+== AUDITORIA
+    audit_logs: EXAM_REQUEST_DRAFT_CREATED,EXAM_REQUEST_SUBMITTED_FOR_REVIEW,EXAM_REQUEST_ISSUED,EXAM_REQUEST_PDF_DOWNLOADED,EXAM_REQUEST_PRINT_VIEWED
+  [OK]   AuditLogger com criação, revisão e emissão
+  [OK]   audit_logs sem texto clínico (justificativa)
+== CANCELAMENTO
+  [OK]   cancelado com motivo
+  [OK]   cancelado: PDF não é mais entregue
+  [OK]   cancelado: impressão mostra o cancelamento
+== FECHAR A LIBERAÇÃO
+  [OK]   close fecha e mantém o registro de quem aprovou
+  [OK]   depois do close, nova emissão volta a ser bloqueada
+RID 1 RID2 2
+  [OK]   log do servidor sem erro de PHP
+RESULTADO: 77 de 77 OK
+
+== navegador (Chrome, CSP ativa)
+depois de salvar: http://127.0.0.1:8145/pacientes/1/exames/1
+liberação fechada, formulário de emissão na tela: 0
+Política 2026.1: emissão LIBERADA
+  aprovação clínica=1 regulatória=1
+  liberada por=1 em=2026-10-29 06:57:14
+  referência=TESTE parecer clínico e regulatório 2026-001 de 29/10/2026
+
+cliques no Imprimir que chamaram window.print(): 1
+modal de cancelamento visível: True
+violações de CSP no console: 0 []

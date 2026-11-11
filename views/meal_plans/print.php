@@ -10,9 +10,10 @@ $n = static fn(float $v, int $d = 0) => number_format($v, $d, ',', '.');
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>Plano alimentar — <?= $e($doc['patient']['name'] ?? '') ?></title>
-  <link rel="stylesheet" href="/assets/css/prontuario-impressao.css">
-  <link rel="stylesheet" href="/assets/css/plano-impressao.css">
+  <title>Plano alimentar — <?= $e($doc['patient']['name'] ?? 'paciente a definir') ?></title>
+  <link rel="stylesheet" href="/assets/css/prontuario-impressao.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/plano-impressao.css?v=botanical-v54-9">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
 </head>
 <body>
 <div class="pi-toolbar" role="region" aria-label="Opções de impressão">
@@ -31,7 +32,7 @@ $n = static fn(float $v, int $d = 0) => number_format($v, $d, ',', '.');
     <div>
       <div class="pi-clinic"><?= $e($doc['clinic']['name'] ?? '') ?></div>
       <h1><?= $e($plan['title']) ?></h1>
-      <div class="pi-muted">Plano alimentar de <strong><?= $e($doc['patient']['name'] ?? '') ?></strong></div>
+      <div class="pi-muted">Plano alimentar de <strong><?= $e($doc['patient']['name'] ?? 'paciente a definir') ?></strong></div>
     </div>
     <div class="pi-meta">
       <?php if ($plan['is_draft']): ?>
@@ -45,9 +46,9 @@ $n = static fn(float $v, int $d = 0) => number_format($v, $d, ',', '.');
   </header>
 
   <?php if ($plan['is_draft']): ?>
-  <div class="pi-alert" role="alert"><strong>Rascunho — plano não publicado.</strong> Pode mudar antes da publicação; não entregue como versão final.</div>
+  <div class="op-message op-message--error pi-alert" role="alert"><strong>Rascunho — plano não publicado.</strong> Pode mudar antes da publicação; não entregue como versão final.</div>
   <?php elseif ($plan['status'] === 'superseded'): ?>
-  <div class="pi-alert" role="alert"><strong>Versão substituída.</strong> Existe um plano mais recente para este paciente.</div>
+  <div class="op-message op-message--error pi-alert" role="alert"><strong>Versão substituída.</strong> Existe um plano mais recente para este paciente.</div>
   <?php endif; ?>
 
   <?php if ($plan['notes'] !== ''): ?>
@@ -112,8 +113,8 @@ $n = static fn(float $v, int $d = 0) => number_format($v, $d, ',', '.');
   </section>
 
   <footer class="pi-footer">
-    Plano individual, elaborado para <?= $e($doc['patient']['name'] ?? '') ?>. Não siga este plano sem orientação do(a) seu(sua) nutricionista e não o compartilhe.
-    Emitido pelo ClyoNutri por <?= $e($doc['printer']['name']) ?> em <?= $e($doc['printed_at_local']) ?>.
+    Plano individual, elaborado para <?= $e($doc['patient']['name'] ?? 'um paciente ainda não definido') ?>. Não siga este plano sem orientação do(a) seu(sua) nutricionista e não o compartilhe.
+    Emitido pelo Clyo Nutri por <?= $e($doc['printer']['name']) ?> em <?= $e($doc['printed_at_local']) ?>.
   </footer>
 </main>
 <script src="/assets/js/prontuario-impressao.js"></script>

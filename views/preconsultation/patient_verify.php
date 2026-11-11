@@ -8,7 +8,7 @@ require __DIR__ . '/patient_head.php';
     <p><?= $e($ctx['professional_name'] ?: 'Seu nutricionista') ?> pediu que você responda algumas perguntas antes da consulta.</p>
     <p>Para proteger suas informações, confirme sua data de nascimento.</p>
     <?php if (!empty($error)): ?>
-      <p class="pc-error" role="alert" id="pc-verify-error"><?= $e($error) ?></p>
+      <p class="op-message op-message--error pc-error" role="alert" id="pc-verify-error"><?= $e($error) ?></p>
     <?php endif; ?>
     <form method="POST" action="/pre-consulta/verificar" novalidate>
       <input type="hidden" name="_csrf_token" value="<?= $e($csrf) ?>">

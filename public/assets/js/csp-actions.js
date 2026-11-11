@@ -36,7 +36,7 @@
     }
     if (el.hasAttribute('data-toggle-dialog')) {
       var m = document.getElementById(el.getAttribute('data-toggle-dialog'));
-      if (m) { if (m.style.display === 'none') m.style.display = 'block'; else if (window.ClyoDialog) window.ClyoDialog.close(m); else m.style.display = 'none'; }
+      if (m) { if (getComputedStyle(m).display === 'none') m.style.display = 'block'; else if (window.ClyoDialog) window.ClyoDialog.close(m); else m.style.display = 'none'; }
     }
     if (el.hasAttribute('data-reset-close-details') && el.form) { el.form.reset(); var det = el.closest('details'); if (det) det.open = false; }
     if (el.hasAttribute('data-history-back')) { e.preventDefault(); history.back(); }

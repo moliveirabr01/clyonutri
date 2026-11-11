@@ -7,12 +7,12 @@
 $h = static fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 $ml = static fn(int $v) => number_format($v, 0, ',', '.') . ' ml';
 ?>
-<section class="card" style="margin-top:24px" aria-labelledby="app-hidratacao-titulo" id="app-hidratacao" data-testid="app-hydration">
+<section class="card u-mt-6" aria-labelledby="app-hidratacao-titulo" id="app-hidratacao" data-testid="app-hydration">
 <h2 id="app-hidratacao-titulo">Hidratação registrada no app</h2>
 <?php if ($appHydration === null): ?>
-  <p role="status">Não foi possível carregar a hidratação agora. Atualize a página para tentar de novo.</p>
+  <p class="op-message op-message--info" role="status">Não foi possível carregar a hidratação agora. Atualize a página para tentar de novo.</p>
 <?php else: ?>
-  <p style="color: var(--neutral-gray-500);">
+  <p class="u-color-neutral-gray-500">
     Registros da própria paciente, por dia (fuso <?= $h($appHydration['timezone']) ?>), nos últimos <?= (int)$appHydration['period_days'] ?> dias.
     <?php if ($appHydration['goal_ml'] !== null): ?>
       Meta prescrita na anamnese: <strong><?= $h($ml((int)$appHydration['goal_ml'])) ?>/dia</strong>.

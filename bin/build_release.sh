@@ -82,7 +82,7 @@ MANIFEST_FILE="$RELEASE_DIR/RELEASE_INFO.json"
 php -r '
 $r = json_decode(file_get_contents($argv[1]), true);
 $manifest = [
-    "product" => "ClyoNutri II",
+    "product" => "Clyo Nutri",
     "version" => $argv[2],
     "build_timestamp" => $argv[3],
     "git_commit" => $r["source"]["commit"],

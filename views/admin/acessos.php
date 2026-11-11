@@ -1,25 +1,25 @@
 <div style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
   <div>
-    <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--admin-navy-900);">Controle de Acessos & Sessões Ativas</h2>
+    <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--admin-navy-900);">Controle de acessos e sessões ativas</h2>
     <p style="font-size: 0.88rem; color: var(--admin-gray-500);">Monitoramento de sessões simultâneas, integridade de credenciais e revogação forçada de acessos.</p>
   </div>
 </div>
 
 <div class="admin-card">
   <div class="admin-card__header">
-    <h3 class="admin-card__title">Sessões Ativas Registradas no Banco Relacional</h3>
-    <span class="badge badge--info"><?= count($sessions) ?> sessões em andamento</span>
+    <h3 class="admin-card__title">Sessões ativas registradas no banco relacional</h3>
+    <span class="badge badge--info"><?= (int)$pagination['total_records'] ?> <?= (int)$pagination['total_records'] === 1 ? 'sessão em andamento' : 'sessões em andamento' ?></span>
   </div>
   <div class="admin-table-wrapper">
     <table class="admin-table">
       <thead>
         <tr>
-          <th>ID Sessão</th>
+          <th>ID sessão</th>
           <th>Usuário</th>
           <th>Clínica</th>
           <th>Endereço IP</th>
-          <th>Navegador / User Agent</th>
-          <th>Última Atividade</th>
+          <th>Navegador / user agent</th>
+          <th>Última atividade</th>
           <th style="text-align: right;">Ação</th>
         </tr>
       </thead>
@@ -53,4 +53,5 @@
       </tbody>
     </table>
   </div>
+  <?php require __DIR__ . '/_pagination.php'; ?>
 </div>

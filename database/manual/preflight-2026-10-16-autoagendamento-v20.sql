@@ -6,6 +6,7 @@
 -- primary keys e integridade para criação de booking_holds e booking_settings.
 -- ============================================================================
 SET NAMES utf8mb4;
+SET SESSION group_concat_max_len = 1048576; -- MySQL 5.7 corta GROUP_CONCAT em 1024 caracteres por padrão
 SET @db = DATABASE();
 
 -- 1. Presença de tabelas base obrigatórias

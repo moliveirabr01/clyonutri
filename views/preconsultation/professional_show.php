@@ -12,6 +12,7 @@ $suggested = [];
 foreach ($q['suggestion'] as $s) { $suggested[$s['id']] = $s; }
 $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 ?>
+<?= \ClyoNutri\Application\View\ClinicalContext::render(\ClyoNutri\Core\Database\Connection::getInstance(),$pid) ?>
 <nav aria-label="Navegação" style="margin-bottom: var(--space-3); font-size: 0.9rem;"><a href="/pacientes/<?= $pid ?>/pre-consulta">← Pré-consultas de <?= $e($patient['name']) ?></a></nav>
 <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0 0 4px;">Pré-consulta</h1>
 <p style="color: var(--neutral-gray-500); margin: 0 0 var(--space-4);" data-testid="pc-status">
@@ -21,7 +22,7 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 </p>
 
 <?php if ($flash): ?>
-  <div role="<?= ($flash['type'] ?? '') === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= ($flash['type'] ?? '') === 'error' ? '#C62828' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);"><?= $e($flash['message'] ?? '') ?></div>
+  <div role="<?= ($flash['type'] ?? '') === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= ($flash['type'] ?? '') === 'error' ? 'var(--semantic-error, #B42318)' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);"><?= $e($flash['message'] ?? '') ?></div>
 <?php endif; ?>
 
 <?php if ($link): ?>
@@ -33,13 +34,13 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
       <button type="button" class="btn btn-secondary" id="pc-copy-link" data-copy-target="pc-link-input" data-testid="pc-copy-link">Copiar link</button>
       <?php if (!empty($whatsappUrl)): ?>
         <a class="btn" href="<?= $e($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" data-testid="pc-whatsapp"
-           style="background: #39734A; color: #fff; border: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-decoration: none;">
+           style="background: var(--botanical-green-600, #39734A); color: #fff; border: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-decoration: none;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4a.5.5 0 0 0 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.5-.3z"/></svg>
           Enviar pelo WhatsApp
         </a>
       <?php endif; ?>
     </div>
-    <p role="status" aria-live="polite" id="pc-copy-status" style="margin: 6px 0 0; font-size: 0.85rem; color: var(--semantic-success, #0A7075);"></p>
+    <p class="op-message op-message--info" role="status" aria-live="polite" id="pc-copy-status" style="margin: 6px 0 0; font-size: 0.85rem; color: var(--semantic-success, #0A7075);"></p>
     <small style="display: block; color: var(--neutral-gray-500);">
       Para abrir, o paciente confirma a data de nascimento cadastrada.
       <?php if (!empty($whatsappUrl) && empty($whatsappHasPhone)): ?>
@@ -53,23 +54,23 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 <?php if ($q['status'] === 'draft' && $canEdit): ?>
 <section class="card" style="margin-bottom: var(--space-5);" aria-labelledby="pc-edit">
   <h2 id="pc-edit" style="font-size: 1.15rem; margin: 0 0 6px;">Revise as perguntas</h2>
-  <p style="margin: 0 0 12px; color: #475569; font-size: 0.9rem;">
+  <p style="margin: 0 0 12px; color: var(--neutral-gray-600, #475467); font-size: 0.9rem;">
     <?= $q['suggestion_ignored'] ? 'Você escolheu ignorar a sugestão: só as perguntas gerais estão marcadas.' : 'Marcadas: sugestão pelos objetivos. Inclua, retire ou mude a obrigatoriedade; perguntas que dependem de outra levam a outra junto.' ?>
   </p>
   <form method="POST" action="<?= $base ?>/perguntas">
     <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
     <?php $currentSection = null; foreach (QuestionBank::questions() as $id => $bq):
         if ($bq['section'] !== $currentSection): if ($currentSection !== null): ?></fieldset><?php endif; $currentSection = $bq['section']; ?>
-        <fieldset style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px;">
+        <fieldset style="border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px;">
           <legend style="padding: 0 6px; font-weight: 600;"><?= $e(QuestionBank::SECTIONS[$currentSection]) ?></legend>
       <?php endif; $isSel = isset($selected[$id]); $isReq = $isSel ? !empty($selected[$id]['required']) : $bq['required']; ?>
-      <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid #f1f5f9;" data-testid="pc-q-<?= $e($id) ?>">
+      <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--neutral-gray-100, #F4F5F6);" data-testid="pc-q-<?= $e($id) ?>">
         <label style="display: flex; gap: 8px; align-items: flex-start;">
           <input type="checkbox" name="questions[]" value="<?= $e($id) ?>" <?= $isSel ? 'checked' : '' ?> style="margin-top: 3px;">
           <span><?= $e($bq['text']) ?>
             <?php if (isset($suggested[$id]) && !in_array('base', $bq['tags'], true)): ?><span class="badge badge-info" style="margin-left: 6px;">Sugerida</span><?php endif; ?>
-            <?php if (!empty($bq['condition'])): ?><small style="display: block; color: #64748b;">Aparece só conforme a resposta de: “<?= $e(QuestionBank::questions()[$bq['condition']['question']]['text']) ?>”</small><?php endif; ?>
-            <?php if (isset($suggested[$id])): ?><small style="display: block; color: #64748b;"><?= $e($suggested[$id]['reason']) ?></small><?php endif; ?>
+            <?php if (!empty($bq['condition'])): ?><small style="display: block; color: var(--neutral-gray-500, #667085);">Aparece só conforme a resposta de: “<?= $e(QuestionBank::questions()[$bq['condition']['question']]['text']) ?>”</small><?php endif; ?>
+            <?php if (isset($suggested[$id])): ?><small style="display: block; color: var(--neutral-gray-500, #667085);"><?= $e($suggested[$id]['reason']) ?></small><?php endif; ?>
           </span>
         </label>
         <label style="display: flex; gap: 6px; align-items: center; font-size: 0.85rem; white-space: nowrap;">
@@ -104,21 +105,21 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
       <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
       <button type="submit" class="btn btn-outline">Revogar link</button>
     </form>
-    <p style="font-size: 0.85rem; color: #475569; margin: 8px 0 0;">Expira em <?= $e(date('d/m/Y H:i', strtotime((string)$q['token_expires_at']))) ?><?= $q['opened_at'] ? ' · aberto em ' . $e(date('d/m/Y H:i', strtotime((string)$q['opened_at']))) : ' · ainda não aberto' ?><?= $q['draft_saved_at'] ? ' · rascunho salvo em ' . $e(date('d/m/Y H:i', strtotime((string)$q['draft_saved_at']))) : '' ?></p>
+    <p style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin: 8px 0 0;">Expira em <?= $e(date('d/m/Y H:i', strtotime((string)$q['token_expires_at']))) ?><?= $q['opened_at'] ? ' · aberto em ' . $e(date('d/m/Y H:i', strtotime((string)$q['opened_at']))) : ' · ainda não aberto' ?><?= $q['draft_saved_at'] ? ' · rascunho salvo em ' . $e(date('d/m/Y H:i', strtotime((string)$q['draft_saved_at']))) : '' ?></p>
   <?php endif; ?>
 </section>
 <?php endif; ?>
 
 <section class="card" style="margin-bottom: var(--space-5);" aria-labelledby="pc-answers">
   <h2 id="pc-answers" style="font-size: 1.15rem; margin: 0 0 12px;"><?= $answered ? 'Respostas do paciente' : 'Perguntas do questionário' ?></h2>
-  <?php if ($answered): ?><p style="font-size: 0.85rem; color: #475569; margin: 0 0 12px;">Enviado em <?= $e(date('d/m/Y H:i', strtotime((string)$q['submitted_at']))) ?>. Relato do paciente, sem interpretação automática.</p><?php endif; ?>
+  <?php if ($answered): ?><p style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin: 0 0 12px;">Enviado em <?= $e(date('d/m/Y H:i', strtotime((string)$q['submitted_at']))) ?>. Relato do paciente, sem interpretação automática.</p><?php endif; ?>
   <dl style="margin: 0;" data-testid="pc-answer-list">
     <?php foreach ($q['questions'] as $item):
         if ($answered && !PreConsultationService::isVisible($item, $q['answers'])) continue;
         $has = array_key_exists($item['id'], $q['answers']); ?>
-      <div style="padding: 8px 0; border-top: 1px solid #f1f5f9;">
-        <dt style="font-weight: 600;"><?= $e($item['text']) ?><?= !empty($item['required']) ? ' <span style="color:#B04A1B" aria-label="obrigatória">*</span>' : '' ?></dt>
-        <dd style="margin: 4px 0 0; color: #334155;"><?= $answered ? ($has ? nl2br($e(PreConsultationService::answerText($item, $q['answers'][$item['id']]))) : '<em>Sem resposta</em>') : $e(QuestionBank::SECTIONS[$item['section']]) ?></dd>
+      <div style="padding: 8px 0; border-top: 1px solid var(--neutral-gray-100, #F4F5F6);">
+        <dt style="font-weight: 600;"><?= $e($item['text']) ?><?= !empty($item['required']) ? ' <span style="color:var(--botanical-copper-600, #B04A1B)" aria-label="obrigatória">*</span>' : '' ?></dt>
+        <dd style="margin: 4px 0 0; color: var(--neutral-gray-700, #344054);"><?= $answered ? ($has ? nl2br($e(PreConsultationService::answerText($item, $q['answers'][$item['id']]))) : '<em>Sem resposta</em>') : $e((QuestionBank::SECTIONS[$item['section']] ?? $item['section'])) ?></dd>
       </div>
     <?php endforeach; ?>
   </dl>
@@ -155,4 +156,11 @@ $answered = in_array($q['status'], ['submitted', 'reviewed'], true);
 
 <?php if ($link): ?>
 <script src="/assets/js/pre-consulta-profissional.js" nonce="<?= $e(\ClyoNutri\Core\Http\SecurityHeaders::nonce()) ?>" defer></script>
+<?php endif; ?>
+
+<?php if ($answered && $canEdit && isset($q['answers']['adaptive_declared_conditions'])): ?>
+<section class="card"><h2>Condições relatadas — aguardam revisão</h2>
+<p><?= $e($q['answers']['adaptive_declared_conditions']) ?></p>
+<form method="POST" action="<?= $base ?>/condicoes"><input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>"><button class="btn btn-secondary">Buscar sugestões no relato</button></form>
+<p><a href="/pacientes/<?= $pid ?>/anamnese#anamnese-adaptativa">Confirmar ou descartar sugestões na anamnese</a>. A pré-consulta nunca altera a avaliação vigente.</p></section>
 <?php endif; ?>

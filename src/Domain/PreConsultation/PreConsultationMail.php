@@ -13,7 +13,7 @@ final class PreConsultationMail
     {
         $first = trim(explode(' ', trim($patientName))[0] ?? '');
         $greeting = $first !== '' ? "Olá, {$first}," : 'Olá,';
-        $subject = 'Questionário antes da sua consulta — ' . ($clinicName !== '' ? $clinicName : 'ClyoNutri');
+        $subject = 'Questionário antes da sua consulta — ' . ($clinicName !== '' ? $clinicName : 'Clyo Nutri');
         $intro = "{$professionalName} pediu que você responda algumas perguntas antes da consulta. Leva poucos minutos e você pode salvar e continuar depois.";
 
         $text = <<<TXT

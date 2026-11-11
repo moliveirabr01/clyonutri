@@ -1,0 +1,68 @@
+/* UX v54.52: task-first presentation. Existing safety and persistence contracts remain authoritative. */
+.ux52-progress, .ux52-exam-context { margin: 8px 0; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: var(--neutral-white); }
+.ux52-progress > summary, .ux52-exam-context > summary, .ux52-attendance-tools > summary { padding: 10px 12px; min-height: 44px; box-sizing: border-box; cursor: pointer; color: var(--botanical-forest-900); font-weight: 600; }
+.ux52-progress .care-flow { margin: 0; }
+.attendance-mode { position: static; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px; margin: 8px 0; }
+.ux52-attendance-tools { flex: 1; min-width: min(100%,240px); }
+.ux52-attendance-tools .attendance-mode__main, .ux52-attendance-tools .attendance-mode__nav { padding: 8px; }
+.ux52-nav-group { margin: 4px 0; }
+.ux52-nav-group > summary { color: var(--botanical-sage-200); min-height: 44px; padding: 12px 16px; font-weight: 600; cursor: pointer; }
+.ux52-nav-group[open] > summary { color: var(--neutral-white); }
+.ux52-nav-group a { margin-left: 8px; }
+.ux52-nav-group summary:focus-visible { outline: 2px solid var(--botanical-copper-400); outline-offset: -3px; }
+.op-message--error a:not(.btn), [data-allergen-item-alert] a:not(.btn), .clinical-context__item.is-alert a:not(.btn) { color: var(--semantic-error-strong); text-decoration: underline; }
+.op-message--error a:not(.btn):visited, [data-allergen-item-alert] a:not(.btn):visited { color: var(--semantic-error-strong); }
+.ux52-public-review { border: 1px solid var(--neutral-gray-300); padding: 16px; border-radius: var(--radius-card); margin: 20px 0; }
+.ux52-public-review p { overflow-wrap: anywhere; white-space: pre-line; }
+.ux52-timeline-filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin: 12px 0; }
+.ux52-timeline-filters label { display: flex; flex-direction: column; gap: 4px; }
+.ux52-event-state { color: var(--neutral-gray-600); }
+#patient-timeline a { text-decoration: underline; }
+#patient-timeline :target { outline: 2px solid var(--botanical-green-600); }
+.cr[data-testid="consulta-page"] .consultation-room-layout > .cr-stack { grid-column: 2; grid-row: 1; }
+.cr[data-testid="consulta-page"] .consultation-room-layout > div:not(.cr-stack) { grid-column: 1; grid-row: 1; }
+.cr[data-testid="consulta-page"] .consultation-room-layout { grid-template-columns: 1.6fr 1fr; }
+@media (max-width: 900px) {
+ .cr[data-testid="consulta-page"] .consultation-room-layout { display: flex; flex-direction: column; }
+ .cr[data-testid="consulta-page"] .consultation-room-layout > .cr-stack { order: 2; }
+ .cr[data-testid="consulta-page"] .consultation-room-layout > div:not(.cr-stack) { order: 1; }
+}
+@media (max-width: 656px) {
+ .patient-header { margin-bottom: 8px; padding-bottom: 4px; }
+ .patient-header__main { gap: 6px; }
+ .patient-header__meta { margin: 4px 0; font-size: .8125rem; line-height: 1.4; }
+ .patient-header__actions { margin: 0; }
+ .patient-tabs ul { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; }
+ .patient-tabs li { min-width: 0; }
+ .patient-tabs a { padding: 6px 4px; font-size: .8125rem; min-height: 32px; }
+ .clinical-context > summary { padding: 8px; }
+ .clinical-context__hint { font-size: .75rem; }
+ .cr-head__lead, .cr-times { margin: 4px 0; font-size: .8125rem; }
+ .cr-head { margin-bottom: 8px; gap: 8px; }
+ .cr-head h1 { font-size: 1.35rem; }
+ .cr-card__lead { font-size: .8125rem; }
+ .ux52-progress > summary { font-size: .8125rem; }
+ #quick-plan-editor { padding: 12px; }
+ #quick-plan-editor > p { margin: 4px 0; font-size: .8125rem; }
+ #quick-plan-editor h2 { margin: 0 0 4px; font-size: 1.2rem; }
+}
+
+.ux52-context-tools { margin: 4px 0 8px; background: var(--neutral-white); border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); min-width: 0; }
+.ux52-context-tools > summary { padding: 10px 12px; min-height: 44px; box-sizing: border-box; font-weight: 600; cursor: pointer; color: var(--botanical-forest-900); }
+.ux52-context-tools[open] { padding: 0 8px 8px; }
+.ux52-clinical-tools { margin-bottom: 8px; }
+.ux52-clinical-tools > a { margin: 0 0 4px; }
+.app-content [data-allergen-item-alert].op-message a[data-open-clinical-context],
+.app-content [data-allergen-item-alert].op-message a[data-open-clinical-context]:visited { color: var(--semantic-error-strong); text-decoration: underline; }
+@media (max-width: 656px) {
+ .cr[data-testid="consulta-page"] .cr-card__lead { font-size: .8125rem; line-height: 1.4; margin: 4px 0; }
+ .cr[data-testid="consulta-page"] .cr-card__head { margin-bottom: 8px; }
+ .cr[data-testid="consulta-page"] .cr-head h1 { font-size: 1.35rem; }
+ .cr[data-testid="consulta-page"] .cr-head__lead { font-size: .8125rem; margin: 4px 0; }
+ .cr[data-testid="consulta-page"] .cr-times { font-size: .8125rem; margin: 4px 0; }
+}
+.cr-profile-link { display: inline-flex; align-items: center; min-height: 32px; padding: 4px; text-decoration: underline; color: var(--botanical-forest-900); }
+@media (max-width: 656px) {
+ .cr[data-testid="consulta-page"] .cr-actions { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+ .cr[data-testid="consulta-page"] .cr-draft-status { font-size: .8125rem; line-height: 1.4; padding: 8px 12px; }
+}

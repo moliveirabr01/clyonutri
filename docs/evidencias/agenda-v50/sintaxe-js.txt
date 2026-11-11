@@ -1,0 +1,2 @@
+PASS: JavaScript renderizado da lista de espera
+PASS: JavaScript do autoagendamento

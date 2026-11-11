@@ -1,0 +1,292 @@
+ClyoNutri v47 · NI2-530, 532, 533, 537, 542 · evidências de teste (dados só de TESTE) · 29/10/2026 11:59 · PHP 8.3.6
+
+######## SQLite (migrações 1 a 66)
+---- tests/v47_baseline_smoke.php
+== Linha de base: fluxo da v46 (rascunho, revisão, emissão, download)
+  PASS  rascunho com 2 exames sem duplicar
+  PASS  emitido com hash
+  PASS  download devolve PDF
+
+3 PASS, 0 FAIL
+---- tests/v47_ni2_529_parciais_test.php
+== NI2-530 política versionada
+  PASS  vigente inicial é a 2026.1
+  PASS  emitida grava 2026.1
+  PASS  versão com vigência futura ainda não vale
+  PASS  vale a partir da data de vigência
+  PASS  nova versão vigente é lida do banco
+  PASS  rascunho novo usa a versão vigente
+  PASS  documento emitido continua com a política da sua versão
+  PASS  aviso de cobertura do documento antigo não muda
+  PASS  lista as versões com a vigente e a contagem de solicitações
+  PASS  contagem por clínica não mostra a outra clínica
+  PASS  exame inexistente é recusado
+== NI2-532 catálogo: personalizado com validação, favoritos, códigos e revisão clínica
+  PASS  exame de imagem recusado já na proposta
+  PASS  duplicado do catálogo recusado
+  PASS  sem a declaração de pertinência é recusado
+  PASS  sistema de código sem código é recusado
+  PASS  proposta fica aguardando validação, da clínica A, revisão clínica pendente
+  PASS  pendente não aparece na busca
+  PASS  pendente não entra em solicitação
+  PASS  nutricionista sem papel de responsável não valida
+  PASS  responsável de outra clínica não valida
+  PASS  recusa sem motivo é bloqueada
+  PASS  responsável valida e fica registrado quem validou
+  PASS  não valida duas vezes
+  PASS  validado aparece na busca da clínica A
+  PASS  não aparece na busca da clínica B
+  PASS  busca sem clínica mostra só o catálogo geral
+  PASS  clínica B não usa exame personalizado da A (responde como inexistente)
+  PASS  clínica A usa o exame validado em solicitação
+  PASS  recusa fica registrada com o motivo
+  PASS  lista de personalizados isolada por clínica
+  PASS  categorias da clínica incluem as dos personalizados
+  PASS  marca favorito
+  PASS  favoritos do usuário na ordem em que foram marcados
+  PASS  favorito é por nutricionista
+  PASS  desmarca favorito
+  PASS  outra clínica não favorita exame personalizado da A
+  PASS  favorito não pré-seleciona nada no pedido
+  PASS  exame inativado sai dos favoritos
+  PASS  inativo continua no histórico da solicitação
+  PASS  catálogo geral com campo de código (vazio, sem licença) e revisão clínica pendente
+== NI2-533 editor: ordem e vínculo com o atendimento
+  PASS  exames gravados na ordem escolhida
+  PASS  solicitação vinculada ao atendimento de origem
+  PASS  reordenar na edição; o que ficou fora da ordem vai para o fim
+  PASS  ordem ignora repetidos
+  PASS  atendimento de outro paciente é recusado
+  PASS  atendimento de outra clínica é recusado
+  PASS  sem atendimento fica sem vínculo
+  PASS  justificativa ausente bloqueia a revisão
+  PASS  atendimentos listados só do paciente e da clínica
+== NI2-537 versões e linha do tempo
+  PASS  rascunho não gera nova versão
+  PASS  outra nutricionista não gera versão da solicitação alheia
+  PASS  nova versão exige motivo
+  PASS  anterior fica cancelada com o motivo da substituição
+  PASS  anterior mantém o PDF e o hash e aponta para a nova
+  PASS  nova é rascunho versão 2 ligada à anterior
+  PASS  nova copia exames, justificativa e atendimento
+  PASS  ciência do aviso tem de ser dada de novo
+  PASS  não gera duas versões da mesma emitida
+  PASS  documento da versão 2 diz qual substitui
+  PASS  versão 3 aponta para a primeira da cadeia
+  PASS  linha do tempo do paciente com exames na ordem
+  PASS  linha do tempo filtrada pelo atendimento
+  PASS  outra clínica não lê a linha do tempo
+  PASS  outra clínica não acha a solicitação pelo id
+== NI2-542 trilha
+  PASS  trilha registra EXAM_REQUEST_VIEWED
+  PASS  trilha registra EXAM_REQUEST_SUPERSEDED
+  PASS  trilha registra EXAM_REQUEST_NEW_VERSION_CREATED
+  PASS  trilha registra EXAM_REQUEST_ISSUED
+  PASS  trilha sem texto clínico
+  PASS  trilha com autor e instante
+  PASS  nada da clínica A na trilha da B
+
+71 PASS, 0 FAIL
+---- tests/v47_ni2_529_telas_test.php
+== Editor (NI2-533)
+  PASS  editor abre com o título novo
+  PASS  atendimento vindo da consulta já vem selecionado
+  PASS  editor tem a ordem dos exames
+  PASS  editor sem script inline nem onclick (CSP)
+  PASS  atendimento de fora é ignorado no editor
+  PASS  não lista atendimento que não é do paciente
+  PASS  salvar pelo formulário grava ordem e atendimento
+  PASS  erro devolve o formulário preenchido e marcado como não salvo
+  PASS  favorito aparece primeiro e tem filtro próprio
+  PASS  favorito não vem marcado
+== Solicitação, nova versão e trilha (NI2-537, NI2-542)
+  PASS  tela da solicitação mostra o atendimento de origem
+  PASS  abrir a solicitação fica na trilha
+  PASS  emitida oferece "Corrigir (nova versão)"
+  PASS  rota de nova versão cria a versão 2
+  PASS  versão 2 mostra qual substitui
+  PASS  anterior mostra que foi substituída e o motivo
+  PASS  lista do paciente com versão
+  PASS  outra clínica: 404 sem dados
+  PASS  outra clínica não cria versão (404)
+== Prontuário e consulta (NI2-537)
+  PASS  linha do tempo do prontuário com as 2 e o atendimento
+  PASS  bloco da consulta leva o atendimento para a nova solicitação
+  PASS  estado vazio útil
+== Catálogo, exames da clínica e política (NI2-532, NI2-530)
+  PASS  catálogo abre e avisa a revisão clínica pendente
+  PASS  mostra o favorito marcado
+  PASS  proposta de imagem recusada com o formulário preenchido
+  PASS  nutricionista propõe exame pela tela
+  PASS  nutricionista vê a situação mas não o botão de validar
+  PASS  nutricionista não valida pela rota
+  PASS  outra clínica não valida pela rota
+  PASS  outra clínica não vê o exame proposto
+  PASS  responsável vê o botão de validar
+  PASS  responsável valida pela rota
+  PASS  proposta e validação ficam na trilha
+  PASS  secretária não marca favorito
+  PASS  secretária não propõe exame
+  PASS  página da política mostra vigente e futura
+== Conferência dos PDFs (NI2-542)
+  PASS  PDF da emitida confere (cancelada mantém o arquivo)
+  PASS  arquivo alterado é apontado
+  PASS  arquivo apagado é apontado
+  PASS  sobra é listada e não apagada
+  PASS  filtro por clínica
+  PASS  relatório sem nome de paciente
+
+42 PASS, 0 FAIL
+---- tests/v47_ni2_537_prontuario_render_test.php
+  PASS  patientMedicalRecord mostra "Solicitações de exames laboratoriais (1)"
+  PASS  consultationRoom mostra "desta consulta (1)"
+  PASS  profile360 mostra "Solicitações de exames"
+
+3 PASS, 0 FAIL
+######## MariaDB 10.11.14-MariaDB-0ubuntu0.24.04.1 (instalação da v46 + migração 66 pelo PHP)
+---- tests/v47_baseline_smoke.php
+[MySQL] migrações aplicadas pelo PHP: 2026_10_29_000066_exam_catalog_favorites_versions_and_links
+== Linha de base: fluxo da v46 (rascunho, revisão, emissão, download)
+  PASS  rascunho com 2 exames sem duplicar
+  PASS  emitido com hash
+  PASS  download devolve PDF
+
+3 PASS, 0 FAIL
+---- tests/v47_ni2_529_parciais_test.php
+[MySQL] migrações aplicadas pelo PHP: 2026_10_29_000066_exam_catalog_favorites_versions_and_links
+== NI2-530 política versionada
+  PASS  vigente inicial é a 2026.1
+  PASS  emitida grava 2026.1
+  PASS  versão com vigência futura ainda não vale
+  PASS  vale a partir da data de vigência
+  PASS  nova versão vigente é lida do banco
+  PASS  rascunho novo usa a versão vigente
+  PASS  documento emitido continua com a política da sua versão
+  PASS  aviso de cobertura do documento antigo não muda
+  PASS  lista as versões com a vigente e a contagem de solicitações
+  PASS  contagem por clínica não mostra a outra clínica
+  PASS  exame inexistente é recusado
+== NI2-532 catálogo: personalizado com validação, favoritos, códigos e revisão clínica
+  PASS  exame de imagem recusado já na proposta
+  PASS  duplicado do catálogo recusado
+  PASS  sem a declaração de pertinência é recusado
+  PASS  sistema de código sem código é recusado
+  PASS  proposta fica aguardando validação, da clínica A, revisão clínica pendente
+  PASS  pendente não aparece na busca
+  PASS  pendente não entra em solicitação
+  PASS  nutricionista sem papel de responsável não valida
+  PASS  responsável de outra clínica não valida
+  PASS  recusa sem motivo é bloqueada
+  PASS  responsável valida e fica registrado quem validou
+  PASS  não valida duas vezes
+  PASS  validado aparece na busca da clínica A
+  PASS  não aparece na busca da clínica B
+  PASS  busca sem clínica mostra só o catálogo geral
+  PASS  clínica B não usa exame personalizado da A (responde como inexistente)
+  PASS  clínica A usa o exame validado em solicitação
+  PASS  recusa fica registrada com o motivo
+  PASS  lista de personalizados isolada por clínica
+  PASS  categorias da clínica incluem as dos personalizados
+  PASS  marca favorito
+  PASS  favoritos do usuário na ordem em que foram marcados
+  PASS  favorito é por nutricionista
+  PASS  desmarca favorito
+  PASS  outra clínica não favorita exame personalizado da A
+  PASS  favorito não pré-seleciona nada no pedido
+  PASS  exame inativado sai dos favoritos
+  PASS  inativo continua no histórico da solicitação
+  PASS  catálogo geral com campo de código (vazio, sem licença) e revisão clínica pendente
+== NI2-533 editor: ordem e vínculo com o atendimento
+  PASS  exames gravados na ordem escolhida
+  PASS  solicitação vinculada ao atendimento de origem
+  PASS  reordenar na edição; o que ficou fora da ordem vai para o fim
+  PASS  ordem ignora repetidos
+  PASS  atendimento de outro paciente é recusado
+  PASS  atendimento de outra clínica é recusado
+  PASS  sem atendimento fica sem vínculo
+  PASS  justificativa ausente bloqueia a revisão
+  PASS  atendimentos listados só do paciente e da clínica
+== NI2-537 versões e linha do tempo
+  PASS  rascunho não gera nova versão
+  PASS  outra nutricionista não gera versão da solicitação alheia
+  PASS  nova versão exige motivo
+  PASS  anterior fica cancelada com o motivo da substituição
+  PASS  anterior mantém o PDF e o hash e aponta para a nova
+  PASS  nova é rascunho versão 2 ligada à anterior
+  PASS  nova copia exames, justificativa e atendimento
+  PASS  ciência do aviso tem de ser dada de novo
+  PASS  não gera duas versões da mesma emitida
+  PASS  documento da versão 2 diz qual substitui
+  PASS  versão 3 aponta para a primeira da cadeia
+  PASS  linha do tempo do paciente com exames na ordem
+  PASS  linha do tempo filtrada pelo atendimento
+  PASS  outra clínica não lê a linha do tempo
+  PASS  outra clínica não acha a solicitação pelo id
+== NI2-542 trilha
+  PASS  trilha registra EXAM_REQUEST_VIEWED
+  PASS  trilha registra EXAM_REQUEST_SUPERSEDED
+  PASS  trilha registra EXAM_REQUEST_NEW_VERSION_CREATED
+  PASS  trilha registra EXAM_REQUEST_ISSUED
+  PASS  trilha sem texto clínico
+  PASS  trilha com autor e instante
+  PASS  nada da clínica A na trilha da B
+
+71 PASS, 0 FAIL
+---- tests/v47_ni2_529_telas_test.php
+[MySQL] migrações aplicadas pelo PHP: 2026_10_29_000066_exam_catalog_favorites_versions_and_links
+== Editor (NI2-533)
+  PASS  editor abre com o título novo
+  PASS  atendimento vindo da consulta já vem selecionado
+  PASS  editor tem a ordem dos exames
+  PASS  editor sem script inline nem onclick (CSP)
+  PASS  atendimento de fora é ignorado no editor
+  PASS  não lista atendimento que não é do paciente
+  PASS  salvar pelo formulário grava ordem e atendimento
+  PASS  erro devolve o formulário preenchido e marcado como não salvo
+  PASS  favorito aparece primeiro e tem filtro próprio
+  PASS  favorito não vem marcado
+== Solicitação, nova versão e trilha (NI2-537, NI2-542)
+  PASS  tela da solicitação mostra o atendimento de origem
+  PASS  abrir a solicitação fica na trilha
+  PASS  emitida oferece "Corrigir (nova versão)"
+  PASS  rota de nova versão cria a versão 2
+  PASS  versão 2 mostra qual substitui
+  PASS  anterior mostra que foi substituída e o motivo
+  PASS  lista do paciente com versão
+  PASS  outra clínica: 404 sem dados
+  PASS  outra clínica não cria versão (404)
+== Prontuário e consulta (NI2-537)
+  PASS  linha do tempo do prontuário com as 2 e o atendimento
+  PASS  bloco da consulta leva o atendimento para a nova solicitação
+  PASS  estado vazio útil
+== Catálogo, exames da clínica e política (NI2-532, NI2-530)
+  PASS  catálogo abre e avisa a revisão clínica pendente
+  PASS  mostra o favorito marcado
+  PASS  proposta de imagem recusada com o formulário preenchido
+  PASS  nutricionista propõe exame pela tela
+  PASS  nutricionista vê a situação mas não o botão de validar
+  PASS  nutricionista não valida pela rota
+  PASS  outra clínica não valida pela rota
+  PASS  outra clínica não vê o exame proposto
+  PASS  responsável vê o botão de validar
+  PASS  responsável valida pela rota
+  PASS  proposta e validação ficam na trilha
+  PASS  secretária não marca favorito
+  PASS  secretária não propõe exame
+  PASS  página da política mostra vigente e futura
+== Conferência dos PDFs (NI2-542)
+  PASS  PDF da emitida confere (cancelada mantém o arquivo)
+  PASS  arquivo alterado é apontado
+  PASS  arquivo apagado é apontado
+  PASS  sobra é listada e não apagada
+  PASS  filtro por clínica
+  PASS  relatório sem nome de paciente
+
+42 PASS, 0 FAIL
+---- tests/v47_ni2_537_prontuario_render_test.php
+[MySQL] migrações aplicadas pelo PHP: 2026_10_29_000066_exam_catalog_favorites_versions_and_links
+  PASS  patientMedicalRecord mostra "Solicitações de exames laboratoriais (1)"
+  PASS  consultationRoom mostra "desta consulta (1)"
+  PASS  profile360 mostra "Solicitações de exames"
+
+3 PASS, 0 FAIL

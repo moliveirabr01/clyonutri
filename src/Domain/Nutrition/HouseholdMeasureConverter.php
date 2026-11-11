@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ClyoNutri\Domain\Nutrition;
 
+use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Domain\Food\FoodSearchIndex;
 use InvalidArgumentException;
 use PDO;
@@ -13,7 +14,7 @@ use PDO;
  *
  * Ordem de decisão (a primeira que se aplica vale):
  *   1. massa (g, mg, kg): exata;
- *   2. medida cadastrada para o alimento (food_household_measures): exata;
+ *   2. medida cadastrada para o alimento (da clínica, em clinic_household_measures, e depois a global, em food_household_measures): exata;
  *   3. porção do próprio alimento (foods.serving_unit / serving_size_g, ex.: 1 unidade = 40 g): exata;
  *   4. tabela padrão (ml, colher, xícara, unidade, fatia…): peso genérico, igual para qualquer alimento.
  *      É uma estimativa: só vale com confirmação explícita ($confirmEstimated); sem ela, erro explícito
@@ -61,7 +62,7 @@ class HouseholdMeasureConverter
     ];
 
     private ?PDO $db;
-    /** @var array<int, list<array{name:string, key:string, grams:float}>> */
+    /** @var array<string, list<array{name:string, key:string, grams:float, origin:string, source_text:string}>> */
     private array $measureCache = [];
 
     public function __construct(?PDO $db = null)
@@ -102,7 +103,7 @@ class HouseholdMeasureConverter
 
     /**
      * @param array|null $food linha de foods (name, serving_unit, serving_size_g); se nula e houver banco, é lida pelo id
-     * @return array{grams: float, estimated: bool, source: string, grams_per_unit: float, unit_label: string}
+     * @return array{grams: float, estimated: bool, source: string, grams_per_unit: float, unit_label: string, origin?: string}
      * @throws UnitConfirmationRequiredException peso só pela tabela padrão e sem confirmação
      * @throws InvalidArgumentException quantidade inválida ou unidade desconhecida
      */
@@ -129,7 +130,7 @@ class HouseholdMeasureConverter
         // 2. Medida cadastrada para o alimento
         foreach ($this->foodMeasures($foodId) as $m) {
             if ($m['key'] === $key) {
-                return $result($m['grams'], self::SOURCE_FOOD_MEASURE, false, $m['name']);
+                return $result($m['grams'], self::SOURCE_FOOD_MEASURE, false, $m['name']) + ['origin' => $m['origin'], 'source_label' => self::originLabel($m['origin'], $m['source_text'] ?? '')];
             }
         }
 
@@ -141,7 +142,7 @@ class HouseholdMeasureConverter
         }
         $serving = self::foodServing($food);
         if ($serving !== null && $serving['key'] === $key) {
-            return $result($serving['grams'], self::SOURCE_FOOD_SERVING, false, $serving['unit']);
+            return $result($serving['grams'], self::SOURCE_FOOD_SERVING, false, $serving['unit']) + ['source_label' => self::originLabel(null)];
         }
 
         // 4. Tabela padrão: estimativa, só com confirmação
@@ -160,19 +161,82 @@ class HouseholdMeasureConverter
 
     /**
      * Medidas exatas conhecidas para o alimento (cadastradas + porção do alimento), para a tela oferecer.
-     * @return list<array{name:string, grams:float, source:string}>
+     * NI2-609: cada medida traz 'source_label' (de onde vem o peso), mostrado ao lado da medida.
+     * @return list<array{name:string, grams:float, source:string, origin?:string, source_label:string}>
      */
     public function exactMeasuresForFood(?int $foodId, ?array $food = null): array
     {
         $out = [];
         foreach ($this->foodMeasures($foodId) as $m) {
-            $out[$m['key']] = ['name' => $m['name'], 'grams' => $m['grams'], 'source' => self::SOURCE_FOOD_MEASURE];
+            $out[$m['key']] = ['name' => $m['name'], 'grams' => $m['grams'], 'source' => self::SOURCE_FOOD_MEASURE, 'origin' => $m['origin'],
+                'source_label' => self::originLabel($m['origin'], $m['source_text'] ?? '')];
         }
         $serving = self::foodServing($food);
         if ($serving !== null && !isset($out[$serving['key']])) {
-            $out[$serving['key']] = ['name' => $serving['unit'], 'grams' => $serving['grams'], 'source' => self::SOURCE_FOOD_SERVING];
+            $out[$serving['key']] = ['name' => $serving['unit'], 'grams' => $serving['grams'], 'source' => self::SOURCE_FOOD_SERVING,
+                'source_label' => 'porção do cadastro do alimento'];
         }
         return array_values($out);
+    }
+
+    /** NI2-609: texto da origem do peso ("medida da clínica · fonte: ..."). */
+    public static function originLabel(?string $origin, string $sourceText = ''): string
+    {
+        $sourceText = trim($sourceText);
+        return match ($origin) {
+            'clinic' => 'medida da clínica' . ($sourceText !== '' ? ' · fonte: ' . $sourceText : ''),
+            'global' => 'medida da base geral do sistema',
+            default => 'porção do cadastro do alimento',
+        };
+    }
+
+    /** NI2-609: mesma unidade depois de normalizada ("Unidades" = "unidade"). */
+    public static function sameUnit(string $a, string $b): bool
+    {
+        $ka = self::normalizeUnit($a);
+        $kb = self::normalizeUnit($b);
+        return (self::ALIASES[$ka] ?? $ka) === (self::ALIASES[$kb] ?? $kb);
+    }
+
+    /** NI2-609: unidade de contagem da tabela padrão (unidade, fatia, porção), cujo peso varia muito entre alimentos. */
+    public static function isGenericCountUnit(string $unit): bool
+    {
+        $key = self::normalizeUnit($unit);
+        $std = self::STANDARD[self::ALIASES[$key] ?? $key] ?? null;
+        return $std !== null && $std['kind'] === 'contagem';
+    }
+
+    /**
+     * NI2-609 (UX-R3-08): "unidade", "fatia" e "porção" só podem ser prescritas quando o alimento tem essa medida
+     * cadastrada (da clínica, da base geral ou a porção do próprio alimento). O peso padrão de 100 g por unidade
+     * deixou de ser aceito, mesmo com confirmação, em itens novos ou com unidade trocada. Itens já gravados não mudam.
+     * @throws InvalidArgumentException
+     */
+    public function assertCountUnitHasMeasure(string $unit, ?int $foodId, ?array $food = null): void
+    {
+        if (!self::isGenericCountUnit($unit)) {
+            return;
+        }
+        $key = self::normalizeUnit($unit);
+        foreach ($this->foodMeasures($foodId) as $m) {
+            if ($m['key'] === $key) {
+                return;
+            }
+        }
+        if ($food === null && $foodId !== null && $this->db !== null) {
+            $st = $this->db->prepare('SELECT name, serving_unit, serving_size_g FROM foods WHERE id = ?');
+            $st->execute([$foodId]);
+            $food = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        $serving = self::foodServing($food);
+        if ($serving !== null && $serving['key'] === $key) {
+            return;
+        }
+        $name = trim((string)($food['name'] ?? ''));
+        $alt = $this->alternatives($foodId, $serving);
+        throw new InvalidArgumentException(($name !== '' ? "«{$name}» não tem" : 'O alimento não tem') . ' a medida «' . trim($unit) . '» cadastrada. '
+            . 'Use gramas' . ($alt !== '' ? " ou uma medida cadastrada ({$alt})" : '')
+            . ', ou cadastre a medida, com a fonte, em Medidas caseiras.');
     }
 
     /** @return array{unit:string, key:string, grams:float}|null porção do alimento quando não é em massa */
@@ -190,20 +254,50 @@ class HouseholdMeasureConverter
         return ['unit' => $unit, 'key' => $key, 'grams' => $grams];
     }
 
-    /** @return list<array{name:string, key:string, grams:float}> */
+    /**
+     * Medidas exatas do alimento: primeiro as cadastradas pela clínica (NI2-514, com fonte), depois as globais.
+     * Se a clínica e a base global têm o mesmo nome de medida, vale a da clínica.
+     * @return list<array{name:string, key:string, grams:float, origin:string}>
+     */
     private function foodMeasures(?int $foodId): array
     {
         if ($foodId === null || $this->db === null) {
             return [];
         }
-        if (!isset($this->measureCache[$foodId])) {
+        $clinicId = TenantContext::hasClinic() ? TenantContext::getClinicId() : 0;
+        $cacheKey = $clinicId . ':' . $foodId;
+        if (!isset($this->measureCache[$cacheKey])) {
+            $rows = [];
+            if ($clinicId > 0) {
+                try {
+                    $st = $this->db->prepare('SELECT measure_name, grams_equivalent, source FROM clinic_household_measures WHERE clinic_id = ? AND food_id = ? ORDER BY id');
+                    $st->execute([$clinicId, $foodId]);
+                    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                        $rows[] = $r + ['origin' => 'clinic'];
+                    }
+                } catch (\PDOException) {
+                    // tabela ainda não criada (migração 61 pendente): segue só com a base global
+                }
+            }
             $st = $this->db->prepare('SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY id');
             $st->execute([$foodId]);
-            $this->measureCache[$foodId] = array_values(array_filter(array_map(static fn($r) => [
-                'name' => (string)$r['measure_name'], 'key' => self::normalizeUnit((string)$r['measure_name']), 'grams' => (float)$r['grams_equivalent'],
-            ], $st->fetchAll(PDO::FETCH_ASSOC)), static fn($m) => $m['key'] !== '' && $m['grams'] > 0));
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $rows[] = $r + ['origin' => 'global'];
+            }
+            $seen = [];
+            $out = [];
+            foreach ($rows as $r) {
+                $key = self::normalizeUnit((string)$r['measure_name']);
+                $grams = (float)$r['grams_equivalent'];
+                if ($key === '' || $grams <= 0 || isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $out[] = ['name' => (string)$r['measure_name'], 'key' => $key, 'grams' => $grams, 'origin' => $r['origin'], 'source_text' => (string)($r['source'] ?? '')];
+            }
+            $this->measureCache[$cacheKey] = $out;
         }
-        return $this->measureCache[$foodId];
+        return $this->measureCache[$cacheKey];
     }
 
     private function alternatives(?int $foodId, ?array $serving): string

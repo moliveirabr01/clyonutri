@@ -9,7 +9,7 @@ $pid = (int)$patient['id'];
 <p style="color: var(--neutral-gray-500); margin: 0 0 var(--space-4);"><?= $e($patient['name']) ?> · Questionário enviado antes da consulta. O sistema só sugere perguntas: você revisa tudo e nada gera diagnóstico automático.</p>
 
 <?php if ($flash): ?>
-  <div role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= $flash['type'] === 'error' ? '#C62828' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);"><?= $e($flash['message']) ?></div>
+  <div role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= $flash['type'] === 'error' ? 'var(--semantic-error, #B42318)' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);"><?= $e($flash['message']) ?></div>
 <?php endif; ?>
 
 <?php if ($canEdit): ?>
@@ -22,7 +22,7 @@ $pid = (int)$patient['id'];
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
         <?php foreach (QuestionBank::CATEGORIES as $cat => $catLabel): ?>
           <div>
-            <p style="margin: 0 0 6px; font-weight: 600; color: #475569;"><?= $e($catLabel) ?></p>
+            <p style="margin: 0 0 6px; font-weight: 600; color: var(--neutral-gray-600, #475467);"><?= $e($catLabel) ?></p>
             <?php foreach (QuestionBank::OBJECTIVES as $code => $o): if ($o['category'] !== $cat) continue; ?>
               <label style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px;">
                 <input type="checkbox" name="objectives[]" value="<?= $e($code) ?>" style="margin-top: 3px;"> <span><?= $e($o['label']) ?></span>

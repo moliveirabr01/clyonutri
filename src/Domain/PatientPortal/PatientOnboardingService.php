@@ -57,7 +57,15 @@ final class PatientOnboardingService
         return ['patient'=>['name'=>$row['name'],'email'=>$row['email']??'','phone'=>$row['phone']??''], 'clinic_name'=>$row['clinic_name'],'professional_name'=>$row['professional_name']];
     }
 
-    public function complete(array $input): array
+    /**
+     * Conclui o primeiro acesso.
+     *
+     * NI2-449: com $acceptance (['channel' => 'web'|'app', 'ip' => ..., 'user_agent' => ...]) grava, na mesma
+     * transação, o aceite dos Termos de Uso e da Política de Privacidade em patient_consents. Quem chama só passa
+     * $acceptance depois de conferir que a pessoa marcou o aceite. Sem ele (aplicativo que ainda não pede o aceite),
+     * o acesso é criado e o paciente fica com o aceite pendente.
+     */
+    public function complete(array $input, ?array $acceptance = null): array
     {
         foreach (['invitation_code','name','email','phone','password','password_confirmation'] as $field) {
             if (!isset($input[$field]) || !is_string($input[$field])) throw new DomainException('Preencha os dados do primeiro acesso.');
@@ -81,6 +89,13 @@ final class PatientOnboardingService
             if ($update->rowCount()!==1) throw new DomainException('Este paciente já possui acesso ao app.');
             $token=bin2hex(random_bytes(32)); $expires=gmdate('Y-m-d H:i:s',time()+30*86400);
             $this->db->prepare("INSERT INTO personal_access_tokens(tokenable_type,tokenable_id,clinic_id,name,token,expires_at) VALUES('patient',?,?,'mobile_app',?,?)")->execute([$row['id'],$row['clinic_id'],hash('sha256',$token),$expires]);
+            if ($acceptance !== null) {
+                (new \ClyoNutri\Domain\Legal\LegalAcceptanceService($this->db))->recordPatientAcceptance(
+                    (int)$row['id'], (int)$row['clinic_id'], (string)($acceptance['channel'] ?? 'web'),
+                    isset($acceptance['ip']) ? (string)$acceptance['ip'] : null,
+                    isset($acceptance['user_agent']) ? (string)$acceptance['user_agent'] : null
+                );
+            }
             $this->db->commit();
             return ['token'=>$token,'expires_at'=>$expires,'patient'=>['id'=>(int)$row['id'],'clinic_id'=>(int)$row['clinic_id'],'name'=>$name,'email'=>$email]];
         } catch (\Throwable $e) { if ($this->db->inTransaction()) $this->db->rollBack(); throw $e; }

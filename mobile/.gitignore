@@ -2,3 +2,4 @@ node_modules/
 .expo/
 dist/
 .test-build/
+dist-patient-reference/

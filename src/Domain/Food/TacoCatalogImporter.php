@@ -21,6 +21,8 @@ use RuntimeException;
  * - alimentos cuja energia/macros estão marcados "*" (análises em reavaliação) não são inseridos;
  *   se já existirem vinculados, mantêm seus valores e só recebem a marcação.
  * Semântica: Tr (traço) e NA (não aplicável) => 0; "*" e célula em branco => 0 com marcação em nutrient_flags.
+ * v43 (NI2-520): com a migração 63, só atualiza linhas com source = 'TACO' e versão vazia ou igual a VERSION; um
+ * alimento de outra base ou de outra versão nunca é sobrescrito. Linhas novas já entram com fonte, versão, código e data.
  */
 class TacoCatalogImporter
 {
@@ -39,6 +41,8 @@ class TacoCatalogImporter
         'Alface americana crua' => 77,
         'Tomate com semente cru' => 157,
     ];
+
+    public const VERSION = '4ª ed. rev. e ampl. (2011)';
 
     private PDO $db;
     private string $csv;
@@ -89,20 +93,27 @@ class TacoCatalogImporter
                 }
             }
 
+            $v43 = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'foods', 'source_version');
+            $guard = $v43 ? " AND source = 'TACO' AND (source_version IS NULL OR source_version = :ver)" : '';
             $upd = $this->db->prepare("UPDATE foods SET energy_kcal = :e, protein_g = :p, lipid_g = :l, carbohydrate_g = :c,
                 fiber_g = :f, nutrient_flags = :fl, category = COALESCE(category, :cat)
-                WHERE taco_code = :code AND clinic_id IS NULL AND is_custom = 0");
-            $flagOnly = $this->db->prepare('UPDATE foods SET nutrient_flags = :fl WHERE taco_code = :code AND clinic_id IS NULL AND is_custom = 0');
-            $ins = $this->db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, lipid_g, carbohydrate_g,
-                fiber_g, serving_size_g, serving_unit, is_custom, taco_code, nutrient_flags)
-                VALUES (NULL, :n, :cat, 'TACO', :e, :p, :l, :c, :f, 100, 'g', 0, :code, :fl)");
+                WHERE taco_code = :code AND clinic_id IS NULL AND is_custom = 0{$guard}");
+            $flagOnly = $this->db->prepare("UPDATE foods SET nutrient_flags = :fl WHERE taco_code = :code AND clinic_id IS NULL AND is_custom = 0{$guard}");
+            $ins = $v43
+                ? $this->db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, lipid_g, carbohydrate_g,
+                    fiber_g, serving_size_g, serving_unit, is_custom, taco_code, nutrient_flags, source_version, source_code, source_imported_at, preparation, is_current)
+                    VALUES (NULL, :n, :cat, 'TACO', :e, :p, :l, :c, :f, 100, 'g', 0, :code, :fl, :ver, :scode, :at, :prep, 1)")
+                : $this->db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, lipid_g, carbohydrate_g,
+                    fiber_g, serving_size_g, serving_unit, is_custom, taco_code, nutrient_flags)
+                    VALUES (NULL, :n, :cat, 'TACO', :e, :p, :l, :c, :f, 100, 'g', 0, :code, :fl)");
+            $ver = $v43 ? ['ver' => self::VERSION] : [];
             foreach ($rows as $r) {
                 $byCode->execute(['c' => $r['taco_code']]);
                 $exists = $byCode->fetchColumn() !== false;
                 $fl = $r['nutrient_flags'] !== '' ? $r['nutrient_flags'] : null;
                 if ($r['import'] !== '1') {
                     if ($exists) {
-                        $flagOnly->execute(['fl' => $fl, 'code' => $r['taco_code']]);
+                        $flagOnly->execute(['fl' => $fl, 'code' => $r['taco_code']] + $ver);
                     }
                     $stats['skipped']++;
                     continue;
@@ -110,10 +121,11 @@ class TacoCatalogImporter
                 $vals = ['e' => $r['energy_kcal'], 'p' => $r['protein_g'], 'l' => $r['lipid_g'], 'c' => $r['carbohydrate_g'],
                     'f' => $r['fiber_g'], 'fl' => $fl, 'cat' => $r['category'], 'code' => $r['taco_code']];
                 if ($exists) {
-                    $upd->execute($vals);
+                    $upd->execute($vals + $ver);
                     $stats['updated']++;
                 } else {
-                    $ins->execute($vals + ['n' => $r['name']]);
+                    $extra = $v43 ? $ver + ['scode' => (string)$r['taco_code'], 'at' => date('Y-m-d H:i:s'), 'prep' => FoodSearchIndex::preparation($r['name'])] : [];
+                    $ins->execute($vals + ['n' => $r['name']] + $extra);
                     $stats['inserted']++;
                 }
             }

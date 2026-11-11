@@ -7,7 +7,6 @@ namespace ClyoNutri\Domain\ShoppingList;
 use ClyoNutri\Core\Audit\AuditLogger;
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
-use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Domain\Clinical\AllergenSafetyValidator;
 use InvalidArgumentException;
@@ -117,7 +116,7 @@ class ShoppingListService
             SELECT mp.id, mp.title, mp.patient_id, mp.professional_id, mp.status, mp.version,
                    p.name AS patient_name, u.name AS professional_name
             FROM meal_plans mp
-            JOIN patients p ON p.id = mp.patient_id
+            LEFT JOIN patients p ON p.id = mp.patient_id
             LEFT JOIN professionals pr ON pr.id = mp.professional_id
             LEFT JOIN users u ON u.id = pr.user_id
             WHERE mp.id = :id AND mp.clinic_id = :clinic_id
@@ -136,8 +135,10 @@ class ShoppingListService
             );
         }
 
-        $patientId = (int)$plan['patient_id'];
-        TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        $patientId = $plan['patient_id'] !== null ? (int)$plan['patient_id'] : null;
+        if ($patientId !== null) {
+            TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+        }
 
         // 1. Buscar todos os itens prescritos nas refeições
         $stmt = $this->db->prepare("
@@ -315,24 +316,23 @@ class ShoppingListService
         }
 
         // 6. Consultar Alergias e Restrições do Paciente (AC4)
-        $anamnesisStmt = $this->db->prepare("
-            SELECT allergies, restrictions
-            FROM anamneses
-            WHERE clinic_id = :clinic_id AND patient_id = :patient_id
-            ORDER BY version DESC, id DESC
-            LIMIT 1
-        ");
-        $anamnesisStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
-        $anamnesis = $anamnesisStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
-        $patientAllergiesRaw = trim((string)(ClinicalEncryptionService::decrypt($anamnesis['allergies'] ?? '') ?? ''));
-        $patientRestrictionsRaw = trim((string)(ClinicalEncryptionService::decrypt($anamnesis['restrictions'] ?? '') ?? ''));
-
-        // Validação de segurança com o validador fail-closed
-        $allergenSafety = $this->allergenValidator->validateFoodsForPatient($patientId, array_keys($allFoodsToEvaluate));
+        $patientAllergiesRaw = '';
+        $patientRestrictionsRaw = '';
         $conflictsByFoodId = [];
-        foreach ($allergenSafety['conflicts'] as $conf) {
-            $conflictsByFoodId[(int)$conf['food_id']] = $conf;
+        $allergenSafety = ['has_conflict' => false, 'conflicts' => []];
+
+        if ($patientId !== null) {
+            // NI2-605: mesma fonte da trava (anamnese concluída + acréscimos de rascunho mais novo)
+            $anamnesis = \ClyoNutri\Domain\Anamnesis\AnamnesisVersions::mergeForSafety(\ClyoNutri\Domain\Anamnesis\AnamnesisVersions::pick($this->db, $clinicId, $patientId, 'a.allergies, a.restrictions, a.version'))['row'] ?? [];
+
+            $patientAllergiesRaw = trim((string)($anamnesis['allergies'] ?? ''));
+            $patientRestrictionsRaw = trim((string)($anamnesis['restrictions'] ?? ''));
+
+            // Validação de segurança com o validador fail-closed
+            $allergenSafety = $this->allergenValidator->validateFoodsForPatient($patientId, array_keys($allFoodsToEvaluate));
+            foreach ($allergenSafety['conflicts'] as $conf) {
+                $conflictsByFoodId[(int)$conf['food_id']] = $conf;
+            }
         }
 
         // 7. Agrupar por Gôndola / Corredor do Supermercado com formatação e arredondamento (AC5)
@@ -423,7 +423,7 @@ class ShoppingListService
             'plan_id' => $planId,
             'plan_title' => $plan['title'],
             'patient_id' => $patientId,
-            'patient_name' => $plan['patient_name'],
+            'patient_name' => $plan['patient_name'] ?: 'Paciente a definir',
             'professional_name' => $plan['professional_name'],
             'version' => (int)$plan['version'],
             'status' => $plan['status'],

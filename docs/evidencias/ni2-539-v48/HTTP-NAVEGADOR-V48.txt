@@ -1,0 +1,47 @@
+Teste HTTP no servidor local (php -S, SQLite, dados TESTE): tela da nutricionista com envio multipart real e API do app com token de paciente.
+
+== Nutricionista: anexar pela tela
+  PASS  tela mostra a seção de laudos e o formulário de envio
+  PASS  sem script inline nem onclick (CSP)
+  PASS  envio redireciona de volta à seção de laudos
+  PASS  laudo aparece, glicemia passa a "Laudo recebido"
+  PASS  PDF com JavaScript recusado na tela, nada guardado
+  PASS  código PHP com nome .jpg recusado pelo tipo real
+  PASS  sem token de formulário válido: recusado (403)
+== Abrir: link assinado de 5 min, só para a mesma sessão
+  PASS  abrir gera link assinado e redireciona
+  PASS  entrega o PDF original, byte a byte
+  PASS  PDF como download, nosniff, CSP sandbox, sem cache
+  PASS  mesmo link na sessão de outra clínica: 404 sem arquivo
+  PASS  link sem sessão: vai para o login
+  PASS  outra clínica não gera link (404)
+  PASS  link com prazo alterado: 404
+== App da paciente (API)
+  PASS  lista só as solicitações emitidas dela, sem caminho nem hash
+  PASS  sem token: 401
+  PASS  paciente envia foto do laudo: 201, aguardando revisão
+  PASS  paciente: PHP disfarçado de .jpg recusado (422)
+  PASS  paciente: PDF com JavaScript recusado (422)
+  PASS  outra paciente não envia para esta solicitação (422)
+  PASS  paciente de outra clínica não vê nada
+  PASS  app: link de 2 minutos
+  PASS  app: abre a própria foto pelo link
+  PASS  app: outra paciente não gera link do laudo dela
+  PASS  link adulterado (tipo trocado): 404
+== Nutricionista revisa o envio da paciente e corrige um laudo
+  PASS  pendência aparece com o formulário de revisão
+  PASS  lista do paciente avisa "1 para revisar"
+  PASS  prontuário avisa laudo aguardando revisão
+  PASS  aceito: ferritina também passa a "Laudo recebido"
+  PASS  correção vira versão 2 e a 1 aparece substituída
+  PASS  versão 1 continua abrindo, intacta
+  PASS  laudos não vazam para a solicitação de outra paciente
+  PASS  solicitação de outra paciente pelo endereço desta: 404
+
+33 PASS, 0 FAIL
+
+Navegador real (Chromium) com a política de segurança ativa:
+  PASS  anexar pelo navegador (campo de arquivo real)
+  PASS  Abrir imagem abre o link assinado em nova aba
+  PASS  sem rolagem lateral no celular
+  PASS  sem erro de JS nem de CSP

@@ -1,0 +1,75 @@
+{
+  "versao": "v50-consolidado",
+  "data_geracao": "2026-11-01T03:54:00-03:00",
+  "ambiente_alvo": "HostGator cPanel / PHP 8.1+ / MySQL 5.7 e 8.0",
+  "pacote_zip": "clyonutri-v50-consolidado-hostgator.zip",
+  "sha256": "434e43e44733c8232900a56fb7941a12fe8075685f7f54034891372fda78e108",
+  "historias_consolidadas": [
+    {
+      "chave": "NI2-223",
+      "titulo": "[P0] Anamnese estruturada completa com campos clínicos condicionais",
+      "status": "VALIDADO_100%",
+      "arquivos_chave": [
+        "src/Domain/Anamnesis/AnamnesisService.php",
+        "database/migrations/2026_11_01_000069_add_structured_conditional_fields_to_anamneses.php",
+        "database/manual/atualizacao-v50-ni2-223-anamnese-estruturada.sql",
+        "views/anamnesis/version.php"
+      ]
+    },
+    {
+      "chave": "NI2-523",
+      "titulo": "Avisos clínicos por população no cálculo energético (gestantes, adolescentes, idosos)",
+      "status": "VALIDADO_100%",
+      "arquivos_chave": [
+        "src/Domain/Nutrition/EnergyCalculator.php",
+        "src/Domain/MealPlan/EnergyTargetService.php"
+      ]
+    },
+    {
+      "chave": "NI2-433",
+      "titulo": "Autoagendamento self-service com Portal do Paciente",
+      "status": "VALIDADO_100%",
+      "arquivos_chave": [
+        "src/Domain/Booking/BookingService.php",
+        "src/Application/Controllers/BookingController.php",
+        "views/booking/public_booking.php",
+        "public/index.php"
+      ]
+    },
+    {
+      "chave": "NI2-487",
+      "titulo": "Notificações transacionais outbox assíncronas com anti-stale",
+      "status": "VALIDADO_100%",
+      "arquivos_chave": [
+        "src/Domain/Notification/AppointmentConfirmationPublisher.php",
+        "src/Domain/Notification/NotificationService.php",
+        "src/Domain/Appointment/AppointmentService.php"
+      ]
+    },
+    {
+      "chave": "NI2-514",
+      "titulo": "Prescrição dietética avançada, modelos, importação CSV (M2/M3) e equivalências (M4/B1)",
+      "status": "VALIDADO_100%",
+      "arquivos_chave": [
+        "src/Domain/Patient/PatientImportService.php",
+        "src/Domain/Food/FoodEquivalenceService.php",
+        "src/Domain/MealPlan/MealPlanTemplateService.php",
+        "src/Domain/ShoppingList/ShoppingListService.php",
+        "routes/web.php"
+      ]
+    }
+  ],
+  "resultados_testes": {
+    "self_service_booking_test": "50 PASS / 0 FAIL",
+    "ni2_223_anamnese_estruturada_test": "7 PASS / 0 FAIL (100%)",
+    "ni2_514_v42_clinical_scenarios_test": "25 PASS / 0 FAIL",
+    "ni2_514_v42_units_test": "15 PASS / 0 FAIL",
+    "ni2_514_phase1_test": "17 PASS / 0 FAIL",
+    "ni2_514_phase2_test": "13 PASS / 0 FAIL",
+    "ni2_514_phase3_test": "35 PASS / 0 FAIL",
+    "ni2_514_v43_test": "10 PASS / 0 FAIL",
+    "ni2_519_520_v44_test": "28 PASS / 0 FAIL",
+    "total_verificacoes_aprovadas": 200,
+    "total_falhas": 0
+  }
+}

@@ -30,8 +30,7 @@ class BookingService
     {
         $this->db = $db ?? Connection::getInstance();
         $this->fixedNow = $now;
-        $tzName = (string)(getenv('APP_TIMEZONE') ?: ($_ENV['APP_TIMEZONE'] ?? date_default_timezone_get() ?: 'America/Sao_Paulo'));
-        $this->timezone = new DateTimeZone($tzName);
+        $this->timezone = BookingCalendarService::tz();
     }
 
     public function now(): DateTimeImmutable
@@ -44,7 +43,7 @@ class BookingService
      */
     public function getSettings(int $clinicId): array
     {
-        $stmt = $this->db->prepare("SELECT * FROM booking_settings WHERE clinic_id = :clinic_id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM booking_settings WHERE clinic_id = :clinic_id LIMIT 1" . ($this->db->inTransaction() && $this->isMysql() ? ' FOR UPDATE' : ''));
         $stmt->execute(['clinic_id' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -65,6 +64,8 @@ class BookingService
                 'patient_can_cancel' => (bool)($row['patient_can_cancel'] ?? false),
                 'patient_can_request_reschedule' => (bool)($row['patient_can_request_reschedule'] ?? false),
                 'patient_show_address' => (bool)($row['patient_show_address'] ?? true),
+                // NI2-596 (migração 77): endereço na página pública do link, desligado por padrão.
+                'public_show_address' => (bool)($row['public_show_address'] ?? false),
             ];
         }
 
@@ -85,6 +86,7 @@ class BookingService
             'patient_can_cancel' => false,
             'patient_can_request_reschedule' => false,
             'patient_show_address' => true,
+            'public_show_address' => false,
         ];
     }
 
@@ -112,7 +114,7 @@ class BookingService
                 throw new InvalidArgumentException("Valor inválido em {$field}: use de {$min} a {$max}.");
             }
         }
-        foreach (['is_enabled', 'require_cpf', 'allow_telehealth', 'allow_presential', 'patient_can_confirm', 'patient_can_cancel', 'patient_can_request_reschedule', 'patient_show_address'] as $flag) {
+        foreach (['is_enabled', 'require_cpf', 'allow_telehealth', 'allow_presential', 'patient_can_confirm', 'patient_can_cancel', 'patient_can_request_reschedule', 'patient_show_address', 'public_show_address'] as $flag) {
             $merged[$flag] = filter_var($merged[$flag], FILTER_VALIDATE_BOOL);
         }
         if ($merged['is_enabled'] && !$merged['allow_telehealth'] && !$merged['allow_presential']) {
@@ -196,6 +198,11 @@ class BookingService
             ]);
         }
 
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'booking_settings', 'public_show_address')) {
+            $this->db->prepare('UPDATE booking_settings SET public_show_address = :ps WHERE clinic_id = :clinic_id')
+                ->execute(['ps' => $merged['public_show_address'] ? 1 : 0, 'clinic_id' => $clinicId]);
+        }
+
         return $this->getSettings($clinicId);
     }
 
@@ -210,13 +217,20 @@ class BookingService
         int $durationMinutes = 60,
         string $modality = 'presential',
         ?int $excludeAppointmentId = null,
-        bool $forPatientReschedule = false
+        bool $forPatientReschedule = false,
+        ?int $excludeHoldId = null,
+        bool $forInternalScheduling = false
     ): array {
         $settings = $this->getSettings($clinicId);
         if (!$this->professionalInClinic($professionalId, $clinicId)) {
             return [];
         }
-        if ($forPatientReschedule) {
+        if ($forInternalScheduling) {
+            $settings['min_advance_hours'] = 0;
+            $settings['is_enabled'] = true;
+            $settings['allow_presential'] = true;
+            $settings['allow_telehealth'] = true;
+        } elseif ($forPatientReschedule) {
             // NI2-137: o pedido de remarcação de quem já é paciente não depende da página pública de
             // autoagendamento (nem das modalidades oferecidas nela); a antecedência é a de remarcação.
             $settings['min_advance_hours'] = self::patientMinAdvanceHours($settings, 'reschedule');
@@ -237,7 +251,8 @@ class BookingService
 
         // Validar data
         try {
-            $requestedDate = new DateTimeImmutable($date . ' 00:00:00', $this->timezone);
+            $requestedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date, $this->timezone);
+            if (!$requestedDate || $requestedDate->format('Y-m-d') !== $date) throw new \InvalidArgumentException('Data inválida. Use AAAA-MM-DD.');
         } catch (\Exception $e) {
             throw new InvalidArgumentException("Data inválida. Use o formato AAAA-MM-DD.");
         }
@@ -249,7 +264,7 @@ class BookingService
         }
 
         $maxFuture = $today->modify('+' . $settings['max_future_days'] . ' days');
-        if ($requestedDate > $maxFuture) {
+        if (!$forInternalScheduling && $requestedDate > $maxFuture) {
             return [];
         }
 
@@ -257,30 +272,13 @@ class BookingService
         // não há horário a oferecer: a página pública não inventa jornada (NI2-433, "horários
         // realmente disponíveis").
         $prefs = $this->getProfessionalPreferences($clinicId, $professionalId);
-        $weeklyAvail = $prefs['weekly_availability'] ?? null;
-        if (empty($weeklyAvail) || !is_array($weeklyAvail)) {
-            return [];
-        }
-
-        $dayIndex = (int)$requestedDate->format('N') - 1; // 0=seg, 6=dom
-        $dayKeys = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
-        $dayKey = $dayKeys[$dayIndex] ?? 'seg';
-        $dayConfig = $weeklyAvail[$dayKey] ?? [];
-
-        if (empty($dayConfig['enabled'])) {
-            return []; // Profissional não atende neste dia da semana
-        }
-
-        $startStr = $dayConfig['start'] ?? '08:00';
-        $endStr = $dayConfig['end'] ?? '18:00';
-        $breakStartStr = !empty($dayConfig['break_start']) ? $dayConfig['break_start'] : null;
-        $breakEndStr = !empty($dayConfig['break_end']) ? $dayConfig['break_end'] : null;
-
-        $workStart = new DateTimeImmutable($date . ' ' . $startStr . ':00', $this->timezone);
-        $workEnd = new DateTimeImmutable($date . ' ' . $endStr . ':00', $this->timezone);
-
-        $breakStart = $breakStartStr ? new DateTimeImmutable($date . ' ' . $breakStartStr . ':00', $this->timezone) : null;
-        $breakEnd = $breakEndStr ? new DateTimeImmutable($date . ' ' . $breakEndStr . ':00', $this->timezone) : null;
+        $weeklyAvail = $prefs['weekly_availability'] ?? [];
+        $calendar = new BookingCalendarService($this->db);
+        $windows = $calendar->windows($clinicId, $professionalId, $date, is_array($weeklyAvail) ? $weeklyAvail : []);
+        if ($windows === []) return [];
+        $policy = $calendar->policy($clinicId);
+        $workStart = (new DateTimeImmutable('@' . $windows[0][0]))->setTimezone($this->timezone)->modify('+' . (int)$policy['buffer_before_minutes'] . ' minutes');
+        $workEnd = (new DateTimeImmutable('@' . $windows[count($windows)-1][1]))->setTimezone($this->timezone);
 
         // Buscar consultas existentes no dia
         // Inclui consultas que começam no dia anterior (podem atravessar a meia-noite) e ignora
@@ -295,7 +293,7 @@ class BookingService
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
             'start_window' => $requestedDate->modify('-1 day')->format('Y-m-d H:i:s'),
-            'end_of_day' => $requestedDate->modify('+1 day')->format('Y-m-d H:i:s'),
+            'end_of_day' => $requestedDate->modify('+2 days')->format('Y-m-d H:i:s'),
         ];
         if ($excludeAppointmentId !== null) {
             $apptsSql .= ' AND id <> :exclude_id';
@@ -312,30 +310,40 @@ class BookingService
             WHERE clinic_id = :clinic_id AND professional_id = :prof_id
               AND scheduled_at >= :start_window AND scheduled_at < :end_of_day
               AND status = 'held' AND expires_at_utc > :now_utc
+              AND (:exclude_hold IS NULL OR id <> :exclude_hold_id)
         ");
         $holdsStmt->execute([
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
             'start_window' => $requestedDate->modify('-1 day')->format('Y-m-d H:i:s'),
-            'end_of_day' => $requestedDate->modify('+1 day')->format('Y-m-d H:i:s'),
+            'end_of_day' => $requestedDate->modify('+2 days')->format('Y-m-d H:i:s'),
             'now_utc' => $nowUtcStr,
+            'exclude_hold' => $excludeHoldId,
+            'exclude_hold_id' => $excludeHoldId,
         ]);
         $existingHolds = $holdsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Limite mínimo de antecedência
         $minAdvanceLimit = $now->modify('+' . $settings['min_advance_hours'] . ' hours');
 
-        // Gerar slots candidatos a cada 30 minutos (ou a cada duration)
-        $slotStep = ($durationMinutes >= 60 && ($durationMinutes % 60 === 0)) ? 60 : 30;
+        // v54.39: horários candidatos no passo da duração da consulta, começando no início de cada
+        // janela (expediente e retorno da pausa). Ex.: 08:00–18:00, pausa 12:00–13:00, 60 min ->
+        // 08, 09, 10, 11, 13, 14, 15, 16, 17. Antes o passo era fixo em 15 minutos.
+        $slotStep = $durationMinutes;
         $slots = [];
-        $cursor = $workStart;
+        $candidates = [];
+        foreach ($windows as [$windowStart, $windowEnd]) {
+            $c = (new DateTimeImmutable('@' . ((int)$windowStart + 60 * (int)$policy['buffer_before_minutes'])))->setTimezone($this->timezone);
+            while ($c < $workEnd && $c->getTimestamp() < (int)$windowEnd) { $candidates[$c->getTimestamp()] = $c; $c = $c->modify('+' . $slotStep . ' minutes'); }
+        }
+        ksort($candidates);
 
-        while ($cursor < $workEnd) {
+        foreach ($candidates as $cursor) {
             $slotStart = $cursor;
             $slotEnd = $cursor->modify('+' . $durationMinutes . ' minutes');
 
             if ($slotEnd > $workEnd) {
-                break;
+                continue;
             }
 
             $isAvailable = true;
@@ -345,10 +353,12 @@ class BookingService
                 $isAvailable = false;
             }
 
-            // 2. Não colide com pausa/almoço
-            if ($isAvailable && $breakStart && $breakEnd) {
-                if ($slotStart < $breakEnd && $slotEnd > $breakStart) {
-                    $isAvailable = false;
+            // The same calendar policy is enforced by internal appointments and hold conversion.
+            if ($isAvailable) {
+                $isAvailable=false;
+                foreach($windows as [$windowStart,$windowEnd]) {
+                    if($slotStart->getTimestamp()-60*(int)$policy['buffer_before_minutes'] >= $windowStart
+                        && $slotEnd->getTimestamp()+60*(int)$policy['buffer_after_minutes'] <= $windowEnd){$isAvailable=true;break;}
                 }
             }
 
@@ -359,7 +369,7 @@ class BookingService
                     $apptDuration = max(15, (int)($appt['duration_minutes'] ?? 60));
                     $apptEnd = $apptStart->modify('+' . $apptDuration . ' minutes');
 
-                    if ($slotStart < $apptEnd && $slotEnd > $apptStart) {
+                    if ($calendar->overlaps($clinicId, $slotStart->format('Y-m-d H:i:s'), $durationMinutes, $appt['scheduled_at'], $apptDuration, $policy)) {
                         $isAvailable = false;
                         break;
                     }
@@ -373,7 +383,7 @@ class BookingService
                     $holdDuration = max(15, (int)($hold['duration_minutes'] ?? 60));
                     $holdEnd = $holdStart->modify('+' . $holdDuration . ' minutes');
 
-                    if ($slotStart < $holdEnd && $slotEnd > $holdStart) {
+                    if ($calendar->overlaps($clinicId, $slotStart->format('Y-m-d H:i:s'), $durationMinutes, $hold['scheduled_at'], $holdDuration, $policy)) {
                         $isAvailable = false;
                         break;
                     }
@@ -387,8 +397,6 @@ class BookingService
                     'available' => true,
                 ];
             }
-
-            $cursor = $cursor->modify('+' . $slotStep . ' minutes');
         }
 
         return $slots;
@@ -397,26 +405,101 @@ class BookingService
     /**
      * Profissional apto a receber autoagendamento: usuário, vínculo e clínica ativos e
      * autoagendamento ligado na clínica. Retorna só dados públicos (nunca e-mail).
+     * Suporta busca por ID numérico ou slug amigável (NI2-596).
      */
-    public function publicProfessional(int $professionalId): ?array
+    /**
+     * Profissional apto ao autoagendamento.
+     *
+     * - Número: uso interno (APIs de horários e reservas, fila de espera). A página pública com número
+     *   é tratada em BookingController::publicBookingPage (redireciona para o apelido ou 404).
+     * - Texto: apelido único gravado em professionals.booking_slug (NI2-596). Não há mais busca por
+     *   nome nem "nutri-{id}": dois profissionais com o mesmo nome nunca se confundem e nenhuma
+     *   página pública varre a tabela de profissionais.
+     */
+    public function publicProfessional(int|string $identifier): ?array
     {
+        if (is_int($identifier) || (is_string($identifier) && ctype_digit($identifier))) {
+            $professionalId = (int)$identifier;
+        } else {
+            $professionalId = (int)((new PublicBookingSlug($this->db))->resolve((string)$identifier) ?? 0);
+        }
         if ($professionalId <= 0) {
             return null;
         }
+
         $stmt = $this->db->prepare("
-            SELECT p.id, cm.clinic_id, u.name, c.name AS clinic_name, c.logo_path
+            SELECT p.id, cm.clinic_id, p.user_id, u.name, c.name AS clinic_name, c.logo_path,
+                   c.address_street, c.address_number, c.address_complement, c.address_neighborhood,
+                   c.address_city, c.address_state, c.address_zip
             FROM professionals p
             JOIN users u ON u.id = p.user_id
             JOIN clinic_members cm ON cm.user_id = p.user_id
             JOIN clinics c ON c.id = cm.clinic_id
-            WHERE p.id = :id AND u.status = 'active' AND c.status = 'active' AND cm.status = 'active'
+            WHERE p.id = :ident
+              AND u.status = 'active'
+              AND c.status = 'active'
+              AND cm.status = 'active'
+              AND cm.role IN ('owner','admin','nutritionist')
+              AND u.role IN ('owner','admin','nutritionist')
             LIMIT 1
         ");
-        $stmt->execute(['id' => $professionalId]);
+        $stmt->execute(['ident' => $professionalId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row || !$this->getSettings((int)$row['clinic_id'])['is_enabled']) {
+        if (!$row) {
             return null;
         }
+        $settings = $this->getSettings((int)$row['clinic_id']);
+        if (!$settings['is_enabled'] || $settings['require_cpf']) {
+            return null;
+        }
+
+        // Endereço: só com a opção própria "Mostrar endereço no link de agendamento" (desligada por padrão).
+        // Quem atende em casa não tem o endereço residencial exposto a qualquer pessoa com o link.
+        $clinicAddress = null;
+        if (!empty($settings['public_show_address'])) {
+            $addrParts = [];
+            if (!empty($row['address_street'])) {
+                $street = trim((string)$row['address_street']);
+                if (!empty($row['address_number'])) {
+                    $street .= ', ' . trim((string)$row['address_number']);
+                }
+                if (!empty($row['address_complement'])) {
+                    $street .= ' (' . trim((string)$row['address_complement']) . ')';
+                }
+                $addrParts[] = $street;
+            }
+            if (!empty($row['address_neighborhood'])) {
+                $addrParts[] = trim((string)$row['address_neighborhood']);
+            }
+            if (!empty($row['address_city'])) {
+                $city = trim((string)$row['address_city']);
+                if (!empty($row['address_state'])) {
+                    $city .= '/' . trim((string)$row['address_state']);
+                }
+                $addrParts[] = $city;
+            }
+            if (!empty($row['address_zip'])) {
+                $addrParts[] = 'CEP ' . trim((string)$row['address_zip']);
+            }
+            $clinicAddress = $addrParts !== [] ? implode(' - ', $addrParts) : null;
+        }
+
+        // Valor de referência: só quando a nutricionista salvou um valor (sem valor inventado).
+        $defaultPrice = null;
+        try {
+            $prefStmt = $this->db->prepare("SELECT practice_preferences FROM onboarding_progress WHERE clinic_id = ? AND user_id = ?");
+            $prefStmt->execute([(int)$row['clinic_id'], (int)$row['user_id']]);
+            $prefRaw = $prefStmt->fetchColumn();
+            if ($prefRaw) {
+                $prefs = json_decode((string)$prefRaw, true) ?: [];
+                if (isset($prefs['default_price']) && is_numeric($prefs['default_price']) && (float)$prefs['default_price'] > 0) {
+                    $defaultPrice = (float)$prefs['default_price'];
+                }
+            }
+        } catch (\Throwable $e) {
+            $defaultPrice = null;
+        }
+
         return [
             'id' => (int)$row['id'],
             'clinic_id' => (int)$row['clinic_id'],
@@ -424,7 +507,268 @@ class BookingService
             'clinic_name' => (string)$row['clinic_name'],
             'logo_path' => $row['logo_path'] ?? null,
             'duration_minutes' => $this->bookingDuration((int)$row['clinic_id'], (int)$row['id']),
+            'clinic_address' => $clinicAddress,
+            'default_price' => $defaultPrice,
+            'slug' => (new PublicBookingSlug($this->db))->current((int)$row['id']),
         ];
+    }
+
+    /**
+     * Lista pública de nutricionistas que habilitaram o link online e o autoatendimento (is_enabled = 1 e require_cpf = 0).
+     * Retorna apenas dados públicos seguros para vitrine e agendamento.
+     */
+    public function listPublicDirectory(?string $query = null, ?string $topic = null): array
+    {
+        $stmt = $this->db->query("
+            SELECT p.id, p.user_id, p.crn, p.crn_region, p.specialty, p.bio,
+                   u.name, u.phone AS user_phone,
+                   cm.clinic_id,
+                   c.name AS clinic_name, c.phone AS clinic_phone, c.logo_path,
+                   c.address_city, c.address_state,
+                   bs.allow_telehealth, bs.allow_presential, bs.public_show_address
+            FROM professionals p
+            JOIN users u ON u.id = p.user_id
+            JOIN clinic_members cm ON cm.user_id = p.user_id
+            JOIN clinics c ON c.id = cm.clinic_id
+            JOIN booking_settings bs ON bs.clinic_id = c.id
+            WHERE u.status = 'active'
+              AND c.status = 'active'
+              AND cm.status = 'active'
+              AND cm.role IN ('owner', 'admin', 'nutritionist')
+              AND u.role IN ('owner', 'admin', 'nutritionist')
+              AND bs.is_enabled = 1
+              AND bs.require_cpf = 0
+              AND (bs.allow_telehealth = 1 OR bs.allow_presential = 1)
+            ORDER BY p.id ASC
+        ");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        if ($rows === []) {
+            return [];
+        }
+
+        $slugger = new PublicBookingSlug($this->db);
+        $focusLabels = [
+            'emagrecimento' => 'Emagrecimento',
+            'weight_loss' => 'Emagrecimento',
+            'hipertrofia' => 'Hipertrofia e Esporte',
+            'sports' => 'Nutrição Esportiva',
+            'esportiva' => 'Nutrição Esportiva',
+            'reeducacao' => 'Reeducação Alimentar',
+            'reeducacao_alimentar' => 'Reeducação Alimentar',
+            'clinica' => 'Nutrição Clínica',
+            'clinical' => 'Nutrição Clínica',
+            'materno_infantil' => 'Materno-Infantil',
+            'saude_mulher' => 'Saúde da Mulher',
+            'diabetes' => 'Diabetes e Metabólica',
+            'intestinal' => 'Saúde Intestinal',
+            'vegetariana' => 'Vegetariana e Vegana',
+            'longevidade' => 'Longevidade e Prevenção',
+        ];
+        $dowShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        $todayStr = $this->now()->format('Y-m-d');
+        $norm = static function (string $s): string {
+            $s = mb_strtolower(trim($s), 'UTF-8');
+            $map = [
+                'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
+                'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+                'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+                'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c',
+            ];
+            return strtr($s, $map);
+        };
+        $qNorm = $query !== null && trim($query) !== '' ? $norm($query) : null;
+        $tNorm = $topic !== null && trim($topic) !== '' ? $norm($topic) : null;
+
+        $seenProfs = [];
+        $items = [];
+        foreach ($rows as $row) {
+            $profId = (int)$row['id'];
+            if (isset($seenProfs[$profId])) {
+                continue;
+            }
+            $seenProfs[$profId] = true;
+            $clinicId = (int)$row['clinic_id'];
+            $userId = (int)$row['user_id'];
+            $name = trim((string)$row['name']);
+
+            // Format CRN cleanly without duplicating "CRN"
+            $rawCrn = trim((string)($row['crn'] ?? ''));
+            $rawRegion = trim((string)($row['crn_region'] ?? ''));
+            $crnDisplay = '';
+            if ($rawCrn !== '') {
+                if (stripos($rawCrn, 'CRN') === 0) {
+                    $crnDisplay = $rawCrn;
+                } elseif ($rawRegion !== '') {
+                    $crnDisplay = (stripos($rawRegion, 'CRN') === 0 ? $rawRegion : 'CRN-' . $rawRegion) . ' ' . $rawCrn;
+                } else {
+                    $crnDisplay = 'CRN ' . $rawCrn;
+                }
+            } elseif ($rawRegion !== '') {
+                $crnDisplay = stripos($rawRegion, 'CRN') === 0 ? $rawRegion : 'CRN-' . $rawRegion;
+            }
+
+            // Read onboarding preferences & focus objectives
+            $defaultPrice = null;
+            $focusTags = [];
+            $contextualNotes = '';
+            try {
+                $opStmt = $this->db->prepare("SELECT focus_objectives, practice_preferences, contextual_notes FROM onboarding_progress WHERE clinic_id = ? AND user_id = ? LIMIT 1");
+                $opStmt->execute([$clinicId, $userId]);
+                $opRow = $opStmt->fetch(PDO::FETCH_ASSOC);
+                if ($opRow) {
+                    $prefs = json_decode((string)($opRow['practice_preferences'] ?? '{}'), true) ?: [];
+                    if (isset($prefs['default_price']) && is_numeric($prefs['default_price']) && (float)$prefs['default_price'] > 0) {
+                        $defaultPrice = (float)$prefs['default_price'];
+                    }
+                    $focusRaw = json_decode((string)($opRow['focus_objectives'] ?? '[]'), true);
+                    if (is_array($focusRaw)) {
+                        foreach ($focusRaw as $fKey) {
+                            if (!is_string($fKey) || trim($fKey) === '') continue;
+                            $fClean = strtolower(trim($fKey));
+                            $focusTags[] = $focusLabels[$fClean] ?? ucfirst(str_replace(['_', '-'], ' ', trim($fKey)));
+                        }
+                    }
+                    $contextualNotes = trim((string)($opRow['contextual_notes'] ?? ''));
+                }
+            } catch (\Throwable) {
+            }
+
+            $tags = [];
+            $specialty = trim((string)($row['specialty'] ?? ''));
+            if ($specialty !== '') {
+                foreach (preg_split('/[,;\/]+|\s+e\s+/iu', $specialty) ?: [] as $part) {
+                    $part = trim($part);
+                    if ($part !== '') {
+                        $tags[] = $part;
+                    }
+                }
+            }
+            foreach ($focusTags as $ft) {
+                $tags[] = $ft;
+            }
+            if ($tags === []) {
+                $tags = ['Nutrição Clínica', 'Reeducação Alimentar', 'Emagrecimento', 'Saúde e Bem-Estar'];
+            }
+            if (!empty($row['allow_telehealth'])) {
+                $tags[] = 'Teleconsulta';
+            }
+            if (!empty($row['allow_presential'])) {
+                $tags[] = 'Presencial';
+            }
+            $uniqueTags = [];
+            foreach ($tags as $tg) {
+                $k = $norm($tg);
+                if ($k !== '' && !isset($uniqueTags[$k])) {
+                    $uniqueTags[$k] = $tg;
+                }
+            }
+            $tags = array_values($uniqueTags);
+
+            $bio = trim((string)($row['bio'] ?? ''));
+            if ($bio === '' && $contextualNotes !== '') {
+                $bio = $contextualNotes;
+            }
+            if ($bio === '') {
+                $specText = $specialty !== '' ? " com foco em {$specialty}" : ' com foco em nutrição clínica e acompanhamento individualizado';
+                $bio = "Atendimento nutricional humanizado e baseado em evidências{$specText}. Planejamento alimentar adaptado à sua rotina, preferências e objetivos de saúde na clínica {$row['clinic_name']}.";
+            }
+
+            // Filter by search query and topic
+            $haystack = $norm(implode(' ', [$name, $crnDisplay, (string)$row['clinic_name'], $specialty, $bio, implode(' ', $tags), (string)($row['address_city'] ?? ''), (string)($row['address_state'] ?? '')]));
+            if ($qNorm !== null && !str_contains($haystack, $qNorm)) {
+                continue;
+            }
+            if ($tNorm !== null && !str_contains($haystack, $tNorm)) {
+                continue;
+            }
+
+            $duration = $this->bookingDuration($clinicId, $profId);
+            $slug = $slugger->ensure($profId, $name);
+            $bookingUrl = '/agendar/' . rawurlencode($slug !== null && $slug !== '' ? $slug : (string)$profId);
+
+            // Next available slot within 14 days
+            $nextSlotLabel = null;
+            $modalityForSlot = !empty($row['allow_telehealth']) ? 'telehealth' : 'presential';
+            $todayObj = new DateTimeImmutable($todayStr, $this->timezone);
+            for ($dayOffset = 0; $dayOffset < 14; $dayOffset++) {
+                $dObj = $todayObj->modify("+{$dayOffset} days");
+                $dStr = $dObj->format('Y-m-d');
+                try {
+                    $daySlots = $this->getAvailableSlots($clinicId, $profId, $dStr, $duration, $modalityForSlot);
+                } catch (\Throwable) {
+                    $daySlots = [];
+                }
+                if (!empty($daySlots[0]['time'])) {
+                    $slotTime = (string)$daySlots[0]['time'];
+                    $shortTime = str_ends_with($slotTime, ':00') ? substr($slotTime, 0, 2) . 'h' : str_replace(':', 'h', $slotTime);
+                    $shortTime = ltrim($shortTime, '0');
+                    if (str_starts_with($shortTime, 'h')) {
+                        $shortTime = '0' . $shortTime;
+                    }
+                    if ($dayOffset === 0) {
+                        $nextSlotLabel = "Próximo: Hoje, {$shortTime}";
+                    } elseif ($dayOffset === 1) {
+                        $nextSlotLabel = "Próximo: Amanhã, {$shortTime}";
+                    } elseif ($dayOffset < 7) {
+                        $nextSlotLabel = 'Próximo: ' . $dowShort[(int)$dObj->format('w')] . ', ' . $shortTime;
+                    } else {
+                        $nextSlotLabel = 'Próximo: ' . $dObj->format('d/m') . ', ' . $shortTime;
+                    }
+                    break;
+                }
+            }
+
+            // Phone / WhatsApp URL
+            $rawPhone = trim((string)($row['user_phone'] ?: ($row['clinic_phone'] ?? '')));
+            $digits = preg_replace('/\D+/', '', $rawPhone) ?? '';
+            $whatsappUrl = null;
+            if (strlen($digits) >= 10 && strlen($digits) <= 13) {
+                $waNumber = strlen($digits) <= 11 ? '55' . $digits : $digits;
+                $waText = rawurlencode("Olá {$name}, encontrei seu perfil no Clyo Nutri e gostaria de tirar uma dúvida sobre consulta.");
+                $whatsappUrl = "https://wa.me/{$waNumber}?text={$waText}";
+            }
+
+            // Initials for avatar
+            $cleanWords = array_values(array_filter(
+                preg_split('/\s+/u', preg_replace('/^(dr\.?|dra\.?|nutri\.?)\s+/iu', '', $name) ?? $name) ?: [],
+                static fn($w) => mb_strlen($w, 'UTF-8') > 1
+            ));
+            $initials = 'CN';
+            if (count($cleanWords) >= 2) {
+                $initials = mb_strtoupper(mb_substr($cleanWords[0], 0, 1, 'UTF-8') . mb_substr($cleanWords[count($cleanWords) - 1], 0, 1, 'UTF-8'), 'UTF-8');
+            } elseif (count($cleanWords) === 1) {
+                $initials = mb_strtoupper(mb_substr($cleanWords[0], 0, 2, 'UTF-8'), 'UTF-8');
+            }
+
+            $cityState = '';
+            if (!empty($row['public_show_address']) && !empty($row['address_city'])) {
+                $cityState = trim((string)$row['address_city']) . (!empty($row['address_state']) ? '/' . trim((string)$row['address_state']) : '');
+            }
+
+            $items[] = [
+                'id' => $profId,
+                'clinic_id' => $clinicId,
+                'name' => $name,
+                'initials' => $initials,
+                'clinic_name' => (string)$row['clinic_name'],
+                'crn_display' => $crnDisplay,
+                'city_state' => $cityState,
+                'logo_path' => $row['logo_path'] ?? null,
+                'specialty' => $specialty,
+                'tags' => $tags,
+                'bio' => $bio,
+                'duration_minutes' => $duration,
+                'default_price' => $defaultPrice,
+                'next_slot_label' => $nextSlotLabel,
+                'allow_telehealth' => (bool)$row['allow_telehealth'],
+                'allow_presential' => (bool)$row['allow_presential'],
+                'booking_url' => $bookingUrl,
+                'whatsapp_url' => $whatsappUrl,
+            ];
+        }
+
+        return $items;
     }
 
     /** Duração definida pelo profissional em Configurações (o paciente não escolhe). */
@@ -482,38 +826,13 @@ class BookingService
         }
         $idempotencyKey = $idempotencyKey !== null ? trim($idempotencyKey) : null;
         if ($idempotencyKey !== null && ($idempotencyKey === '' || strlen($idempotencyKey) > 64 || !preg_match('/^[A-Za-z0-9_.:-]+$/', $idempotencyKey))) {
-            $idempotencyKey = null;
+            throw new InvalidArgumentException('Chave de idempotência inválida. Use até 64 caracteres: letras, números, ponto, dois-pontos, hífen ou sublinhado.');
         }
 
         // A duração é a do profissional; o valor enviado pelo cliente é ignorado.
         $durationMinutes = $prof['duration_minutes'];
         $now = $this->now();
         $nowUtcStr = gmdate('Y-m-d H:i:s', $now->getTimestamp());
-
-        // Idempotência: mesma chave + mesmo horário devolve o hold ativo, sem duplicar.
-        if ($idempotencyKey !== null) {
-            $stmt = $this->db->prepare("
-                SELECT * FROM booking_holds
-                WHERE clinic_id = :clinic_id AND idempotency_key = :key
-                  AND status = 'held' AND expires_at_utc > :now_utc
-                LIMIT 1
-            ");
-            $stmt->execute(['clinic_id' => $clinicId, 'key' => $idempotencyKey, 'now_utc' => $nowUtcStr]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($existing) {
-                $exp = new DateTimeImmutable((string)$existing['expires_at_utc'], new DateTimeZone('UTC'));
-                return [
-                    'id' => (int)$existing['id'],
-                    'hold_token' => (string)$existing['hold_token'],
-                    'status' => 'held',
-                    'scheduled_at' => (string)$existing['scheduled_at'],
-                    'duration_minutes' => (int)$existing['duration_minutes'],
-                    'expires_at_utc' => (string)$existing['expires_at_utc'],
-                    'ttl_seconds_remaining' => max(0, $exp->getTimestamp() - $now->getTimestamp()),
-                    'idempotent_replay' => true,
-                ];
-            }
-        }
 
         if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/', $scheduledAt)) {
             throw new InvalidArgumentException('Formato de data e hora inválido. Use AAAA-MM-DD HH:MM.');
@@ -523,13 +842,8 @@ class BookingService
         } catch (\Exception $e) {
             throw new InvalidArgumentException('Formato de data e hora inválido.');
         }
+        if ($slotStart->format('Y-m-d H:i:s') !== str_replace('T', ' ', $scheduledAt).(strlen($scheduledAt)===16?':00':'')) throw new InvalidArgumentException('Data e hora inexistentes.');
         $slotEnd = $slotStart->modify('+' . $durationMinutes . ' minutes');
-
-        // O horário precisa ser um dos oferecidos pelo motor de disponibilidade.
-        $offered = array_column($this->getAvailableSlots($clinicId, $professionalId, $slotStart->format('Y-m-d'), $durationMinutes, $modality), 'scheduled_at');
-        if (!in_array($slotStart->format('Y-m-d H:i:s'), $offered, true)) {
-            throw new BookingConflictException('O horário ' . $slotStart->format('d/m/Y H:i') . ' não está disponível. Escolha outro horário da lista.');
-        }
 
         $ownsTransaction = false;
         if (!$this->db->inTransaction()) {
@@ -538,8 +852,36 @@ class BookingService
         }
 
         try {
+            $this->lockBookingSettings($clinicId);
             $this->lockProfessional($professionalId);
             TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
+            $this->assertBookingEligible($clinicId, $professionalId, $modality);
+            if ($idempotencyKey !== null) {
+                $replay = $this->db->prepare("SELECT * FROM booking_holds WHERE clinic_id = ? AND idempotency_key = ? AND status = 'held' AND expires_at_utc > ? ORDER BY id LIMIT 1" . ($this->isMysql() ? ' FOR UPDATE' : ''));
+                $replay->execute([$clinicId, $idempotencyKey, $nowUtcStr]);
+                $existing = $replay->fetch(PDO::FETCH_ASSOC);
+                if ($existing) {
+                    if ((int)$existing['professional_id'] !== $professionalId
+                        || $existing['scheduled_at'] !== $slotStart->format('Y-m-d H:i:s')
+                        || (int)$existing['duration_minutes'] !== $durationMinutes
+                        || $existing['service_type'] !== $normalizedType || $existing['modality'] !== $modality) {
+                        throw new BookingConflictException('Esta chave de solicitação já foi usada para outra reserva. Gere uma nova chave ao trocar os dados.');
+                    }
+                    $exp = new DateTimeImmutable($existing['expires_at_utc'], new DateTimeZone('UTC'));
+                    if ($ownsTransaction) { $this->db->commit(); }
+                    return [
+                        'id' => (int)$existing['id'], 'hold_token' => $existing['hold_token'], 'status' => 'held',
+                        'scheduled_at' => $existing['scheduled_at'], 'duration_minutes' => (int)$existing['duration_minutes'],
+                        'expires_at_utc' => $existing['expires_at_utc'],
+                        'ttl_seconds_remaining' => max(0, $exp->getTimestamp() - $now->getTimestamp()), 'idempotent_replay' => true,
+                    ];
+                }
+            }
+            // Check availability only after replay: this request's own hold occupies the slot.
+            $offered = array_column($this->getAvailableSlots($clinicId, $professionalId, $slotStart->format('Y-m-d'), $durationMinutes, $modality), 'scheduled_at');
+            if (!in_array($slotStart->format('Y-m-d H:i:s'), $offered, true)) {
+                throw new BookingConflictException('O horário ' . $slotStart->format('d/m/Y H:i') . ' não está disponível. Escolha outro horário da lista.');
+            }
 
             $conflictAppt = $this->findAppointmentConflict($clinicId, $professionalId, $slotStart, $slotEnd);
             if ($conflictAppt !== null) {
@@ -577,6 +919,7 @@ class BookingService
                 'expires_at_utc' => $expiresAtUtc,
             ]);
             $holdId = (int)$this->db->lastInsertId();
+            (new BookingFlowMetrics($this->db))->count($clinicId,'hold_created');
             $this->audit($clinicId, 'BOOKING_HOLD_CREATED', (string)$holdId, ['modality' => $modality, 'service_type' => $normalizedType]);
 
             if ($ownsTransaction && $this->db->inTransaction()) {
@@ -610,6 +953,33 @@ class BookingService
      */
     public function confirmBooking(string $holdToken, array $confirmationData): array
     {
+        return $this->completeBooking($holdToken, $confirmationData);
+    }
+
+    public function authenticatedPatient(): array
+    {
+        $actor = \ClyoNutri\Core\Auth\TenantContext::getUser();
+        $clinicId = \ClyoNutri\Core\Auth\TenantContext::getClinicId();
+        if (($actor['role'] ?? '') !== 'patient') {
+            throw new BookingUnavailableException();
+        }
+        $st = $this->db->prepare("SELECT p.id, p.clinic_id, p.name, p.email, p.phone FROM patients p JOIN clinics c ON c.id = p.clinic_id WHERE p.id = ? AND p.clinic_id = ? AND p.status = 'active' AND c.status = 'active'");
+        $st->execute([(int)($actor['id'] ?? 0), $clinicId]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: throw new BookingUnavailableException();
+    }
+
+    public function confirmBookingForPatient(string $holdToken, array $confirmationData): array
+    {
+        $patient = $this->authenticatedPatient();
+        // HTTP patient_id/name/contact can never choose or overwrite the authenticated identity.
+        $confirmationData = array_merge($confirmationData, [
+            'name' => $patient['name'], 'email' => $patient['email'] ?? '', 'phone' => $patient['phone'] ?? '',
+        ]);
+        return $this->completeBooking($holdToken, $confirmationData, $patient);
+    }
+
+    private function completeBooking(string $holdToken, array $confirmationData, ?array $authenticatedPatient = null): array
+    {
         if (!preg_match('/^[a-f0-9]{64}$/', $holdToken)) {
             throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
         }
@@ -618,10 +988,11 @@ class BookingService
         $now = $this->now();
         $nowUtcStr = gmdate('Y-m-d H:i:s', $now->getTimestamp());
 
-        $peek = $this->db->prepare('SELECT professional_id FROM booking_holds WHERE hold_token = :token LIMIT 1');
+        $peek = $this->db->prepare('SELECT professional_id, clinic_id FROM booking_holds WHERE hold_token = :token LIMIT 1');
         $peek->execute(['token' => $holdToken]);
-        $professionalId = $peek->fetchColumn();
-        if ($professionalId === false) {
+        $holdIdentity = $peek->fetch(PDO::FETCH_ASSOC);
+        $professionalId = $holdIdentity['professional_id'] ?? null;
+        if ($professionalId === null) {
             throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
         }
 
@@ -632,7 +1003,8 @@ class BookingService
         }
 
         try {
-            // Mesma ordem de travas da agenda interna e do createHold: profissional primeiro.
+            // Reservas públicas travam a configuração da clínica e depois o profissional; a agenda interna usa a mesma trava de profissional.
+            $this->lockBookingSettings((int)$holdIdentity['clinic_id']);
             $this->lockProfessional((int)$professionalId);
 
             $sel = 'SELECT * FROM booking_holds WHERE hold_token = :token LIMIT 1';
@@ -644,6 +1016,19 @@ class BookingService
             $hold = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$hold) {
                 throw new InvalidArgumentException('Reserva não encontrada ou token inválido.');
+            }
+
+            $now = $this->now();
+            $nowUtcStr = gmdate('Y-m-d H:i:s', $now->getTimestamp());
+
+            if ($authenticatedPatient !== null && ((int)$hold['clinic_id'] !== (int)$authenticatedPatient['clinic_id']
+                || ($hold['status'] === 'converted' && (int)$hold['patient_id'] !== (int)$authenticatedPatient['id']))) {
+                throw new BookingUnavailableException();
+            }
+
+            if ($hold['status'] === 'held' && !empty($hold['patient_id'])
+                && ($authenticatedPatient === null || (int)$hold['patient_id'] !== (int)$authenticatedPatient['id'])) {
+                throw new BookingUnavailableException();
             }
 
             if ($hold['status'] === 'converted') {
@@ -671,6 +1056,21 @@ class BookingService
                 throw new HoldExpiredException();
             }
 
+            $this->assertBookingEligible((int)$hold['clinic_id'], (int)$professionalId, (string)$hold['modality']);
+            $offered = array_column($this->getAvailableSlots((int)$hold['clinic_id'], (int)$professionalId,
+                substr($hold['scheduled_at'], 0, 10), (int)$hold['duration_minutes'], (string)$hold['modality'], null, false, (int)$hold['id']), 'scheduled_at');
+            if (!in_array($hold['scheduled_at'], $offered, true)) {
+                throw new BookingConflictException('As regras de disponibilidade mudaram. Escolha um horário disponível novamente.');
+            }
+
+            if ($authenticatedPatient !== null) {
+                $identity = $this->db->prepare("SELECT id FROM patients WHERE id = ? AND clinic_id = ? AND status = 'active'" . ($this->isMysql() ? ' FOR UPDATE' : ''));
+                $identity->execute([(int)$authenticatedPatient['id'], (int)$hold['clinic_id']]);
+                if (!$identity->fetchColumn()) { throw new BookingUnavailableException(); }
+            }
+
+            if (!empty($hold['patient_id']) && empty((new BookingCalendarService($this->db))->policy((int)$hold['clinic_id'])['waitlist_enabled'])) throw new BookingUnavailableException('A lista de espera está pausada.');
+
             // Toma posse do hold. rowCount 0 = outra requisição chegou antes.
             $claim = $this->db->prepare("UPDATE booking_holds SET status = 'converted', updated_at = CURRENT_TIMESTAMP WHERE id = :id AND status = 'held'");
             $claim->execute(['id' => $hold['id']]);
@@ -691,7 +1091,7 @@ class BookingService
                 throw new BookingConflictException('O horário foi ocupado enquanto você preenchia os dados. Escolha outro horário.');
             }
 
-            $patientId = $this->findOrCreatePatient($clinicId, $patient['name'], $patient['email'], $patient['phone']);
+            $patientId = $authenticatedPatient !== null ? (int)$authenticatedPatient['id'] : $this->findOrCreatePatient($clinicId, $patient['name'], $patient['email'], $patient['phone']);
             // Consentimento para assistência clínica, com a versão do termo que o paciente viu.
             $this->db->prepare("
                 INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, term_id, source_channel, user_agent)
@@ -746,6 +1146,14 @@ class BookingService
                 WHERE id = :id
             ")->execute(['appt_id' => $appointmentId, 'patient_id' => $patientId, 'tele_id' => $teleSessionId, 'id' => $hold['id']]);
 
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'booking_waitlist')) {
+                $this->db->prepare("UPDATE booking_waitlist SET status='fulfilled', active_key=NULL, updated_at=? WHERE clinic_id=? AND patient_id=? AND hold_id=? AND status='offered'")
+                    ->execute([$now->format('Y-m-d H:i:s'),$clinicId,$patientId,$hold['id']]);
+            }
+
+            (new \ClyoNutri\Domain\Notification\AppointmentConfirmationPublisher($this->db))->publish($clinicId, $appointmentId);
+
+            (new BookingFlowMetrics($this->db))->count($clinicId,'booking_confirmed');
             $this->audit($clinicId, 'BOOKING_CONFIRMED', (string)$appointmentId, ['hold_id' => (int)$hold['id'], 'modality' => $modality, 'service_type' => $serviceType]);
 
             if ($ownsTransaction && $this->db->inTransaction()) {
@@ -838,6 +1246,36 @@ class BookingService
     // Métodos Auxiliares Internos
     // =========================================================================
 
+    /**
+     * Verifica se há horários livres nos próximos N dias para a modalidade presencial ou online (NI2-584).
+     */
+    public function hasAvailableSlotsInNextDays(int $clinicId, int $professionalId, int $days = 14, bool $forInternalScheduling = false): bool
+    {
+        $settings = $this->getSettings($clinicId);
+        if (!$forInternalScheduling && empty($settings['is_enabled'])) {
+            return false;
+        }
+        $today = new DateTimeImmutable('today', $this->timezone);
+        $duration = 60;
+        $prefs = $this->getProfessionalPreferences($clinicId, $professionalId);
+        if (!empty($prefs['default_duration_minutes']) && is_numeric($prefs['default_duration_minutes'])) {
+            $duration = (int)$prefs['default_duration_minutes'];
+        }
+        $modality = !empty($settings['allow_presential']) || $forInternalScheduling ? 'presential' : 'telehealth';
+        for ($i = 0; $i < $days; $i++) { // para no primeiro dia com horário
+            $checkDate = $today->modify("+{$i} days")->format('Y-m-d');
+            $slots = $this->getAvailableSlots($clinicId, $professionalId, $checkDate, $duration, $modality, null, false, null, $forInternalScheduling);
+            if (!empty($slots)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Preferências salvas (leitura pura). NI2-584: conta antiga só com working_days continua sem horários
+     * públicos até a nutricionista confirmar a disponibilidade em Configurações (nada é gravado ao ler).
+     */
     private function getProfessionalPreferences(int $clinicId, int $professionalId): array
     {
         $stmt = $this->db->prepare("
@@ -849,6 +1287,31 @@ class BookingService
         $stmt->execute(['clinic_id' => $clinicId, 'prof_id' => $professionalId]);
         $json = $stmt->fetchColumn();
         return json_decode((string)($json ?: '{}'), true) ?: [];
+    }
+
+    private function lockBookingSettings(int $clinicId): void
+    {
+        if ($this->isMysql()) {
+            // Serializes idempotency within a clinic, including requests to different professionals.
+            $this->db->prepare('SELECT clinic_id FROM booking_settings WHERE clinic_id = ? FOR UPDATE')->execute([$clinicId]);
+        }
+    }
+
+    private function assertBookingEligible(int $clinicId, int $professionalId, string $modality): void
+    {
+        $sql = "SELECT p.id FROM professionals p JOIN users u ON u.id = p.user_id
+            JOIN clinic_members cm ON cm.user_id = p.user_id JOIN clinics c ON c.id = cm.clinic_id
+            WHERE p.id = ? AND cm.clinic_id = ? AND cm.status = 'active' AND c.status = 'active'
+              AND u.status = 'active' AND cm.role IN ('owner','admin','nutritionist') AND u.role IN ('owner','admin','nutritionist')";
+        $st = $this->db->prepare($sql . ($this->isMysql() ? ' FOR UPDATE' : ''));
+        $st->execute([$professionalId, $clinicId]);
+        if (!$st->fetchColumn()) { throw new BookingUnavailableException(); }
+        $settings = $this->getSettings($clinicId);
+        if (!$settings['is_enabled'] || $settings['require_cpf'] || !in_array($modality, self::MODALITIES, true)
+            || ($modality === 'telehealth' && !$settings['allow_telehealth'])
+            || ($modality === 'presential' && !$settings['allow_presential'])) {
+            throw new BookingUnavailableException();
+        }
     }
 
     private function isMysql(): bool
@@ -915,7 +1378,7 @@ class BookingService
             'clinic_id' => $clinicId,
             'prof_id' => $professionalId,
             'window_start' => $slotStart->modify('-1 day')->format('Y-m-d H:i:s'),
-            'slot_end' => $slotEnd->format('Y-m-d H:i:s'),
+            'slot_end' => $slotEnd->modify('+' . array_sum(array_intersect_key((new BookingCalendarService($this->db))->policy($clinicId), array_flip(['buffer_before_minutes','buffer_after_minutes']))) . ' minutes')->format('Y-m-d H:i:s'),
         ];
         if ($excludeAppointmentId !== null) {
             $sql .= ' AND a.id <> :exclude_id';
@@ -929,7 +1392,7 @@ class BookingService
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $apptStartTs = $this->ts((string)$row['scheduled_at']);
             $apptEndTs = $apptStartTs + (max(15, (int)($row['duration_minutes'] ?? 60)) * 60);
-            if ($startTs < $apptEndTs && $endTs > $apptStartTs) {
+            if ((new BookingCalendarService($this->db))->overlaps($clinicId, $slotStart->format('Y-m-d H:i:s'), (int)(($endTs-$startTs)/60), (string)$row['scheduled_at'], max(15, (int)($row['duration_minutes'] ?? 60)))) {
                 return $row;
             }
         }
@@ -955,35 +1418,28 @@ class BookingService
             'prof_id' => $professionalId,
             'now_utc' => $nowUtcStr,
             'window_start' => $slotStart->modify('-1 day')->format('Y-m-d H:i:s'),
-            'slot_end' => $slotEnd->format('Y-m-d H:i:s'),
+            'slot_end' => $slotEnd->modify('+' . array_sum(array_intersect_key((new BookingCalendarService($this->db))->policy($clinicId), array_flip(['buffer_before_minutes','buffer_after_minutes']))) . ' minutes')->format('Y-m-d H:i:s'),
         ]);
         $startTs = $slotStart->getTimestamp();
         $endTs = $slotEnd->getTimestamp();
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $holdStartTs = $this->ts((string)$row['scheduled_at']);
             $holdEndTs = $holdStartTs + (max(15, (int)($row['duration_minutes'] ?? 60)) * 60);
-            if ($startTs < $holdEndTs && $endTs > $holdStartTs) {
+            if ((new BookingCalendarService($this->db))->overlaps($clinicId, $slotStart->format('Y-m-d H:i:s'), (int)(($endTs-$startTs)/60), (string)$row['scheduled_at'], max(15, (int)($row['duration_minutes'] ?? 60)))) {
                 return $row;
             }
         }
         return null;
     }
 
-    /**
-     * Vincula ao paciente existente da clínica só quando e-mail E nome conferem (evita que um
-     * visitante anexe a consulta ao prontuário de outra pessoa digitando só o e-mail dela).
-     * Caso contrário, cria um cadastro novo, marcado como vindo do autoagendamento.
-     */
+    /** Autoagendamento anônimo nunca comprova a identidade de um paciente existente. */
     private function findOrCreatePatient(int $clinicId, string $name, string $email, string $phone): int
     {
-        if ($email !== '') {
-            $stmt = $this->db->prepare('SELECT id, name FROM patients WHERE clinic_id = :clinic_id AND LOWER(email) = :email');
-            $stmt->execute(['clinic_id' => $clinicId, 'email' => $email]);
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                if (self::sameName((string)$row['name'], $name)) {
-                    return (int)$row['id'];
-                }
-            }
+        $stmt = $this->db->prepare("SELECT id FROM patients WHERE clinic_id = :clinic_id AND ((:email_present <> '' AND LOWER(TRIM(email)) = :email) OR (:phone_present <> '' AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone,''),' ',''),'-',''),'(',''),')',''),'+',''),'.','') = :phone)) LIMIT 1");
+        $phoneDigits = preg_replace('/\D+/', '', $phone) ?? '';
+        $stmt->execute(['clinic_id' => $clinicId, 'email_present' => $email, 'email' => strtolower($email), 'phone_present' => $phoneDigits, 'phone' => $phoneDigits]);
+        if ($stmt->fetchColumn() !== false) {
+            throw new \InvalidArgumentException('Não foi possível concluir o autoagendamento. Entre no Portal do Paciente para confirmar sua identidade e concluir o agendamento.');
         }
 
         $this->db->prepare("

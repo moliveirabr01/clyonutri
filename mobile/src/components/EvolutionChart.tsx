@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 export interface ChartPoint { date: string; value: number; source: 'clinical_official' | 'patient_self_report' | string; }
 export interface ChartSeries { type: string; label: string; unit: string; points: ChartPoint[]; }
@@ -72,9 +72,9 @@ export default function EvolutionChart({ series, goal }: { series: ChartSeries; 
 
 const styles = StyleSheet.create({
   title: { fontWeight: '700', color: t.navy, fontSize: 15, marginBottom: 6 },
-  plot: { height: HEIGHT, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: t.border, position: 'relative', overflow: 'hidden' },
+  plot: { backgroundColor: t.chartWash, borderRadius: 14, height: HEIGHT, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: t.border, position: 'relative', overflow: 'hidden' },
   axis: { position: 'absolute', left: 4, fontSize: 11, color: t.muted },
-  line: { position: 'absolute', height: 2, backgroundColor: '#98A2B3' },
+  line: { position: 'absolute', height: 2, backgroundColor: t.success },
   clinical: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: t.navy },
   self: { position: 'absolute', width: 10, height: 10, borderWidth: 2, borderColor: t.copper, backgroundColor: t.white },
   goal: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: t.success },

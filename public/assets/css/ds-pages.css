@@ -1,0 +1,819 @@
+/* ds-pages.css — NI2-687: estilos de páginas que estavam em <style> nas views,
+   agora só com tokens do design system (sem hex). */
+
+/* ── Agenda: calendário mensal e marcadores ── */
+.agenda-calendar-markers{display:grid;gap:6px;margin:10px 0}
+.agenda-calendar-marker{display:grid;gap:2px;border-left:3px solid var(--brand-copper-500);background:var(--botanical-cream-50);color:var(--brand-navy-900);border-radius:5px;padding:8px 10px;text-decoration:none;overflow-wrap:anywhere}
+.agenda-calendar-marker strong{font-size:.85rem;font-weight:600}.agenda-calendar-marker span,.agenda-calendar-marker small{font-size:.78rem}
+.agenda-calendar-marker--open{border-left-color:var(--semantic-success);background:var(--semantic-success-light)}
+.agenda-calendar-note{font-size:.85rem;color:var(--neutral-gray-500);margin:8px 0 16px}
+
+/* ── Agenda: visão semanal (barra de comando + quadro 7 colunas) ── */
+.agenda-week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-5);
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.agenda-week-toolbar__left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.agenda-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--botanical-cream-50);
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  gap: 2px;
+}
+
+.agenda-nav-pill__arrow,
+.agenda-nav-pill__today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  color: var(--botanical-forest-900);
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+  transition: background-color 150ms ease;
+}
+
+.agenda-nav-pill__arrow {
+  width: 32px;
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.agenda-nav-pill__today {
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-compact);
+  font-weight: var(--font-weight-semibold);
+}
+
+.agenda-nav-pill__arrow:hover,
+.agenda-nav-pill__today:hover {
+  background: var(--neutral-white);
+}
+
+.agenda-week-toolbar__heading {
+  min-width: 0;
+}
+
+.agenda-week-toolbar__title {
+  font-family: var(--font-editorial);
+  font-size: 1.45rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-forest-900);
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.agenda-week-toolbar__subtitle {
+  font-size: 0.8rem;
+  color: var(--neutral-gray-500);
+  margin: 2px 0 0;
+}
+
+.agenda-week-toolbar__right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.agenda-view-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: var(--botanical-cream-50);
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  gap: 2px;
+}
+
+.agenda-view-segmented__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-compact);
+  font-weight: var(--font-weight-medium);
+  color: var(--neutral-gray-600);
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.agenda-view-segmented__item:hover {
+  color: var(--botanical-forest-900);
+}
+
+.agenda-view-segmented__item.is-active {
+  background: var(--neutral-white);
+  color: var(--botanical-forest-900);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-sm);
+}
+
+.agenda-week-toolbar__block-btn.btn {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-compact);
+  font-weight: var(--font-weight-semibold);
+  color: var(--botanical-forest-900);
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-input);
+}
+
+.agenda-week-toolbar__block-btn.btn:hover {
+  background: var(--botanical-cream-50);
+  border-color: var(--neutral-gray-300);
+}
+
+.agenda-week-toolbar__new-btn.btn {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-compact);
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-white);
+  background: var(--botanical-forest-900);
+  border: 1px solid var(--botanical-forest-900);
+  border-radius: var(--radius-input);
+}
+
+.agenda-week-toolbar__new-btn.btn:hover {
+  background: var(--botanical-forest-800);
+  border-color: var(--botanical-forest-800);
+}
+
+.agenda-week-board.card {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-card);
+  background: var(--neutral-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.op-week-grid.agenda-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0;
+  align-items: stretch;
+}
+
+.op-week-day.agenda-week-col {
+  min-width: 0;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-right: 1px solid var(--neutral-gray-200);
+  border-radius: 0;
+  background: var(--neutral-white);
+}
+
+.op-week-day.agenda-week-col:last-child {
+  border-right: 0;
+}
+
+.agenda-week-col__head {
+  margin: 0;
+  background: var(--botanical-cream-50);
+  border-bottom: 1px solid var(--neutral-gray-200);
+}
+
+.agenda-week-col.is-today .agenda-week-col__head {
+  background: var(--botanical-sage-100);
+}
+
+.agenda-week-col.is-holiday .agenda-week-col__head {
+  background: var(--semantic-warning-light);
+}
+
+.agenda-week-col__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  text-decoration: none;
+  color: var(--botanical-forest-900);
+}
+
+.agenda-week-col__dow {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--neutral-gray-500);
+}
+
+.agenda-week-col.is-today .agenda-week-col__dow {
+  color: var(--botanical-forest-900);
+  font-weight: var(--font-weight-bold);
+}
+
+.agenda-week-col__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  font-size: 0.925rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-forest-900);
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-week-col.is-today .agenda-week-col__day {
+  background: var(--botanical-green-700);
+  color: var(--neutral-white);
+  padding: 0 6px;
+}
+
+.agenda-week-col__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  flex: 1;
+}
+
+.op-week-appointment.agenda-week-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-200);
+  border-inline-start: 3px solid var(--botanical-green-600);
+  border-radius: var(--radius-input);
+  text-decoration: none;
+  color: var(--neutral-ink-900);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.op-week-appointment.agenda-week-card:hover {
+  border-color: var(--botanical-sage-300);
+  border-inline-start-color: var(--botanical-forest-900);
+  box-shadow: var(--shadow-sm);
+}
+
+.op-week-appointment.agenda-week-card--scheduled {
+  border-inline-start-color: var(--botanical-green-700);
+}
+
+.op-week-appointment.agenda-week-card--confirmed {
+  border-inline-start-color: var(--botanical-green-600);
+}
+
+.op-week-appointment.agenda-week-card--in-progress {
+  border-inline-start-color: var(--botanical-copper-600);
+}
+
+.op-week-appointment.agenda-week-card--muted {
+  border-inline-start-color: var(--neutral-gray-400);
+  opacity: 0.75;
+}
+
+.agenda-week-card__time {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-forest-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-week-card__patient {
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-week-card__status {
+  font-size: var(--font-size-caption);
+  color: var(--neutral-gray-500);
+}
+
+@media (max-width: 900px) {
+  .agenda-week-toolbar {
+    padding: var(--space-3) var(--space-4);
+  }
+  .op-week-grid.agenda-week-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .op-week-day.agenda-week-col {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--neutral-gray-200);
+  }
+  .op-week-day.agenda-week-col:last-child {
+    border-bottom: 0;
+  }
+}
+
+.agenda-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:16px}
+.agenda-month-weekday{text-align:center;font-weight:700;font-size:.8rem;padding:8px}.agenda-month-list-label{display:none}
+.agenda-month-day{min-width:0;min-height:110px;background:var(--neutral-gray-50);border:1px solid var(--botanical-sage-200);border-radius:8px;padding:8px;overflow-wrap:anywhere}
+.agenda-month-day h4{margin:0 0 8px}.agenda-month-day h4 a{display:block;min-height:32px;color:var(--botanical-forest-900);font-size:.85rem}
+.agenda-month-day.is-today{outline:2px solid var(--botanical-green-600);outline-offset:1px}.agenda-month-day.is-holiday{background:var(--semantic-warning-light);border-color:var(--semantic-warning)}
+.agenda-month-appointment{display:block;color:var(--botanical-forest-900);background:var(--neutral-white);border:1px solid var(--botanical-sage-200);border-radius:5px;padding:6px;margin-top:6px;font-size:.8rem;min-height:24px}
+.agenda-calendar-markers summary{cursor:pointer;font-size:.8rem;min-height:32px;padding:6px;background:var(--semantic-warning-light);border-radius:6px}
+.agenda-calendar-markers details[open] .agenda-calendar-marker{margin-top:6px}
+@media(max-width:800px){.agenda-month-grid{grid-template-columns:minmax(0,1fr)}.agenda-month-weekday,.agenda-month-filler{display:none}.agenda-month-list-label{display:block}.agenda-month-day{min-height:0}.agenda-month-day h4 a{min-height:44px}}
+
+/* ── Configurações: feriados e regras da agenda ── */
+.clyo-calendar{margin-top:24px;border:1px solid var(--neutral-gray-200);border-radius:14px;background:var(--neutral-white);overflow:hidden;color:var(--brand-navy-900)}
+.clyo-calendar__header{padding:26px 28px 22px;border-bottom:1px solid var(--neutral-gray-200)}
+.clyo-calendar__eyebrow{font-size:.8rem;color:var(--neutral-gray-500);margin:0 0 12px}
+.clyo-calendar__header h2{margin:0 0 8px;font-size:1.45rem;font-weight:600;letter-spacing:-.3px}
+.clyo-calendar__header p:last-child{margin:0;color:var(--neutral-gray-500)}
+.clyo-calendar__body{padding:24px 28px}
+.clyo-calendar__form{background:var(--neutral-gray-50);padding:20px;border-radius:10px;margin-bottom:24px}
+.clyo-calendar__form-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.clyo-calendar__form-title h3,.clyo-calendar__body>h3{margin:0;font-size:1rem;font-weight:600}
+.clyo-calendar__subtle{font-size:.8rem;color:var(--neutral-gray-500)}
+.clyo-calendar__grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.clyo-calendar__field{display:grid;gap:7px;font-size:.875rem;font-weight:600;min-width:0}
+.clyo-calendar__field .form-control{width:100%;box-sizing:border-box;min-width:0;min-height:42px;background:var(--neutral-white)}
+.clyo-calendar__period-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:16px}
+.clyo-calendar__edit{flex-basis:100%}.clyo-calendar__edit>summary{display:inline-flex;cursor:pointer;margin-bottom:12px}.clyo-calendar__field input:disabled{opacity:.55}
+.clyo-calendar__actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:20px}
+.clyo-calendar__entry{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:1px solid var(--neutral-gray-200);flex-wrap:wrap}
+.clyo-calendar__date{display:grid;text-align:center;min-width:52px;padding:8px 12px;border-radius:8px;box-sizing:border-box;background:var(--neutral-gray-50)}
+.clyo-calendar__date span{font-size:.65rem;letter-spacing:1px;color:var(--neutral-gray-500)}
+.clyo-calendar__date strong{font-size:1.4rem;font-weight:600;line-height:1.2}
+.clyo-calendar__entry-copy{display:grid;gap:4px;flex:1;min-width:160px;overflow-wrap:anywhere}
+.clyo-calendar__entry-copy strong{font-weight:600}
+.clyo-calendar__badge{font-size:.75rem;padding:5px 9px;border-radius:6px;background:var(--semantic-success-light);color:var(--semantic-success)}
+.clyo-calendar__remove{margin:0}
+.clyo-calendar__note{font-size:.825rem;color:var(--neutral-gray-500);margin:20px 0 0}
+.clyo-calendar__details{border-top:1px solid var(--neutral-gray-200);padding-top:20px;margin-top:24px}
+.clyo-calendar__details>summary{font-weight:600;cursor:pointer;padding:4px 0}
+.clyo-calendar__details>p{color:var(--neutral-gray-500);font-size:.875rem}
+.clyo-calendar__import-list{list-style:none;padding:0;margin:0 0 16px;display:grid;gap:8px}.clyo-calendar__import-list label{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-weight:400}
+.clyo-calendar__counts{display:flex;gap:12px;flex-wrap:wrap;padding:0;list-style:none;font-size:.875rem}
+@media(max-width:640px){.clyo-calendar__header,.clyo-calendar__body{padding:20px}.clyo-calendar__grid{grid-template-columns:1fr}.clyo-calendar__form{padding:16px}.clyo-calendar__entry-copy{min-width:130px}.clyo-calendar__badge{margin-left:66px}.clyo-calendar__remove{margin-left:auto}}
+
+/* ── Convite do app ── */
+@media (max-width: 680px) {
+  .invitation-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Plano alimentar: tabela de itens no celular ── */
+@media (max-width: 600px) {
+            .meal-plan-items, .meal-plan-items tbody { display: block; width: 100%; }
+            .meal-plan-items tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .meal-plan-items td { display: block; width: auto !important; padding: var(--space-3) !important; overflow-wrap: anywhere; }
+            .meal-plan-items tr:has(details) { display: block; }
+            .meal-plan-items input, .meal-plan-items textarea { min-width: 0; max-width: 100%; }
+          }
+
+/* v54.33: link "Versão instalada" no rodapé (área de toque mínima de 24px) */
+.clinical-footer__version-link{color:inherit;min-height:24px}
+
+/* v54.34 — Perfil do paciente (/pacientes/{id}): seções finais no design system */
+body:has(#secao-documentos) .op-context-panel { position: relative; top: auto; max-height: none; overflow: visible; margin-bottom: var(--space-4); }
+body:has(#secao-documentos) main section[id], body:has(#secao-documentos) main h2[id], body:has(#secao-documentos) main h3[id] { scroll-margin-top: calc(var(--space-6) + 4rem); }
+.cn-profile-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.cn-profile-head > h2, .cn-profile-head > h3 { margin: 0; }
+.cn-profile-note { color: var(--neutral-gray-600); font-size: .875rem; margin: var(--space-3) 0 0; }
+.cn-profile-list, .cn-profile-timeline, .cn-profile-links { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+.cn-profile-list > li { padding: var(--space-3) var(--space-4); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-input); background: var(--neutral-gray-50); display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); align-items: baseline; }
+.cn-profile-list__note { flex-basis: 100%; margin: var(--space-1) 0 0; color: var(--neutral-gray-600); }
+.cn-profile-timeline { gap: 0; border-left: 2px solid var(--neutral-gray-200); margin-left: var(--space-2); }
+.cn-profile-timeline > li { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: var(--space-2) 0 var(--space-2) var(--space-5); }
+.cn-profile-timeline > li::before { content: ""; position: absolute; left: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: var(--neutral-white); border: 2px solid var(--botanical-green-600); }
+.cn-profile-timeline time { color: var(--neutral-gray-600); font-size: .875rem; font-variant-numeric: tabular-nums; }
+.cn-profile-links { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.cn-profile-links > li > a { display: flex; align-items: center; min-height: 44px; padding: var(--space-2) var(--space-4); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-input); background: var(--neutral-white); color: var(--botanical-forest-900); font-weight: 600; text-decoration: none; }
+.cn-profile-links > li > a:hover { border-color: var(--botanical-green-600); background: var(--neutral-gray-50); }
+.cn-profile-form { display: grid; gap: var(--space-3); margin: var(--space-4) 0 0; max-width: 40rem; }
+.cn-profile-form .form-label { margin: 0; }
+.cn-profile-form .btn { justify-self: start; }
+.cn-fieldset { display: grid; gap: var(--space-3); margin: 0; padding: var(--space-4); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-card); background: var(--neutral-white); min-width: 0; }
+.cn-fieldset > legend { padding: 0 var(--space-2); font-weight: 700; font-size: .95rem; color: var(--botanical-forest-900); }
+.cn-check-row { display: flex; align-items: flex-start; gap: var(--space-2); min-height: 44px; padding: var(--space-2) 0; margin: 0; line-height: 1.4; cursor: pointer; }
+.cn-check-row > input { margin-top: 2px; accent-color: var(--botanical-green-600); flex-shrink: 0; }
+#app-evolucao [data-goal-id] form .btn, #secao-documentos ~ section .btn { min-height: 44px; }
+
+/* ── Vitrine Pública de Nutricionistas (/nutricionistas) ── */
+.nutri-directory-body {
+  background-color: var(--botanical-cream-50);
+  color: var(--neutral-ink-900);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.nutri-dir-banner {
+  background: linear-gradient(135deg, var(--botanical-forest-950) 0%, var(--botanical-forest-900) 100%);
+  color: var(--neutral-white);
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--botanical-forest-800);
+}
+
+.nutri-dir-banner__inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.nutri-dir-banner__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.nutri-dir-banner__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-white);
+  flex-shrink: 0;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.nutri-dir-banner__logo img {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.nutri-dir-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--neutral-white);
+  border-radius: var(--radius-input);
+  padding: 4px 6px 4px var(--space-3);
+  gap: var(--space-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.nutri-dir-search__icon {
+  color: var(--neutral-gray-400);
+  flex-shrink: 0;
+}
+
+.nutri-dir-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--neutral-ink-900);
+  padding: var(--space-2) 0;
+}
+
+.nutri-dir-search__input:focus {
+  outline: none;
+}
+
+.nutri-dir-search:focus-within {
+  outline: 3px solid var(--botanical-copper-500);
+  outline-offset: 2px;
+}
+
+.nutri-dir-search__btn {
+  border: 0;
+  background: transparent;
+  color: var(--botanical-green-700);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-compact);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-input);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.nutri-dir-search__btn:hover {
+  background: var(--botanical-sage-100);
+  color: var(--botanical-forest-900);
+}
+
+.nutri-dir-banner__links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: var(--font-size-compact);
+}
+
+.nutri-dir-banner__link {
+  color: var(--botanical-sage-200);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.nutri-dir-banner__link:hover {
+  color: var(--neutral-white);
+  text-decoration: underline;
+}
+
+.nutri-dir-banner__link--muted {
+  font-weight: var(--font-weight-medium);
+}
+
+.nutri-dir-main {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4) var(--space-16);
+  flex: 1;
+}
+
+.nutri-dir-hero {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.nutri-dir-hero__title {
+  font-family: var(--font-body);
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-forest-900);
+  margin: 0 0 var(--space-3);
+}
+
+.nutri-dir-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--semantic-success-light);
+  color: var(--semantic-success-text);
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.nutri-dir-tz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--font-size-caption);
+  color: var(--neutral-gray-500);
+  margin: 0;
+}
+
+.nutri-dir-topics {
+  margin-bottom: var(--space-6);
+}
+
+.nutri-dir-topics__title {
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-forest-900);
+  margin: 0 0 var(--space-3);
+}
+
+.nutri-dir-topics__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.nutri-dir-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--neutral-gray-300);
+  background: var(--neutral-white);
+  color: var(--neutral-gray-700);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.nutri-dir-chip:hover {
+  border-color: var(--botanical-green-600);
+  color: var(--botanical-forest-900);
+  background: var(--botanical-sage-100);
+}
+
+.nutri-dir-chip.is-active {
+  border-color: var(--botanical-forest-900);
+  background: var(--botanical-forest-900);
+  color: var(--neutral-white);
+  font-weight: var(--font-weight-semibold);
+}
+
+.nutri-dir-chip--dashed {
+  border-style: dashed;
+}
+
+.nutri-dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.nutri-dir-card {
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-200);
+  border-radius: var(--radius-modal);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.nutri-dir-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.nutri-dir-card__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-pill);
+  background: var(--botanical-sage-100);
+  border: 1px solid var(--botanical-sage-300);
+  color: var(--botanical-forest-900);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-weight-bold);
+  font-size: 1rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.nutri-dir-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nutri-dir-card__identity {
+  min-width: 0;
+}
+
+.nutri-dir-card__name {
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--neutral-ink-900);
+  margin: 0 0 2px;
+}
+
+.nutri-dir-card__crn {
+  font-size: 0.825rem;
+  color: var(--neutral-gray-500);
+  margin: 0;
+}
+
+.nutri-dir-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nutri-dir-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-gray-100);
+  color: var(--neutral-gray-700);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.nutri-dir-card__bio {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--neutral-gray-600);
+  margin: 0;
+}
+
+.nutri-dir-card__more summary {
+  display: inline-block;
+  margin-top: var(--space-1);
+  color: var(--botanical-green-700);
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.nutri-dir-card__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-1);
+}
+
+.nutri-dir-card__price {
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--neutral-ink-900);
+}
+
+.nutri-dir-card__duration {
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-regular);
+  color: var(--neutral-gray-500);
+}
+
+.nutri-dir-card__next {
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--botanical-green-600);
+}
+
+.nutri-dir-card__next--muted {
+  color: var(--neutral-gray-500);
+  font-weight: var(--font-weight-medium);
+}
+
+.nutri-dir-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.nutri-dir-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-button);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.nutri-dir-btn--secondary {
+  background: var(--neutral-white);
+  border: 1px solid var(--border-input);
+  color: var(--botanical-forest-900);
+}
+
+.nutri-dir-btn--secondary:hover {
+  background: var(--botanical-sage-100);
+  border-color: var(--botanical-forest-900);
+}
+
+.nutri-dir-btn--primary {
+  background: var(--botanical-green-600);
+  border: 1px solid var(--botanical-green-600);
+  color: var(--neutral-white);
+}
+
+.nutri-dir-btn--primary:hover {
+  background: var(--botanical-green-700);
+  border-color: var(--botanical-green-700);
+}
+
+.nutri-dir-empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+}
+
+@media (max-width: 560px) {
+  .nutri-dir-card__actions {
+    grid-template-columns: 1fr;
+  }
+}

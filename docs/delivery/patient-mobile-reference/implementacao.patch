@@ -1,0 +1,1768 @@
+diff --git a/mobile/.gitignore b/mobile/.gitignore
+index b7d8bbc..5d1cf8d 100644
+--- a/mobile/.gitignore
++++ b/mobile/.gitignore
+@@ -2,3 +2,4 @@ node_modules/
+ .expo/
+ dist/
+ .test-build/
++dist-patient-reference/
+diff --git a/mobile/App.tsx b/mobile/App.tsx
+index 937169d..ba9b7ff 100644
+--- a/mobile/App.tsx
++++ b/mobile/App.tsx
+@@ -6,7 +6,7 @@ import PatientOnboardingScreen from './src/screens/PatientOnboardingScreen';
+ import PatientHomeScreen from './src/screens/PatientHomeScreen';
+ import ProfessionalHomeScreen from './src/screens/ProfessionalHomeScreen';
+ import { ApiService, PatientAuthData, ProfessionalAuthData, setApiBaseUrl, setSessionExpiredHandler } from './src/services/api';
+-import { tokens as t } from './src/theme/tokens';
++import { patientTokens as t } from './src/theme/patient';
+ 
+ export default function App() {
+   const [onboarding, setOnboarding] = useState(false);
+@@ -229,9 +229,9 @@ export default function App() {
+ const styles = StyleSheet.create({
+   page: { flex: 1, backgroundColor: t.background },
+   loginContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20, paddingVertical: 32 },
+-  card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E4E7EC', shadowColor: t.navy, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+-  brandPanel: { backgroundColor: t.navy, padding: 28, borderTopWidth: 4, borderTopColor: '#E67E3A', alignItems: 'center', gap: 10 },
+-  brandCaption: { color: '#D7E1E9', fontSize: 14, lineHeight: 20 },
++  card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: t.divider, shadowColor: t.navy, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
++  brandPanel: { backgroundColor: t.forest, padding: 28, borderTopWidth: 4, borderTopColor: t.mint, alignItems: 'center', gap: 10 },
++  brandCaption: { color: t.onForestMuted, fontSize: 14, lineHeight: 20 },
+   formBody: { padding: 24, gap: t.space },
+   pageFooter: { color: t.muted, fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
+   title: { color: t.navy, fontSize: 23, fontWeight: '700', lineHeight: 30 },
+@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
+   roleTabText: { color: t.muted, fontSize: 14, fontWeight: '600' },
+   roleTabTextActive: { color: t.white, fontWeight: '700' },
+   label: { color: t.navy, fontSize: 14, fontWeight: '600' },
+-  input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, padding: 12, fontSize: 16, color: t.ink, minHeight: 48 },
++  input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 12, fontSize: 16, color: t.ink, minHeight: 48 },
+   message: { color: t.error, backgroundColor: '#FEF3F2', borderLeftWidth: 3, borderLeftColor: t.error, padding: 12, borderRadius: 6, fontSize: 14, lineHeight: 22 },
+   button: { backgroundColor: t.copper, padding: 14, borderRadius: t.buttonRadius, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+   buttonText: { color: t.white, fontSize: 16, fontWeight: '600' },
+diff --git a/mobile/app.json b/mobile/app.json
+index d953bdb..6bae698 100644
+--- a/mobile/app.json
++++ b/mobile/app.json
+@@ -7,6 +7,13 @@
+     },
+     "android": {
+       "package": "com.moliveirabr.clyonutrimobile"
++    },
++    "name": "Clyo Nutri",
++    "slug": "clyonutri-mobile",
++    "owner": "moliveirabr",
++    "version": "1.0.0",
++    "splash": {
++      "backgroundColor": "#102D28"
+     }
+   }
+ }
+diff --git a/mobile/eas.json b/mobile/eas.json
+index 1197b03..0e6c285 100644
+--- a/mobile/eas.json
++++ b/mobile/eas.json
+@@ -9,7 +9,11 @@
+       "distribution": "internal"
+     },
+     "preview": {
+-      "distribution": "internal"
++      "distribution": "internal",
++      "environment": "preview",
++      "android": {
++        "buildType": "apk"
++      }
+     },
+     "production": {
+       "autoIncrement": true
+diff --git a/mobile/package-lock.json b/mobile/package-lock.json
+index fa99ffa..3ebcaf5 100644
+--- a/mobile/package-lock.json
++++ b/mobile/package-lock.json
+@@ -9,15 +9,17 @@
+       "version": "1.0.0",
+       "dependencies": {
+         "@expo/metro-runtime": "~3.2.3",
++        "@expo/vector-icons": "14.1.0",
+         "expo": "~51.0.0",
+         "expo-constants": "~16.0.2",
+         "expo-device": "~6.0.2",
+         "expo-document-picker": "~12.0.2",
+         "expo-notifications": "~0.28.19",
++        "expo-splash-screen": "0.27.7",
+         "expo-status-bar": "~1.12.1",
+         "react": "18.2.0",
+         "react-dom": "18.2.0",
+-        "react-native": "0.74.2",
++        "react-native": "0.74.5",
+         "react-native-web": "~0.19.10"
+       },
+       "devDependencies": {
+@@ -3417,19 +3419,19 @@
+       }
+     },
+     "node_modules/@react-native-community/cli": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli/-/cli-13.6.8.tgz",
+-      "integrity": "sha512-0lRdgLNaXixWY4BfFRl1J6Ao9Lapo2z+++iE7TD4GAbuxOWJSyFi+KUA8XNfSDyML4jFO02MZgyBPxAWdaminQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@react-native-community/cli-clean": "13.6.8",
+-        "@react-native-community/cli-config": "13.6.8",
+-        "@react-native-community/cli-debugger-ui": "13.6.8",
+-        "@react-native-community/cli-doctor": "13.6.8",
+-        "@react-native-community/cli-hermes": "13.6.8",
+-        "@react-native-community/cli-server-api": "13.6.8",
+-        "@react-native-community/cli-tools": "13.6.8",
+-        "@react-native-community/cli-types": "13.6.8",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli/-/cli-13.6.9.tgz",
++      "integrity": "sha512-hFJL4cgLPxncJJd/epQ4dHnMg5Jy/7Q56jFvA3MHViuKpzzfTCJCB+pGY54maZbtym53UJON9WTGpM3S81UfjQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@react-native-community/cli-clean": "13.6.9",
++        "@react-native-community/cli-config": "13.6.9",
++        "@react-native-community/cli-debugger-ui": "13.6.9",
++        "@react-native-community/cli-doctor": "13.6.9",
++        "@react-native-community/cli-hermes": "13.6.9",
++        "@react-native-community/cli-server-api": "13.6.9",
++        "@react-native-community/cli-tools": "13.6.9",
++        "@react-native-community/cli-types": "13.6.9",
+         "chalk": "^4.1.2",
+         "commander": "^9.4.1",
+         "deepmerge": "^4.3.0",
+@@ -3448,12 +3450,12 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-clean": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-clean/-/cli-clean-13.6.8.tgz",
+-      "integrity": "sha512-B1uxlm1N4BQuWFvBL3yRl3LVvydjswsdbTi7tMrHMtSxfRio1p9HjcmDzlzKco09Y+8qBGgakm3jcMZGLbhXQQ==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-clean/-/cli-clean-13.6.9.tgz",
++      "integrity": "sha512-7Dj5+4p9JggxuVNOjPbduZBAP1SUgNhLKVw5noBUzT/3ZpUZkDM+RCSwyoyg8xKWoE4OrdUAXwAFlMcFDPKykA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "execa": "^5.0.0",
+         "fast-glob": "^3.3.2"
+@@ -3543,12 +3545,12 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-config": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-config/-/cli-config-13.6.8.tgz",
+-      "integrity": "sha512-RabCkIsWdP4Ex/sf1uSP9qxc30utm+0uIJAjrZkNQynm7T4Lyqn/kT3LKm4yM6M0Qk61YxGguiaXF4601vAduw==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-config/-/cli-config-13.6.9.tgz",
++      "integrity": "sha512-rFfVBcNojcMm+KKHE/xqpqXg8HoKl4EC7bFHUrahMJ+y/tZll55+oX/PGG37rzB8QzP2UbMQ19DYQKC1G7kXeg==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "cosmiconfig": "^5.1.0",
+         "deepmerge": "^4.3.0",
+@@ -3557,25 +3559,25 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-debugger-ui": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-debugger-ui/-/cli-debugger-ui-13.6.8.tgz",
+-      "integrity": "sha512-2cS+MX/Su6sVSjqpDftFOXbK7EuPg98xzsPkdPhkQnkZwvXqodK9CAMuDMbx3lBHHtrPrpMbBCpFmPN8iVOnlA==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-debugger-ui/-/cli-debugger-ui-13.6.9.tgz",
++      "integrity": "sha512-TkN7IdFmGPPvTpAo3nCAH9uwGCPxWBEAwpqEZDrq0NWllI7Tdie8vDpGdrcuCcKalmhq6OYnkXzeBah7O1Ztpw==",
+       "license": "MIT",
+       "dependencies": {
+         "serve-static": "^1.13.1"
+       }
+     },
+     "node_modules/@react-native-community/cli-doctor": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-doctor/-/cli-doctor-13.6.8.tgz",
+-      "integrity": "sha512-/3Vdy9J3hyiu0y3nd/CU3kBqPlTRxnLXg7V6jrA1jbTOlZAMyV9imEkrqEaGK0SMOyMhh9Pipf98Ozhk0Nl4QA==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-doctor/-/cli-doctor-13.6.9.tgz",
++      "integrity": "sha512-5quFaLdWFQB+677GXh5dGU9I5eg2z6Vg4jOX9vKnc9IffwyIFAyJfCZHrxLSRPDGNXD7biDQUdoezXYGwb6P/A==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-config": "13.6.8",
+-        "@react-native-community/cli-platform-android": "13.6.8",
+-        "@react-native-community/cli-platform-apple": "13.6.8",
+-        "@react-native-community/cli-platform-ios": "13.6.8",
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-config": "13.6.9",
++        "@react-native-community/cli-platform-android": "13.6.9",
++        "@react-native-community/cli-platform-apple": "13.6.9",
++        "@react-native-community/cli-platform-ios": "13.6.9",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "command-exists": "^1.2.8",
+         "deepmerge": "^4.3.0",
+@@ -3759,24 +3761,24 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-hermes": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-hermes/-/cli-hermes-13.6.8.tgz",
+-      "integrity": "sha512-lZi/OBFuZUj5cLK94oEgtrtmxGoqeYVRcnHXl/R5c4put9PDl+qH2bEMlGZkFiw57ae3UZKr3TMk+1s4jh3FYQ==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-hermes/-/cli-hermes-13.6.9.tgz",
++      "integrity": "sha512-GvwiwgvFw4Ws+krg2+gYj8sR3g05evmNjAHkKIKMkDTJjZ8EdyxbkifRUs1ZCq3TMZy2oeblZBXCJVOH4W7ZbA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-platform-android": "13.6.8",
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-platform-android": "13.6.9",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "hermes-profile-transformer": "^0.0.6"
+       }
+     },
+     "node_modules/@react-native-community/cli-platform-android": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-android/-/cli-platform-android-13.6.8.tgz",
+-      "integrity": "sha512-vWrqeLRRTwp2kO33nbrAgbYn8HR2c2CpIfyVJY9Ckk7HGUSwDyxdcSu7YBvt2ShdfLZH0HctWFNXsgGrfg6BDw==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-android/-/cli-platform-android-13.6.9.tgz",
++      "integrity": "sha512-9KsYGdr08QhdvT3Ht7e8phQB3gDX9Fs427NJe0xnoBh+PDPTI2BD5ks5ttsH8CzEw8/P6H8tJCHq6hf2nxd9cw==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "execa": "^5.0.0",
+         "fast-glob": "^3.3.2",
+@@ -3868,12 +3870,12 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-platform-apple": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-apple/-/cli-platform-apple-13.6.8.tgz",
+-      "integrity": "sha512-1JPohnlXPqU44zns3ALEzIbH2cKRw6JtEDJERgLuEUbs2r2NeJgqDbKyZ7fTTO8o+pegDnn6+Rr7qGVVOuUzzg==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-apple/-/cli-platform-apple-13.6.9.tgz",
++      "integrity": "sha512-KoeIHfhxMhKXZPXmhQdl6EE+jGKWwoO9jUVWgBvibpVmsNjo7woaG/tfJMEWfWF3najX1EkQAoJWpCDBMYWtlA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-tools": "13.6.9",
+         "chalk": "^4.1.2",
+         "execa": "^5.0.0",
+         "fast-glob": "^3.3.2",
+@@ -4050,22 +4052,22 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-platform-ios": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-ios/-/cli-platform-ios-13.6.8.tgz",
+-      "integrity": "sha512-/IIcIRM8qaoD7iZqsvtf6Qq1AwtChWYfB9sTn3mTiolZ5Zd5bXH37g+6liPfAICRkj2Ptq3iXmjrDVUQAxrOXw==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-platform-ios/-/cli-platform-ios-13.6.9.tgz",
++      "integrity": "sha512-CiUcHlGs8vE0CAB4oi1f+dzniqfGuhWPNrDvae2nm8dewlahTBwIcK5CawyGezjcJoeQhjBflh9vloska+nlnw==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-platform-apple": "13.6.8"
++        "@react-native-community/cli-platform-apple": "13.6.9"
+       }
+     },
+     "node_modules/@react-native-community/cli-server-api": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-server-api/-/cli-server-api-13.6.8.tgz",
+-      "integrity": "sha512-Lx664oWTzpVfbKUTy+3GIX7e+Mt5Zn+zdkM4ehllNdik/lbB3tM9Nrg8PSvOfI+tTXs2w55+nIydLfH+0FqJVg==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-server-api/-/cli-server-api-13.6.9.tgz",
++      "integrity": "sha512-W8FSlCPWymO+tlQfM3E0JmM8Oei5HZsIk5S0COOl0MRi8h0NmHI4WSTF2GCfbFZkcr2VI/fRsocoN8Au4EZAug==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-debugger-ui": "13.6.8",
+-        "@react-native-community/cli-tools": "13.6.8",
++        "@react-native-community/cli-debugger-ui": "13.6.9",
++        "@react-native-community/cli-tools": "13.6.9",
+         "compression": "^1.7.1",
+         "connect": "^3.6.5",
+         "errorhandler": "^1.5.1",
+@@ -4149,9 +4151,9 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-tools": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-tools/-/cli-tools-13.6.8.tgz",
+-      "integrity": "sha512-1MYlae9EkbjC7DBYOGMH5xF9yDoeNYUKgEdDjL6WAUBoF2gtwiZPM6igLKi/+dhb5sCtC7fiLrLi0Oevdf+RmQ==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-tools/-/cli-tools-13.6.9.tgz",
++      "integrity": "sha512-OXaSjoN0mZVw3nrAwcY1PC0uMfyTd9fz7Cy06dh+EJc+h0wikABsVRzV8cIOPrVV+PPEEXE0DBrH20T2puZzgQ==",
+       "license": "MIT",
+       "dependencies": {
+         "appdirsjs": "^1.2.4",
+@@ -4357,9 +4359,9 @@
+       }
+     },
+     "node_modules/@react-native-community/cli-types": {
+-      "version": "13.6.8",
+-      "resolved": "https://registry.npmjs.org/@react-native-community/cli-types/-/cli-types-13.6.8.tgz",
+-      "integrity": "sha512-C4mVByy0i+/NPuPhdMLBR7ubEVkjVS1VwoQu/BoG1crJFNE+167QXAzH01eFbXndsjZaMWmD4Gerx7TYc6lHfA==",
++      "version": "13.6.9",
++      "resolved": "https://registry.npmjs.org/@react-native-community/cli-types/-/cli-types-13.6.9.tgz",
++      "integrity": "sha512-RLxDppvRxXfs3hxceW/mShi+6o5yS+kFPnPqZTaMKKR5aSg7LwDpLQW4K2D22irEG8e6RKDkZUeH9aL3vO2O0w==",
+       "license": "MIT",
+       "dependencies": {
+         "joi": "^17.2.1"
+@@ -4510,9 +4512,9 @@
+       }
+     },
+     "node_modules/@react-native/assets-registry": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/assets-registry/-/assets-registry-0.74.84.tgz",
+-      "integrity": "sha512-dzUhwyaX04QosWZ8zyaaNB/WYZIdeDN1lcpfQbqiOhZJShRH+FLTDVONE/dqlMQrP+EO7lDqF0RrlIt9lnOCQQ==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/assets-registry/-/assets-registry-0.74.87.tgz",
++      "integrity": "sha512-1XmRhqQchN+pXPKEKYdpJlwESxVomJOxtEnIkbo7GAlaN2sym84fHEGDXAjLilih5GVPpcpSmFzTy8jx3LtaFg==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=18"
+@@ -4621,15 +4623,15 @@
+       }
+     },
+     "node_modules/@react-native/community-cli-plugin": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/community-cli-plugin/-/community-cli-plugin-0.74.84.tgz",
+-      "integrity": "sha512-GBKE+1sUh86fS2XXV46gMCNHMc1KetshMbYJ0AhDhldpaILZHqRBX50mdVsiYVvkzp4QjM0nmYqefuJ9NVwicQ==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/community-cli-plugin/-/community-cli-plugin-0.74.87.tgz",
++      "integrity": "sha512-EgJG9lSr8x3X67dHQKQvU6EkO+3ksVlJHYIVv6U/AmW9dN80BEFxgYbSJ7icXS4wri7m4kHdgeq2PQ7/3vvrTQ==",
+       "license": "MIT",
+       "dependencies": {
+-        "@react-native-community/cli-server-api": "13.6.8",
+-        "@react-native-community/cli-tools": "13.6.8",
+-        "@react-native/dev-middleware": "0.74.84",
+-        "@react-native/metro-babel-transformer": "0.74.84",
++        "@react-native-community/cli-server-api": "13.6.9",
++        "@react-native-community/cli-tools": "13.6.9",
++        "@react-native/dev-middleware": "0.74.87",
++        "@react-native/metro-babel-transformer": "0.74.87",
+         "chalk": "^4.0.0",
+         "execa": "^5.1.1",
+         "metro": "^0.80.3",
+@@ -4644,22 +4646,22 @@
+       }
+     },
+     "node_modules/@react-native/community-cli-plugin/node_modules/@react-native/debugger-frontend": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/debugger-frontend/-/debugger-frontend-0.74.84.tgz",
+-      "integrity": "sha512-YUEA03UNFbiYzHpYxlcS2D9+3eNT5YLGkl5yRg3nOSN6KbCc/OttGnNZme+tuSOJwjMN/vcvtDKYkTqjJw8U0A==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/debugger-frontend/-/debugger-frontend-0.74.87.tgz",
++      "integrity": "sha512-MN95DJLYTv4EqJc+9JajA3AJZSBYJz2QEJ3uWlHrOky2vKrbbRVaW1ityTmaZa2OXIvNc6CZwSRSE7xCoHbXhQ==",
+       "license": "BSD-3-Clause",
+       "engines": {
+         "node": ">=18"
+       }
+     },
+     "node_modules/@react-native/community-cli-plugin/node_modules/@react-native/dev-middleware": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/dev-middleware/-/dev-middleware-0.74.84.tgz",
+-      "integrity": "sha512-veYw/WmyrAOQHUiIeULzn2duJQnXDPiKq2jZ/lcmDo6jsLirpp+Q73lx09TYgy/oVoPRuV0nfmU3x9B6EV/7qQ==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/dev-middleware/-/dev-middleware-0.74.87.tgz",
++      "integrity": "sha512-7TmZ3hTHwooYgIHqc/z87BMe1ryrIqAUi+AF7vsD+EHCGxHFdMjSpf1BZ2SUPXuLnF2cTiTfV2RwhbPzx0tYIA==",
+       "license": "MIT",
+       "dependencies": {
+         "@isaacs/ttlcache": "^1.4.1",
+-        "@react-native/debugger-frontend": "0.74.84",
++        "@react-native/debugger-frontend": "0.74.87",
+         "@rnx-kit/chromium-edge-launcher": "^1.0.0",
+         "chrome-launcher": "^0.15.2",
+         "connect": "^3.6.5",
+@@ -4873,31 +4875,31 @@
+       }
+     },
+     "node_modules/@react-native/gradle-plugin": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/gradle-plugin/-/gradle-plugin-0.74.84.tgz",
+-      "integrity": "sha512-wYWC5WWXqzCCe4PDogz9pNc4xH5ZamahW5XGSbrrYJ5V3walZ+7z43V6iEBJkZbLjj9YBcSttkXYGr1Xh4veAg==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/gradle-plugin/-/gradle-plugin-0.74.87.tgz",
++      "integrity": "sha512-T+VX0N1qP+U9V4oAtn7FTX7pfsoVkd1ocyw9swYXgJqU2fK7hC9famW7b3s3ZiufPGPr1VPJe2TVGtSopBjL6A==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=18"
+       }
+     },
+     "node_modules/@react-native/js-polyfills": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/js-polyfills/-/js-polyfills-0.74.84.tgz",
+-      "integrity": "sha512-+PgxuUjBw9JVlz6m4ECsIJMLbDopnr4rpLmsG32hQaJrg0wMuvHtsgAY/J/aVCSG2GNUXexfjrnhc+O9yGOZXQ==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/js-polyfills/-/js-polyfills-0.74.87.tgz",
++      "integrity": "sha512-M5Evdn76CuVEF0GsaXiGi95CBZ4IWubHqwXxV9vG9CC9kq0PSkoM2Pn7Lx7dgyp4vT7ccJ8a3IwHbe+5KJRnpw==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=18"
+       }
+     },
+     "node_modules/@react-native/metro-babel-transformer": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/metro-babel-transformer/-/metro-babel-transformer-0.74.84.tgz",
+-      "integrity": "sha512-YtVGq7jkgyUECv5yt4BOFbOXyW4ddUn8+dnwGGpJKdfhXYL5o5++AxNdE+2x+SZdkj3JUVekGKPwRabFECABaw==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/metro-babel-transformer/-/metro-babel-transformer-0.74.87.tgz",
++      "integrity": "sha512-UsJCO24sNax2NSPBmV1zLEVVNkS88kcgAiYrZHtYSwSjpl4WZ656tIeedBfiySdJ94Hr3kQmBYLipV5zk0NI1A==",
+       "license": "MIT",
+       "dependencies": {
+         "@babel/core": "^7.20.0",
+-        "@react-native/babel-preset": "0.74.84",
++        "@react-native/babel-preset": "0.74.87",
+         "hermes-parser": "0.19.1",
+         "nullthrows": "^1.1.1"
+       },
+@@ -4908,108 +4910,6 @@
+         "@babel/core": "*"
+       }
+     },
+-    "node_modules/@react-native/metro-babel-transformer/node_modules/@react-native/babel-plugin-codegen": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/babel-plugin-codegen/-/babel-plugin-codegen-0.74.84.tgz",
+-      "integrity": "sha512-UR4uiii5szIJA84mSC6GJOfYKDq7/ThyetOQT62+BBcyGeHVtHlNLNRzgaMeLqIQaT8Fq4pccMI+7QqLOMXzdw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@react-native/codegen": "0.74.84"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+-    "node_modules/@react-native/metro-babel-transformer/node_modules/@react-native/babel-preset": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/babel-preset/-/babel-preset-0.74.84.tgz",
+-      "integrity": "sha512-WUfu6Y4aGuVdocQZvx33BJiQWFH6kRCHYbZfBn2psgFrSRLgQWEQrDCxqPFObNAVSayM0rNhp2FvI5K/Eyeqlg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@babel/core": "^7.20.0",
+-        "@babel/plugin-proposal-async-generator-functions": "^7.0.0",
+-        "@babel/plugin-proposal-class-properties": "^7.18.0",
+-        "@babel/plugin-proposal-export-default-from": "^7.0.0",
+-        "@babel/plugin-proposal-logical-assignment-operators": "^7.18.0",
+-        "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.0",
+-        "@babel/plugin-proposal-numeric-separator": "^7.0.0",
+-        "@babel/plugin-proposal-object-rest-spread": "^7.20.0",
+-        "@babel/plugin-proposal-optional-catch-binding": "^7.0.0",
+-        "@babel/plugin-proposal-optional-chaining": "^7.20.0",
+-        "@babel/plugin-syntax-dynamic-import": "^7.8.0",
+-        "@babel/plugin-syntax-export-default-from": "^7.0.0",
+-        "@babel/plugin-syntax-flow": "^7.18.0",
+-        "@babel/plugin-syntax-nullish-coalescing-operator": "^7.0.0",
+-        "@babel/plugin-syntax-optional-chaining": "^7.0.0",
+-        "@babel/plugin-transform-arrow-functions": "^7.0.0",
+-        "@babel/plugin-transform-async-to-generator": "^7.20.0",
+-        "@babel/plugin-transform-block-scoping": "^7.0.0",
+-        "@babel/plugin-transform-classes": "^7.0.0",
+-        "@babel/plugin-transform-computed-properties": "^7.0.0",
+-        "@babel/plugin-transform-destructuring": "^7.20.0",
+-        "@babel/plugin-transform-flow-strip-types": "^7.20.0",
+-        "@babel/plugin-transform-function-name": "^7.0.0",
+-        "@babel/plugin-transform-literals": "^7.0.0",
+-        "@babel/plugin-transform-modules-commonjs": "^7.0.0",
+-        "@babel/plugin-transform-named-capturing-groups-regex": "^7.0.0",
+-        "@babel/plugin-transform-parameters": "^7.0.0",
+-        "@babel/plugin-transform-private-methods": "^7.22.5",
+-        "@babel/plugin-transform-private-property-in-object": "^7.22.11",
+-        "@babel/plugin-transform-react-display-name": "^7.0.0",
+-        "@babel/plugin-transform-react-jsx": "^7.0.0",
+-        "@babel/plugin-transform-react-jsx-self": "^7.0.0",
+-        "@babel/plugin-transform-react-jsx-source": "^7.0.0",
+-        "@babel/plugin-transform-runtime": "^7.0.0",
+-        "@babel/plugin-transform-shorthand-properties": "^7.0.0",
+-        "@babel/plugin-transform-spread": "^7.0.0",
+-        "@babel/plugin-transform-sticky-regex": "^7.0.0",
+-        "@babel/plugin-transform-typescript": "^7.5.0",
+-        "@babel/plugin-transform-unicode-regex": "^7.0.0",
+-        "@babel/template": "^7.0.0",
+-        "@react-native/babel-plugin-codegen": "0.74.84",
+-        "babel-plugin-transform-flow-enums": "^0.0.2",
+-        "react-refresh": "^0.14.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "peerDependencies": {
+-        "@babel/core": "*"
+-      }
+-    },
+-    "node_modules/@react-native/metro-babel-transformer/node_modules/@react-native/codegen": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/codegen/-/codegen-0.74.84.tgz",
+-      "integrity": "sha512-0hXlnu9i0o8v+gXKQi+x6T471L85kCDwW4WrJiYAeOheWrQdNNW6rC3g8+LL7HXAf7QcHGU/8/d57iYfdVK2BQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@babel/parser": "^7.20.0",
+-        "glob": "^7.1.1",
+-        "hermes-parser": "0.19.1",
+-        "invariant": "^2.2.4",
+-        "jscodeshift": "^0.14.0",
+-        "mkdirp": "^0.5.1",
+-        "nullthrows": "^1.1.1"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "peerDependencies": {
+-        "@babel/preset-env": "^7.1.6"
+-      }
+-    },
+-    "node_modules/@react-native/metro-babel-transformer/node_modules/mkdirp": {
+-      "version": "0.5.6",
+-      "resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-0.5.6.tgz",
+-      "integrity": "sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "minimist": "^1.2.6"
+-      },
+-      "bin": {
+-        "mkdirp": "bin/cmd.js"
+-      }
+-    },
+     "node_modules/@react-native/normalize-colors": {
+       "version": "0.74.85",
+       "resolved": "https://registry.npmjs.org/@react-native/normalize-colors/-/normalize-colors-0.74.85.tgz",
+@@ -5834,10 +5734,10 @@
+       }
+     },
+     "node_modules/bser": {
+-      "version": "2.1.1",
+-      "resolved": "https://registry.npmjs.org/bser/-/bser-2.1.1.tgz",
+-      "integrity": "sha512-gQxTNE/GAfIIrmHLUE3oJyp5FO6HRBfhjnw4/wMmA63ZGDJnWBmgY/lyQBpnDUkGmAhbSe39tx2d/iTOAfglwQ==",
+-      "license": "Apache-2.0",
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/bser/-/bser-2.1.2.tgz",
++      "integrity": "sha512-V2o8YS2EhrKMO9AumnkK0ynynfFlsajpYupwq7S46H5mhcanwxDkNTw3K67wPIcKTH1ffkA4vhMOtAc7gRmPZw==",
++      "license": "MIT",
+       "dependencies": {
+         "node-int64": "^0.4.0"
+       }
+@@ -7478,6 +7378,18 @@
+         "node": ">= 10.0.0"
+       }
+     },
++    "node_modules/expo-splash-screen": {
++      "version": "0.27.7",
++      "resolved": "https://registry.npmjs.org/expo-splash-screen/-/expo-splash-screen-0.27.7.tgz",
++      "integrity": "sha512-s+eGcG185878nixlrjhhLD6UDYrvoqBUaBkIEozBVWFg3pkdsKpONPiUAco4XR3h7I/9ODq4quN28RJLFO+s0Q==",
++      "license": "MIT",
++      "dependencies": {
++        "@expo/prebuild-config": "7.0.9"
++      },
++      "peerDependencies": {
++        "expo": "*"
++      }
++    },
+     "node_modules/expo-status-bar": {
+       "version": "1.12.1",
+       "resolved": "https://registry.npmjs.org/expo-status-bar/-/expo-status-bar-1.12.1.tgz",
+@@ -7540,12 +7452,12 @@
+       }
+     },
+     "node_modules/fb-watchman": {
+-      "version": "2.0.2",
+-      "resolved": "https://registry.npmjs.org/fb-watchman/-/fb-watchman-2.0.2.tgz",
+-      "integrity": "sha512-p5161BqbuCaSnB8jIbzQHOlpgsPmK5rJVDfDKO91Axs5NC1uu3HRQm6wt9cd9/+GtQQIO53JdGXXoyDpTAsgYA==",
+-      "license": "Apache-2.0",
++      "version": "2.0.4",
++      "resolved": "https://registry.npmjs.org/fb-watchman/-/fb-watchman-2.0.4.tgz",
++      "integrity": "sha512-tGQtaoYisPDriJBN0mT5yZSyNETnJGA1gTYxaVRAE5KUO3LI9kPUc9WIu8JXcxaIci+faIKlzXqXyPgrmubtBQ==",
++      "license": "MIT",
+       "dependencies": {
+-        "bser": "2.1.1"
++        "bser": "2.1.2"
+       }
+     },
+     "node_modules/fbemitter": {
+@@ -9454,9 +9366,9 @@
+       "license": "MIT"
+     },
+     "node_modules/joi": {
+-      "version": "17.13.8",
+-      "resolved": "https://registry.npmjs.org/joi/-/joi-17.13.8.tgz",
+-      "integrity": "sha512-iPKOGmiRw1jxf/JOPwxmCcUQAOdF359mdzYiP2DJ+TMX0YK2zjK3D+zYOaGjpumWxOFF/l2xVWjRVK5bGSLdEw==",
++      "version": "17.13.9",
++      "resolved": "https://registry.npmjs.org/joi/-/joi-17.13.9.tgz",
++      "integrity": "sha512-llFCT2rVtfwgBCaIqxtjim+iHqrgss4ONiGSYiiGH9jnjWq90ppSRffqmqKvwpa8W+YfILyQV6XyGcegXX2T4g==",
+       "license": "BSD-3-Clause",
+       "dependencies": {
+         "@hapi/hoek": "^9.3.0",
+@@ -11972,22 +11884,22 @@
+       "license": "MIT"
+     },
+     "node_modules/react-native": {
+-      "version": "0.74.2",
+-      "resolved": "https://registry.npmjs.org/react-native/-/react-native-0.74.2.tgz",
+-      "integrity": "sha512-EBMBjPPL4/GjHMP4NqsZabT3gI5WU9cSmduABGAGrd8uIcmTZ5F2Ng9k6gFmRm7n8e8CULxDNu98ZpQfBjl7Bw==",
++      "version": "0.74.5",
++      "resolved": "https://registry.npmjs.org/react-native/-/react-native-0.74.5.tgz",
++      "integrity": "sha512-Bgg2WvxaGODukJMTZFTZBNMKVaROHLwSb8VAGEdrlvKwfb1hHg/3aXTUICYk7dwgAnb+INbGMwnF8yeAgIUmqw==",
+       "license": "MIT",
+       "dependencies": {
+         "@jest/create-cache-key-function": "^29.6.3",
+-        "@react-native-community/cli": "13.6.8",
+-        "@react-native-community/cli-platform-android": "13.6.8",
+-        "@react-native-community/cli-platform-ios": "13.6.8",
+-        "@react-native/assets-registry": "0.74.84",
+-        "@react-native/codegen": "0.74.84",
+-        "@react-native/community-cli-plugin": "0.74.84",
+-        "@react-native/gradle-plugin": "0.74.84",
+-        "@react-native/js-polyfills": "0.74.84",
+-        "@react-native/normalize-colors": "0.74.84",
+-        "@react-native/virtualized-lists": "0.74.84",
++        "@react-native-community/cli": "13.6.9",
++        "@react-native-community/cli-platform-android": "13.6.9",
++        "@react-native-community/cli-platform-ios": "13.6.9",
++        "@react-native/assets-registry": "0.74.87",
++        "@react-native/codegen": "0.74.87",
++        "@react-native/community-cli-plugin": "0.74.87",
++        "@react-native/gradle-plugin": "0.74.87",
++        "@react-native/js-polyfills": "0.74.87",
++        "@react-native/normalize-colors": "0.74.87",
++        "@react-native/virtualized-lists": "0.74.87",
+         "abort-controller": "^3.0.0",
+         "anser": "^1.4.9",
+         "ansi-regex": "^5.0.0",
+@@ -12073,37 +11985,16 @@
+         "node": ">= 10.14.2"
+       }
+     },
+-    "node_modules/react-native/node_modules/@react-native/codegen": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/codegen/-/codegen-0.74.84.tgz",
+-      "integrity": "sha512-0hXlnu9i0o8v+gXKQi+x6T471L85kCDwW4WrJiYAeOheWrQdNNW6rC3g8+LL7HXAf7QcHGU/8/d57iYfdVK2BQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@babel/parser": "^7.20.0",
+-        "glob": "^7.1.1",
+-        "hermes-parser": "0.19.1",
+-        "invariant": "^2.2.4",
+-        "jscodeshift": "^0.14.0",
+-        "mkdirp": "^0.5.1",
+-        "nullthrows": "^1.1.1"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "peerDependencies": {
+-        "@babel/preset-env": "^7.1.6"
+-      }
+-    },
+     "node_modules/react-native/node_modules/@react-native/normalize-colors": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/normalize-colors/-/normalize-colors-0.74.84.tgz",
+-      "integrity": "sha512-Y5W6x8cC5RuakUcTVUFNAIhUZ/tYpuqHZlRBoAuakrTwVuoNHXfQki8lj1KsYU7rW6e3VWgdEx33AfOQpdNp6A==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/normalize-colors/-/normalize-colors-0.74.87.tgz",
++      "integrity": "sha512-Xh7Nyk/MPefkb0Itl5Z+3oOobeG9lfLb7ZOY2DKpFnoCE1TzBmib9vMNdFaLdSxLIP+Ec6icgKtdzYg8QUPYzA==",
+       "license": "MIT"
+     },
+     "node_modules/react-native/node_modules/@react-native/virtualized-lists": {
+-      "version": "0.74.84",
+-      "resolved": "https://registry.npmjs.org/@react-native/virtualized-lists/-/virtualized-lists-0.74.84.tgz",
+-      "integrity": "sha512-XcV+qdqt2WihaY4iRm/M1FdSy+18lecU9mRXNmy9YK8g9Th/8XbNtmmKI0qWBx3KxyuXMH/zd0ps05YTrX16kw==",
++      "version": "0.74.87",
++      "resolved": "https://registry.npmjs.org/@react-native/virtualized-lists/-/virtualized-lists-0.74.87.tgz",
++      "integrity": "sha512-lsGxoFMb0lyK/MiplNKJpD+A1EoEUumkLrCjH4Ht+ZlG8S0BfCxmskLZ6qXn3BiDSkLjfjI/qyZ3pnxNBvkXpQ==",
+       "license": "MIT",
+       "dependencies": {
+         "invariant": "^2.2.4",
+diff --git a/mobile/package.json b/mobile/package.json
+index daf1067..c40ec86 100644
+--- a/mobile/package.json
++++ b/mobile/package.json
+@@ -13,15 +13,17 @@
+   },
+   "dependencies": {
+     "@expo/metro-runtime": "~3.2.3",
++    "@expo/vector-icons": "14.1.0",
+     "expo": "~51.0.0",
+     "expo-constants": "~16.0.2",
+     "expo-device": "~6.0.2",
+     "expo-document-picker": "~12.0.2",
+     "expo-notifications": "~0.28.19",
++    "expo-splash-screen": "0.27.7",
+     "expo-status-bar": "~1.12.1",
+     "react": "18.2.0",
+     "react-dom": "18.2.0",
+-    "react-native": "0.74.2",
++    "react-native": "0.74.5",
+     "react-native-web": "~0.19.10"
+   },
+   "devDependencies": {
+diff --git a/mobile/src/components/DailyCheckinCard.tsx b/mobile/src/components/DailyCheckinCard.tsx
+index bec7d87..4846f75 100644
+--- a/mobile/src/components/DailyCheckinCard.tsx
++++ b/mobile/src/components/DailyCheckinCard.tsx
+@@ -1,7 +1,7 @@
+ import React, { useEffect, useState } from 'react';
+ import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import { ApiError, ApiService, DailyCheckin } from '../services/api';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ const ADHERENCE = [
+   { value: 0, label: 'Quase nada' },
+@@ -123,7 +123,7 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
+ }
+ 
+ const styles = StyleSheet.create({
+-  card: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
++  card: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+   title: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 4 },
+   line: { fontSize: 14, color: t.ink, marginTop: 6 },
+   strong: { fontWeight: '700' },
+diff --git a/mobile/src/components/EvolutionChart.tsx b/mobile/src/components/EvolutionChart.tsx
+index 8f89b97..3d0aa5c 100644
+--- a/mobile/src/components/EvolutionChart.tsx
++++ b/mobile/src/components/EvolutionChart.tsx
+@@ -1,6 +1,6 @@
+ import React, { useState } from 'react';
+ import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ export interface ChartPoint { date: string; value: number; source: 'clinical_official' | 'patient_self_report' | string; }
+ export interface ChartSeries { type: string; label: string; unit: string; points: ChartPoint[]; }
+@@ -72,9 +72,9 @@ export default function EvolutionChart({ series, goal }: { series: ChartSeries;
+ 
+ const styles = StyleSheet.create({
+   title: { fontWeight: '700', color: t.navy, fontSize: 15, marginBottom: 6 },
+-  plot: { height: HEIGHT, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: t.border, position: 'relative', overflow: 'hidden' },
++  plot: { backgroundColor: t.chartWash, borderRadius: 14, height: HEIGHT, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: t.border, position: 'relative', overflow: 'hidden' },
+   axis: { position: 'absolute', left: 4, fontSize: 11, color: t.muted },
+-  line: { position: 'absolute', height: 2, backgroundColor: '#98A2B3' },
++  line: { position: 'absolute', height: 2, backgroundColor: t.success },
+   clinical: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: t.navy },
+   self: { position: 'absolute', width: 10, height: 10, borderWidth: 2, borderColor: t.copper, backgroundColor: t.white },
+   goal: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: t.success },
+diff --git a/mobile/src/components/HydrationHistory.tsx b/mobile/src/components/HydrationHistory.tsx
+index 905596b..39872c7 100644
+--- a/mobile/src/components/HydrationHistory.tsx
++++ b/mobile/src/components/HydrationHistory.tsx
+@@ -6,7 +6,7 @@
+ import React, { useCallback, useEffect, useState } from 'react';
+ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import { ApiError, ApiService, HydrationEntry, HydrationHistory as History, HydrationHistoryDay, HydrationResult } from '../services/api';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ const TZ = 'America/Sao_Paulo';
+ const fmtDay = (d: string) => {
+diff --git a/mobile/src/components/NextAppointmentCard.tsx b/mobile/src/components/NextAppointmentCard.tsx
+index e08e7f0..4b5dcab 100644
+--- a/mobile/src/components/NextAppointmentCard.tsx
++++ b/mobile/src/components/NextAppointmentCard.tsx
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import { ApiError, ApiService, Appointment, RescheduleOptions } from '../services/api';
+ import { deviceTimezoneDiffers, formatClinicDateTime } from '../utils/presentation';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ type Banner = { kind: 'success' | 'error'; text: string } | null;
+ type Mode = 'idle' | 'cancel' | 'reschedule';
+@@ -211,7 +211,7 @@ function BannerView({ banner }: { banner: NonNullable<Banner> }) {
+ }
+ 
+ const styles = StyleSheet.create({
+-  card: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
++  card: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+   title: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 8 },
+   when: { fontSize: 17, fontWeight: '700', color: t.navy },
+   muted: { fontSize: 13, color: '#4B5563', marginTop: 4 },
+@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
+   requestTitle: { fontSize: 14, fontWeight: '700', color: t.ink },
+   dayLabel: { fontSize: 13, fontWeight: '700', color: t.ink, marginTop: 4 },
+   slotRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
+-  slot: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
++  slot: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
+   slotOn: { backgroundColor: t.navy, borderColor: t.navy },
+   slotText: { color: t.ink, fontWeight: '600' },
+   slotTextOn: { color: t.white, fontWeight: '700' },
+diff --git a/mobile/src/components/PatientChat.tsx b/mobile/src/components/PatientChat.tsx
+index 717a4f9..c768038 100644
+--- a/mobile/src/components/PatientChat.tsx
++++ b/mobile/src/components/PatientChat.tsx
+@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
+ import { ActivityIndicator, AppState, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import * as DocumentPicker from 'expo-document-picker';
+ import { ApiError, ApiService, ChatAccess, ChatAttachmentInput, ChatChannel, ChatMessage, ChatNotice, newChatKey } from '../services/api';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ const MAX_CHARS = 2000;
+ const MAX_FILE_BYTES = 10 * 1024 * 1024;
+@@ -261,7 +261,7 @@ export default function PatientChat({ active, draft, setDraft }: { active: boole
+ 
+ const s = StyleSheet.create({
+   wrap: { paddingBottom: 24 },
+-  header: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' },
++  header: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' },
+   title: { fontSize: 17, fontWeight: '700', color: t.navy },
+   muted: { fontSize: 13, color: '#4B5563', marginTop: 4 },
+   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 8 },
+@@ -269,22 +269,22 @@ const s = StyleSheet.create({
+   chipOn: { backgroundColor: t.navy },
+   chipText: { color: t.navy, fontWeight: '600' },
+   chipTextOn: { color: t.white, fontWeight: '700' },
+-  list: { backgroundColor: t.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', minHeight: 160 },
++  list: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', minHeight: 160 },
+   empty: { color: '#4B5563', fontSize: 14, textAlign: 'center', marginVertical: 24 },
+-  bubble: { maxWidth: '85%', borderRadius: 12, padding: 10, marginVertical: 4 },
++  bubble: { maxWidth: '85%', borderRadius: t.cardRadius, padding: 10, marginVertical: 4 },
+   mine: { alignSelf: 'flex-end', backgroundColor: t.navy },
+-  theirs: { alignSelf: 'flex-start', backgroundColor: '#F1F5F9' },
++  theirs: { alignSelf: 'flex-start', backgroundColor: t.background },
+   failed: { backgroundColor: '#7A271A' },
+   text: { color: t.ink, fontSize: 15 },
+   textMine: { color: t.white, fontSize: 15 },
+   meta: { color: '#475569', fontSize: 12, marginTop: 4 },
+-  metaMine: { color: '#E2E8F0', fontSize: 12, marginTop: 4 },
++  metaMine: { color: t.divider, fontSize: 12, marginTop: 4 },
+   failedText: { color: '#FEE4E2', fontSize: 13, marginTop: 4 },
+   attach: { minHeight: 44, justifyContent: 'center' },
+   attachText: { color: t.navy, textDecorationLine: 'underline', fontWeight: '600' },
+   attachTextMine: { color: t.white, textDecorationLine: 'underline', fontWeight: '600', marginTop: 4 },
+   composer: { marginTop: 12 },
+-  notice: { backgroundColor: '#FFF7ED', borderLeftWidth: 4, borderLeftColor: '#B45309', padding: 10, borderRadius: 8, marginBottom: 8 },
++  notice: { backgroundColor: '#FFF7ED', borderLeftWidth: 4, borderLeftColor: '#B45309', padding: 10, borderRadius: t.inputRadius, marginBottom: 8 },
+   noticeText: { color: t.ink, fontSize: 13 },
+   noticeStrong: { color: '#7C2D12', fontSize: 13, fontWeight: '700', marginTop: 4 },
+   readOnly: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: '#FFF7ED', color: '#7C2D12' },
+@@ -293,7 +293,7 @@ const s = StyleSheet.create({
+   primaryText: { color: t.white, fontWeight: '700' },
+   secondaryBtn: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.buttonRadius, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center' },
+   secondaryText: { color: t.navy, fontWeight: '600' },
+-  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: 8, minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
++  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: t.inputRadius, minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
+   smallBtnText: { color: t.white, fontWeight: '600' },
+   disabled: { opacity: 0.5 },
+   errorBox: { backgroundColor: '#FEF3F2', padding: 10, borderRadius: 10, marginBottom: 8 },
+diff --git a/mobile/src/components/PatientNotifications.tsx b/mobile/src/components/PatientNotifications.tsx
+index 05cf84e..f91213c 100644
+--- a/mobile/src/components/PatientNotifications.tsx
++++ b/mobile/src/components/PatientNotifications.tsx
+@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
+ import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import { ApiError, ApiService, NotificationPreferences, PatientNotification } from '../services/api';
+ import { displayLocalDateTime } from '../utils/presentation';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+ 
+@@ -84,21 +84,22 @@ export default function PatientNotifications({ active }: { active: boolean }) {
+         <View style={s.row}>
+           <Text style={s.title} accessibilityRole="header">Avisos{unread > 0 ? ` (${unread} novo${unread > 1 ? 's' : ''})` : ''}</Text>
+           {unread > 0 && (
+-            <TouchableOpacity accessibilityRole="button" onPress={markAll}><Text style={s.link}>Marcar todos como lidos</Text></TouchableOpacity>
++            <TouchableOpacity accessibilityRole="button" style={{ minHeight: t.touch, justifyContent: 'center', paddingVertical: 10 }} onPress={markAll}><Text style={s.link}>Marcar todos como lidos</Text></TouchableOpacity>
+           )}
+         </View>
+         {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+         {!error && items.length === 0 && <Text style={s.helper}>Você não tem avisos por enquanto.</Text>}
+         {items.map((n) => (
+-          <TouchableOpacity key={n.id} accessibilityRole="button" accessibilityLabel={`${n.read ? '' : 'Não lido. '}${n.title}. ${n.body}`}
++          <TouchableOpacity key={n.id} accessibilityRole="button"
+             onPress={() => markRead(n)} style={[s.item, !n.read && s.itemUnread]}>
++            {!n.read && <Text style={[s.helper, { color: t.success, fontWeight: '700' }]}>Não lido</Text>}
+             <Text style={[s.itemTitle, !n.read && { fontWeight: '700' }]}>{n.title}</Text>
+             <Text style={s.body}>{n.body}</Text>
+             <Text style={s.helper}>{displayLocalDateTime(n.created_at)}</Text>
+           </TouchableOpacity>
+         ))}
+         {nextBefore && (
+-          <TouchableOpacity accessibilityRole="button" onPress={more} style={{ marginTop: 8 }}><Text style={s.link}>Ver avisos mais antigos</Text></TouchableOpacity>
++          <TouchableOpacity accessibilityRole="button" onPress={more} style={{ marginTop: 8, minHeight: t.touch, justifyContent: 'center' }}><Text style={s.link}>Ver avisos mais antigos</Text></TouchableOpacity>
+         )}
+       </View>
+ 
+diff --git a/mobile/src/screens/PatientHomeScreen.tsx b/mobile/src/screens/PatientHomeScreen.tsx
+index f827528..6e0a1b8 100644
+--- a/mobile/src/screens/PatientHomeScreen.tsx
++++ b/mobile/src/screens/PatientHomeScreen.tsx
+@@ -21,9 +21,11 @@ import PatientChat from '../components/PatientChat';
+ import PatientNotifications from '../components/PatientNotifications';
+ import { setupPushNotifications, onPushOpened } from '../services/pushNotifications';
+ import BrandLogo from '../components/BrandLogo';
++import PatientOverview from '../components/PatientOverview';
++import Feather from '@expo/vector-icons/Feather';
+ import HydrationHistory from '../components/HydrationHistory';
+ import { HydrationQueue, QueuedHydration, memoryStorage, webStorage } from '../services/hydrationQueue';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ import { announce, useAnnounce } from '../utils/a11y';
+ import {
+   ApiService,
+@@ -481,19 +483,97 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+       >
+         {currentTab === 'Hoje' && (
+           <>
+-            {/* Header com Design System Premium */}
+-            <View style={styles.header}>
+-              <BrandLogo compact />
+-              <Text
+-                style={styles.greeting}
+-                accessibilityRole="header"
+-              >
+-                Olá, {patientName}
+-              </Text>
+-              <Text style={styles.subGreeting}>Acompanhamento nutricional dedicado</Text>
+-            </View>
++            <PatientOverview name={patientName} hasPlan={!!activePlan} meals={activePlan?.meals?.length ?? 0} waterMl={waterMl} waterGoal={waterGoal} onPlan={() => setCurrentTab('Plano')} />
++            {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
++            {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
++            <Text style={styles.sectionTitle} accessibilityRole="header">Suas refeições de hoje</Text>
++
++            {activePlan && activePlan.meals && activePlan.meals.length > 0 ? (
++              activePlan.meals.map((meal) => (
++                <View key={meal.id} style={styles.mealCard}>
++                  <View style={styles.mealHeader}>
++                    <Text style={styles.mealName}>{meal.name}</Text>
++                    <Text style={styles.mealTime}>{meal.time || '--:--'}</Text>
++                  </View>
+ 
+-            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')} accessibilityLabel="Minhas receitas. Ver as receitas e orientações do seu nutricionista">
++                  {meal.notes ? <Text style={styles.itemNotesText}>Orientação da refeição: {meal.notes}</Text> : null}
++                  {meal.items && meal.items.length > 0 ? (
++                    meal.items.map((item) => (
++                      <View key={item.id} style={styles.mealItemRow}>
++                        <Text style={styles.mealItem}>
++                          • {item.quantity} {item.unit} de {item.food_name}
++                        </Text>
++                        {item.substitutions && item.substitutions.length > 0 && (
++                          <View style={styles.substitutionContainer}>
++                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
++                            {item.substitutions.map((s) => (
++                              <Text key={s.id} style={styles.substitutionText}>
++                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
++                              </Text>
++                            ))}
++                          </View>
++                        )}
++                        {item.notes ? (
++                          <Text style={styles.itemNotesText}>
++                            Orientação: {item.notes}
++                          </Text>
++                        ) : null}
++                      </View>
++                    ))
++                  ) : (
++                    <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
++                  )}
++
++                  {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
++            {mealDraft?.name === meal.name && <View style={styles.card}>
++              <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
++              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
++              <View accessibilityRole="radiogroup">
++                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
++                  <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
++                </TouchableOpacity>)}
++              </View>
++              {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
++                <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
++                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" placeholderTextColor={t.muted} style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, minHeight: 88, marginTop: 8 }]} />
++              </>}
++              {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
++              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
++                <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
++            </View>}
++                  <View style={styles.actionRow}>
++                    <TouchableOpacity
++                      style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
++                      onPress={() => {
++                        const pending = pendingMealWrites.current[meal.name];
++                        setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
++                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
++                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
++                        setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
++                      }}
++                      disabled={registeringMeal !== null || mealDraft !== null}
++                      accessibilityRole="button"
++                      accessibilityLabel={(registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo') + ' da refeição ' + meal.name}
++                    >
++                      <Text style={styles.registerMealText}>
++                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo'}
++                      </Text>
++                    </TouchableOpacity>
++                  </View>
++                </View>
++              ))
++            ) : (
++              <View style={styles.emptyContainer}>
++                <Text style={styles.emptyTitle}>Nenhum plano publicado</Text>
++                <Text style={styles.emptyDescription}>
++                  Seu nutricionista ainda não publicou um plano alimentar ativo. Assim que a prescrição for disponibilizada, você verá suas refeições aqui.
++                </Text>
++              </View>
++            )}
++            <Text style={styles.sectionTitle} accessibilityRole="header">Seu acompanhamento</Text>
++            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')}>
+               <Text style={styles.cardTitle}>Minhas receitas</Text>
+               <Text style={styles.helperText}>Veja as receitas e orientações prescritas pelo seu nutricionista</Text>
+             </TouchableOpacity>
+@@ -502,7 +582,6 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+               style={[styles.card, { borderColor: t.success, backgroundColor: t.successBg }]}
+               accessibilityRole="button"
+               onPress={() => setCurrentTab('Chat')}
+-              accessibilityLabel="Mensagens com o nutricionista. Tire dúvidas sobre o plano. Não é canal de urgência"
+             >
+               <Text style={[styles.cardTitle, { color: t.success }]}>Mensagens com o nutricionista</Text>
+               <Text style={[styles.helperText, { color: t.success }]}>
+@@ -555,13 +634,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+                   <Text style={styles.navyButtonText}>+ 250 ml</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity
+-                  style={styles.navyButton}
++                  style={[styles.navyButton, { backgroundColor: t.accent }]}
+                   onPress={() => handleAddWater(500)}
+                   accessibilityRole="button"
+                   accessibilityLabel="Adicionar 500 ml de água"
+                   testID="water-add-500"
+                 >
+-                  <Text style={styles.navyButtonText}>+ 500 ml</Text>
++                  <Text style={[styles.navyButtonText, { color: t.accentInk }]}>+ 500 ml</Text>
+                 </TouchableOpacity>
+               </View>
+               {waterFeedback && (
+@@ -590,94 +669,6 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+               {showWaterHistory && <HydrationHistory refreshToken={waterHistoryToken} onChanged={(r) => applyWaterTotal(r.total_water_today)} />}
+             </View>
+ 
+-            {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
+-            {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
+-            <Text style={styles.sectionTitle} accessibilityRole="header">Prescrição do dia</Text>
+-
+-            {activePlan && activePlan.meals && activePlan.meals.length > 0 ? (
+-              activePlan.meals.map((meal) => (
+-                <View key={meal.id} style={styles.mealCard}>
+-                  <View style={styles.mealHeader}>
+-                    <Text style={styles.mealName}>{meal.name}</Text>
+-                    <Text style={styles.mealTime}>{meal.time || '--:--'}</Text>
+-                  </View>
+-
+-                  {meal.notes ? <Text style={styles.itemNotesText}>Orientação da refeição: {meal.notes}</Text> : null}
+-                  {meal.items && meal.items.length > 0 ? (
+-                    meal.items.map((item) => (
+-                      <View key={item.id} style={styles.mealItemRow}>
+-                        <Text style={styles.mealItem}>
+-                          • {item.quantity} {item.unit} de {item.food_name}
+-                        </Text>
+-                        {item.substitutions && item.substitutions.length > 0 && (
+-                          <View style={styles.substitutionContainer}>
+-                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
+-                            {item.substitutions.map((s) => (
+-                              <Text key={s.id} style={styles.substitutionText}>
+-                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+-                              </Text>
+-                            ))}
+-                          </View>
+-                        )}
+-                        {item.notes ? (
+-                          <Text style={styles.itemNotesText}>
+-                            Orientação: {item.notes}
+-                          </Text>
+-                        ) : null}
+-                      </View>
+-                    ))
+-                  ) : (
+-                    <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
+-                  )}
+-
+-                  {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
+-            {mealDraft?.name === meal.name && <View style={styles.card}>
+-              <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
+-              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
+-              <View accessibilityRole="radiogroup">
+-                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
+-                  <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
+-                </TouchableOpacity>)}
+-              </View>
+-              {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
+-                <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
+-                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" placeholderTextColor={t.muted} style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 88, marginTop: 8 }]} />
+-              </>}
+-              {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
+-              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
+-                <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
+-              </TouchableOpacity>
+-              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
+-            </View>}
+-                  <View style={styles.actionRow}>
+-                    <TouchableOpacity
+-                      style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
+-                      onPress={() => {
+-                        const pending = pendingMealWrites.current[meal.name];
+-                        setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
+-                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
+-                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
+-                        setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
+-                      }}
+-                      disabled={registeringMeal !== null || mealDraft !== null}
+-                      accessibilityRole="button"
+-                      accessibilityLabel={`Registrar consumo da refeição ${meal.name}`}
+-                    >
+-                      <Text style={styles.registerMealText}>
+-                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo'}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  </View>
+-                </View>
+-              ))
+-            ) : (
+-              <View style={styles.emptyContainer}>
+-                <Text style={styles.emptyTitle}>Nenhum plano publicado</Text>
+-                <Text style={styles.emptyDescription}>
+-                  Seu nutricionista ainda não publicou um plano alimentar ativo. Assim que a prescrição for disponibilizada, você verá suas refeições aqui.
+-                </Text>
+-              </View>
+-            )}
+           </>
+         )}
+ 
+@@ -877,9 +868,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+                 </View>
+                 <TextInput value={metricValue} onChangeText={setMetricValue} keyboardType="decimal-pad" accessibilityLabel="Valor da medida"
+                   placeholder={metricType ? `Valor em ${evolutionData.enabled_metrics?.find((m) => m.type === metricType)?.unit}` : 'Escolha a medida acima'} placeholderTextColor={t.muted}
+-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 4 }]} />
++                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, marginTop: 4 }]} />
+                 <TextInput value={metricNotes} onChangeText={setMetricNotes} maxLength={500} accessibilityLabel="Observação (opcional)" placeholder="Observação (opcional)" placeholderTextColor={t.muted}
+-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 8 }]} />
++                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, marginTop: 8 }]} />
+                 {metricError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{metricError}</Text>}
+                 {metricFeedback && <Text accessibilityRole="alert" style={styles.mealItem}>{metricFeedback}</Text>}
+                 <TouchableOpacity accessibilityRole="button" style={[styles.navyButton, { marginTop: 12 }]} disabled={metricSaving} onPress={submitSelfMetric}>
+@@ -1020,9 +1011,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
+             style={[styles.navItem, currentTab === tab && styles.navItemActive]}
+             onPress={() => setCurrentTab(tab)}
+             accessibilityRole="tab"
++            accessibilityLabel={tabLabels[tab]}
+             aria-selected={currentTab === tab}
+             accessibilityState={{ selected: currentTab === tab }}
+           >
++            <Feather name={({ Hoje: 'sun', Plano: 'book-open', Diario: 'edit-3', Chat: 'message-circle', Evolucao: 'trending-up', Perfil: 'user' } as const)[tab]} size={19} color={currentTab === tab ? t.success : t.muted} accessible={false} importantForAccessibility="no-hide-descendants" />
+             <Text style={[styles.navText, currentTab === tab && styles.navTextActive]} maxFontSizeMultiplier={t.maxNavFontScale} numberOfLines={1}>
+               {tabLabels[tab]}
+             </Text>
+@@ -1053,12 +1046,12 @@ const styles = StyleSheet.create({
+     fontWeight: '600',
+   },
+   syncBanner: {
+-    backgroundColor: '#EBF3FA',
++    backgroundColor: t.mintSoft,
+     paddingVertical: 8,
+     paddingHorizontal: 16,
+     alignItems: 'center',
+     borderBottomWidth: 1,
+-    borderBottomColor: '#D0E1F2',
++    borderBottomColor: t.border,
+   },
+   syncBannerOffline: {
+     backgroundColor: t.errorBg,
+@@ -1077,7 +1070,7 @@ const styles = StyleSheet.create({
+     padding: 12,
+     marginHorizontal: 16,
+     marginTop: 10,
+-    borderRadius: 8,
++    borderRadius: t.inputRadius,
+     borderWidth: 1,
+     borderColor: '#FDA29B',
+     flexDirection: 'row',
+@@ -1113,7 +1106,7 @@ const styles = StyleSheet.create({
+   inlineFeedback: {
+     marginTop: 10,
+     padding: 10,
+-    borderRadius: 8,
++    borderRadius: t.inputRadius,
+     fontSize: 14,
+     borderWidth: 1,
+   },
+@@ -1129,7 +1122,10 @@ const styles = StyleSheet.create({
+   },
+   scroll: {
+     padding: 20,
+-    paddingBottom: 32,
++    paddingBottom: 36,
++    width: '100%',
++    maxWidth: 760,
++    alignSelf: 'center',
+   },
+   header: {
+     marginBottom: 20,
+@@ -1141,12 +1137,12 @@ const styles = StyleSheet.create({
+   },
+   subGreeting: {
+     fontSize: 14,
+-    color: '#526071',
++    color: t.muted,
+     marginTop: 4,
+   },
+   card: {
+     backgroundColor: t.white,
+-    borderRadius: 14,
++    borderRadius: t.cardRadius,
+     padding: 16,
+     marginBottom: 16,
+     borderWidth: 1,
+@@ -1165,7 +1161,7 @@ const styles = StyleSheet.create({
+   },
+   appointmentDoctor: {
+     fontSize: 13,
+-    color: '#526071',
++    color: t.muted,
+     marginBottom: 12,
+   },
+   telehealthLink: {
+@@ -1178,7 +1174,7 @@ const styles = StyleSheet.create({
+     backgroundColor: t.success,
+     paddingVertical: 10,
+     paddingHorizontal: 16,
+-    borderRadius: 8,
++    borderRadius: t.inputRadius,
+     minHeight: 44,
+     justifyContent: 'center',
+     alignItems: 'center',
+@@ -1208,14 +1204,15 @@ const styles = StyleSheet.create({
+   },
+   buttonRow: {
+     flexDirection: 'row',
++    flexWrap: 'wrap',
+     gap: 10,
+   },
+   navyButton: {
+     backgroundColor: t.navy,
+     paddingVertical: 10,
+     paddingHorizontal: 16,
+-    borderRadius: 8,
+-    minHeight: 44, // WCAG alvo de toque
++    borderRadius: t.buttonRadius,
++    minHeight: t.touch,
+     justifyContent: 'center',
+   },
+   navyButtonText: {
+@@ -1227,9 +1224,9 @@ const styles = StyleSheet.create({
+     backgroundColor: t.copper, // copper-600: texto branco 5,0:1 (o #E67A3F dava 2,9:1)
+     paddingVertical: 10,
+     paddingHorizontal: 16,
+-    borderRadius: 8,
++    borderRadius: t.buttonRadius,
+     alignItems: 'center',
+-    minHeight: 44,
++    minHeight: t.touch,
+     justifyContent: 'center',
+   },
+   copperButtonText: {
+@@ -1238,7 +1235,7 @@ const styles = StyleSheet.create({
+     fontSize: 14,
+   },
+   sectionTitle: {
+-    fontSize: 18,
++    fontSize: 21,
+     fontWeight: '700',
+     color: t.navy,
+     marginBottom: 12,
+@@ -1246,7 +1243,7 @@ const styles = StyleSheet.create({
+   },
+   mealCard: {
+     backgroundColor: t.white,
+-    borderRadius: 14,
++    borderRadius: t.cardRadius,
+     padding: 16,
+     marginBottom: 14,
+     borderWidth: 1,
+@@ -1254,6 +1251,8 @@ const styles = StyleSheet.create({
+   },
+   mealHeader: {
+     flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
+     justifyContent: 'space-between',
+     marginBottom: 10,
+   },
+@@ -1263,7 +1262,11 @@ const styles = StyleSheet.create({
+     color: t.navy,
+   },
+   mealTime: {
+-    fontSize: 14,
++    backgroundColor: t.mintSoft,
++    paddingHorizontal: 10,
++    paddingVertical: 5,
++    borderRadius: 14,
++    fontSize: 13,
+     fontWeight: '600',
+     color: t.copper,
+   },
+@@ -1297,7 +1300,7 @@ const styles = StyleSheet.create({
+   },
+   itemNotesText: {
+     fontSize: 12,
+-    color: '#0369A1',
++    color: t.info,
+     marginLeft: 12,
+     marginTop: 2,
+     fontStyle: 'italic',
+@@ -1318,11 +1321,11 @@ const styles = StyleSheet.create({
+     borderTopColor: '#F3F4F6',
+   },
+   registerMealButton: {
+-    backgroundColor: t.navy,
++    backgroundColor: t.copper,
+     paddingVertical: 8,
+-    paddingHorizontal: 14,
+-    borderRadius: 6,
+-    minHeight: 44,
++    paddingHorizontal: 18,
++    borderRadius: t.buttonRadius,
++    minHeight: t.touch,
+     justifyContent: 'center',
+   },
+   registerMealButtonDisabled: {
+@@ -1338,12 +1341,12 @@ const styles = StyleSheet.create({
+   },
+   helperText: {
+     fontSize: 13,
+-    color: '#526071',
++    color: t.muted,
+     marginBottom: 12,
+   },
+   emptyContainer: {
+     backgroundColor: t.white,
+-    borderRadius: 14,
++    borderRadius: t.cardRadius,
+     padding: 24,
+     alignItems: 'center',
+     borderWidth: 1,
+@@ -1378,17 +1381,17 @@ const styles = StyleSheet.create({
+     marginTop: 6,
+   },
+   feedbackBox: {
+-    backgroundColor: '#F0F9FF',
++    backgroundColor: t.mintSoft,
+     padding: 10,
+     borderRadius: 6,
+     marginTop: 8,
+     borderLeftWidth: 3,
+-    borderLeftColor: '#0284C7',
++    borderLeftColor: t.success,
+   },
+   feedbackTitle: {
+     fontSize: 12,
+     fontWeight: '700',
+-    color: '#0369A1',
++    color: t.info,
+     marginBottom: 2,
+   },
+   feedbackText: {
+@@ -1412,23 +1415,27 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     justifyContent: 'space-around',
+     alignItems: 'stretch',
+-    paddingHorizontal: 4,
++    paddingHorizontal: 6,
++    paddingVertical: 6,
+   },
+   navItem: {
+     alignItems: 'center',
+     justifyContent: 'center',
+-    paddingVertical: 8,
+-    paddingHorizontal: 10,
+-    minWidth: t.touch,
++    paddingVertical: 9,
++    paddingHorizontal: 7,
++    gap: 4,
++    minWidth: 56,
+     minHeight: 48,
+     borderBottomWidth: 3,
+     borderBottomColor: 'transparent',
+   },
+   navItemActive: {
+-    borderBottomColor: t.copper,
++    borderBottomColor: t.success,
++    backgroundColor: t.mintSoft,
++    borderRadius: 18,
+   },
+   navText: {
+-    fontSize: 13,
++    fontSize: 11,
+     fontWeight: '500',
+     color: t.muted,
+   },
+@@ -1440,11 +1447,11 @@ const styles = StyleSheet.create({
+   // Chat Styles
+   chatHeaderCard: {
+     backgroundColor: t.white,
+-    borderRadius: 12,
++    borderRadius: t.cardRadius,
+     padding: 16,
+     marginBottom: 16,
+     borderWidth: 1,
+-    borderColor: '#E2E8F0',
++    borderColor: t.divider,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 1 },
+     shadowOpacity: 0.05,
+diff --git a/mobile/src/screens/PatientOnboardingScreen.tsx b/mobile/src/screens/PatientOnboardingScreen.tsx
+index 4cf82cb..50224e2 100644
+--- a/mobile/src/screens/PatientOnboardingScreen.tsx
++++ b/mobile/src/screens/PatientOnboardingScreen.tsx
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+ import BrandLogo from '../components/BrandLogo';
+ import { ApiService, PatientAuthData, PatientInvitationPreview } from '../services/api';
+-import { tokens as t } from '../theme/tokens';
++import { patientTokens as t } from '../theme/patient';
+ 
+ export default function PatientOnboardingScreen({ onBack, onActivated, initialCode = '' }: { onBack: () => void; onActivated: (auth: PatientAuthData) => void; initialCode?: string }) {
+   const [code, setCode] = useState(initialCode);
+@@ -59,7 +59,7 @@ const s = StyleSheet.create({
+   card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: t.border },
+   brand: { padding: 24, backgroundColor: t.navy, alignItems: 'center', gap: 10, borderTopWidth: 4, borderTopColor: t.copperAccent }, caption: { color: '#D7E1E9' },
+   body: { padding: 24, gap: 12 }, title: { fontSize: 23, fontWeight: '700', color: t.navy }, description: { fontSize: 14, lineHeight: 22, color: t.muted },
+-  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
++  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
+   button: { backgroundColor: t.copper, padding: 14, borderRadius: 10, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, buttonText: { color: t.white, fontWeight: '600', fontSize: 16 },
+   back: { minHeight: 44, alignItems: 'center', justifyContent: 'center' }, link: { color: t.navy, fontWeight: '600' }, error: { color: t.error, fontSize: 14, lineHeight: 22 },
+ });
+diff --git a/mobile/src/components/PatientOverview.tsx b/mobile/src/components/PatientOverview.tsx
+new file mode 100644
+index 0000000..7c578be
+--- /dev/null
++++ b/mobile/src/components/PatientOverview.tsx
+@@ -0,0 +1,50 @@
++import React from 'react';
++import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
++import { patientTokens as t, patientType } from '../theme/patient';
++
++type Props = { name: string; meals: number; hasPlan: boolean; waterMl: number; waterGoal: number | null; onPlan: () => void };
++/** Uses actual prescribed meals and confirmed hydration; never infers calorie targets. */
++export default function PatientOverview({ name, meals, hasPlan, waterMl, waterGoal, onPlan }: Props) {
++  const percent = waterGoal && waterGoal > 0 ? Math.min(100, Math.round(waterMl / waterGoal * 100)) : null;
++  return <View style={s.hero} testID="patient-overview">
++    <Text style={s.eyebrow}>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
++    <Text accessibilityRole="header" style={s.greeting}>Olá, {name}</Text>
++    <Text style={s.subtitle}>Um dia de cada vez. No seu ritmo.</Text>
++    <View style={s.overview}>
++      <View style={s.copy}>
++        <Text style={s.planLabel}>SEU PLANO DE HOJE</Text>
++        <Text style={s.planTitle}>{hasPlan ? meals + (meals === 1 ? ' refeição no seu plano' : ' refeições no seu plano') : 'Seu cuidado começa aqui'}</Text>
++        <Text style={s.description}>{hasPlan ? 'Orientações do seu nutricionista, sempre por perto.' : 'Quando seu plano for publicado, ele aparecerá aqui.'}</Text>
++      </View>
++      <View style={s.waterSummary} accessible accessibilityRole="image" accessibilityLabel={percent !== null ? 'Água confirmada hoje: ' + waterMl + ' ml. ' + percent + '% da meta definida pelo nutricionista.' : 'Água confirmada hoje: ' + waterMl + ' ml. Sem meta definida.'}>
++        <View style={s.ring}>
++          <Text style={s.ringValue}>{percent !== null ? percent + '%' : waterMl.toLocaleString('pt-BR')}</Text>
++          <Text style={s.ringCaption}>{percent !== null ? 'da meta' : 'ml'}</Text>
++        </View>
++        <Text style={s.waterLabel}>Água hoje</Text>
++      </View>
++    </View>
++    <TouchableOpacity accessibilityRole="button" accessibilityLabel={hasPlan ? 'Ver meu plano alimentar' : 'Consultar meu plano alimentar'} onPress={onPlan} style={s.action}>
++      <Text style={s.actionText}>{hasPlan ? 'Ver meu plano' : 'Consultar meu plano'}</Text><Text style={s.arrow} accessible={false}>→</Text>
++    </TouchableOpacity>
++  </View>;
++}
++const s = StyleSheet.create({
++  hero: { backgroundColor: t.forest, borderRadius: 28, padding: 24, marginBottom: 28 },
++  eyebrow: { ...patientType.caption, color: t.onForestMuted, marginBottom: 16 },
++  greeting: { ...patientType.title, color: t.onForest },
++  subtitle: { ...patientType.body, color: t.onForestMuted, marginTop: 6 },
++  overview: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 20, marginVertical: 24 },
++  copy: { flexGrow: 1, flexShrink: 1, flexBasis: 140 },
++  planLabel: { fontSize: 10, lineHeight: 16, letterSpacing: 1.1, fontWeight: '700', color: t.mint, marginBottom: 8 },
++  planTitle: { fontSize: 21, lineHeight: 28, fontWeight: '600', color: t.onForest },
++  description: { ...patientType.caption, color: t.onForestMuted, marginTop: 8 },
++  waterSummary: { alignItems: 'center' },
++  ring: { minWidth: 88, minHeight: 88, padding: 12, borderRadius: 999, borderWidth: 3, borderColor: t.mint, alignItems: 'center', justifyContent: 'center' },
++  ringValue: { color: t.onForest, fontSize: 22, fontWeight: '700' },
++  ringCaption: { color: t.onForestMuted, fontSize: 11 },
++  waterLabel: { color: t.onForestMuted, fontSize: 11, marginTop: 8 },
++  action: { backgroundColor: t.mint, borderRadius: t.buttonRadius, minHeight: t.touch, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
++  actionText: { fontSize: 15, fontWeight: '700', color: t.forest, flexShrink: 1 },
++  arrow: { color: t.forest, fontSize: 22 },
++});
+diff --git a/mobile/src/theme/patient.ts b/mobile/src/theme/patient.ts
+new file mode 100644
+index 0000000..191fe45
+--- /dev/null
++++ b/mobile/src/theme/patient.ts
+@@ -0,0 +1,18 @@
++/** Patient reference palette. Professional screens retain theme/tokens.ts. */
++export const patientTokens = {
++  navy: '#183D32', copper: '#087C53', copperAccent: '#F5B746',
++  background: '#F5F7F2', white: '#FFFFFF', ink: '#202E28', muted: '#57675E',
++  border: '#D6E1D8', inputBorder: '#7A8D80', divider: '#E3EBE3',
++  error: '#AC302B', errorBg: '#FFF1EF', success: '#136B47', successBg: '#E6F5EB',
++  info: '#285D51', mint: '#BFEADB', mintSoft: '#EDF7EF', forest: '#102D28',
++  onForest: '#F8FFF9', onForestMuted: '#C1D8CC', accent: '#F5B746',
++  accentInk: '#50360C', chartWash: '#ECF4DF',
++  inputRadius: 14, buttonRadius: 24, cardRadius: 22, space: 16, touch: 48,
++  maxNavFontScale: 1.5,
++} as const;
++export const patientType = {
++  title: { fontSize: 28, lineHeight: 35, fontWeight: '700' as const },
++  section: { fontSize: 21, lineHeight: 28, fontWeight: '700' as const },
++  body: { fontSize: 15, lineHeight: 23 },
++  caption: { fontSize: 12, lineHeight: 18 },
++};
+diff --git a/mobile/tests/patient-reference-fixture.php b/mobile/tests/patient-reference-fixture.php
+new file mode 100644
+index 0000000..7fea181
+--- /dev/null
++++ b/mobile/tests/patient-reference-fixture.php
+@@ -0,0 +1,44 @@
++<?php
++declare(strict_types=1);
++if(PHP_SAPI!=='cli')exit(2);
++$root=getenv('PATIENT_BACKEND_ROOT');$dsn=getenv('ADAPTIVE_TEST_DSN')?:'';
++if(!$root||!is_file($root.'/config/build-manifest.json')||!str_starts_with($dsn,'sqlite:/tmp/clyonutri-patient-ds-test-'))throw new RuntimeException('Isolated v54.32 SQLite fixture required');
++$manifest=json_decode(file_get_contents($root.'/config/build-manifest.json'),true,64,JSON_THROW_ON_ERROR);
++if($manifest['package_version']!=='v54.32')throw new RuntimeException('Wrong backend version');
++ob_start();require $root.'/tests/ni2_703_fixture.php';ob_end_clean();
++use ClyoNutri\Domain\MealPlan\MealPlanService;
++use ClyoNutri\Domain\Dietary\DietarySuggestionService;
++use ClyoNutri\Domain\Anthropometry\AnthropometryService;
++use ClyoNutri\Domain\Evolution\PatientEvolutionService;
++use ClyoNutri\Domain\Engagement\EngagementService;
++$patient=$dietPatient;$plan=$dietPlan;
++$db->prepare('UPDATE patients SET name=?,email=?,password_hash=? WHERE id=? AND clinic_id=?')
++ ->execute(['Marina TESTE','patient-ds-'.$run.'@example.invalid',password_hash('Synthetic-mobile-2026!',PASSWORD_DEFAULT),$patient,$c1]);
++$db->prepare('UPDATE anamneses SET water_intake_ml=2000 WHERE patient_id=? AND clinic_id=?')->execute([$patient,$c1]);
++$mp=new MealPlanService($db);$mealIds=[];
++foreach([['Café da manhã','08:00'],['Almoço','12:00'],['Jantar','18:00']] as [$name,$hour]){
++ $meal=$mp->addMeal($plan,$name,$hour,'Orientação sintética da refeição: confira o preparo combinado na consulta.');
++ $item=$mp->addItem($meal,$foods[0],300,'g','Orientação sintética do alimento.');
++ $mp->addSubstitution($item,$foods[1],250,'g','Alternativa sintética autorizada, sem troca automática.');
++ $mealIds[]=$meal;
++}
++$svc=new DietarySuggestionService($db);$preview=$svc->preview($plan);$card=$preview['cards'][0];
++$svc->confirm($plan,bin2hex(random_bytes(16)),$preview['workflow']['revision'],$preview['context_sha256'],[$card['id']],[$card['id']=>'TEXTO SINTÉTICO v54.32: orientações revisadas para testar a leitura no aplicativo.'],'TESTE de integração: revisão sintética, sem paciente real.',true);
++$mp->publishPlan($plan,false,true);
++$recipeSvc=new ClyoNutri\Domain\Recipe\RecipeService($db);
++$recipe=$recipeSvc->createRecipe(['title'=>'Receita SINTÉTICA de teste','servings'=>2,'instructions'=>'Preparo SINTÉTICO: misture os ingredientes e divida em duas porções.','status'=>'published','allergens_verified'=>true],[['food_id'=>$foods[0],'amount'=>200,'measure_unit'=>'g']]);
++$recipeSvc->prescribeRecipe($c1,$plan,$mealIds[0],$patient,$recipe['id'],1.0,null,'Café da manhã');
++$appointment=(new ClyoNutri\Domain\Appointment\AppointmentService($db))->schedule($patient,$professionals[0],$f['date'].' 16:00:00','first_visit',60,'Consulta SINTÉTICA',false,$users[0]);
++$db->prepare('UPDATE patients SET email=?,password_hash=? WHERE id=? AND clinic_id=?')->execute(['patient-other-'.$run.'@example.invalid',password_hash('Synthetic-mobile-2026!',PASSWORD_DEFAULT),$p2,$c2]);
++$f['patient_other_email']='patient-other-'.$run.'@example.invalid';$f['mobile_appointment']=$appointment['id'];$f['mobile_recipe']=$recipe['id'];
++
++$anthro=new AnthropometryService($db);
++foreach([[-21,72.1],[-14,71.8],[-7,72.0],[0,71.6]] as [$days,$weight]){
++ $anthro->recordAssessment($patient,$professionals[0],['weight_kg'=>$weight,'height_cm'=>170,'assessed_at'=>date('Y-m-d H:i:s',strtotime($days.' days')),'notes'=>'Avaliação SINTÉTICA para teste do gráfico','is_shared'=>1],$users[0]);
++}
++(new PatientEvolutionService($db))->setEnabledMetrics($patient,['weight_kg'],$users[0]);
++(new EngagementService($db))->logHydration($patient,500);
++(new ClyoNutri\Domain\Chat\PatientLinkService($db))->ensureFromCare($c1,$patient,$professionals[0],'synthetic_test');
++$f['patient_email']='patient-ds-'.$run.'@example.invalid';$f['mobile_patient']=$patient;$f['mobile_plan']=$plan;$f['mobile_meals']=$mealIds;
++file_put_contents(getenv('ADAPTIVE_FIXTURE_FILE'),json_encode($f));
++echo json_encode(['synthetic'=>true,'backend'=>'v54.32','patient'=>$patient,'schema_through'=>87,'published_plan'=>true,'clinical_approval_real'=>false])."\n";
+diff --git a/mobile/tests/patient-reference-ui.cjs b/mobile/tests/patient-reference-ui.cjs
+new file mode 100644
+index 0000000..07862e8
+--- /dev/null
++++ b/mobile/tests/patient-reference-ui.cjs
+@@ -0,0 +1,98 @@
++const pw=require(process.env.PLAYWRIGHT_MODULE||'playwright'),axe=require(process.env.AXE_MODULE||'axe-core'),fs=require('node:fs'),assert=require('node:assert/strict');
++const f=JSON.parse(fs.readFileSync(process.env.PATIENT_FIXTURE)),base=process.env.PATIENT_TEST_URL,out=process.env.PATIENT_EVIDENCE;
++assert(new URL(base).hostname==='127.0.0.1');
++const tabs=['Hoje','Plano','Diário','Chat','Evolução','Perfil'],checks=[],states=[],errors=[],profiles=[];
++let browser;
++function check(name,pass){checks.push({name,pass:!!pass});save();assert(pass,name);}
++function save(){fs.writeFileSync(out+'/ui-progress.json',JSON.stringify({checks,states,errors},null,2));}
++async function login(p,email=f.patient_email){
++ await p.goto(base);await p.getByLabel('E-mail do paciente',{exact:true}).fill(email);await p.getByLabel('Senha do paciente',{exact:true}).fill('Synthetic-mobile-2026!');
++ await p.getByRole('button',{name:'Entrar',exact:true}).click();await p.getByTestId('patient-overview').waitFor();await p.waitForTimeout(150);
++}
++async function tab(p,name){await p.getByRole('tab',{name,exact:true}).click();await p.waitForTimeout(100);}
++async function inspect(p,label){
++ await p.evaluate(axe.source);const a=await p.evaluate(()=>axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}}));
++ const g=await p.evaluate(()=>({width:innerWidth,outerWidth,dpr:devicePixelRatio,scale:visualViewport.scale,scroll:document.documentElement.scrollWidth,
++  overflows:[...document.querySelectorAll('main *')].filter(e=>e instanceof HTMLElement&&e.checkVisibility()&&e.clientWidth>0&&e.scrollWidth>e.clientWidth+3&&['hidden','clip','auto','scroll'].includes(getComputedStyle(e).overflowX)&&!e.matches('textarea,input')&&!e.querySelector('[role=tablist]')&&getComputedStyle(e).textOverflow!=='ellipsis').map(e=>({tag:e.tagName,role:e.getAttribute('role'),width:e.clientWidth,scroll:e.scrollWidth}))}));
++ states.push({label,...g,violations:a.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),incomplete:a.incomplete.map(v=>({id:v.id,nodes:v.nodes.length}))});save();
++ check(label+' document reflows',g.scroll<=g.width);
++ check(label+' axe detects no WCAG violations',a.violations.length===0);
++ check(label+' one tab selected',await p.getByRole('tab').evaluateAll(els=>els.filter(e=>e.getAttribute('aria-selected')==='true').length)===1);
++ if(a.violations.length)await p.screenshot({path:out+'/'+label+'-failure.png'});
++}
++(async()=>{try{
++ browser=await pw.chromium.launch({headless:true,executablePath:process.env.CHROME_PATH});
++ const c=await browser.newContext({viewport:{width:390,height:844},locale:'pt-BR',timezoneId:'America/Sao_Paulo'}),p=await c.newPage();
++ p.on('pageerror',e=>errors.push(e.message));await login(p);
++ check('all six original destinations retained',JSON.stringify(await p.getByRole('tab').evaluateAll(es=>es.map(e=>e.getAttribute('aria-label'))))===JSON.stringify(tabs));
++ check('meal task precedes secondary links',await p.getByRole('heading',{name:'Suas refeições de hoje'}).evaluate(el=>el.compareDocumentPosition([...document.querySelectorAll('[role=button]')].find(e=>e.textContent.includes('Minhas receitas')))&Node.DOCUMENT_POSITION_FOLLOWING));
++ await p.getByRole('button',{name:'Ver meu plano alimentar'}).click();
++ check('hero opens published plan',await p.getByRole('heading',{name:'Plano alimentar completo'}).count()===1);
++ check('v54.32 confirmed notes visible',await p.getByText('TEXTO SINTÉTICO v54.32:',{exact:false}).count()===1);
++ check('food quantity and substitute preserved',await p.locator('body').innerText().then(t=>t.includes('300 g')&&t.includes('250 g')&&t.includes('Alternativa sintética autorizada')));
++ await p.getByRole('button',{name:'Ver ingredientes e preparo',exact:false}).first().click();
++ await p.getByText('Preparo da receita base',{exact:false}).waitFor();check('recipe preparation and base versus dose retained',true);
++ await tab(p,'Hoje');await p.getByRole('button',{name:/^Registrar (outro )?consumo da refeição/}).first().click();
++ await p.getByRole('radio',{name:'Comi diferente',exact:true}).click();
++ const description='TESTE UI '+Date.now()+': sanduíche e fruta descritos pelo paciente.';
++ await p.getByLabel('O que você comeu e quantidade aproximada').fill(description);
++ await p.getByRole('button',{name:'Confirmar consumo',exact:true}).click();
++ await p.getByText('Consumo registrado em',{exact:false}).first().waitFor();
++ await tab(p,'Diário');await p.getByText('Comi diferente: '+description,{exact:true}).waitFor();check('actual consumption survives tab change',true);
++ await p.reload();await p.getByTestId('patient-overview').waitFor();check('valid web session restores without credentials',true);
++ await tab(p,'Diário');await p.getByText('Comi diferente: '+description,{exact:true}).waitFor();check('diary persists after reload',true);
++ await tab(p,'Hoje');
++ const before=await c.request.get(base+'/api/v1/patient/home',{headers:{'X-ClyoNutri-Web':'1'}}).then(r=>r.json());
++ await p.getByTestId('water-add-250').click();await p.getByTestId('water-feedback').waitFor();
++ await p.getByTestId('water-feedback').filter({hasText:'registrados'}).waitFor();
++ const after=await c.request.get(base+'/api/v1/patient/home',{headers:{'X-ClyoNutri-Web':'1'}}).then(r=>r.json());
++ check('hydration is confirmed by v54.32',after.water_ml_today===before.water_ml_today+250);
++ await p.getByTestId('water-history-toggle').click();await p.getByTestId('hydration-history').waitFor();check('hydration history opens',await p.getByTestId('hydration-history').isVisible());
++ if(await p.getByRole('button',{name:'Corrigir check-in de hoje',exact:true}).count())await p.getByRole('button',{name:'Corrigir check-in de hoje',exact:true}).click();
++ await p.getByRole('radio',{name:'Tudo do plano',exact:true}).click();
++ await p.getByRole('button',{name:/^(Enviar check-in|Salvar correção)$/}).click();await p.getByText(/Check-in de hoje (enviado|corrigido)\./).waitFor();
++ await p.reload();await p.getByTestId('patient-overview').waitFor();
++ await p.getByText('Plano seguido hoje:',{exact:false}).waitFor();check('check-in persists after reload',true);
++ await tab(p,'Chat');await p.getByLabel('Mensagem para o nutricionista',{exact:true}).fill('Rascunho SINTÉTICO, não enviar.');
++ await tab(p,'Plano');await tab(p,'Chat');check('unsent chat draft preserved',await p.getByLabel('Mensagem para o nutricionista',{exact:true}).inputValue()==='Rascunho SINTÉTICO, não enviar.');
++ await p.getByLabel('Mensagem para o nutricionista',{exact:true}).fill('');
++ for(const width of [320,375,390,768]){
++  await p.setViewportSize({width,height:900});
++  for(const name of tabs){await tab(p,name);await inspect(p,name+'-'+width);}
++ }
++ await p.setViewportSize({width:390,height:844});await tab(p,'Hoje');await p.screenshot({path:out+'/today.png'});
++ await tab(p,'Plano');await p.screenshot({path:out+'/plan.png'});
++ await tab(p,'Evolução');await p.screenshot({path:out+'/evolution.png'});
++ await p.setViewportSize({width:812,height:375});await inspect(p,'evolution-landscape');
++ await p.setViewportSize({width:375,height:812});await tab(p,'Plano');
++ await p.addStyleTag({content:'*{line-height:1.5!important;letter-spacing:.12em!important;word-spacing:.16em!important}p{margin-bottom:2em!important}'});
++ await inspect(p,'plan-textspacing');await p.reload();await p.getByTestId('patient-overview').waitFor();
++ const waterBeforeOffline=await c.request.get(base+'/api/v1/patient/home',{headers:{'X-ClyoNutri-Web':'1'}}).then(r=>r.json());
++ await c.setOffline(true);await p.getByTestId('water-add-250').click();await p.getByTestId('water-pending').waitFor();
++ check('offline hydration is pending, never falsely confirmed',await p.getByTestId('water-pending').isVisible());
++ await c.setOffline(false);
++ await p.getByTestId('water-pending').waitFor({state:'hidden',timeout:20000});
++ const waterAfterOffline=await c.request.get(base+'/api/v1/patient/home',{headers:{'X-ClyoNutri-Web':'1'}}).then(r=>r.json());check('offline queue resumes against real API',waterAfterOffline.water_ml_today===waterBeforeOffline.water_ml_today+250);
++ await tab(p,'Perfil');await p.getByRole('button',{name:'Encerrar sessão',exact:true}).click();await p.getByLabel('E-mail do paciente',{exact:true}).waitFor();check('logout reaches access screen',true);
++ await c.close();
++ const other=await browser.newContext({viewport:{width:375,height:812}}),op=await other.newPage();await login(op,f.patient_other_email);
++ await op.getByText('Nenhum plano publicado',{exact:true}).waitFor();check('empty state comes from second clinic, no first patient data',!(await op.locator('body').innerText()).includes('Marina'));
++ await inspect(op,'empty-other-clinic');await other.close();await browser.close();browser=null;
++ for(const engine of ['firefox','webkit']){
++  const b=await pw[engine].launch({headless:true});try{
++   const page=await b.newPage({viewport:{width:375,height:812},locale:'pt-BR',timezoneId:'America/Sao_Paulo'});await login(page);
++   for(const name of ['Hoje','Plano','Evolução']){await tab(page,name);await inspect(page,engine+'-'+name);}
++  }finally{await b.close();}
++ }
++ for(const zoom of [2,4]){
++  const profile=fs.mkdtempSync('/tmp/patient-ds-zoom-');profiles.push(profile);fs.mkdirSync(profile+'/Default');
++  fs.writeFileSync(profile+'/Default/Preferences',JSON.stringify({partition:{per_host_zoom_levels:{x:{'127.0.0.1':{last_modified:'13400000000000000',zoom_level:Math.log(zoom)/Math.log(1.2)}}}}}));
++  const context=await pw.chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.CHROME_PATH,viewport:null,args:['--window-size=1280,900']});
++  try{const page=context.pages()[0];await login(page);check('native zoom geometry '+zoom,await page.evaluate(z=>Math.abs(devicePixelRatio-z)<.01&&Math.abs(outerWidth/innerWidth-z)<.01&&visualViewport.scale===1,zoom));
++   for(const name of ['Hoje','Plano','Evolução']){await tab(page,name);await inspect(page,'native'+zoom+'-'+name);}
++  }finally{await context.close();fs.rmSync(profile,{recursive:true,force:true});}
++ }
++ check('no uncaught JavaScript errors',errors.length===0);
++ fs.writeFileSync(out+'/ui-report.json',JSON.stringify({synthetic:true,backend:'v54.32',browser:'Chrome/Firefox/WebKit',axe_version:axe.version,checks,states,errors,limitations:'Expo Web and native JS exports; no physical Android/iOS, keyboard/safe-area or assistive reader certification. No chat sent.'},null,2));
++ console.log(JSON.stringify({checks:checks.length,states:states.length,failed:checks.filter(x=>!x.pass)}));
++}catch(e){save();throw e;}finally{if(browser)await browser.close();for(const profile of profiles)fs.rmSync(profile,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});
+diff --git a/mobile/tests/patient-reference-api.cjs b/mobile/tests/patient-reference-api.cjs
+new file mode 100644
+index 0000000..38394cd
+--- /dev/null
++++ b/mobile/tests/patient-reference-api.cjs
+@@ -0,0 +1,34 @@
++const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
++const {ApiService,setApiBaseUrl,setAuthToken}=require('../.test-build/api.js');
++const f=JSON.parse(fs.readFileSync(process.env.PATIENT_FIXTURE)),base=process.env.PATIENT_TEST_URL;
++assert(new URL(base).hostname==='127.0.0.1');setApiBaseUrl(base);
++const checks=[];function check(name,ok){checks.push({name,pass:!!ok});assert(ok,name);}
++(async()=>{
++ const a=await ApiService.login({email:f.patient_email,password:'Synthetic-mobile-2026!'});check('production client authenticates against v54.32',a.patient.id===f.mobile_patient);
++ const home=await ApiService.getHome();check('published plan read from real snapshot',home.active_plan.id===f.mobile_plan&&home.active_plan.meals.length===3);
++ check('v54.32 confirmed guidance reaches mobile contract',home.active_plan.notes.includes('TEXTO SINTÉTICO v54.32'));
++ check('authorized substitution amount and notes preserved',home.active_plan.meals[0].items[0].substitutions[0].amount===250&&home.active_plan.meals[0].items[0].substitutions[0].notes.includes('sintética'));
++ check('goal and confirmed hydration come from backend',home.water_goal_ml===2000&&typeof home.water_ml_today==='number');
++ check('actual appointment read',home.next_appointment.id===f.mobile_appointment);
++ const key='ds-native-'+Date.now();
++ const first=await ApiService.logHydration(250,{idempotencyKey:key});const again=await ApiService.logHydration(250,{idempotencyKey:key});
++ check('native-client hydration retry is idempotent',first.id===again.id&&first.total_water_today===again.total_water_today);
++ const when=new Date().toISOString(),mealKey='ds-meal-'+Date.now();
++ const input={meal_name:'Lanche SINTÉTICO',description:'TESTE integração nativa: consumo informado.',consumed_at:when,idempotency_key:mealKey};
++ const entry=await ApiService.logMeal(input),replay=await ApiService.logMeal(input);
++ check('native-client diary retry is idempotent',entry.id===replay.id);
++ const diary=await ApiService.getFoodDiary();check('diary persisted with actual description',diary.entries.some(x=>x.id===entry.id&&x.description===input.description));
++ const recipes=await ApiService.getRecipes();check('prescribed recipe available',recipes.some(x=>x.recipe_id===f.mobile_recipe));
++ const prescribed=recipes.find(x=>x.recipe_id===f.mobile_recipe),recipe=await ApiService.getRecipe(f.mobile_recipe,prescribed.id);
++ check('recipe snapshot includes ingredients and preparation',recipe.ingredients.length>0&&recipe.instructions.includes('SINTÉTICO'));
++ const evo=await ApiService.getEvolution();check('clinical history and source available',evo.clinical_records.length>=4&&evo.series.some(x=>x.points.length>=4));
++ const privacy=await ApiService.getPrivacy();check('privacy contract loads',!!privacy);
++ const notif=await ApiService.getNotifications();check('notifications contract loads',!!notif);
++ const others=await ApiService.login({email:f.patient_other_email,password:'Synthetic-mobile-2026!'});
++ check('other clinic authenticates separately',others.patient.id===f.patient_b);
++ const otherHome=await ApiService.getHome();check('other clinic cannot see first patient plan',otherHome.active_plan===null);
++ await assert.rejects(()=>ApiService.deleteHydration(first.id),e=>[403,404,422].includes(e.status));check('cross clinic hydration mutation denied',true);
++ await ApiService.logout();await assert.rejects(()=>ApiService.getHome(),e=>e.status===401);check('logout revokes API access',true);
++ fs.writeFileSync(process.env.PATIENT_EVIDENCE+'/api-native-client.json',JSON.stringify({backend:'v54.32',synthetic:true,transport:'Actual production TypeScript client compiled to CommonJS; real HTTP to unchanged PHP backend, no response mocks.',checks},null,2));
++ console.log(JSON.stringify({checks:checks.length,failed:checks.filter(x=>!x.pass)}));
++})().catch(e=>{console.error(e);process.exitCode=1});
+diff --git a/mobile/tests/patient-reference-router.php b/mobile/tests/patient-reference-router.php
+new file mode 100644
+index 0000000..e4520e4
+--- /dev/null
++++ b/mobile/tests/patient-reference-router.php
+@@ -0,0 +1,10 @@
++<?php
++declare(strict_types=1);
++// Test-only same-origin host: exported Expo assets + the unmodified v54.32 API.
++$root=getenv('PATIENT_BACKEND_ROOT');$dist=dirname(__DIR__).'/dist-patient-reference';
++if(!$root||!str_starts_with($_SERVER['REMOTE_ADDR']??'','127.')){http_response_code(404);return;}
++$uri=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
++if(str_starts_with($uri,'/api/')||$uri==='/up'){require $root.'/public/index.php';return;}
++$path=realpath($dist.rawurldecode($uri));
++if($uri!=='/'&&$path&&str_starts_with($path,realpath($dist).DIRECTORY_SEPARATOR)&&is_file($path))return false;
++header('Content-Type: text/html; charset=UTF-8');readfile($dist.'/index.html');
+diff --git a/mobile/tests/patient-reference-verify.cjs b/mobile/tests/patient-reference-verify.cjs
+new file mode 100644
+index 0000000..07e5d34
+--- /dev/null
++++ b/mobile/tests/patient-reference-verify.cjs
+@@ -0,0 +1,35 @@
++/** Repeatable local verification; never runs against production or sends external messages. */
++const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),net=require('node:net'),cp=require('node:child_process'),crypto=require('node:crypto');
++const mobile=path.resolve(__dirname,'..'),repo=path.resolve(mobile,'..'),backend=process.env.PATIENT_BACKEND_ROOT;
++if(!backend)throw Error('Set PATIENT_BACKEND_ROOT to the v54.32 release directory.');
++const evidence=path.join(repo,'docs/delivery/patient-mobile-reference/evidence');
++fs.mkdirSync(evidence,{recursive:true});const work=fs.mkdtempSync('/tmp/clyonutri-patient-ds-test-');
++const npm=process.platform==='win32'?'npm.cmd':'npm';let server;
++const build=JSON.parse(cp.execFileSync('php',[path.join(backend,'bin/build_identity.php'),'--verify'],{encoding:'utf8'}));
++if(build.integrity!=='consistent'||build.package_version!=='v54.32')throw Error('Verified v54.32 backend required.');
++function run(command,args,env,log){const r=cp.spawnSync(command,args,{cwd:mobile,env,encoding:'utf8',maxBuffer:12*1024*1024});fs.writeFileSync(path.join(evidence,log),(r.stdout||'')+(r.stderr||''));if(r.status!==0)throw Error(command+' failed; see '+log);}
++(async()=>{try{
++ const sock=net.createServer();await new Promise(r=>sock.listen(0,'127.0.0.1',r));const port=sock.address().port;await new Promise(r=>sock.close(r));
++ const base='http://127.0.0.1:'+port;
++ const env={...process.env,PATIENT_BACKEND_ROOT:backend,PATIENT_FIXTURE:work+'/fixture.json',PATIENT_TEST_URL:base,PATIENT_EVIDENCE:evidence,
++  ADAPTIVE_TEST_DSN:'sqlite:'+work+'/test.sqlite',ADAPTIVE_FIXTURE_FILE:work+'/fixture.json',
++  APP_ENV:'testing',FORCE_HTTPS:'false',DB_CONNECTION:'sqlite',DB_DATABASE:work+'/test.sqlite',APP_URL:base,
++  APP_KEY:'patient-reference-synthetic-key-000000000',APP_TIMEZONE:'America/Sao_Paulo',EXPO_NO_TELEMETRY:'1',EXPO_OFFLINE:'1',CI:'1'};
++ run('php',['tests/patient-reference-fixture.php'],env,'fixture.log');
++ run(npm,['run','typecheck'],env,'typecheck.log');
++ run(npm,['run','build:api-test'],env,'api-build.log');
++ run(path.join(mobile,'node_modules/.bin/expo'),['export','--platform','web','--output-dir','dist-patient-reference'],env,'web-export.log');
++ const log=fs.openSync(work+'/server.log','w');
++ server=cp.spawn('php',['-S','127.0.0.1:'+port,'-t','dist-patient-reference','tests/patient-reference-router.php'],{cwd:mobile,env,stdio:['ignore',log,log]});
++ for(let i=0;i<60;i++){try{const r=await fetch(base);if(r.ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
++ run(process.execPath,['tests/patient-reference-api.cjs'],env,'api-client.log');
++ run(process.execPath,['tests/patient-reference-ui.cjs'],env,'ui.log');
++ run(path.join(mobile,'node_modules/.bin/expo'),['export','--platform','android','--platform','ios','--output-dir',work+'/native'],env,'native-export.log');
++ const after=JSON.parse(cp.execFileSync('php',[path.join(backend,'bin/build_identity.php'),'--verify'],{encoding:'utf8'}));
++ if(JSON.stringify(build)!==JSON.stringify(after))throw Error('Backend changed during verification.');
++ const files=[];for(const dir of ['src','tests']){const walk=p=>{for(const f of fs.readdirSync(p,{withFileTypes:true})){const q=path.join(p,f.name);if(f.isDirectory())walk(q);else files.push(q);}};walk(path.join(mobile,dir));}
++ for(const name of ['App.tsx','package.json','package-lock.json','app.json','eas.json'])files.push(path.join(mobile,name));
++ fs.writeFileSync(path.join(evidence,'run.json'),JSON.stringify({at_utc:new Date().toISOString(),technical_result:'PASS',backend:build,api:JSON.parse(fs.readFileSync(evidence+'/api-native-client.json')),ui:{checks:JSON.parse(fs.readFileSync(evidence+'/ui-report.json')).checks.length,states:JSON.parse(fs.readFileSync(evidence+'/ui-report.json')).states.length},native_exports:['android Hermes JS','ios Hermes JS'],physical_devices_tested:false,app_store_publication:false,
++ source_files:files.sort().map(file=>({path:path.relative(mobile,file),sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}))},null,2));
++ console.log('Patient reference: PASS; backend v54.32 unchanged; evidence '+evidence);
++}finally{if(server){server.kill();await new Promise(r=>server.once('exit',r));}fs.rmSync(work,{recursive:true,force:true});}})().catch(e=>{console.error(e.message);process.exitCode=1});

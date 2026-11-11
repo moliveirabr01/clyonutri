@@ -72,6 +72,8 @@ class Migrator
             $this->db->beginTransaction();
             try {
                 $migration->up($this->db);
+                // A migração pode ter criado colunas/tabelas que SchemaInfo guardou como ausentes neste processo.
+                SchemaInfo::reset();
                 $ins = $this->db->prepare("INSERT INTO migrations (migration) VALUES (:migration)");
                 $ins->execute(['migration' => $migrationName]);
                 // MySQL faz commit implícito em DDL (CREATE/ALTER/DROP); só confirma se ainda houver transação aberta.

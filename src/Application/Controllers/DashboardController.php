@@ -14,6 +14,7 @@ use ClyoNutri\Domain\Anthropometry\InvalidAnthropometricDataException;
 use ClyoNutri\Domain\Appointment\AppointmentConflictException;
 use ClyoNutri\Domain\Appointment\AppointmentService;
 use ClyoNutri\Domain\Appointment\InvalidAppointmentTransitionException;
+use ClyoNutri\Domain\Booking\BookingService;
 use ClyoNutri\Domain\Clinical\ClinicalRecordService;
 use ClyoNutri\Domain\Engagement\EngagementService;
 use ClyoNutri\Domain\Finance\FinanceService;
@@ -44,16 +45,24 @@ class DashboardController
         $submission = $_POST['_submission_id'] ?? '';
         if (!is_string($submission) || !isset($_SESSION['patient_submissions'][$submission])) { http_response_code(422); echo 'Recarregue o formulário antes de cadastrar.'; return; }
         if ($_SESSION['patient_submissions'][$submission] === 'completed') { header('Location: /pacientes?success=1'); return; }
-        $_SESSION['patient_form'] = array_filter(array_intersect_key($_POST, array_flip(['name','email','phone','birth_date','gender','notes'])), 'is_string');
+        $_SESSION['patient_form'] = array_filter(array_intersect_key($_POST, array_flip(['name','email','phone','birth_date','gender','notes','allergies','allergy_assessment'])), 'is_string');
         try {
         if ($name === '' || mb_strlen($name) > 150) throw new \InvalidArgumentException('Informe um nome válido.');
-        foreach (['email','phone','birth_date','gender','notes','consent_choice','consent_term_id'] as $field) if (isset($_POST[$field]) && !is_string($_POST[$field])) throw new \InvalidArgumentException('Confira os campos do cadastro.');
+        foreach (['email','phone','birth_date','gender','notes','allergies','allergy_assessment','consent_choice','consent_term_id'] as $field) if (isset($_POST[$field]) && !is_string($_POST[$field])) throw new \InvalidArgumentException('Confira os campos do cadastro.');
         if (!empty($_POST['email']) && !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Informe um e-mail válido.');
         if (!empty($_POST['birth_date'])) {
             $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $_POST['birth_date']);
             if (!$date || $date->format('Y-m-d') !== $_POST['birth_date'] || $date > new \DateTimeImmutable('today')) throw new \InvalidArgumentException('Informe uma data de nascimento válida.');
         }
         if (!empty($_POST['gender']) && !in_array($_POST['gender'], ['Feminino','Masculino','Outro','female','male','other'], true)) throw new \InvalidArgumentException('Selecione um gênero válido.');
+
+        $allergyAssessment = null;
+        if (!empty($_POST['allergy_denied']) || ($_POST['allergy_assessment'] ?? '') === 'denied') {
+            $allergyAssessment = 'denied';
+        } elseif (!empty($_POST['allergies'])) {
+            $allergyAssessment = 'recorded';
+        }
+
         $repo = new PatientRepository();
         $createdPatient = $repo->create([
             'name' => $name,
@@ -62,11 +71,14 @@ class DashboardController
             'birth_date' => !empty($_POST['birth_date']) ? $_POST['birth_date'] : null,
             'gender' => !empty($_POST['gender']) ? $_POST['gender'] : null,
             'notes' => !empty($_POST['notes']) ? trim((string)$_POST['notes']) : null,
+            'allergies' => !empty($_POST['allergies']) ? trim((string)$_POST['allergies']) : null,
+            'allergy_assessment' => $allergyAssessment,
             'consent_choice' => $_POST['consent_choice'] ?? 'not_collected',
             'consent_term_id' => $_POST['consent_term_id'] ?? null,
         ]);
 
         $_SESSION['patient_created_id'] = (int)$createdPatient['id'];
+        $_SESSION['patient_created_name'] = $name;
         $_SESSION['patient_submissions'][$submission] = 'completed';
         unset($_SESSION['patient_form']);
         } catch (\InvalidArgumentException $e) {
@@ -78,6 +90,13 @@ class DashboardController
             $_SESSION['patient_error'] = 'Não foi possível cadastrar o paciente. Os dados foram mantidos. Confira o termo e tente novamente.';
             header('Location: /pacientes?error=cadastro');
             return;
+        }
+        // Só caminho interno: "/agenda?..." sim; "//site" e "/\site" (redirecionamento aberto) não.
+        if (!empty($_POST['return_to']) && is_string($_POST['return_to']) && preg_match('#^/(?![/\\\\])[A-Za-z0-9/_\-?=&%.:]*$#', $_POST['return_to'])) {
+            $redirectUrl = $_POST['return_to'];
+            $sep = str_contains($redirectUrl, '?') ? '&' : '?';
+            header('Location: ' . $redirectUrl . $sep . 'paciente=' . (int)$createdPatient['id']);
+            exit;
         }
         header('Location: /pacientes?success=1');
         exit;
@@ -100,9 +119,17 @@ class DashboardController
                 return;
             }
             $data = [];
-            foreach (['name', 'email', 'phone', 'birth_date', 'gender', 'notes'] as $field) {
+            foreach (['name', 'email', 'phone', 'birth_date', 'gender', 'notes', 'allergies'] as $field) {
                 $data[$field] = is_string($_POST[$field] ?? null) ? trim($_POST[$field]) : '';
                 if ($field !== 'name' && $data[$field] === '') $data[$field] = null;
+            }
+            if (!empty($_POST['allergy_denied']) || ($_POST['allergy_assessment'] ?? '') === 'denied') {
+                $data['allergy_assessment'] = 'denied';
+                $data['allergies'] = null;
+            } elseif (!empty($data['allergies'])) {
+                $data['allergy_assessment'] = 'recorded';
+            } else {
+                $data['allergy_assessment'] = null;
             }
             if (mb_strlen($data['name']) > 150) $errors[] = 'O nome deve ter até 150 caracteres.';
             if ($data['name'] === '') $errors[] = 'Informe o nome completo.';
@@ -128,7 +155,7 @@ class DashboardController
             http_response_code(422);
             $patient = array_replace($patient, $data);
         }
-        $title = 'Editar Paciente';
+        $title = 'Editar paciente';
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? '';
@@ -213,8 +240,9 @@ class DashboardController
         }
 
         $p = $profile['patient'];
+        \ClyoNutri\Core\Audit\PatientRecordAccessAudit::record($id, 'profile360'); // CR-NI2-006 / NI2-719
         $consents = (new \ClyoNutri\Domain\Privacy\ConsentManagementService())->getConsentAuditTrail($id);
-        $title = 'Perfil do paciente — ' . $p['name'];
+        $title = 'Perfil do paciente · ' . $p['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -229,7 +257,7 @@ class DashboardController
         $clinicalRecords = $profile['clinical_records'] ?? [];
 
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
-        $latestAnamnesis = $anamnesisService->getLatestAnamnesis($id);
+        $latestAnamnesis = $anamnesisService->getEffectiveAnamnesis($id); // NI2-605: a concluída vale; o rascunho novo é "em andamento"
         $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
         $careStep = (new AppointmentService())->careStepForPatient($id);
         // NI2-135: autorrelatos, medidas liberadas e metas do app da paciente.
@@ -252,119 +280,120 @@ class DashboardController
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
-        <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação antropométrica registrada com sucesso no prontuário!' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro gravado com sucesso no prontuário!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Operação realizada com sucesso!')) ?>
-          </div>
-        <?php endif; ?>
         <?php if (!empty($_GET['error'])): ?>
-          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
-            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na validação dos dados clínicos.' ?>
+          <div class="op-message op-message--error" role="alert">
+            <strong>Erro:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na validação dos dados clínicos.' ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($_GET['success'])): ?>
+          <div role="status" class="op-message op-message--success u-mb-4">
+            <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação salva no prontuário.' : ($_GET['success'] === 'prontuario_salvo' ? 'Registro salvo no prontuário.' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : ($_GET['success'] === 'consulta_concluida' ? 'Consulta concluída. A evolução foi registrada no prontuário.' : ($_GET['success'] === 'agendado' ? 'Consulta agendada. Ela aparece na agenda e no atendimento do paciente.' : 'Pronto, alteração salva.')))) ?>
+          </div>
+        <?php endif; ?>
+        <?php if (($_GET['aviso'] ?? '') === 'medidas'): /* NI2-220: a evolução foi gravada, mas a avaliação antropométrica não */ ?>
+          <div class="op-message op-message--warning" role="status" data-testid="aviso-medidas">
+            <strong>Atenção:</strong> a evolução foi registrada, mas o peso e a cintura informados não puderam ser salvos na avaliação antropométrica. Confira em Antropometria e registre de novo, se precisar.
           </div>
         <?php endif; ?>
 
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar para Pacientes</a>
-            </div>
-            <h1><?= htmlspecialchars($p['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Perfil do paciente • Histórico de acompanhamento</p>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <a href="/chat?patient_id=<?= $p['id'] ?>" class="btn btn-secondary">Conversar via Chat</a>
-            <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary">Editar paciente</a>
-            <form method="post" action="/pacientes/<?= $p['id'] ?>/convite-app" style="margin:0">
-              <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-              <button class="btn btn-secondary" type="submit">Gerar convite para o app</button>
-            </form>
-            <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-secondary">
-              Prontuário ➔
-            </a>
-            <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-secondary">
-              Anamnese Estruturada ➔
-            </a>
-            <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="btn btn-secondary">
-              Antropometria ➔
-            </a>
-            <button type="button" class="btn btn-primary" data-call="openAnthroModal">
-              + Nova Avaliação
-            </button>
-          </div>
-        </div>
-
+        <p class="patient-back"><a href="/pacientes">← Pacientes</a></p>
         <?php
-          $stepApp = $careStep['appointment'];
-          $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
-          // UX-07 (v14): "em andamento" mostra o início real (trilha), separado do horário agendado.
-          $stepStarted = null;
-          if ($stepApp && $careStep['state'] === 'continue') {
-              try {
-                  $stepTimeline = AppointmentService::executionTimeline(['scheduled_at' => $stepApp['scheduled_at'], 'history' => (new AppointmentService())->getStatusHistory((int)$stepApp['id'])]);
-                  $stepStarted = $stepTimeline['started_at'] ? date('d/m/Y \à\s H:i', strtotime($stepTimeline['started_at'])) : null;
-              } catch (\Throwable $e) {
-                  $stepStarted = null;
+          $activePlan = null;
+          if (!empty($profile['meal_plans'])) {
+              foreach ($profile['meal_plans'] as $mp) {
+                  if ($mp['status'] === 'active') {
+                      $activePlan = $mp;
+                      break;
+                  }
+              }
+              if (!$activePlan) {
+                  $activePlan = $profile['meal_plans'][0];
               }
           }
         ?>
-        <?php /* NI2-418 (UX-06): próximo passo do atendimento. GET não cria nem altera consulta. */ ?>
-        <section class="card cn-next-step" aria-labelledby="proximo-passo-titulo" data-testid="care-next-step" data-state="<?= htmlspecialchars($careStep['state']) ?>">
-          <div>
-            <h2 id="proximo-passo-titulo" style="font-size: 1.05rem; margin: 0 0 4px;">Próximo passo com <?= htmlspecialchars($p['name']) ?></h2>
-            <p style="margin: 0; color: var(--neutral-gray-600, #475569); font-size: 0.9rem;">
-              <?php if ($careStep['state'] === 'continue'): ?>Atendimento em andamento<?= $stepStarted ? ' — iniciado em ' . htmlspecialchars($stepStarted) : '' ?> (agendado para <?= htmlspecialchars($stepWhen) ?>). Continue de onde parou: anamnese, avaliação e plano ficam vinculados a este paciente.
-              <?php elseif ($careStep['state'] === 'start_today'): ?>Consulta agendada para hoje (<?= htmlspecialchars(date('H:i', strtotime($stepApp['scheduled_at']))) ?>). Ao iniciar, a consulta passa para "em andamento".
-              <?php elseif ($careStep['state'] === 'upcoming'): ?>Próxima consulta em <?= htmlspecialchars($stepWhen) ?>. Você pode revisar a anamnese e os planos antes do atendimento.
-              <?php else: ?>Nenhuma consulta agendada. Agende o atendimento para iniciar a sequência anamnese → avaliação → plano.
-              <?php endif; ?>
-            </p>
-          </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <?php if ($careStep['state'] === 'continue'): ?>
-              <a class="btn btn-primary" href="/consulta/<?= (int)$stepApp['id'] ?>" data-testid="care-continue">Continuar atendimento</a>
-            <?php elseif ($careStep['state'] === 'start_today'): ?>
-              <form method="POST" action="/agenda/<?= (int)$stepApp['id'] ?>/status" style="margin: 0;" data-no-dirty data-confirm="<?= htmlspecialchars('Iniciar agora o atendimento de ' . $p['name'] . ' (consulta das ' . date('H:i', strtotime($stepApp['scheduled_at'])) . ')?', ENT_QUOTES) ?>">
-                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                <input type="hidden" name="status" value="in_progress">
-                <button type="submit" class="btn btn-primary" data-testid="care-start">Iniciar atendimento</button>
-              </form>
-              <a class="btn btn-secondary" href="/agenda/<?= (int)$stepApp['id'] ?>/reagendar?de=paciente" data-testid="care-reschedule">Reagendar</a>
-            <?php elseif ($careStep['state'] === 'upcoming'): ?>
-              <a class="btn btn-secondary" href="/agenda?view=day&amp;date=<?= htmlspecialchars(substr($stepApp['scheduled_at'], 0, 10)) ?>">Ver na agenda</a>
-              <a class="btn btn-secondary" href="/agenda/<?= (int)$stepApp['id'] ?>/reagendar?de=paciente" data-testid="care-reschedule">Reagendar</a>
-              <a class="btn btn-primary" href="/pacientes/<?= (int)$p['id'] ?>/anamnese">Revisar anamnese</a>
-            <?php else: ?>
-              <a class="btn btn-primary" href="/agenda?novo=1&amp;paciente=<?= (int)$p['id'] ?>" data-testid="care-schedule">Agendar atendimento</a>
-            <?php endif; ?>
-          </div>
-        </section>
-        <nav aria-label="Seções do perfil">
-          <ul class="cn-section-nav">
-            <li><a href="#secao-dados">Dados</a></li>
-            <li><a href="#secao-prontuario">Prontuário</a></li>
-            <li><a href="#secao-anamnese">Anamnese</a></li>
-            <li><a href="#secao-planos">Planos</a></li>
-            <li><a href="#secao-avaliacoes">Avaliações</a></li>
-            <li><a href="#patient-appointments">Consultas</a></li>
-            <li><a href="#patient-checkins">Check-ins</a></li>
-            <li><a href="#app-hidratacao">Hidratação</a></li>
-            <li><a href="#patient-finance">Financeiro</a></li>
-            <li><a href="#patient-consents">Privacidade</a></li>
-          </ul>
-        </nav>
+        <?php
+          // NI2-710/712: último atendimento concluído + pendências de exame para a faixa operacional
+          $pendingExamCount = 0;
+          try {
+              $pe = Connection::getInstance()->prepare("SELECT COUNT(*) FROM exam_requests WHERE clinic_id = ? AND patient_id = ? AND status IN ('draft','review')");
+              $pe->execute([(int)\ClyoNutri\Core\Auth\TenantContext::getClinicId(), (int)$p['id']]);
+              $pendingExamCount = (int)$pe->fetchColumn();
+          } catch (\Throwable $e) { $pendingExamCount = 0; }
+          $lastCompleted = null;
+          try {
+              $lc = Connection::getInstance()->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY COALESCE(completed_at, scheduled_at) DESC, id DESC LIMIT 1");
+              $lc->execute([(int)\ClyoNutri\Core\Auth\TenantContext::getClinicId(), (int)$p['id']]);
+              $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
+          } catch (\Throwable $e) { $lastCompleted = null; }
+          $priorityActions = [];
+          $st = (string)($careStep['state'] ?? 'none');
+          if ($st === 'continue' && !empty($careStep['appointment']['id'])) {
+              $priorityActions[] = ['label' => 'Continuar atendimento', 'href' => '/consulta/' . (int)$careStep['appointment']['id']];
+          } elseif ($st === 'upcoming' || $st === 'start_today') {
+              $priorityActions[] = ['label' => 'Preparar consulta', 'href' => '/pacientes/' . (int)$p['id'] . '/preparar'];
+          }
+          if (!empty($clinicalSummary['draft_in_progress'])) {
+              $priorityActions[] = ['label' => 'Continuar anamnese', 'href' => '/pacientes/' . (int)$p['id'] . '/anamnese'];
+          }
+          if (($activePlan['status'] ?? '') === 'draft') {
+              $priorityActions[] = ['label' => 'Continuar plano', 'href' => '/planos/' . (int)$activePlan['id']];
+          } elseif (!$activePlan) {
+              $priorityActions[] = ['label' => 'Criar plano', 'href' => '/pacientes/' . (int)$p['id'] . '/plano'];
+          }
+          if (!empty($clinicalSummary['allergy_review'])) {
+              $priorityActions[] = ['label' => 'Revisar alergia', 'href' => '#alergia-revisao'];
+          }
+        ?>
+        <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$p['id'], 'resumo', $p, $careStep, $clinicalSummary, $activePlan, true) // NI2-622/661 ?>
+        <?php /* NI2-624: alergia de versão anterior (ou do cadastro) que a vigente não confirma: revisão clínica, sem descartar o risco. */ ?>
+        <?php $allergyReview = $clinicalSummary['allergy_review'] ?? []; ?>
+        <?php if (!empty($_GET['alergia_revisada'])): ?>
+          <div class="op-message op-message--info card allergy-review allergy-review--done" role="status" data-testid="allergy-review-done">Revisão registrada no histórico do paciente.</div>
+        <?php endif; ?>
+        <?php if ($allergyReview): ?>
+          <section class="card allergy-review" id="alergia-revisao" role="alert" aria-labelledby="allergy-review-title" data-testid="allergy-review">
+            <h2 id="allergy-review-title" class="allergy-review__title"><?= \ClyoNutri\Application\View\Icon::svg('triangle-alert', 20) ?> Alergia exige revisão clínica</h2>
+            <p class="allergy-review__lead">A anamnese vigente não confirma uma alergia registrada antes. Até a revisão, ela <strong>continua valendo</strong> na trava de alérgenos do plano, das receitas e da lista de compras.</p>
+            <ul class="allergy-review__list">
+              <?php foreach ($allergyReview as $rf): ?>
+                <li data-testid="allergy-review-item" data-group="<?= htmlspecialchars($rf['group']) ?>">
+                  <p class="u-mt-0 u-mb-2 u-mx-0"><?= htmlspecialchars($rf['message']) ?></p>
+                  <?php if ($this->canEditPlanItems(Connection::getInstance())): ?>
+                  <details class="allergy-review__dismiss">
+                    <summary>A alergia foi descartada clinicamente</summary>
+                    <form method="POST" action="/pacientes/<?= (int)$p['id'] ?>/alergias/revisao">
+                      <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                      <input type="hidden" name="group" value="<?= htmlspecialchars($rf['group']) ?>">
+                      <label class="form-label" for="ar-<?= htmlspecialchars($rf['group']) ?>">Motivo (fica no histórico do paciente)</label>
+                      <textarea class="form-control" id="ar-<?= htmlspecialchars($rf['group']) ?>" name="reason" rows="2" minlength="5" maxlength="300" required placeholder="Ex.: teste de provocação oral negativo em 10/2026"></textarea>
+                      <button type="submit" class="btn btn-secondary btn-sm u-mt-2">Registrar que foi descartada</button>
+                    </form>
+                  </details>
+                  <?php endif; ?>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+            <p class="u-mt-2 u-mb-0 u-mx-0"><a class="btn btn-secondary btn-sm" href="/pacientes/<?= (int)$p['id'] ?>/anamnese">Confirmar na anamnese</a> <span class="allergy-review__hint">Se a alergia continua, registre-a de novo na anamnese.</span></p>
+          </section>
+        <?php endif; ?>
 
+
+        <?php require __DIR__ . '/../../../views/patients/_operational_strip.php'; ?>
+        <details class="profile-details" data-testid="profile-details" open>
+          <summary>Detalhes do prontuário, planos, avaliações e app</summary>
+          <div class="profile-details__body">
         <div class="cn-split">
           <!-- Coluna 1: Dados Cadastrais -->
           <div class="card" id="secao-dados">
-            <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Dados Essenciais</h3>
-            <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
-            <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
-            <p style="margin-bottom: var(--space-2);"><strong>Nascimento:</strong> <?= $p['birth_date'] ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
-            <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
+            <h3 class="u-mt-0 u-mb-4">Dados essenciais</h3>
+            <p class="u-mb-2"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
+            <p class="u-mb-2"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
+            <p class="u-mb-2"><strong>Nascimento:</strong> <?= $p['birth_date'] ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
+            <p class="u-mb-2"><strong>Sexo registrado para referências clínicas:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
             <?php if (!empty($p['notes'])): ?>
-              <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--border-default);">
+              <div class="u-mt-4 u-pt-4 u-border-t">
                 <strong>Observações:</strong>
-                <p style="color: var(--neutral-gray-500); margin-top: 4px;"><?= nl2br(htmlspecialchars($p['notes'])) ?></p>
+                <p class="u-color-neutral-gray-500 u-mt-1"><?= nl2br(htmlspecialchars($p['notes'])) ?></p>
               </div>
             <?php endif; ?>
           </div>
@@ -372,40 +401,40 @@ class DashboardController
           <!-- Coluna 2: Prontuário, Anamnese, Avaliações e Planos -->
           <div>
             <!-- Card 1: Prontuário Eletrônico & Evoluções -->
-            <div class="card" id="secao-prontuario" style="margin-bottom: var(--space-6);">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div class="card u-mb-6" id="secao-prontuario">
+              <div class="card__header u-flex u-justify-between u-items-center u-mb-3 u-wrap u-gap-2">
                 <div>
-                  <h3 style="margin: 0; display: inline-block;">Prontuário</h3>
+                  <h3 class="u-m-0 u-inline-block">Prontuário</h3>
                   <?php if ($integrity['is_valid'] && (int)$integrity['total_records'] > 0): ?>
-                    <span class="badge badge-success" style="font-size: 0.75rem; margin-left: 8px;">✓ <?= !empty($integrity['legacy_records']) ? 'Conteúdo e encadeamento verificados' : 'Integridade dos registros verificada' ?></span>
+                    <span class="badge badge-success u-text-caption u-ml-2">✓ <?= !empty($integrity['legacy_records']) ? 'Conteúdo e encadeamento verificados' : 'Integridade dos registros verificada' ?></span>
                   <?php elseif (!$integrity['is_valid']): ?>
-                    <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 0.75rem; margin-left: 8px;">⚠️ Os registros precisam de verificação</span>
+                    <span class="badge u-bg-semantic-error-light u-color-semantic-error u-text-caption u-ml-2">Os registros precisam de verificação</span>
                   <?php endif; ?>
                 </div>
-                <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
-                  Abrir Prontuário Completo ➔
+                <a href="/pacientes/<?= $p['id'] ?>/prontuario" class="btn btn-sm btn-outline u-text-compact u-no-underline u-py-0 u-px-2">
+                  Abrir prontuário completo →
                 </a>
               </div>
 
               <?php if (empty($clinicalRecords)): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhum registro clínico adicionado ao prontuário até o momento.</p>
+                <p class="u-color-neutral-gray-500 u-text-compact">Nenhum registro clínico adicionado ao prontuário até o momento.</p>
               <?php else: ?>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="u-flex u-flex-col u-gap-2">
                   <?php foreach (array_slice($clinicalRecords, 0, 3) as $cr): ?>
-                    <div style="padding: 10px 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px; font-size: 0.875rem;">
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($cr['title']) ?></strong>
-                        <div style="display: flex; gap: 6px; align-items: center;">
-                          <span style="font-size: 0.75rem; color: #64748B;">v<?= $cr['version'] ?> • <?= date('d/m/Y H:i', strtotime($cr['created_at'])) ?></span>
+                    <div class="u-py-2 u-px-3 u-bg-neutral-gray-50 u-border u-radius-input u-text-compact">
+                      <div class="u-flex u-justify-between u-items-center u-mb-1">
+                        <strong class="u-color-botanical-forest-900"><?= htmlspecialchars($cr['title']) ?></strong>
+                        <div class="u-flex u-gap-1 u-items-center">
+                          <span class="u-text-caption u-color-neutral-gray-500">v<?= $cr['version'] ?> • <?= date('d/m/Y H:i', strtotime($cr['created_at'])) ?></span>
                           <?php if ($cr['is_retracted']): ?>
-                            <span class="badge badge-warning" style="font-size: 0.7rem;">Retificado</span>
+                            <span class="badge badge-warning u-text-caption">Retificado</span>
                           <?php endif; ?>
                         </div>
                       </div>
-                      <div style="color: var(--neutral-gray-600); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        <?= htmlspecialchars($cr['content']['text'] ?? $cr['content']['evolution_summary'] ?? json_encode($cr['content'], JSON_UNESCAPED_UNICODE)) ?>
+                      <div class="u-color-neutral-gray-600 u-text-compact u-nowrap u-overflow-hidden u-ellipsis">
+                        <?= htmlspecialchars(\ClyoNutri\Domain\Clinical\ClinicalRecordContent::plainText($cr['content'] ?? ($cr['content_json'] ?? null))) // v54.27: texto, nunca JSON ?>
                       </div>
-                      <div style="margin-top: 4px; font-size: 0.7rem; color: #94A3B8; font-family: monospace;">
+                      <div class="u-mt-1 u-text-caption u-color-neutral-gray-600 u-font-mono">
                         Responsável: <?= htmlspecialchars($cr['professional_name']) ?>
                       </div>
                     </div>
@@ -415,86 +444,98 @@ class DashboardController
             </div>
 
             <!-- Card 2: Anamnese Nutricional Vigente & Resumo Crítico -->
-            <div class="card" id="secao-anamnese" style="margin-bottom: var(--space-6);">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div class="card u-mb-6" id="secao-anamnese">
+              <div class="card__header u-flex u-justify-between u-items-center u-mb-3 u-wrap u-gap-2">
                 <div>
-                  <h3 style="margin: 0; display: inline-block;">Anamnese Nutricional</h3>
-                  <?php if ($latestAnamnesis): ?>
-                    <span class="badge badge-info" style="font-size: 0.75rem; margin-left: 8px;">
-                      v<?= $latestAnamnesis['version'] ?> <?= $latestAnamnesis['is_draft'] ? '(Rascunho)' : '(Vigente)' ?> • <?= date('d/m/Y', strtotime($latestAnamnesis['created_at'])) ?>
+                  <h3 class="u-m-0 u-inline-block">Anamnese nutricional</h3>
+                  <?php
+                    // NI2-605: o selo mostra a versão que vale (a última concluída); o rascunho mais novo é "alteração em andamento".
+                    $anVigente = !empty($clinicalSummary['source']['anamnesis_id']) ? $clinicalSummary['source'] : null;
+                    $anDraft = $clinicalSummary['draft_in_progress'] ?? null;
+                  ?>
+                  <?php if ($anVigente && empty($clinicalSummary['is_draft'])): ?>
+                    <span class="badge badge-info u-text-caption u-ml-2" data-testid="profile-anamnesis-version">
+                      v<?= (int)$anVigente['version'] ?> (Vigente) • <?= date('d/m/Y', strtotime($anVigente['recorded_at'])) ?>
+                    </span>
+                  <?php elseif ($latestAnamnesis): ?>
+                    <span class="badge badge-warning u-text-caption u-ml-2" data-testid="profile-anamnesis-version">
+                      v<?= (int)$latestAnamnesis['version'] ?> (Rascunho, nenhuma versão concluída) • <?= date('d/m/Y', strtotime($latestAnamnesis['created_at'])) ?>
                     </span>
                   <?php endif; ?>
+                  <?php if ($anDraft): ?>
+                    <span class="badge badge-warning u-text-caption u-ml-1" data-testid="profile-anamnesis-draft"><?= htmlspecialchars($anDraft['label']) ?></span>
+                  <?php endif; ?>
                 </div>
-                <div style="display: flex; gap: 6px;">
-                  <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
-                    <?= $latestAnamnesis ? 'Atualizar / Ver Histórico ➔' : '+ Realizar Anamnese ➔' ?>
+                <div class="u-flex u-gap-1">
+                  <a href="/pacientes/<?= $p['id'] ?>/anamnese" class="btn btn-sm btn-outline u-text-compact u-no-underline u-py-0 u-px-2">
+                    <?= !empty($anDraft) ? 'Continuar alteração (v' . (int)$anDraft['version'] . ') →' : ($latestAnamnesis ? 'Atualizar / ver histórico →' : '+ Realizar anamnese →') ?>
                   </a>
                 </div>
               </div>
 
               <?php if (!$latestAnamnesis): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhuma anamnese cadastrada para este paciente. Clique acima para coletar objetivos e restrições.</p>
+                <p class="u-color-neutral-gray-500 u-text-compact">Nenhuma anamnese cadastrada para este paciente. Clique acima para coletar objetivos e restrições.</p>
               <?php else: ?>
                 <!-- Destaques Críticos da Anamnese -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
+                <div class="u-grid u-cols-auto-md u-gap-2 u-mb-2">
                   <!-- Alergias -->
-                  <div style="padding: 8px 12px; border-radius: 6px; background: <?= !empty($latestAnamnesis['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($latestAnamnesis['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($latestAnamnesis['allergies']) ? '#DC2626' : '#64748B' ?>; display: block;">
-                      <?= !empty($latestAnamnesis['allergies']) ? '⚠️ ALERGIAS (CRÍTICO)' : 'ALERGIAS' ?>
+                  <div class="ds-clinical-flag<?= !empty($latestAnamnesis['allergies']) ? ' ds-clinical-flag--critical op-message--critical' : '' ?>" data-testid="profile-allergy-flag"<?= !empty($latestAnamnesis['allergies']) ? ' data-severity="critical"' : '' ?>>
+                    <span class="ds-clinical-flag__title"><?php if (!empty($latestAnamnesis['allergies'])): ?><span class="cn-flag-icon" aria-hidden="true"></span><span class="sr-only">Alerta clínico: </span><?php endif; ?>
+                      <?= !empty($latestAnamnesis['allergies']) ? 'ALERGIAS (CRÍTICO)' : 'ALERGIAS' ?>
                     </span>
-                    <span style="font-size: 0.85rem; color: #1E293B;">
+                    <span class="u-text-compact u-color-neutral-ink-900">
                       <?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?>
                     </span>
                   </div>
 
                   <!-- Restrições / Intolerâncias -->
-                  <div style="padding: 8px 12px; border-radius: 6px; background: <?= !empty($latestAnamnesis['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($latestAnamnesis['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($latestAnamnesis['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">
-                      <?= !empty($latestAnamnesis['restrictions']) ? '⚠️ RESTRIÇÕES ALIMENTARES' : 'RESTRIÇÕES' ?>
+                  <div class="ds-clinical-flag<?= !empty($latestAnamnesis['restrictions']) ? ' ds-clinical-flag--warning op-message--warning' : '' ?>" data-testid="profile-restriction-flag"<?= !empty($latestAnamnesis['restrictions']) ? ' data-severity="warning"' : '' ?>>
+                    <span class="ds-clinical-flag__title"><?php if (!empty($latestAnamnesis['restrictions'])): ?><span class="cn-flag-icon" aria-hidden="true"></span><span class="sr-only">Atenção: </span><?php endif; ?>
+                      <?= !empty($latestAnamnesis['restrictions']) ? 'RESTRIÇÕES ALIMENTARES' : 'RESTRIÇÕES' ?>
                     </span>
-                    <span style="font-size: 0.85rem; color: #1E293B;">
+                    <span class="u-text-compact u-color-neutral-ink-900">
                       <?= htmlspecialchars(LabelMap::recorded($latestAnamnesis['restrictions'] ?? null)) ?>
                     </span>
                   </div>
 
                   <!-- Objetivos -->
-                  <div style="padding: 8px 12px; border-radius: 6px; background: #F8FAFC; border: 1px solid #E2E8F0;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: #0369A1; display: block;">OBJETIVOS & METAS</span>
-                    <span style="font-size: 0.85rem; color: #1E293B;">
+                  <div class="u-py-2 u-px-3 u-radius-input u-bg-neutral-gray-50 u-border">
+                    <span class="u-text-caption u-font-bold u-color-semantic-info u-block">OBJETIVOS & METAS</span>
+                    <span class="u-text-compact u-color-neutral-ink-900">
                       <?= htmlspecialchars($latestAnamnesis['objectives'] ?? 'Não especificados') ?>
                     </span>
                   </div>
                 </div>
 
                 <?php if (!empty($latestAnamnesis['symptoms'])): ?>
-                  <div style="padding: 6px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 0.8rem; margin-top: 6px;">
-                    <strong>Sinais & Sintomas:</strong> <?= htmlspecialchars($latestAnamnesis['symptoms']) ?>
+                  <div class="u-py-1 u-px-3 u-bg-neutral-gray-50 u-border u-radius-input u-text-compact u-mt-1">
+                    <strong>Sinais e sintomas:</strong> <?= htmlspecialchars($latestAnamnesis['symptoms']) ?>
                   </div>
                 <?php endif; ?>
               <?php endif; ?>
             </div>
 
             <!-- Card 3: Planos Alimentares -->
-            <div class="card" id="secao-planos" style="margin-bottom: var(--space-6);">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="margin: 0;">Planos Alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
-                <button type="button" class="btn btn-secondary" data-show="modal-new-plan-p360" style="font-size: 0.8rem; padding: 3px 8px;">
+            <div class="card u-mb-6" id="secao-planos">
+              <div class="card__header u-flex u-justify-between u-items-center u-mb-3">
+                <h3 class="u-m-0">Planos alimentares (<?= count($profile['meal_plans'] ?? []) ?>)</h3>
+                <button type="button" class="btn btn-secondary u-text-compact u-py-1 u-px-2" data-show="modal-new-plan-p360">
                   + Novo Plano
                 </button>
               </div>
               <?php if (empty($profile['meal_plans'])): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">Nenhum plano alimentar prescrito ainda para este paciente.</p>
+                <p class="u-color-neutral-gray-500 u-text-compact">Nenhum plano alimentar prescrito ainda para este paciente.</p>
               <?php else: ?>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="u-flex u-flex-col u-gap-2">
                   <?php foreach ($profile['meal_plans'] as $mp): ?>
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8fafc; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
+                    <div class="u-flex u-justify-between u-items-center u-py-2 u-px-3 u-bg-neutral-gray-50 u-border u-radius-input">
                       <div>
-                        <strong style="color: var(--brand-navy-900); font-size: 0.95rem;"><?= htmlspecialchars($mp['title']) ?></strong>
-                        <span style="font-size: 0.75rem; color: #64748b; margin-left: 6px;">v<?= $mp['version'] ?></span>
-                        <span style="margin-left: 6px;"><?= LabelMap::mealPlanStatusBadge($mp['status']) ?></span>
+                        <strong class="u-color-botanical-forest-900 u-text-body"><?= htmlspecialchars($mp['title']) ?></strong>
+                        <span class="u-text-caption u-color-neutral-gray-500 u-ml-1">v<?= $mp['version'] ?></span>
+                        <span class="u-ml-1"><?= LabelMap::mealPlanStatusBadge($mp['status']) ?></span>
                       </div>
-                      <a href="/planos/<?= $mp['id'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none; padding: 2px 8px;">
-                        Abrir Editor ➔
+                      <a href="/planos/<?= $mp['id'] ?>" class="btn btn-sm btn-outline u-text-compact u-no-underline u-py-0 u-px-2">
+                        Abrir editor →
                       </a>
                     </div>
                   <?php endforeach; ?>
@@ -503,24 +544,24 @@ class DashboardController
             </div>
 
             <!-- Modal Novo Plano para Paciente -->
-            <div id="modal-new-plan-p360" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-              <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-                <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Nova Prescrição Alimentar</h3>
-                <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;">Paciente: <strong><?= htmlspecialchars($p['name']) ?></strong></p>
+            <div id="modal-new-plan-p360" data-dialog="modal" class="modal-overlay">
+              <div class="cn-dialog__panel u-bg-neutral-white u-radius-card u-w-full u-maxw-form u-p-6 u-shadow-lg">
+                <h3 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mt-0 u-mb-2">Nova prescrição alimentar</h3>
+                <p class="u-color-neutral-gray-500 u-text-compact u-mb-4">Paciente: <strong><?= htmlspecialchars($p['name']) ?></strong></p>
                 <form method="POST" action="/planos/novo">
                   <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                   <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
-                  <div style="margin-bottom: 16px;">
-                    <label for="dc1-title" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título do Plano *</label>
-                    <input id="dc1-title" type="text" name="title" required placeholder="Ex: Plano Alimentar Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <div class="u-mb-4">
+                    <label for="dc1-title" class="u-block u-font-semibold u-mb-1 u-text-compact">Título do Plano *</label>
+                    <input id="dc1-title" type="text" name="title" required placeholder="Ex: Plano Alimentar Fase 1" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                   </div>
-                  <div style="margin-bottom: 20px;">
-                    <label for="dc2-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Iniciais (Opcional)</label>
-                    <textarea id="dc2-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                  <div class="u-mb-5">
+                    <label for="dc2-notes" class="u-block u-font-semibold u-mb-1 u-text-compact">Orientações iniciais (opcional)</label>
+                    <textarea id="dc2-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários, hidratação..." class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
                   </div>
-                  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                  <div class="u-flex u-justify-end u-gap-2">
                     <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan-p360">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Abrir Editor</button>
+                    <button type="submit" class="btn btn-primary">Abrir editor</button>
                   </div>
                 </form>
               </div>
@@ -528,72 +569,72 @@ class DashboardController
 
             <!-- Card de Avaliações Antropométricas com Indicadores OMS -->
             <div class="card" id="secao-avaliacoes">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="margin: 0;">Avaliações Antropométricas (<?= count($assessments) ?>)</h3>
-                <a href="/pacientes/<?= $p['id'] ?>/antropometria" style="font-size: 0.85rem; color: var(--brand-copper-600); font-weight: 600; text-decoration: none;">Análise Completa ➔</a>
+              <div class="card__header u-flex u-justify-between u-items-center u-mb-3">
+                <h3 class="u-m-0">Avaliações antropométricas (<?= count($assessments) ?>)</h3>
+                <a href="/pacientes/<?= $p['id'] ?>/antropometria" class="u-text-compact u-color-botanical-copper-600 u-font-semibold u-no-underline">Análise completa →</a>
               </div>
 
               <?php if (empty($assessments)): ?>
-                <div style="text-align: center; padding: var(--space-6); color: var(--neutral-gray-500);">
+                <div class="u-text-center u-p-6 u-color-neutral-gray-500">
                   <p>Nenhuma avaliação antropométrica registrada ainda para este paciente.</p>
-                  <button type="button" class="btn btn-secondary" data-call="openAnthroModal" style="margin-top: 8px;">Registrar 1ª Avaliação</button>
+                  <button type="button" class="btn btn-secondary u-mt-2" data-call="openAnthroModal">Registrar 1ª avaliação</button>
                 </div>
               <?php else: ?>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="u-flex u-flex-col u-gap-3">
                   <?php foreach (array_reverse(array_slice($assessments, -5)) as $as): ?>
-                    <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 12px 16px;">
-                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                    <div class="u-bg-neutral-gray-50 u-border u-radius-input u-py-3 u-px-4">
+                      <div class="u-flex u-justify-between u-items-start u-mb-2 u-wrap u-gap-2">
                         <div>
-                          <strong style="color: var(--brand-navy-900); font-size: 1rem;"><?= date('d/m/Y', strtotime($as['assessed_at'])) ?></strong>
-                          <span style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-left: 8px;">Avaliador: <?= htmlspecialchars($as['professional_name'] ?? 'Nutricionista') ?></span>
+                          <strong class="u-color-botanical-forest-900 u-text-body"><?= date('d/m/Y', strtotime($as['assessed_at'])) ?></strong>
+                          <span class="u-text-compact u-color-neutral-gray-500 u-ml-2">Avaliador: <?= htmlspecialchars($as['professional_name'] ?? 'Nutricionista') ?></span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="u-flex u-items-center u-gap-2">
                           <?php if ($as['is_shared']): ?>
-                            <span class="badge badge-success" style="font-size: 0.75rem;">✓ Liberado ao Paciente</span>
+                            <span class="badge badge-success u-text-caption">✓ Liberado ao Paciente</span>
                           <?php else: ?>
-                            <span class="badge badge-secondary" style="font-size: 0.75rem; background: #E2E8F0; color: #475569;">Privado (Clínico)</span>
+                            <span class="badge badge-secondary u-text-caption u-bg-neutral-gray-200 u-color-neutral-gray-600">Privado (clínico)</span>
                           <?php endif; ?>
                           
-                          <form action="/pacientes/<?= $p['id'] ?>/antropometria/<?= $as['id'] ?>/compartilhar" method="POST" style="display: inline;">
+                          <form action="/pacientes/<?= $p['id'] ?>/antropometria/<?= $as['id'] ?>/compartilhar" method="POST" class="u-inline">
                             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="is_shared" value="<?= $as['is_shared'] ? '0' : '1' ?>">
-                            <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 26px;">
+                            <button type="submit" class="btn btn-secondary u-text-caption u-py-0 u-px-2 u-minh-touch">
                               <?= $as['is_shared'] ? 'Revogar' : 'Liberar' ?>
                             </button>
                           </form>
                         </div>
                       </div>
 
-                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; font-size: 0.875rem;">
+                      <div class="u-grid u-cols-auto-sm u-gap-2 u-text-compact">
                         <div>
-                          <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">PESO & ALTURA</span>
-                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($as['weight_kg'] ?? null, 1)) ?> kg</strong> / <span class="tabular-nums"><?= htmlspecialchars(LabelMap::num($as['height_cm'] ?? null, 1)) ?> cm</span>
+                          <span class="u-color-neutral-gray-500 u-text-caption u-block">PESO & ALTURA</span>
+                          <strong class="tabular-nums u-color-botanical-forest-900"><?= htmlspecialchars(LabelMap::num($as['weight_kg'] ?? null, 1)) ?> kg</strong> / <span class="tabular-nums"><?= htmlspecialchars(LabelMap::num($as['height_cm'] ?? null, 1)) ?> cm</span>
                         </div>
                         <div>
-                          <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">IMC (OMS)</span>
-                          <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($as['bmi'] ?? null, 2)) ?></strong>
-                          <span class="badge badge-info" style="font-size: 0.7rem; padding: 1px 5px;"><?= $as['bmi_classification'] ?></span>
+                          <span class="u-color-neutral-gray-500 u-text-caption u-block">IMC (OMS)</span>
+                          <strong class="tabular-nums u-color-botanical-forest-900"><?= htmlspecialchars(LabelMap::num($as['bmi'] ?? null, 2)) ?></strong>
+                          <span class="badge badge-info u-text-caption u-py-0 u-px-1"><?= $as['bmi_classification'] ?></span>
                         </div>
                         <?php if ($as['whr'] !== null): ?>
                           <div>
-                            <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">RCQ (CINTURA/QUADRIL)</span>
-                            <strong class="tabular-nums" style="color: var(--brand-navy-900);"><?= $as['whr'] ?></strong>
-                            <span style="font-size: 0.7rem; color: var(--neutral-gray-600); display: block;"><?= $as['whr_classification'] ?></span>
+                            <span class="u-color-neutral-gray-500 u-text-caption u-block">RCQ (CINTURA/QUADRIL)</span>
+                            <strong class="tabular-nums u-color-botanical-forest-900"><?= $as['whr'] ?></strong>
+                            <span class="u-text-caption u-color-neutral-gray-600 u-block"><?= $as['whr_classification'] ?></span>
                           </div>
                         <?php endif; ?>
                         <?php if ($as['body_fat_pct'] !== null): ?>
                           <div>
-                            <span style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block;">GORDURA CORPORAL</span>
-                            <strong class="tabular-nums" style="color: var(--brand-copper-600);"><?= htmlspecialchars(LabelMap::num($as['body_fat_pct'] ?? null, 1)) ?>%</strong>
+                            <span class="u-color-neutral-gray-500 u-text-caption u-block">GORDURA CORPORAL</span>
+                            <strong class="tabular-nums u-color-botanical-copper-600"><?= htmlspecialchars(LabelMap::num($as['body_fat_pct'] ?? null, 1)) ?>%</strong>
                             <?php if ($as['fat_mass_kg'] !== null): ?>
-                              <span style="font-size: 0.75rem; color: var(--neutral-gray-500);">(<?= $as['fat_mass_kg'] ?> kg)</span>
+                              <span class="u-text-caption u-color-neutral-gray-500">(<?= $as['fat_mass_kg'] ?> kg)</span>
                             <?php endif; ?>
                           </div>
                         <?php endif; ?>
                       </div>
 
                       <?php if (!empty($as['notes'])): ?>
-                        <div style="margin-top: 8px; font-size: 0.8rem; color: var(--neutral-gray-600); background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--neutral-gray-200);">
+                        <div class="u-mt-2 u-text-compact u-color-neutral-gray-600 u-bg-neutral-white u-py-1 u-px-2 u-radius-input u-border">
                           <strong>Notas:</strong> <?= htmlspecialchars($as['notes']) ?>
                         </div>
                       <?php endif; ?>
@@ -605,24 +646,38 @@ class DashboardController
           </div>
         </div>
 
+        <section class="card u-mb-6" id="secao-documentos" aria-labelledby="docs-title">
+          <h3 id="docs-title" class="u-mt-0">Documentos</h3>
+          <p class="u-color-neutral-gray-600 u-text-compact">A área completa está em <a href="/pacientes/<?= (int)$p['id'] ?>/documentos">Documentos</a>. Manipulados = fórmulas/suplementação.</p>
+          <ul class="cn-profile-links" data-testid="profile-docs">
+            <li><a href="/pacientes/<?= (int)$p['id'] ?>/prescricoes" data-testid="profile-manipulados-btn">Manipulados (fórmulas)</a></li>
+            <li><a href="/pacientes/<?= (int)$p['id'] ?>/prontuario/imprimir">Prontuário para impressão</a></li>
+            <li><a href="/pacientes/<?= (int)$p['id'] ?>/prontuario/exportar">Exportar prontuário</a></li>
+            <li><a href="#patient-consents">Termos e consentimentos</a></li>
+          </ul>
+        </section>
         <?php require __DIR__ . '/../../../views/patients/longitudinal.php'; ?>
         <?php $pid = (int)$p['id']; require __DIR__ . '/../../../views/patients/app-evolution.php'; ?>
         <?php if ($chatLinkSvc->available()) require __DIR__ . '/../../../views/patients/chat-link.php'; ?>
         <?php require __DIR__ . '/../../../views/patients/app-hydration.php'; ?>
+          </div>
+        </details>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
-          <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
+          <div class="cn-dialog__panel modal-dialog u-maxw-prose">
             <div class="modal-header">
-              <h3>Nova Avaliação Antropométrica</h3>
+              <h3>Nova avaliação antropométrica</h3>
               <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
-            <form method="POST" action="/pacientes/<?= $p['id'] ?>/antropometria">
+            <?php /* NI2-602: id do paciente lido de $profile, não de $p (views incluídas acima podem reaproveitar nomes). */ $anthroPatientId = (int)$profile['patient']['id']; ?>
+            <?= \ClyoNutri\Application\View\ClinicalContext::render(Connection::getInstance(),$anthroPatientId) ?>
+            <form method="POST" action="/pacientes/<?= $anthroPatientId ?>/antropometria" data-testid="profile-anthro-form" data-patient-id="<?= $anthroPatientId ?>">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <input type="hidden" name="patient_id" value="<?= $p['id'] ?>">
+              <input type="hidden" name="patient_id" value="<?= $anthroPatientId ?>">
 
-              <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+              <div class="modal-body u-maxh-dialog u-overflow-y-auto">
+                <div class="u-grid u-cols-2 u-gap-4">
                   <div class="form-group">
                     <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
                     <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
@@ -638,8 +693,8 @@ class DashboardController
                   <input type="datetime-local" id="ant_date" name="assessed_at" class="form-control" value="<?= date('Y-m-d\TH:i') ?>">
                 </div>
 
-                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Circunferências Corporais (cm)</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
+                <h4 class="u-text-body u-mt-4 u-mb-2 u-color-botanical-forest-900">Circunferências Corporais (cm)</h4>
+                <div class="u-grid u-cols-3 u-gap-3">
                   <div class="form-group">
                     <label class="form-label" for="ant_waist">Cintura (cm)</label>
                     <input type="number" step="0.1" min="10" max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82.0">
@@ -654,7 +709,7 @@ class DashboardController
                   </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-3);">
+                <div class="u-grid u-cols-4 u-gap-3">
                   <div class="form-group">
                     <label class="form-label" for="ant_arm">Braço (cm)</label>
                     <input type="number" step="0.1" min="10" max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32.5">
@@ -673,26 +728,26 @@ class DashboardController
                   </div>
                 </div>
 
-                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Composição Corporal Informada (Bioimpedância / Dobras)</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                <h4 class="u-text-body u-mt-4 u-mb-2 u-color-botanical-forest-900">Composição corporal informada (bioimpedância / dobras)</h4>
+                <div class="u-grid u-cols-2 u-gap-4">
                   <div class="form-group">
-                    <label class="form-label" for="ant_fat">% Gordura Corporal</label>
+                    <label class="form-label" for="ant_fat">% Gordura corporal</label>
                     <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="ant_muscle">% Massa Muscular</label>
+                    <label class="form-label" for="ant_muscle">% Massa muscular</label>
                     <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
                   </div>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="ant_notes">Anotações Clínicas & Metas</label>
-                  <textarea id="ant_notes" name="notes" class="form-control" style="min-height: 60px;" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
+                  <label class="form-label" for="ant_notes">Anotações clínicas e metas</label>
+                  <textarea id="ant_notes" name="notes" class="form-control u-minh-field" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
                 </div>
 
-                <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
-                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
-                    <input type="checkbox" name="is_shared" value="1" style="width: 16px; height: 16px;"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
+                <div class="u-mt-3 u-p-3 u-bg-neutral-gray-50 u-border u-radius-input">
+                  <label class="u-flex u-items-center u-gap-2 u-pointer u-text-compact u-color-botanical-forest-900 u-font-medium">
+                    <input type="checkbox" name="is_shared" value="1" class="ds-check"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
                     Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
@@ -700,7 +755,7 @@ class DashboardController
 
               <div class="modal-footer">
                 <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
+                <button type="submit" class="btn btn-primary">Salvar avaliação antropométrica</button>
               </div>
             </form>
           </div>
@@ -767,7 +822,7 @@ class DashboardController
         $latestEval = !empty($assessments) ? end($assessments) : null;
         $firstEval = !empty($assessments) ? $assessments[0] : null;
 
-        $title = 'Evolução Antropométrica — ' . $patient['name'];
+        $title = 'Antropometria e avaliações · ' . $patient['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
@@ -776,27 +831,25 @@ class DashboardController
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
-        <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação registrada com sucesso!' : ($_GET['success'] === 'avaliacao_ja_registrada' ? 'Esta avaliação já estava registrada; o reenvio não criou duplicata.' : 'Permissão de compartilhamento atualizada com sucesso!') ?>
+        <?php if (!empty($_GET['error'])): ?>
+          <div class="op-message op-message--error" role="alert">
+            <strong>Erro:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
           </div>
         <?php endif; ?>
-        <?php if (!empty($_GET['error'])): ?>
-          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
-            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
+        <?php if (!empty($_GET['success'])): ?>
+          <div role="status" class="op-message op-message--success u-mb-4">
+            <?= $_GET['success'] === 'avaliacao_registrada' ? 'Avaliação salva.' : ($_GET['success'] === 'avaliacao_ja_registrada' ? 'Esta avaliação já estava registrada; o reenvio não criou duplicata.' : 'Visibilidade no app do paciente atualizada.') ?>
           </div>
         <?php endif; ?>
 
         <!-- Cabeçalho -->
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$patient['id'], 'avaliacoes') // NI2-661 ?>
+        <div class="u-mb-6 u-flex u-justify-between u-items-center u-wrap u-gap-3">
           <div>
-            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
-            </div>
-            <h1>Evolução Antropométrica: <?= htmlspecialchars($patient['name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">Evolução dos indicadores, composição corporal e comparação entre avaliações.</p>
+            <h2 class="patient-page-title">Antropometria e avaliações</h2>
+            <p class="u-color-neutral-gray-500">Histórico dos indicadores, composição corporal e comparação entre avaliações.</p>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div class="u-flex u-gap-2 u-wrap">
             <a class="btn btn-outline" href="/pacientes/<?= (int)$patient['id'] ?>/antropometria/dobras" data-testid="link-skinfolds">Dobras cutâneas</a>
             <button type="button" class="btn btn-primary" data-call="openAnthroModal">
               + Nova Avaliação
@@ -806,34 +859,34 @@ class DashboardController
 
         <!-- KPIs Resumo Clínico -->
         <?php if ($latestEval): ?>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: var(--space-6);">
-            <div class="card" style="margin-bottom: 0;">
-              <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">ÚLTIMO PESO REGISTRADO</div>
-              <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+          <div class="u-grid u-cols-auto-md u-gap-4 u-mb-6">
+            <div class="card u-mb-0">
+              <div class="u-text-caption u-uppercase u-color-neutral-gray-500 u-font-bold">ÚLTIMO PESO REGISTRADO</div>
+              <div class="tabular-nums u-text-h1 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
                 <?= htmlspecialchars(LabelMap::num($latestEval['weight_kg'] ?? null, 1)) ?> kg
               </div>
               <?php if ($firstEval && $firstEval['id'] !== $latestEval['id']): ?>
                 <?php $deltaTot = round($latestEval['weight_kg'] - $firstEval['weight_kg'], 1); ?>
-                <span style="font-size: 0.8rem; color: <?= $deltaTot < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>; font-weight: 600;">
+                <span class="u-text-compact u-font-semibold <?= $deltaTot < 0 ? 'ds-delta--down' : 'ds-delta--up' ?>">
                   <?= $deltaTot > 0 ? "+{$deltaTot}" : $deltaTot ?> kg desde a 1ª consulta
                 </span>
               <?php else: ?>
-                <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">Primeira avaliação</span>
+                <span class="u-text-compact u-color-neutral-gray-500">Primeira avaliação</span>
               <?php endif; ?>
             </div>
 
-            <div class="card" style="margin-bottom: 0;">
-              <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">IMC ATUAL (OMS)</div>
-              <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+            <div class="card u-mb-0">
+              <div class="u-text-caption u-uppercase u-color-neutral-gray-500 u-font-bold">IMC ATUAL (OMS)</div>
+              <div class="tabular-nums u-text-h1 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
                 <?= htmlspecialchars(LabelMap::num($latestEval['bmi'] ?? null, 2)) ?>
               </div>
               <span class="badge badge-info"><?= $latestEval['bmi_classification'] ?></span>
             </div>
 
             <?php if ($latestEval['whr'] !== null): ?>
-              <div class="card" style="margin-bottom: 0;">
-                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">RCQ (CINTURA / QUADRIL)</div>
-                <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-navy-900); margin: 6px 0;">
+              <div class="card u-mb-0">
+                <div class="u-text-caption u-uppercase u-color-neutral-gray-500 u-font-bold">RCQ (CINTURA / QUADRIL)</div>
+                <div class="tabular-nums u-text-h1 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
                   <?= htmlspecialchars(LabelMap::num($latestEval['whr'] ?? null, 2)) ?>
                 </div>
                 <span class="badge badge-<?= $latestEval['whr_risk'] === 'baixo' ? 'success' : ($latestEval['whr_risk'] === 'moderado' ? 'warning' : 'danger') ?>">
@@ -843,13 +896,25 @@ class DashboardController
             <?php endif; ?>
 
             <?php if ($latestEval['body_fat_pct'] !== null): ?>
-              <div class="card" style="margin-bottom: 0;">
-                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 700;">% GORDURA CORPORAL</div>
-                <div class="tabular-nums" style="font-size: 2rem; font-weight: 700; color: var(--brand-copper-600); margin: 6px 0;">
+              <div class="card u-mb-0" data-testid="kpi-body-fat-measured">
+                <div class="u-text-caption u-uppercase u-color-neutral-gray-500 u-font-bold">% GORDURA (MEDIDA / BIA)</div>
+                <div class="tabular-nums u-text-h1 u-font-bold u-color-botanical-copper-600 u-my-1 u-mx-0">
                   <?= htmlspecialchars(LabelMap::num($latestEval['body_fat_pct'] ?? null, 1)) ?>%
                 </div>
-                <span style="font-size: 0.8rem; color: var(--neutral-gray-500);">
-                  <?= $latestEval['fat_mass_kg'] !== null ? "{$latestEval['fat_mass_kg']} kg massa gorda" : 'Informado' ?>
+                <span class="u-text-compact u-color-neutral-gray-500 u-block">
+                  <?= $latestEval['fat_mass_kg'] !== null ? "{$latestEval['fat_mass_kg']} kg massa gorda · " : '' ?>Origem: <?= htmlspecialchars($latestEval['body_fat_source_label'] ?? 'Informado manualmente') ?>
+                </span>
+              </div>
+            <?php endif; ?>
+
+            <?php if (!empty($latestEval['derived_skinfold'])): $dsf = $latestEval['derived_skinfold']; ?>
+              <div class="card u-mb-0" data-testid="kpi-body-fat-skinfold">
+                <div class="u-text-caption u-uppercase u-color-neutral-gray-500 u-font-bold">% GORDURA (ESTIMADA POR DOBRAS)</div>
+                <div class="tabular-nums u-text-h1 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
+                  <?= htmlspecialchars(LabelMap::num($dsf['body_fat_pct'] ?? null, 1)) ?>%
+                </div>
+                <span class="u-text-compact u-color-neutral-gray-500 u-block">
+                  <?= $dsf['fat_mass_kg'] !== null ? "{$dsf['fat_mass_kg']} kg · " : '' ?><?= htmlspecialchars($dsf['source_label']) ?>
                 </span>
               </div>
             <?php endif; ?>
@@ -857,37 +922,37 @@ class DashboardController
         <?php endif; ?>
 
         <!-- Alternativa Textual Acessível -->
-        <div class="card" style="border-left: 4px solid var(--brand-copper-500); background: #FAF9F4; margin-bottom: var(--space-6);">
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div class="card u-accent u-accent-brand-copper-500 u-bg-botanical-cream-50 u-mb-6">
+          <div class="u-flex u-gap-3 u-items-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="u-color-botanical-copper-600 u-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             <div>
-              <strong style="color: var(--brand-navy-900); font-size: 0.95rem; display: block;">Resumo Clínico da Evolução (Acessibilidade & Auditoria):</strong>
-              <span style="font-size: 0.875rem; color: var(--neutral-ink-900);"><?= htmlspecialchars($evolution['accessible_summary']) ?></span>
+              <strong class="u-color-botanical-forest-900 u-text-body u-block">Resumo clínico da evolução (acessibilidade e auditoria):</strong>
+              <span class="u-text-compact u-color-neutral-ink-900"><?= htmlspecialchars($evolution['accessible_summary']) ?></span>
             </div>
           </div>
         </div>
 
         <!-- Seletor de Métrica & Linha do Tempo -->
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <h3>Série Histórica Ponto a Ponto</h3>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <label for="dc3-campo" style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600);">Métrica:</label>
-              <select id="dc3-campo" aria-label="Medida da evolução antropométrica" data-nav-prefix="/pacientes/<?= (int)$patient['id'] ?>/antropometria?metric=" style="padding: 6px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem;">
+        <div class="card u-mb-6">
+          <div class="card__header u-flex u-justify-between u-items-center u-wrap u-gap-3">
+            <h3>Série histórica ponto a ponto</h3>
+            <div class="u-flex u-gap-2 u-items-center">
+              <label for="dc3-campo" class="u-text-compact u-font-semibold u-color-neutral-gray-600">Métrica:</label>
+              <select id="dc3-campo" aria-label="Medida da evolução antropométrica" data-nav-prefix="/pacientes/<?= (int)$patient['id'] ?>/antropometria?metric=" class="u-py-1 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                 <option value="weight_kg" <?= $metric === 'weight_kg' ? 'selected' : '' ?>>Peso Corporal (kg)</option>
                 <option value="bmi" <?= $metric === 'bmi' ? 'selected' : '' ?>>IMC (kg/m²)</option>
                 <option value="waist_cm" <?= $metric === 'waist_cm' ? 'selected' : '' ?>>Cintura (cm)</option>
                 <option value="hip_cm" <?= $metric === 'hip_cm' ? 'selected' : '' ?>>Quadril (cm)</option>
-                <option value="whr" <?= $metric === 'whr' ? 'selected' : '' ?>>RCQ (Cintura/Quadril)</option>
-                <option value="whtr" <?= $metric === 'whtr' ? 'selected' : '' ?>>RCE (Cintura/Estatura)</option>
-                <option value="body_fat_pct" <?= $metric === 'body_fat_pct' ? 'selected' : '' ?>>Gordura Corporal (%)</option>
-                <option value="muscle_mass_pct" <?= $metric === 'muscle_mass_pct' ? 'selected' : '' ?>>Massa Muscular (%)</option>
+                <option value="whr" <?= $metric === 'whr' ? 'selected' : '' ?>>RCQ (cintura/quadril)</option>
+                <option value="whtr" <?= $metric === 'whtr' ? 'selected' : '' ?>>RCE (cintura/estatura)</option>
+                <option value="body_fat_pct" <?= $metric === 'body_fat_pct' ? 'selected' : '' ?>>Gordura corporal (%)</option>
+                <option value="muscle_mass_pct" <?= $metric === 'muscle_mass_pct' ? 'selected' : '' ?>>Massa muscular (%)</option>
               </select>
             </div>
           </div>
 
           <?php if (empty($series)): ?>
-            <p style="color: var(--neutral-gray-500); text-align: center; padding: 24px;">Nenhuma medição encontrada para esta métrica.</p>
+            <p class="u-color-neutral-gray-500 u-text-center u-p-6">Nenhuma medição encontrada para esta métrica.</p>
           <?php else: ?>
             <div class="table-responsive">
               <table class="table">
@@ -895,23 +960,23 @@ class DashboardController
                   <tr>
                     <th>Data</th>
                     <th>Valor</th>
-                    <th>Variação Ponto Anterior</th>
+                    <th>Variação ponto anterior</th>
                     <th>Variação %</th>
-                    <th>Status Paciente</th>
+                    <th>Status paciente</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php foreach ($series as $pnt): ?>
                     <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= $pnt['formatted_date'] ?></td>
-                      <td class="tabular-nums" style="font-weight: 700; font-size: 1.05rem; color: var(--brand-navy-900);"><?= $pnt['value'] ?></td>
+                      <td class="u-font-semibold u-color-botanical-forest-900"><?= $pnt['formatted_date'] ?></td>
+                      <td class="tabular-nums u-font-bold u-text-body u-color-botanical-forest-900"><?= number_format((float)$pnt['value'], 2, ',', '.') ?></td>
                       <td class="tabular-nums">
                         <?php if ($pnt['delta_previous'] === null): ?>
-                          <span style="color: var(--neutral-gray-500);">Baseline inicial</span>
+                          <span class="u-color-neutral-gray-500">Baseline inicial</span>
                         <?php else: ?>
-                          <span style="font-weight: 600; color: <?= $pnt['delta_previous'] < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>;">
-                            <?= $pnt['delta_previous'] > 0 ? "+{$pnt['delta_previous']}" : $pnt['delta_previous'] ?>
+                          <span class="u-font-semibold <?= $pnt['delta_previous'] < 0 ? 'ds-delta--down' : 'ds-delta--up' ?>">
+                            <?= ($pnt['delta_previous'] > 0 ? '+' : '') . number_format((float)$pnt['delta_previous'], 2, ',', '.') ?>
                           </span>
                         <?php endif; ?>
                       </td>
@@ -919,8 +984,8 @@ class DashboardController
                         <?php if ($pnt['delta_previous_pct'] === null): ?>
                           —
                         <?php else: ?>
-                          <span style="color: <?= $pnt['delta_previous_pct'] < 0 ? 'var(--semantic-success)' : 'var(--brand-copper-600)' ?>;">
-                            <?= $pnt['delta_previous_pct'] > 0 ? "+{$pnt['delta_previous_pct']}%" : "{$pnt['delta_previous_pct']}%" ?>
+                          <span class="<?= $pnt['delta_previous_pct'] < 0 ? 'ds-delta--down' : 'ds-delta--up' ?>">
+                            <?= ($pnt['delta_previous_pct'] > 0 ? '+' : '') . number_format((float)$pnt['delta_previous_pct'], 2, ',', '.') . '%' ?>
                           </span>
                         <?php endif; ?>
                       </td>
@@ -937,14 +1002,14 @@ class DashboardController
                         <?php if ($isSh): ?>
                           <span class="badge badge-success">✓ Visível no app</span>
                         <?php else: ?>
-                          <span class="badge badge-secondary" style="background: #E2E8F0; color: #475569;">Privado</span>
+                          <span class="badge badge-secondary u-bg-neutral-gray-200 u-color-neutral-gray-600">Privado</span>
                         <?php endif; ?>
                       </td>
                       <td>
-                        <form action="/pacientes/<?= $patient['id'] ?>/antropometria/<?= $pnt['assessment_id'] ?>/compartilhar" method="POST" style="display: inline;">
+                        <form action="/pacientes/<?= $patient['id'] ?>/antropometria/<?= $pnt['assessment_id'] ?>/compartilhar" method="POST" class="u-inline">
                           <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                           <input type="hidden" name="is_shared" value="<?= $isSh ? '0' : '1' ?>">
-                          <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; min-height: 28px;">
+                          <button type="submit" class="btn btn-secondary u-text-caption u-py-0 u-px-2 u-minh-touch">
                             <?= $isSh ? 'Revogar do Paciente' : 'Liberar ao Paciente' ?>
                           </button>
                         </form>
@@ -958,18 +1023,18 @@ class DashboardController
         </div>
 
         <!-- Seção: Comparador Clínico de Avaliações -->
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div class="card u-mb-6">
+          <div class="card__header u-flex u-justify-between u-items-center u-wrap u-gap-3">
             <div>
-              <h3>Comparativo Clínico Entre Avaliações</h3>
-              <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.85rem;">Selecione duas avaliações para analisar deltas absolutos, percentuais e evolução corporal.</p>
+              <h3>Comparativo clínico entre avaliações</h3>
+              <p class="u-color-neutral-gray-500 u-m-0 u-text-compact">Selecione duas avaliações para analisar deltas absolutos, percentuais e evolução corporal.</p>
             </div>
             
             <?php if (count($assessments) >= 2): ?>
-              <form method="GET" action="/pacientes/<?= $patient['id'] ?>/antropometria" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <form method="GET" action="/pacientes/<?= $patient['id'] ?>/antropometria" class="u-flex u-gap-2 u-items-center u-wrap">
                 <input type="hidden" name="metric" value="<?= htmlspecialchars($metric) ?>">
-                <label for="eval_a_select" id="label_eval_a" class="sr-only">Avaliação Baseline</label>
-                <select id="eval_a_select" name="eval_a" aria-labelledby="label_eval_a" aria-label="Avaliação baseline para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                <label for="eval_a_select" id="label_eval_a" class="sr-only">Avaliação baseline</label>
+                <select id="eval_a_select" name="eval_a" aria-labelledby="label_eval_a" aria-label="Avaliação baseline para comparação" class="u-py-1 u-px-2 u-border u-bc-border-input u-radius-input u-text-compact">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalAId === (int)$opt['id'] ? 'selected' : '' ?>>
                       Baseline: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= htmlspecialchars(LabelMap::num($opt['weight_kg'] ?? null, 1)) ?> kg)
@@ -977,10 +1042,10 @@ class DashboardController
                   <?php endforeach; ?>
                 </select>
 
-                <span style="font-weight: 600; color: var(--neutral-gray-500);" aria-hidden="true">vs</span>
+                <span class="u-font-semibold u-color-neutral-gray-500" aria-hidden="true">vs</span>
 
-                <label for="eval_b_select" id="label_eval_b" class="sr-only">Avaliação Comparada</label>
-                <select id="eval_b_select" name="eval_b" aria-labelledby="label_eval_b" aria-label="Avaliação comparada para evolução" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
+                <label for="eval_b_select" id="label_eval_b" class="sr-only">Avaliação comparada</label>
+                <select id="eval_b_select" name="eval_b" aria-labelledby="label_eval_b" aria-label="Avaliação comparada para evolução" class="u-py-1 u-px-2 u-border u-bc-border-input u-radius-input u-text-compact">
                   <?php foreach ($assessments as $opt): ?>
                     <option value="<?= $opt['id'] ?>" <?= $evalBId === (int)$opt['id'] ? 'selected' : '' ?>>
                       Comparar: <?= date('d/m/Y', strtotime($opt['assessed_at'])) ?> (<?= htmlspecialchars(LabelMap::num($opt['weight_kg'] ?? null, 1)) ?> kg)
@@ -988,22 +1053,22 @@ class DashboardController
                   <?php endforeach; ?>
                 </select>
 
-                <button type="submit" class="btn btn-secondary" style="min-height: 34px;" aria-label="Comparar avaliações selecionadas">Comparar</button>
+                <button type="submit" class="btn btn-secondary u-minh-touch" aria-label="Comparar avaliações selecionadas">Comparar</button>
               </form>
             <?php endif; ?>
           </div>
 
           <?php if (!$comparison): ?>
-            <p style="color: var(--neutral-gray-500); text-align: center; padding: 24px;">
+            <p class="u-color-neutral-gray-500 u-text-center u-p-6">
               <?= count($assessments) < 2 ? 'São necessárias pelo menos duas avaliações para realizar o comparativo clínico.' : 'Selecione duas avaliações distintas para comparar.' ?>
             </p>
           <?php else: ?>
-            <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div class="u-bg-neutral-gray-50 u-border u-radius-input u-py-3 u-px-4 u-mb-4 u-flex u-justify-between u-items-center u-wrap u-gap-2">
               <div>
-                <strong>Período:</strong> <?= $comparison['baseline']['formatted_date'] ?> ➔ <?= $comparison['followup']['formatted_date'] ?>
-                <span style="color: var(--neutral-gray-500); margin-left: 8px;">(<?= $comparison['days_between'] ?> dias decorridos)</span>
+                <strong>Período:</strong> <?= $comparison['baseline']['formatted_date'] ?> → <?= $comparison['followup']['formatted_date'] ?>
+                <span class="u-color-neutral-gray-500 u-ml-2">(<?= $comparison['days_between'] ?> dias decorridos)</span>
               </div>
-              <div style="font-size: 0.85rem; color: var(--neutral-gray-600);">
+              <div class="u-text-compact u-color-neutral-gray-600">
                 Avaliadores: <?= htmlspecialchars($comparison['baseline']['evaluator']) ?> e <?= htmlspecialchars($comparison['followup']['evaluator']) ?>
               </div>
             </div>
@@ -1012,11 +1077,11 @@ class DashboardController
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Indicador / Métrica</th>
+                    <th>Indicador / métrica</th>
                     <th class="tabular-nums">Baseline (<?= $comparison['baseline']['formatted_date'] ?>)</th>
                     <th class="tabular-nums">Follow-up (<?= $comparison['followup']['formatted_date'] ?>)</th>
-                    <th class="tabular-nums">Delta Absoluto</th>
-                    <th class="tabular-nums">Delta Percentual</th>
+                    <th class="tabular-nums">Delta absoluto</th>
+                    <th class="tabular-nums">Delta percentual</th>
                     <th>Tendência</th>
                     <th>Status do Dado</th>
                   </tr>
@@ -1024,51 +1089,51 @@ class DashboardController
                 <tbody>
                   <?php foreach ($comparison['metrics'] as $mKey => $mRow): ?>
                     <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($mRow['label']) ?></td>
+                      <td class="u-font-semibold u-color-botanical-forest-900"><?= htmlspecialchars($mRow['label']) ?></td>
                       <td class="tabular-nums">
-                        <?= $mRow['initial_value'] !== null ? "{$mRow['initial_value']} {$mRow['unit']}" : '<span style="color: var(--neutral-gray-400);">—</span>' ?>
+                        <?= $mRow['initial_value'] !== null ? "{$mRow['initial_value']} {$mRow['unit']}" : '<span class="u-color-neutral-gray-400">—</span>' ?>
                       </td>
                       <td class="tabular-nums">
-                        <?= $mRow['final_value'] !== null ? "{$mRow['final_value']} {$mRow['unit']}" : '<span style="color: var(--neutral-gray-400);">—</span>' ?>
+                        <?= $mRow['final_value'] !== null ? "{$mRow['final_value']} {$mRow['unit']}" : '<span class="u-color-neutral-gray-400">—</span>' ?>
                       </td>
                       <td class="tabular-nums">
                         <?php if ($mRow['delta_abs'] === null): ?>
-                          <span style="color: var(--neutral-gray-400);">—</span>
+                          <span class="u-color-neutral-gray-400">—</span>
                         <?php else: ?>
-                          <strong style="color: <?= $mRow['delta_abs'] < 0 ? 'var(--semantic-success)' : ($mRow['delta_abs'] > 0 ? 'var(--brand-copper-600)' : 'var(--neutral-gray-600)') ?>;">
+                          <strong class="<?= $mRow['delta_abs'] < 0 ? 'ds-delta--down' : ($mRow['delta_abs'] > 0 ? 'ds-delta--up' : 'ds-delta--flat') ?>">
                             <?= $mRow['delta_abs'] > 0 ? "+{$mRow['delta_abs']}" : $mRow['delta_abs'] ?> <?= $mRow['unit'] ?>
                           </strong>
                         <?php endif; ?>
                       </td>
                       <td class="tabular-nums">
                         <?php if ($mRow['delta_pct'] === null): ?>
-                          <span style="color: var(--neutral-gray-400);">—</span>
+                          <span class="u-color-neutral-gray-400">—</span>
                         <?php else: ?>
-                          <strong style="color: <?= $mRow['delta_pct'] < 0 ? 'var(--semantic-success)' : ($mRow['delta_pct'] > 0 ? 'var(--brand-copper-600)' : 'var(--neutral-gray-600)') ?>;">
+                          <strong class="<?= $mRow['delta_pct'] < 0 ? 'ds-delta--down' : ($mRow['delta_pct'] > 0 ? 'ds-delta--up' : 'ds-delta--flat') ?>">
                             <?= $mRow['delta_pct'] > 0 ? "+{$mRow['delta_pct']}%" : "{$mRow['delta_pct']}%" ?>
                           </strong>
                         <?php endif; ?>
                       </td>
                       <td>
                         <?php if ($mRow['trend'] === 'decrease'): ?>
-                          <span style="color: var(--semantic-success); font-weight: 700;">↓ Redução</span>
+                          <span class="u-color-semantic-success u-font-bold">↓ Redução</span>
                         <?php elseif ($mRow['trend'] === 'increase'): ?>
-                          <span style="color: var(--brand-copper-600); font-weight: 700;">↑ Aumento</span>
+                          <span class="u-color-botanical-copper-600 u-font-bold">↑ Aumento</span>
                         <?php elseif ($mRow['trend'] === 'stable'): ?>
-                          <span style="color: var(--neutral-gray-500);">↔ Estável</span>
+                          <span class="u-color-neutral-gray-500">↔ Estável</span>
                         <?php else: ?>
-                          <span style="color: var(--neutral-gray-400);">—</span>
+                          <span class="u-color-neutral-gray-400">—</span>
                         <?php endif; ?>
                       </td>
                       <td>
                         <?php if ($mRow['status'] === 'evaluated'): ?>
-                          <span class="badge badge-success" style="font-size: 0.7rem;">Consistente</span>
+                          <span class="badge badge-success u-text-caption">Consistente</span>
                         <?php elseif ($mRow['status'] === 'missing_in_baseline'): ?>
-                          <span class="badge badge-warning" style="font-size: 0.7rem;">Não medido no início</span>
+                          <span class="badge badge-warning u-text-caption">Não medido no início</span>
                         <?php elseif ($mRow['status'] === 'missing_in_followup'): ?>
-                          <span class="badge badge-warning" style="font-size: 0.7rem;">Não medido no follow-up</span>
+                          <span class="badge badge-warning u-text-caption">Não medido no follow-up</span>
                         <?php else: ?>
-                          <span class="badge badge-secondary" style="font-size: 0.7rem;">Não medido</span>
+                          <span class="badge badge-secondary u-text-caption">Não medido</span>
                         <?php endif; ?>
                       </td>
                     </tr>
@@ -1079,97 +1144,153 @@ class DashboardController
           <?php endif; ?>
         </div>
 
-        <!-- Modal Nova Avaliação Antropométrica -->
+        <?php /* Modal Nova Avaliação Antropométrica Unificada (NI2-524) */ ?>
+        <?php
+          $patientSex = \ClyoNutri\Domain\Anthropometry\SkinfoldService::sexFromPatient($patient['gender'] ?? null);
+          $patientAge = \ClyoNutri\Domain\Anthropometry\SkinfoldService::ageAt($patient['birth_date'] ?? null, date('Y-m-d'));
+          $skinfoldEligibility = \ClyoNutri\Domain\Anthropometry\SkinfoldProtocolCatalog::eligibleFor($patientSex, $patientAge);
+        ?>
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
-          <div class="cn-dialog__panel modal-dialog" style="max-width: 650px;">
+          <div class="cn-dialog__panel modal-dialog u-maxw-prose">
             <div class="modal-header">
-              <h3>Nova Avaliação Antropométrica</h3>
+              <h3>Nova avaliação antropométrica unificada</h3>
               <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
             </div>
-            <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria">
+            <?= \ClyoNutri\Application\View\ClinicalContext::render(Connection::getInstance(),(int)$patient['id']) ?>
+            <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria" data-testid="unified-anthropometry-form">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="patient_id" value="<?= $patient['id'] ?>">
 
-              <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                  <div class="form-group">
-                    <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
-                    <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+              <?php /* Abas do Fluxo Único (NI2-524: rascunho preservado ao navegar entre abas) */ ?>
+              <div role="tablist" aria-label="Etapas da avaliação antropométrica" class="u-flex u-gap-1 u-pt-2 u-pb-0 u-px-5 u-border-b u-wrap">
+                <button type="button" role="tab" aria-selected="true" aria-controls="anthro-panel-basico" data-anthro-tab="basico" class="btn btn-secondary u-text-compact u-py-1 u-px-3">1. Básico</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="anthro-panel-circunferencias" data-anthro-tab="circunferencias" class="btn btn-outline u-text-compact u-py-1 u-px-3">2. Circunferências (14)</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="anthro-panel-dobras" data-anthro-tab="dobras" class="btn btn-outline u-text-compact u-py-1 u-px-3">3. Dobras Cutâneas</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="anthro-panel-bioimpedancia" data-anthro-tab="bioimpedancia" class="btn btn-outline u-text-compact u-py-1 u-px-3">4. Bioimpedância / Composição</button>
+              </div>
+
+              <div class="modal-body u-maxh-dialog u-overflow-y-auto">
+                <!-- ABA 1: BÁSICO -->
+                <div id="anthro-panel-basico" role="tabpanel" data-anthro-panel="basico">
+                  <div class="u-grid u-cols-2 u-gap-4">
+                    <div class="form-group">
+                      <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
+                      <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
+                      <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
+                    </div>
                   </div>
+
                   <div class="form-group">
-                    <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
-                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required>
+                    <label class="form-label" for="ant_date">Data da avaliação</label>
+                    <input type="datetime-local" id="ant_date" name="assessed_at" class="form-control" value="<?= date('Y-m-d\TH:i') ?>">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="ant_notes">Anotações clínicas e metas</label>
+                    <textarea id="ant_notes" name="notes" class="form-control u-minh-field" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
+                  </div>
+
+                  <div class="u-mt-3 u-p-3 u-bg-neutral-gray-50 u-border u-radius-input">
+                    <label class="u-flex u-items-center u-gap-2 u-pointer u-text-compact u-color-botanical-forest-900 u-font-medium">
+                      <input type="checkbox" name="is_shared" value="1" class="ds-check">
+                      Liberar imediatamente para o paciente visualizar no aplicativo
+                    </label>
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label" for="ant_date">Data da avaliação</label>
-                  <input type="datetime-local" id="ant_date" name="assessed_at" class="form-control" value="<?= date('Y-m-d\TH:i') ?>">
-                </div>
-
-                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Circunferências Corporais (cm)</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3);">
-                  <div class="form-group">
-                    <label class="form-label" for="ant_waist">Cintura (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82.0">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_hip">Quadril (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_hip" name="hip_cm" class="form-control" placeholder="Ex: 98.0">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_neck">Pescoço (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_neck" name="neck_cm" class="form-control" placeholder="Ex: 38.0">
+                <!-- ABA 2: CIRCUNFERÊNCIAS (14 MEDIDAS) -->
+                <div id="anthro-panel-circunferencias" role="tabpanel" data-anthro-panel="circunferencias" hidden>
+                  <h4 class="u-text-body u-mt-0 u-mb-2 u-color-botanical-forest-900">Circunferências Corporais Ampliadas (14 pontos em cm)</h4>
+                  <div class="u-grid u-cols-auto-sm u-gap-3">
+                    <?php foreach (\ClyoNutri\Domain\Anthropometry\AnthropometryService::CIRCUMFERENCE_FIELDS as $cField => $cLabel): ?>
+                      <div class="form-group u-mb-1">
+                        <label class="form-label" for="ant_<?= $cField ?>"><?= htmlspecialchars($cLabel) ?> (cm)</label>
+                        <input type="number" step="0.1" min="10" max="250" id="ant_<?= $cField ?>" name="<?= $cField ?>" class="form-control" placeholder="cm">
+                      </div>
+                    <?php endforeach; ?>
                   </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: var(--space-3);">
+                <!-- ABA 3: DOBRAS CUTÂNEAS (DERIVADO COM PROVENIÊNCIA) -->
+                <div id="anthro-panel-dobras" role="tabpanel" data-anthro-panel="dobras" hidden>
+                  <h4 class="u-text-body u-mt-0 u-mb-2 u-color-botanical-forest-900">Dobras Cutâneas por Protocolo Validado (Estimativa Derivada)</h4>
+                  <p>Antes de selecionar um protocolo, confirme os parâmetros registrados: sexo para a equação <strong><?= $patientSex==='male'?'Masculino':($patientSex==='female'?'Feminino':'Não informado') ?></strong> e idade <strong><?= $patientAge!==null?(int)$patientAge.' anos':'Não informada' ?></strong>. Eles não representam identidade de gênero nem dispensam a avaliação da população de referência.</p>
+                  <?php if(!$patientSex || $patientAge===null): ?><p role="note">Para verificar a elegibilidade, confirme o parâmetro da equação e a idade. <a href="/pacientes/<?= (int)$patient['id'] ?>/antropometria/dobras" target="_blank" rel="noopener">Conferir parâmetros e protocolos em outra aba</a>. Salve esta avaliação antes de sair. Sem elegibilidade, o cálculo permanece indisponível.</p><?php endif; ?>
+                  <p class="u-text-compact u-color-neutral-gray-600 u-mb-3">
+                    O percentual de gordura calculado por dobras cutâneas é salvo com trilha de proveniência própria (equação, densidade corporal e soma em mm) e <strong>não sobrescreve</strong> a gordura medida por bioimpedância ou informada manualmente.
+                  </p>
                   <div class="form-group">
-                    <label class="form-label" for="ant_arm">Braço (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32.5">
+                    <label class="form-label" for="ant_skinfold_protocol">Protocolo de dobras cutâneas (elegibilidade por sexo e idade)</label>
+                    <select id="ant_skinfold_protocol" name="skinfold_protocol" class="form-control">
+                      <option value="">Não registrar dobras nesta avaliação</option>
+                      <?php foreach ($skinfoldEligibility as $el): ?>
+                        <option value="<?= htmlspecialchars($el['code']) ?>" <?= !$el['eligible'] ? 'disabled' : '' ?>>
+                          <?= htmlspecialchars($el['name']) ?> <?= !$el['eligible'] ? '— Inelegível: ' . htmlspecialchars((string)$el['reason']) : '(Elegível)' ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_chest">Tórax (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_chest" name="chest_cm" class="form-control" placeholder="Ex: 96.0">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_thigh">Coxa (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_thigh" name="thigh_cm" class="form-control" placeholder="Ex: 55.0">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_calf">Panturrilha (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_calf" name="calf_cm" class="form-control" placeholder="Ex: 37.0">
-                  </div>
-                </div>
-
-                <h4 style="font-size: 0.95rem; margin-top: var(--space-4); margin-bottom: var(--space-2); color: var(--brand-navy-900);">Composição Corporal Informada (Bioimpedância / Dobras)</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                  <div class="form-group">
-                    <label class="form-label" for="ant_fat">% Gordura Corporal</label>
-                    <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="ant_muscle">% Massa Muscular</label>
-                    <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                  <div class="u-grid u-cols-auto-sm u-gap-3">
+                    <?php foreach (\ClyoNutri\Domain\Anthropometry\SkinfoldProtocolCatalog::SITES as $siteCode => $siteMeta): ?>
+                      <div class="form-group u-mb-1">
+                        <label class="form-label" for="ant_sf_<?= $siteCode ?>"><?= htmlspecialchars($siteMeta['label']) ?> (mm)</label>
+                        <input type="number" step="0.1" min="1" max="80" id="ant_sf_<?= $siteCode ?>" name="readings[<?= $siteCode ?>][]" class="form-control" placeholder="mm">
+                      </div>
+                    <?php endforeach; ?>
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label" for="ant_notes">Anotações Clínicas & Metas</label>
-                  <textarea id="ant_notes" name="notes" class="form-control" style="min-height: 60px;" placeholder="Observações do protocolo, balança utilizada ou conduta..."></textarea>
-                </div>
-
-                <div style="margin-top: var(--space-3); padding: 12px; background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 6px;">
-                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.875rem; color: var(--brand-navy-900); font-weight: 500;">
-                    <input type="checkbox" name="is_shared" value="1" style="width: 16px; height: 16px;"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
-                    Liberar imediatamente para o paciente visualizar no aplicativo
-                  </label>
+                <!-- ABA 4: BIOIMPEDÂNCIA / COMPOSIÇÃO INFORMADA -->
+                <div id="anthro-panel-bioimpedancia" role="tabpanel" data-anthro-panel="bioimpedancia" hidden>
+                  <h4 class="u-text-body u-mt-0 u-mb-2 u-color-botanical-forest-900">Composição Corporal Informada / Bioimpedância (BIA)</h4>
+                  <div class="u-grid u-cols-2 u-gap-4">
+                    <div class="form-group">
+                      <label class="form-label" for="ant_fat_source">Origem da medida</label>
+                      <select id="ant_fat_source" name="body_fat_source" class="form-control">
+                        <option value="manual">Informado manualmente</option>
+                        <option value="bioimpedance">Bioimpedância (BIA)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_bia_device">Equipamento / Balança BIA</label>
+                      <input type="text" id="ant_bia_device" name="bioimpedance_device" maxlength="120" class="form-control" placeholder="Ex: InBody 270 / Omron HBF-514">
+                    </div>
+                  </div>
+                  <div class="u-grid u-cols-3 u-gap-3">
+                    <div class="form-group">
+                      <label class="form-label" for="ant_fat">% Gordura corporal</label>
+                      <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_muscle">% Massa muscular</label>
+                      <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_visceral">Gordura visceral (nível)</label>
+                      <input type="number" step="0.5" min="1" max="60" id="ant_visceral" name="visceral_fat_level" class="form-control" placeholder="Ex: 6">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_tbw">% Água corporal total</label>
+                      <input type="number" step="0.1" min="20" max="85" id="ant_tbw" name="total_body_water_pct" class="form-control" placeholder="Ex: 55.2">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_bone">Massa óssea (kg)</label>
+                      <input type="number" step="0.1" min="0.5" max="15" id="ant_bone" name="bone_mass_kg" class="form-control" placeholder="Ex: 2.8">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="ant_phase">Ângulo de fase (°)</label>
+                      <input type="number" step="0.1" min="1" max="15" id="ant_phase" name="phase_angle_deg" class="form-control" placeholder="Ex: 6.4">
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div class="modal-footer">
                 <button data-dialog-close type="button" class="btn btn-secondary" data-call="closeAnthroModal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar Avaliação Antropométrica</button>
+                <button type="submit" class="btn btn-primary">Salvar avaliação antropométrica</button>
               </div>
             </form>
           </div>
@@ -1183,6 +1304,19 @@ class DashboardController
           function closeAnthroModal() {
             document.getElementById('anthroModal').classList.remove('active');
           }
+          document.querySelectorAll('[data-anthro-tab]').forEach(function (tabBtn) {
+            tabBtn.addEventListener('click', function () {
+              var target = tabBtn.getAttribute('data-anthro-tab');
+              document.querySelectorAll('[data-anthro-tab]').forEach(function (b) {
+                var active = b.getAttribute('data-anthro-tab') === target;
+                b.setAttribute('aria-selected', active ? 'true' : 'false');
+                b.className = active ? 'btn btn-secondary' : 'btn btn-outline';
+              });
+              document.querySelectorAll('[data-anthro-panel]').forEach(function (p) {
+                p.hidden = p.getAttribute('data-anthro-panel') !== target;
+              });
+            });
+          });
         </script>
         <?php
         $content = ob_get_clean();
@@ -1204,10 +1338,23 @@ class DashboardController
             header("Location: /pacientes?error=paciente_invalido");
             exit;
         }
+        // NI2-602: o paciente do formulário precisa ser o mesmo da rota. Divergência = formulário montado para
+        // outro paciente; nada é gravado e o profissional volta ao paciente indicado no formulário.
+        if (isset($_POST['patient_id']) && (string)$_POST['patient_id'] !== '' && (int)$_POST['patient_id'] !== $patientId) {
+            error_log('[antropometria] paciente do formulário diverge da rota: rota=' . $patientId . ' form=' . (int)$_POST['patient_id']);
+            http_response_code(409);
+            echo 'Esta avaliação não foi salva: o formulário pertence a outro paciente. Recarregue a página do paciente e tente de novo.';
+            return;
+        }
 
         if (!(new PatientRepository())->findById($patientId)) { http_response_code(404); echo 'Paciente não encontrado.'; return; }
+        $profId = $this->clinicalAuthorProfessionalId();
+        if ($profId === null) {
+            http_response_code(403);
+            echo self::SEM_CRN_MSG;
+            return;
+        }
         \ClyoNutri\Domain\Clinical\FormRecovery::remember($patientId,'antropometria',$_POST);
-        $profId = $this->getActiveProfessionalId();
         $userId = TenantContext::getUserId();
         $service = new AnthropometryService();
 
@@ -1247,7 +1394,7 @@ class DashboardController
             header("Location: /pacientes/{$patientId}/antropometria?success=compartilhamento_atualizado");
             exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/antropometria?error=falha_compartilhar&msg=" . urlencode($e->getMessage()));
+            header("Location: /pacientes/{$patientId}/antropometria?error=falha_compartilhar&msg=" . urlencode($this->userFacingError('antropometria compartilhar', $e)));
             exit;
         }
     }
@@ -1266,7 +1413,7 @@ class DashboardController
             exit;
         } catch (\Throwable $e) {
             header('Content-Type: application/json; charset=utf-8', true, 400);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode(['error' => $this->userFacingError('antropometria json', $e)]);
             exit;
         }
     }
@@ -1285,7 +1432,8 @@ class DashboardController
             exit;
         }
 
-        $title = 'Prontuário Eletrônico — ' . $patient['name'];
+        \ClyoNutri\Core\Audit\PatientRecordAccessAudit::record($id, 'medical_record'); // CR-NI2-006 / NI2-719
+        $title = 'Prontuário · ' . $patient['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Nutricionista';
@@ -1301,254 +1449,18 @@ class DashboardController
         $auditAccess = Connection::getInstance()->prepare("SELECT 1 FROM clinic_members WHERE clinic_id=? AND user_id=? AND status='active'");
         $auditAccess->execute([TenantContext::getClinicId(), TenantContext::getUserId()]);
         $canSeeAudit = (bool)$auditAccess->fetchColumn();
+        // v54.27: link para a consulta de origem só quando ela é desta clínica e deste paciente.
+        $consultLinkIds = [];
+        try {
+            $ap = Connection::getInstance()->prepare('SELECT id FROM appointments WHERE clinic_id = ? AND patient_id = ?');
+            $ap->execute([TenantContext::getClinicId(), $id]);
+            $consultLinkIds = array_flip(array_map('intval', $ap->fetchAll(\PDO::FETCH_COLUMN)));
+        } catch (\Throwable $e) {
+            $consultLinkIds = [];
+        }
         ob_start();
-        ?>
-        <!-- Alertas de Feedback -->
-        <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'registro_adicionado' ? 'Evolução clínica registrada no prontuário!' : ($_GET['success'] === 'registro_retificado' ? 'Retificação versionada gravada com justificativa formal!' : 'Operação realizada com sucesso!') ?>
-          </div>
-        <?php endif; ?>
-        <?php if (!empty($_GET['error'])): ?>
-          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
-            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro no processamento do registro clínico.' ?>
-          </div>
-        <?php endif; ?>
-
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
-            </div>
-            <h1>Prontuário Eletrônico & Evolução Clínica</h1>
-            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Histórico de registros clínicos</p>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <a href="/pacientes/<?= (int)$patient['id'] ?>/prontuario/imprimir" target="_blank" rel="noopener" class="btn btn-secondary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              Imprimir prontuário
-            </a>
-            <a href="/pacientes/<?= $patient['id'] ?>/prontuario/exportar" target="_blank" class="btn btn-secondary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Exportar histórico de registros
-            </a>
-            <a href="/pacientes/<?= $patient['id'] ?>/anamnese" class="btn btn-secondary">
-              Ver Anamnese ➔
-            </a>
-            <button type="button" class="btn btn-primary" data-show="modal-new-record">
-              + Nova Evolução / Anotação
-            </button>
-          </div>
-        </div>
-
-        <!-- Barra de Integridade e Autenticidade Clínica -->
-        <?php if ((int)($integrity['total_records'] ?? 0) > 0 || !$integrity['is_valid']): ?>
-        <div style="background: <?= $integrity['is_valid'] ? '#E3F4F2' : '#FEF2F2' ?>; border: 1px solid <?= $integrity['is_valid'] ? '#B7DFDC' : '#FECACA' ?>; border-radius: 8px; padding: 14px 18px; margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="width: 36px; height: 36px; border-radius: 50%; background: <?= $integrity['is_valid'] ? '#0A7075' : '#EF4444' ?>; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold;">
-              <?= $integrity['is_valid'] ? '✓' : '!' ?>
-            </div>
-            <div>
-              <strong style="color: <?= $integrity['is_valid'] ? '#0A5F63' : '#991B1B' ?>; font-size: 0.95rem;">
-                <?= $integrity['is_valid'] ? 'Histórico Clínico Autêntico e Protegido Contra Adulteração' : 'Atenção: Integridade dos registros precisa de verificação' ?>
-              </strong>
-              <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
-                Conteúdo e encadeamento dos registros verificados. <?= (int)($integrity['total_records'] ?? 0) ?> versões registradas. As versões anteriores são preservadas.
-                <?php if (!empty($integrity['legacy_records'])): ?>Título e justificativa de <?= (int)$integrity['legacy_records'] ?> registro(s) antigo(s) não fazem parte desta verificação.<?php endif; ?>
-              </div>
-              <?php if ($canSeeAudit && !empty($integrity['latest_hash'])): ?>
-                <details style="font-size: 0.75rem; color: #64748B; margin-top: 6px;">
-                  <summary style="cursor: pointer; color: var(--brand-copper-600); font-weight: 500;">Ver detalhes técnicos de integridade digital</summary>
-                  <div style="margin-top: 4px; font-family: monospace; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; word-break: break-all;">
-                    Assinatura raiz da cadeia: <?= htmlspecialchars($integrity['latest_hash']) ?>
-                  </div>
-                </details>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-
-        <?php endif; ?>
-
-        <!-- Resumo Clínico para Prescrição -->
-        <div class="card" style="margin-bottom: var(--space-6); border-left: 4px solid #0284C7;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);">Resumo Crítico da Anamnese para Prescrição</h3>
-            <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
-              <span style="font-size: 0.75rem; color: #64748B;">
-                Fonte: <a href="<?= $clinicalSummary['source']['url'] ?>" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?></a> por <?= htmlspecialchars($clinicalSummary['source']['author']) ?> em <?= date('d/m/Y', strtotime($clinicalSummary['source']['recorded_at'])) ?>
-              </span>
-            <?php endif; ?>
-          </div>
-
-          <?php if (!$clinicalSummary['has_data']): ?>
-            <p style="color: #64748B; font-size: 0.875rem; margin: 0;">Nenhum dado clínico registrado na anamnese ainda. Não há dados inferidos.</p>
-          <?php else: ?>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px;">
-              <div style="padding: 10px; background: <?= !empty($clinicalSummary['allergies']) ? '#FEF2F2' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['allergies']) ? '#FCA5A5' : '#E2E8F0' ?>; border-radius: 6px;">
-                <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; display: block;">ALERGIAS ALIMENTARES</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?></span>
-              </div>
-              <div style="padding: 10px; background: <?= !empty($clinicalSummary['restrictions']) ? '#FFFBEB' : '#F8FAFC' ?>; border: 1px solid <?= !empty($clinicalSummary['restrictions']) ? '#FCD34D' : '#E2E8F0' ?>; border-radius: 6px;">
-                <span style="font-size: 0.75rem; font-weight: 700; color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; display: block;">RESTRIÇÕES & INTOLERÂNCIAS</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['restrictions'] ?? null)) ?></span>
-              </div>
-              <div style="padding: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
-                <span style="font-size: 0.75rem; font-weight: 700; color: #0369A1; display: block;">OBJETIVOS PRINCIPAIS</span>
-                <span style="font-size: 0.875rem; color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['objectives'] ?? null)) ?></span>
-              </div>
-            </div>
-          <?php endif; ?>
-        </div>
-
-        <!-- Linha do Tempo Longitudinal -->
-        <div class="card">
-          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Evolução Clínica & Histórico Preservado (<?= count($timeline) ?> Registros)</h3>
-            <span style="font-size: 0.8rem; color: #64748B;">Autoria e integridade asseguradas para cada lançamento</span>
-          </div>
-
-          <?php if (empty($timeline)): ?>
-            <div style="text-align: center; padding: 32px; color: #64748B;">
-              <p>Nenhuma entrada clínica registrada ainda neste prontuário.</p>
-              <button type="button" class="btn btn-primary" data-show="modal-new-record">
-                Registrar Primeira Evolução
-              </button>
-            </div>
-          <?php else: ?>
-            <div style="display: flex; flex-direction: column; gap: 16px;">
-              <?php foreach (array_reverse($timeline) as $rec): ?>
-                <div style="border: 1px solid <?= $rec['is_retracted'] ? '#FCA5A5' : '#E2E8F0' ?>; background: <?= $rec['is_retracted'] ? '#FFF5F5' : '#FFFFFF' ?>; border-radius: 8px; padding: 16px;">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                    <div>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="badge" style="background: #1E293B; color: #fff; font-size: 0.75rem;">v<?= $rec['version'] ?></span>
-                        <h4 style="margin: 0; font-size: 1.05rem; color: var(--brand-navy-900);"><?= htmlspecialchars($rec['title']) ?></h4>
-                        <?php if ($rec['is_retracted']): ?>
-                          <span class="badge badge-warning" style="font-size: 0.75rem;">Superado / Retificado</span>
-                        <?php endif; ?>
-                        <?php if ($rec['supersedes_id']): ?>
-                          <span class="badge badge-info" style="font-size: 0.75rem;">Retificação do Registro #<?= $rec['supersedes_id'] ?></span>
-                        <?php endif; ?>
-                      </div>
-                      <div style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
-                        Por <strong><?= htmlspecialchars($rec['professional_name']) ?></strong> em <?= date('d/m/Y \à\s H:i', strtotime($rec['created_at'])) ?>
-                      </div>
-                    </div>
-                    <?php if (!$rec['is_retracted']): ?>
-                      <button type="button" class="btn btn-sm btn-outline" data-call="openRevisionModal" data-args="[<?= $rec['id'] ?>, <?= htmlspecialchars(json_encode((string)$rec['title'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="font-size: 0.75rem; padding: 3px 8px;">
-                        Retificar Formalmente (v<?= $rec['version'] + 1 ?>)
-                      </button>
-                    <?php endif; ?>
-                  </div>
-
-                  <?php if (!empty($rec['revision_reason'])): ?>
-                    <div style="background: #FEF3C7; border-left: 3px solid #F59E0B; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; color: #92400E; margin-bottom: 10px;">
-                      <strong>Justificativa da retificação:</strong> <?= htmlspecialchars($rec['revision_reason']) ?>
-                    </div>
-                  <?php endif; ?>
-
-                  <!-- Conteúdo Clínico Estruturado / SOAP -->
-                  <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; font-size: 0.875rem; line-height: 1.6; color: #334155; margin-bottom: 10px;">
-                    <?php if (isset($rec['content']['evolution_summary'])): ?>
-                      <p style="margin: 0 0 8px 0;"><?= nl2br(htmlspecialchars($rec['content']['evolution_summary'])) ?></p>
-                    <?php elseif (isset($rec['content']['text'])): ?>
-                      <p style="margin: 0 0 8px 0;"><?= nl2br(htmlspecialchars($rec['content']['text'])) ?></p>
-                    <?php else: ?>
-                      <pre style="margin: 0; font-size: 0.8rem; font-family: inherit; white-space: pre-wrap;"><?= htmlspecialchars(json_encode($rec['content'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>
-                    <?php endif; ?>
-
-                    <?php if (!empty($rec['content']['weight_kg'])): ?>
-                      <div style="margin-top: 8px; font-size: 0.8rem; color: #0284C7;">
-                        <strong>Peso aferido:</strong> <?= htmlspecialchars(LabelMap::num($rec['content']['weight_kg'] ?? null, 1)) ?> kg
-                        <?php if (!empty($rec['content']['waist_cm'])): ?>
-                          | <strong>Cintura:</strong> <?= htmlspecialchars(LabelMap::num($rec['content']['waist_cm'] ?? null, 1)) ?> cm
-                        <?php endif; ?>
-                      </div>
-                    <?php endif; ?>
-                  </div>
-
-                  <!-- Autenticidade e Trilha Criptográfica Sob Demanda (PX-13) -->
-                  <?php if ($canSeeAudit): ?><details style="margin-top: 6px; font-size: 0.75rem; color: #64748B;">
-                    <summary style="cursor: pointer; color: var(--brand-teal-700); font-weight: 500; font-size: 0.72rem; outline: none; user-select: none;">
-                      Verificar autenticidade digital (cadeia criptográfica)
-                    </summary>
-                    <div style="display: flex; gap: 12px; font-size: 0.70rem; color: #64748B; font-family: monospace; background: #F1F5F9; padding: 6px 10px; border-radius: 4px; overflow-x: auto; margin-top: 4px;">
-                      <div><strong>Assinatura digital (SHA-256):</strong> <?= htmlspecialchars($rec['record_hash'] ?? '') ?></div>
-                      <div><strong>Elo anterior:</strong> <?= !empty($rec['previous_hash']) ? htmlspecialchars($rec['previous_hash']) : 'Registro inicial' ?></div>
-                    </div>
-                  </details><?php endif; ?>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
-
-        <!-- Modal Nova Evolução / Observação Clínica -->
-        <div id="modal-new-record" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Adicionar Entrada ao Prontuário</h3>
-            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">O registro será datado, assinado pelo profissional e preservado com garantia de autenticidade digital.</p>
-            <form method="POST" action="/pacientes/<?= $patient['id'] ?>/prontuario">
-              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <div style="margin-bottom: 12px;">
-                <label for="dc4-title" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Título da Entrada *</label>
-                <input id="dc4-title" type="text" name="title" required placeholder="Ex: Evolução Clínica de Retorno, Intercorrência, Orientação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-              </div>
-              <div style="margin-bottom: 12px;">
-                <label for="dc5-category" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Categoria</label>
-                <select id="dc5-category" name="category" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <option value="evolucao">Evolução Clínica / Atendimento</option>
-                  <option value="observacao">Observação Clínica Geral</option>
-                  <option value="retorno">Consulta de Retorno</option>
-                  <option value="intercorrencia">Intercorrência Clínica</option>
-                </select>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <label for="dc6-content_text" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Conteúdo / Conduta Nutricional (Máx. 10.000 caracteres) *</label>
-                <textarea id="dc6-content_text" name="content_text" required rows="6" maxlength="10000" placeholder="Descreva os achados, relato do paciente, metas nutricionais e conduta estabelecida..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
-              </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-record">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Assinar & Gravar no Prontuário</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Modal Retificação Formal Versionada -->
-        <div id="modal-revise-record" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 0; margin-bottom: 8px;">Retificação Formal de Registro Clínico</h3>
-            <p style="color: #64748B; font-size: 0.85rem; margin-bottom: 16px;">
-              Conforme as normas do CFN e integridade médica, o registro anterior será marcado como superado, mas permanecerá preservado no histórico. Uma nova versão será gravada com a justificativa obrigatória.
-            </p>
-            <form id="form-revise-record" method="POST" action="">
-              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <div style="margin-bottom: 12px;">
-                <label for="dc7-revision_reason" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Justificativa Formal da Retificação (Mín. 10 caracteres) *</label>
-                <input id="dc7-revision_reason" type="text" name="revision_reason" minlength="10" required placeholder="Ex: Correção de digitação no percentual de gordura acordado..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-              </div>
-              <div style="margin-bottom: 16px;">
-                <label for="dc8-revised_text" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.875rem;">Novo Texto Corrigido *</label>
-                <textarea id="dc8-revised_text" name="revised_text" required rows="6" maxlength="10000" placeholder="Insira o texto retificado e atualizado para este atendimento..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
-              </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-revise-record">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="background: #D97706; border-color: #D97706;">Publicar Retificação Versionada</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
-          function openRevisionModal(recId, title) {
-            var form = document.getElementById('form-revise-record');
-            form.action = '/pacientes/<?= $patient['id'] ?>/prontuario/' + recId + '/retificar';
-            document.getElementById('modal-revise-record').style.display = 'flex';
-          }
-        </script>
-        <?php
+        // v54.25 (NI2-220 I9/I10): tela no design system, em views/clinical/medical_record.php.
+        require __DIR__ . '/../../../views/clinical/medical_record.php';
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
@@ -1572,15 +1484,24 @@ class DashboardController
             exit;
         }
 
-        $profId = $this->getActiveProfessionalId();
+        $profId = $this->clinicalAuthorProfessionalId();
+        if ($profId === null) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG));
+            exit;
+        }
         $clinicalService = new ClinicalRecordService();
 
         try {
             $clinicalService->addClinicalObservation($patientId, $profId, $title, $text, $category);
             header("Location: /pacientes/{$patientId}/prontuario?success=registro_adicionado");
             exit;
+        } catch (\InvalidArgumentException $e) {
+            // Regra de negócio com texto escrito para a pessoa (limite de tamanho, campo vazio).
+            header("Location: /pacientes/{$patientId}/prontuario?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
+            $ref = $this->logClinicalFailure('prontuario.registrar', $e);
+            header("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}");
             exit;
         }
     }
@@ -1604,19 +1525,32 @@ class DashboardController
             exit;
         }
 
-        $profId = $this->getActiveProfessionalId();
+        $profId = $this->clinicalAuthorProfessionalId();
+        if ($profId === null) {
+            header("Location: /pacientes/{$patientId}/prontuario?error=sem_crn&msg=" . urlencode(self::SEM_CRN_MSG));
+            exit;
+        }
         $clinicalService = new ClinicalRecordService();
 
         try {
-            $clinicalService->reviseRecord($recId, $patientId, $profId, $reason, [
+            $revised = [
                 'type' => 'revised_note',
                 'text' => $revisedText,
                 'revised_by' => $profId,
-            ]);
+            ];
+            // v54.27: registro da sala de teleconsulta tem anotações e metas; o serviço mantém esse formato.
+            if (array_key_exists('revised_goals', $_POST)) {
+                $revised['goals'] = trim((string)$_POST['revised_goals']);
+            }
+            $clinicalService->reviseRecord($recId, $patientId, $profId, $reason, $revised);
             header("Location: /pacientes/{$patientId}/prontuario?success=registro_retificado");
             exit;
-        } catch (\Throwable $e) {
+        } catch (\InvalidArgumentException $e) {
             header("Location: /pacientes/{$patientId}/prontuario?error=falha&msg=" . urlencode($e->getMessage()));
+            exit;
+        } catch (\Throwable $e) {
+            $ref = $this->logClinicalFailure('prontuario.retificar', $e);
+            header("Location: /pacientes/{$patientId}/prontuario?error=falha&ref={$ref}");
             exit;
         }
     }
@@ -1692,7 +1626,7 @@ class DashboardController
             );
         } catch (\InvalidArgumentException $e) {
             http_response_code(422);
-            echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><title>Prontuário</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px">'
+            echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><title>Prontuário</title><body class="u-maxw-form u-my-16 u-mx-auto u-py-0 u-px-4">'
                 . '<p>' . htmlspecialchars($e->getMessage()) . '</p><p><a href="/pacientes/' . $patientId . '/prontuario/imprimir">Voltar</a></p></body></html>';
             return;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
@@ -1705,24 +1639,42 @@ class DashboardController
             header('Referrer-Policy: same-origin');
             header('X-Frame-Options: DENY');
         }
+        \ClyoNutri\Core\Audit\PatientRecordAccessAudit::record($patientId, 'medical_record_print'); // CR-NI2-006
         require __DIR__ . '/../../../views/patients/medical_record_print.php';
     }
 
     public function exportMedicalRecord(array $params): void
     {
         $patientId = (int)($params['id'] ?? 0);
-        $profId = $this->getActiveProfessionalId();
+        // NI2-220 (I6): a exportação registra quem de fato exportou. Sem cadastro profissional com CRN ativo
+        // nesta clínica não há exportação (antes caía no primeiro profissional da clínica ou no id 1).
+        $profId = $this->clinicalAuthorProfessionalId();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if ($profId === null) {
+            http_response_code(403);
+            echo json_encode(['error' => self::SEM_CRN_MSG], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $clinicalService = new ClinicalRecordService();
 
         try {
             $export = $clinicalService->exportRecordTimelineSafe($patientId, $profId);
-            header('Content-Type: application/json; charset=utf-8');
+            \ClyoNutri\Core\Audit\PatientRecordAccessAudit::record($patientId, 'medical_record_export'); // CR-NI2-006
             header('Content-Disposition: attachment; filename="prontuario_paciente_' . $patientId . '_' . date('Ymd_His') . '.json"');
             echo json_encode($export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Paciente não encontrado.'], JSON_UNESCAPED_UNICODE);
+            exit;
         } catch (\Throwable $e) {
-            header('Content-Type: application/json; charset=utf-8', true, 400);
-            echo json_encode(['error' => $e->getMessage()]);
+            // NI2-220 (I8): detalhe técnico vai para o log; a pessoa recebe mensagem e código de referência.
+            $ref = $this->logClinicalFailure('prontuario.exportar', $e);
+            http_response_code($e instanceof \RuntimeException && str_starts_with($e->getMessage(), 'Exportação bloqueada') ? 409 : 500);
+            echo json_encode(['error' => $e instanceof \RuntimeException && str_starts_with($e->getMessage(), 'Exportação bloqueada')
+                ? 'Exportação bloqueada: a verificação do histórico encontrou divergência. Fale com o suporte informando o código.'
+                : 'Não foi possível exportar o prontuário agora. Tente novamente.', 'correlation_id' => $ref], JSON_UNESCAPED_UNICODE);
             exit;
         }
     }
@@ -1744,7 +1696,7 @@ class DashboardController
             return;
         }
 
-        $title = 'Anamnese Nutricional — ' . $patient['name'];
+        $title = 'Anamnese · ' . $patient['name'];
         $activeNav = 'pacientes';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Nutricionista';
@@ -1812,362 +1764,21 @@ class DashboardController
         }
 
         ob_start();
-        ?>
-        <!-- Alertas de Feedback -->
-        <?php if (!empty($_GET['success'])): ?>
-          <div role="status" aria-live="polite" style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'rascunho_salvo' ? 'Rascunho da anamnese salvo com sucesso. Você pode continuar preenchendo a qualquer momento.' : ($_GET['success'] === 'anamnese_concluida' ? 'Anamnese concluída e assinada com sucesso! A versão foi arquivada no histórico do prontuário.' : 'Anamnese salva. As versões anteriores continuam disponíveis no histórico.') ?>
-          </div>
-        <?php endif; ?>
-        <?php if (!empty($_GET['error'])): ?>
-          <div role="alert" aria-live="assertive" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
-            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro ao salvar a anamnese.' ?>
-          </div>
-        <?php endif; ?>
-
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/pacientes/<?= $patient['id'] ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil do paciente</a>
-            </div>
-            <h1>Anamnese Nutricional Estruturada</h1>
-            <p style="color: var(--neutral-gray-500);">Paciente: <strong><?= htmlspecialchars($patient['name']) ?></strong> • Cada conclusão gera uma nova versão; as anteriores ficam no histórico</p>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <a href="/pacientes/<?= $patient['id'] ?>/pre-consulta" class="btn btn-secondary" data-testid="link-pre-consulta">
-              Pré-consulta
-            </a>
-            <a href="/pacientes/<?= $patient['id'] ?>/prontuario" class="btn btn-secondary">
-              Prontuário ➔
-            </a>
-            <a href="#historico-versoes" class="btn btn-secondary">
-              Ver Histórico (<?= count($history) ?> Versões)
-            </a>
-          </div>
-        </div>
-
-        <!-- Se solicitou comparação de versões -->
-        <?php if ($compareData): ?>
-          <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid var(--brand-copper-600);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <h3 style="margin: 0;">Comparativo de Versões: v<?= $compareData['v1_meta']['version'] ?> vs v<?= $compareData['v2_meta']['version'] ?></h3>
-              <a href="/pacientes/<?= $patient['id'] ?>/anamnese" style="color: #64748B; font-size: 0.85rem; text-decoration: none;">Fechar Comparador ✕</a>
-            </div>
-            <div style="overflow-x: auto;">
-              <table class="table" style="width: 100%; font-size: 0.875rem;">
-                <thead>
-                  <tr style="background: #F8FAFC;">
-                    <th style="width: 25%;">Seção Clínica</th>
-                    <th style="width: 37.5%;">v<?= $compareData['v1_meta']['version'] ?> (<?= date('d/m/Y', strtotime($compareData['v1_meta']['created_at'])) ?> por <?= htmlspecialchars($compareData['v1_meta']['professional_name']) ?>)</th>
-                    <th style="width: 37.5%;">v<?= $compareData['v2_meta']['version'] ?> (<?= date('d/m/Y', strtotime($compareData['v2_meta']['created_at'])) ?> por <?= htmlspecialchars($compareData['v2_meta']['professional_name']) ?>)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($compareData['diff'] as $fieldKey => $diffRow): ?>
-                    <tr style="<?= $diffRow['changed'] ? 'background: #FFFBEB;' : '' ?>">
-                      <td>
-                        <strong><?= htmlspecialchars($diffRow['label']) ?></strong>
-                        <?php if ($diffRow['changed']): ?>
-                          <span class="badge badge-warning" style="font-size: 0.65rem; margin-left: 4px;">Alterado</span>
-                        <?php endif; ?>
-                      </td>
-                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars((string)($diffRow['v1'] ?? '—'))) ?></td>
-                      <td style="color: #334155; line-height: 1.5;"><?= nl2br(htmlspecialchars((string)($diffRow['v2'] ?? '—'))) ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        <?php endif; ?>
-
-        <?php if ($selectedVersion): ?>
-          <?php require __DIR__ . '/../../../views/anamnesis/version.php'; ?>
-        <?php elseif ($compareData): ?>
-          <div class="card">
-            <p>Comparação somente leitura. As versões permanecem preservadas.</p>
-            <a class="btn btn-secondary" href="/pacientes/<?= (int)$patient['id'] ?>/anamnese">Voltar à coleta atual</a>
-          </div>
-        <?php else: ?>
-        <!-- Formulário Estruturado da Anamnese -->
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <div>
-              <h3 style="margin: 0;">Coleta & Atualização da Anamnese</h3>
-              <p style="color: #64748B; font-size: 0.85rem; margin-top: 4px;">
-                Preencha as seções clínicas abaixo. Cada gravação cria uma nova versão preservada sem apagar as anteriores.
-              </p>
-            </div>
-            <?php if ($latest): ?>
-              <span class="badge badge-info" style="font-size: 0.8rem;">
-                <?= $revisionFrom ? 'Nova revisão baseada em' : 'Última Versão:' ?> v<?= $latest['version'] ?> (<?= date('d/m/Y', strtotime($latest['created_at'])) ?>)
-              </span>
-            <?php endif; ?>
-          </div>
-
-          <form method="POST" action="/pacientes/<?= $patient['id'] ?>/anamnese" id="anamnesis-form" aria-describedby="anamnesis-progress">
-            <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-            <?php /* NI2-420 (UX-08): índice acessível das seções; não impõe ordem clínica */ ?>
-            <nav class="cn-anamnesis-index" aria-label="Seções da anamnese">
-              <p id="anamnesis-progress" role="status" aria-live="polite" style="margin: 0 0 6px; font-size: 0.8rem; color: #475569;"></p>
-              <ol>
-                <li><a href="#sec-objetivos" data-sec="objectives">Objetivos</a></li>
-                <li><a href="#sec-alergias" data-sec="allergy_assessment,allergies">Alergias</a></li>
-                <li><a href="#sec-restricoes" data-sec="restrictions">Restrições</a></li>
-                <li><a href="#sec-preferencias" data-sec="food_preferences">Preferências</a></li>
-                <li><a href="#sec-sintomas" data-sec="symptoms">Sintomas</a></li>
-                <li><a href="#sec-rotina" data-sec="routine,habits">Rotina e hábitos</a></li>
-                <li><a href="#sec-historico" data-sec="clinical_history,water_intake_ml">Histórico e hidratação</a></li>
-                <li><a href="#sec-notas" data-sec="notes">Notas e conduta</a></li>
-              </ol>
-            </nav>
-            <?php if ($revisionFrom): ?>
-              <input type="hidden" name="revision_from" value="<?= (int)$revisionFrom['version'] ?>">
-              <p role="status">Esta gravação criará uma nova versão. A versão de origem será preservada.</p>
-            <?php elseif (!$latest): ?>
-              <p>Nenhuma anamnese registrada. Preencha a primeira coleta abaixo.</p>
-            <?php endif; ?>
-
-            <!-- 1. Objetivos & Metas -->
-            <div class="form-group" id="sec-objetivos" style="margin-bottom: 16px;">
-              <label for="anamnesis_objectives" id="label_anamnesis_objectives" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                1. Objetivos & Metas do Paciente
-              </label>
-              <textarea name="objectives" id="anamnesis_objectives" aria-labelledby="label_anamnesis_objectives" rows="2" placeholder="Ex: Perda de 5kg em 3 meses, controle da glicemia em jejum, hipertrofia muscular..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['objectives'] ?? '') ?></textarea>
-            </div>
-
-            <!-- 2. Alergias & Restrições (Crítico para Prescrição) -->
-            <fieldset style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Alergias Alimentares & Restrições Clínicas</legend>
-              <div class="cn-form-grid">
-                <div id="sec-alergias" style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px;">
-                  <label for="anamnesis_allergies" id="label_anamnesis_allergies" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #B91C1C;">
-                    ⚠️ 2. Alergias Alimentares Diagnosticadas (Crítico)
-                  </label>
-                  <label class="form-label" for="allergy-assessment">Avaliação de alergias</label>
-                  <select class="form-control" id="allergy-assessment" name="allergy_assessment">
-                    <?php foreach (['not_assessed' => 'Não avaliado', 'denied' => 'Nega alergias', 'recorded' => 'Alergia registrada'] as $value => $label): ?>
-                    <option value="<?= $value ?>" <?= (($latest['allergy_assessment'] ?? 'not_assessed') === $value) ? 'selected' : '' ?>><?= $label ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <textarea id="anamnesis_allergies" name="allergies" aria-labelledby="label_anamnesis_allergies" aria-describedby="anamnesis_allergies_help" rows="3" placeholder="Ex: Amendoim, frutos do mar, proteína do leite de vaca (APLV), ovo..." style="width: 100%; padding: 8px; border: 1px solid #FCA5A5; border-radius: 6px;"><?= htmlspecialchars($latest['allergies'] ?? '') ?></textarea>
-                  <span id="anamnesis_allergies_help" style="font-size: 0.75rem; color: #991B1B; display: block; margin-top: 4px;">Utilizado na checagem automática de segurança de prescrição.</span>
-                </div>
-                <div id="sec-restricoes" style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 14px;">
-                  <label for="anamnesis_restrictions" id="label_anamnesis_restrictions" style="display: block; font-weight: 700; margin-bottom: 4px; font-size: 0.9rem; color: #92400E;">
-                    ⚠️ 3. Restrições Alimentares & Intolerâncias
-                  </label>
-                  <textarea id="anamnesis_restrictions" name="restrictions" aria-labelledby="label_anamnesis_restrictions" aria-describedby="anamnesis_restrictions_help" rows="3" placeholder="Ex: Intolerância à lactose, doença celíaca / glúten, dieta vegetariana estrita..." style="width: 100%; padding: 8px; border: 1px solid #FCD34D; border-radius: 6px;"><?= htmlspecialchars($latest['restrictions'] ?? '') ?></textarea>
-                  <span id="anamnesis_restrictions_help" style="font-size: 0.75rem; color: #92400E; display: block; margin-top: 4px;">Informações essenciais para formulação do plano alimentar.</span>
-                </div>
-              </div>
-            </fieldset>
-
-            <!-- 3. Preferências & Aversões -->
-            <div class="form-group" id="sec-preferencias" style="margin-bottom: 16px;">
-              <label for="anamnesis_food_preferences" id="label_anamnesis_food_preferences" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                4. Preferências Alimentares & Aversões
-              </label>
-              <textarea id="anamnesis_food_preferences" name="food_preferences" aria-labelledby="label_anamnesis_food_preferences" rows="2" placeholder="Alimentos preferidos, alimentos rejeitados, hábitos regionais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['food_preferences'] ?? '') ?></textarea>
-            </div>
-
-            <!-- 4. Sinais & Sintomas Clínicos -->
-            <div class="form-group" id="sec-sintomas" style="margin-bottom: 16px;">
-              <label for="anamnesis_symptoms" id="label_anamnesis_symptoms" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                5. Sinais & Sintomas Gastrointestinais / Gerais
-              </label>
-              <textarea id="anamnesis_symptoms" name="symptoms" aria-labelledby="label_anamnesis_symptoms" rows="2" placeholder="Pirose, constipação, distensão abdominal, diarreia, cefaleia, indisposição..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['symptoms'] ?? '') ?></textarea>
-            </div>
-
-            <!-- 5. Rotina & Hábitos -->
-            <fieldset id="sec-rotina" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Rotina Diária & Hábitos de Vida</legend>
-              <div class="cn-form-grid">
-                <div class="form-group">
-                  <label for="anamnesis_routine" id="label_anamnesis_routine" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                    6. Rotina Diária & Horários
-                  </label>
-                  <textarea id="anamnesis_routine" name="routine" aria-labelledby="label_anamnesis_routine" rows="3" placeholder="Horário de acordar, dormir, trabalho, pausas de refeições, atividade física..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['routine'] ?? '') ?></textarea>
-                </div>
-                <div class="form-group">
-                  <label for="anamnesis_habits" id="label_anamnesis_habits" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                    7. Hábitos de Vida & Consumo
-                  </label>
-                  <textarea id="anamnesis_habits" name="habits" aria-labelledby="label_anamnesis_habits" rows="3" placeholder="Consumo de álcool, tabagismo, cafeína, mastigação rápida, beliscos..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['habits'] ?? '') ?></textarea>
-                </div>
-              </div>
-            </fieldset>
-
-            <!-- 6. Histórico Clínico & Hidratação -->
-            <fieldset id="sec-historico" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-              <legend style="font-weight: 700; color: var(--brand-navy-900); padding: 0 8px; font-size: 0.95rem;">Histórico Clínico & Meta Hídrica Prescrita</legend>
-              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
-                <div class="form-group">
-                  <label for="anamnesis_clinical_history" id="label_anamnesis_clinical_history" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                    8. Histórico Clínico, Patologias & Medicamentos
-                  </label>
-                  <textarea id="anamnesis_clinical_history" name="clinical_history" aria-labelledby="label_anamnesis_clinical_history" rows="2" placeholder="Hipertensão, DM2, dislipidemia, cirurgias prévias, histórico familiar, medicamentos atuais..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['clinical_history'] ?? '') ?></textarea>
-                </div>
-                <div class="form-group">
-                  <label for="anamnesis_water_intake_ml" id="label_anamnesis_water_intake_ml" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                    9. Meta Hídrica (ml/dia)
-                  </label>
-                  <input type="number" step="50" min="0" max="10000" id="anamnesis_water_intake_ml" name="water_intake_ml" value="<?= htmlspecialchars((string)($latest['water_intake_ml'] ?? '')) ?>" aria-labelledby="label_anamnesis_water_intake_ml" aria-describedby="anamnesis_water_help" placeholder="Ex: 2500" style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <span id="anamnesis_water_help" style="font-size: 0.75rem; color: var(--neutral-gray-500); display: block; margin-top: 4px;">Meta prescrita em ml exibida na Home do paciente.</span>
-                </div>
-              </div>
-            </fieldset>
-
-            <!-- 7. Anotações Adicionais -->
-            <div class="form-group" id="sec-notas" style="margin-bottom: 24px;">
-              <label for="anamnesis_notes" id="label_anamnesis_notes" style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem; color: var(--brand-navy-900);">
-                10. Notas & Conduta Inicial do Nutricionista
-              </label>
-              <textarea id="anamnesis_notes" name="notes" aria-labelledby="label_anamnesis_notes" rows="2" placeholder="Observações sigilosas da consulta ou direcionamentos para a elaboração do cardápio..." style="width: 100%; padding: 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars($latest['notes'] ?? '') ?></textarea>
-            </div>
-
-            <?php /* NI2-420 (UX-08) / NI2-419 (UX-07): barra de ações sempre alcançável, com estado de salvamento */ ?>
-            <div class="cn-sticky-actions" role="group" aria-label="Salvar anamnese">
-              <p class="cn-sticky-actions__status" id="anamnesis-save-status" aria-live="polite">
-                <?php if ($latest): ?>Última gravação: v<?= (int)$latest['version'] ?> <?= !empty($latest['is_draft']) ? '(rascunho)' : '(concluída)' ?> em <?= date('d/m/Y H:i', strtotime($latest['created_at'])) ?>.<?php else: ?>Nada salvo ainda para este paciente.<?php endif; ?>
-              </p>
-              <span id="anamnesis-actions-help" class="sr-only">Salvar rascunho guarda a coleta parcial para continuar depois. Concluir anamnese registra uma nova versão; as versões anteriores continuam no histórico.</span>
-              <button type="submit" name="save_mode" value="draft" class="btn btn-outline" style="font-weight: 600;" aria-describedby="anamnesis-actions-help">
-                Salvar rascunho
-              </button>
-              <button type="submit" name="save_mode" value="final" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;" aria-describedby="anamnesis-actions-help">
-                Concluir anamnese
-              </button>
-              <p style="flex-basis: 100%; margin: 0; text-align: right; font-size: 0.75rem; color: #64748B;">Concluir registra uma nova versão. As versões anteriores continuam no histórico.</p>
-            </div>
-          </form>
-          <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
-          (() => {
-            const form = document.getElementById('anamnesis-form'); if (!form) return;
-            const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status'), initial = status.textContent.trim();
-            const assessLabel = {not_assessed: 'não avaliado', denied: 'nega alergias', recorded: 'alergia registrada'};
-            const update = () => {
-              let filled = 0; const links = [...form.querySelectorAll('.cn-anamnesis-index a[data-sec]')];
-              links.forEach(a => {
-                const names = a.dataset.sec.split(','), isAllergy = names.includes('allergy_assessment');
-                const has = names.some(n => { const el = form.elements[n]; return el && el.value.trim() !== '' && !(n === 'allergy_assessment' && el.value === 'not_assessed'); });
-                a.dataset.filled = String(has); if (has) filled++;
-                const base = a.textContent.replace(/ \(.*\)$/, '');
-                a.textContent = isAllergy ? base + ' (' + (assessLabel[form.elements.allergy_assessment?.value] || 'não avaliado') + ')' : base;
-                a.setAttribute('aria-label', a.textContent + (isAllergy ? '' : (has ? ', com conteúdo' : ', sem conteúdo')));
-              });
-              progress.textContent = filled + ' de ' + links.length + ' seções com conteúdo. Seção vazia significa "não registrado", não negação.';
-              const dirty = window.ClyoForms ? window.ClyoForms.isDirty(form) : false;
-              status.textContent = dirty ? 'Alterações não salvas. ' + initial : initial;
-            };
-            form.addEventListener('input', update); form.addEventListener('change', update); update();
-            window.addEventListener('load', update);
-          })();
-          </script>
-        </div>
-
-        <?php endif; ?>
-
-        <!-- Seção: Histórico de Versões da Anamnese -->
-        <div id="historico-versoes" class="card">
-          <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Histórico Versionado da Anamnese (<?= count($history) ?> Versões)</h3>
-            <span style="font-size: 0.8rem; color: #64748B;">As versões anteriores são preservadas</span>
-          </div>
-
-          <?php if (empty($history)): ?>
-            <p style="color: #64748B; font-size: 0.875rem;">Nenhuma versão histórica anterior registrada.</p>
-          <?php else: ?>
-            <div style="overflow-x: auto; margin-bottom: 16px;">
-              <table class="table" style="width: 100%; font-size: 0.875rem;">
-                <thead>
-                  <tr style="background: #F8FAFC;">
-                    <th>Versão</th>
-                    <th>Data / Hora</th>
-                    <th>Profissional</th>
-                    <th>Status</th>
-                    <th>Alergias Relatadas</th>
-                    <th>Restrições Relatadas</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($history as $h): ?>
-                    <tr>
-                      <td><strong>v<?= $h['version'] ?></strong></td>
-                      <td><?= date('d/m/Y H:i', strtotime($h['created_at'])) ?></td>
-                      <td><?= htmlspecialchars($h['professional_name']) ?></td>
-                      <td>
-                        <span class="badge badge-<?= $h['is_draft'] ? 'warning' : 'success' ?>">
-                          <?= $h['is_draft'] ? 'Rascunho' : 'Finalizada' ?>
-                        </span>
-                      </td>
-                      <td>
-                        <?= !empty($h['allergies']) ? '<span style="color: #DC2626; font-weight: 600;">' . htmlspecialchars(mb_substr($h['allergies'], 0, 30)) . '...</span>' : '<span style="color: #94A3B8;">—</span>' ?>
-                      </td>
-                      <td>
-                        <?= !empty($h['restrictions']) ? '<span style="color: #D97706; font-weight: 600;">' . htmlspecialchars(mb_substr($h['restrictions'], 0, 30)) . '...</span>' : '<span style="color: #94A3B8;">—</span>' ?>
-                      </td>
-                      <td>
-                        <a href="/pacientes/<?= $patient['id'] ?>/anamnese?version=<?= $h['version'] ?>" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 2px 6px;">Visualizar</a>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Formulário para Comparar 2 Versões -->
-            <?php if (count($history) >= 2): ?>
-              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px;">
-                <h4 style="margin: 0 0 8px 0; font-size: 0.875rem; color: var(--brand-navy-900);">Comparar Versões Lado a Lado (Diff Clínico)</h4>
-                <form method="GET" action="/pacientes/<?= $patient['id'] ?>/anamnese" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                  <div>
-                    <label for="compare_version_1" id="label_compare_version_1" style="font-size: 0.8rem; color: #64748B; display: block; margin-bottom: 2px;">Versão A (base):</label>
-                    <select id="compare_version_1" name="v1" aria-labelledby="label_compare_version_1" aria-label="Versão A para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
-                      <?php foreach ($history as $h): ?>
-                        <option value="<?= $h['version'] ?>">v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
-                      <?php endforeach; ?>
-                    </select>
-                  </div>
-                  <div>
-                    <label for="compare_version_2" id="label_compare_version_2" style="font-size: 0.8rem; color: #64748B; display: block; margin-bottom: 2px;">Versão B (comparada):</label>
-                    <select id="compare_version_2" name="v2" aria-labelledby="label_compare_version_2" aria-label="Versão B para comparação" style="padding: 6px 10px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.85rem;">
-                      <?php foreach (array_reverse($history) as $h): ?>
-                        <option value="<?= $h['version'] ?>" <?= $h['version'] === $history[0]['version'] ? 'selected' : '' ?>>v<?= $h['version'] ?> (<?= date('d/m/Y', strtotime($h['created_at'])) ?>)</option>
-                      <?php endforeach; ?>
-                    </select>
-                  </div>
-                  <button type="submit" class="btn btn-secondary" style="margin-top: 16px; font-size: 0.85rem;" aria-label="Comparar versões selecionadas">
-                    Comparar Versões Selecionadas ➔
-                  </button>
-                </form>
-              </div>
-            <?php endif; ?>
-          <?php endif; ?>
-        </div>
-        <?php
+        // v54.25 (NI2-220 I9/B2/B3): tela no design system, em views/anamnesis/form_page.php.
+        require __DIR__ . '/../../../views/anamnesis/form_page.php';
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     private function anamnesisProfessional(): ?int
     {
-        $db = Connection::getInstance();
-        $stmt = $db->prepare("SELECT p.id FROM professionals p
-            JOIN users u ON u.id = p.user_id
-            JOIN clinic_members cm ON cm.user_id = u.id
-            JOIN clinics c ON c.id = cm.clinic_id
-            WHERE u.id = :uid AND cm.clinic_id = :cid
-              AND u.status = 'active' AND c.status = 'active' AND cm.status = 'active'
-              AND u.role = 'nutritionist' AND cm.role IN ('owner', 'nutritionist') LIMIT 1");
-        $stmt->execute(['uid' => TenantContext::getUserId(), 'cid' => TenantContext::getClinicId()]);
-        $id = $stmt->fetchColumn();
-        if (!$id) {
-            $this->anamnesisError(403, 'Acesso clínico não autorizado.');
+        // NI2-220 (I4): mesma regra de autoria do prontuário, da antropometria e da consulta (ClinicalAuthor).
+        $id = $this->clinicalAuthorProfessionalId();
+        if ($id === null) {
+            $this->anamnesisError(403, 'Acesso clínico não autorizado. A anamnese é registrada e consultada por nutricionista com CRN ativo nesta clínica.');
             return null;
         }
-        return (int)$id;
+        return $id;
     }
 
     private function anamnesisError(int $status, string $message): void
@@ -2179,7 +1790,7 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? '';
         ob_start();
         ?>
-        <div class="card" role="alert">
+        <div class="op-message op-message--error card" role="alert">
           <h1>Anamnese indisponível</h1>
           <p><?= htmlspecialchars($message) ?></p>
           <a href="/pacientes" class="btn btn-secondary">Voltar aos pacientes</a>
@@ -2218,8 +1829,18 @@ class DashboardController
         $isDraft = ($_POST['save_mode'] ?? '') === 'draft';
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
 
+        // NI2-220 (I2): a conferência de concorrência é obrigatória no servidor. Sem a revisão lida na abertura do
+        // formulário e a chave da gravação, nada é gravado (antes, omitir os campos pulava a checagem).
+        $wfRevision = $_POST['_workflow_revision'] ?? null;
+        $wfKey = $_POST['_final_request_key'] ?? null;
+        if (!is_string($wfRevision) || !is_string($wfKey) || $wfRevision === '' || $wfKey === '') {
+            header("Location: /pacientes/{$patientId}/anamnese?error=conflict&msg=" . urlencode('Não foi possível confirmar qual versão da anamnese estava aberta. Nada foi gravado; recarregue a página e tente de novo.'));
+            exit;
+        }
+        unset($_SESSION['anamnesis_field_errors'][$patientId]);
+
         try {
-            $anamnesisService->saveAnamnesis($patientId, $profId, $_POST, $isDraft);
+            (new \ClyoNutri\Domain\Clinical\WorkflowWrites(Connection::getInstance()))->write('anamnesis',$patientId,0,$wfKey,$wfRevision,$_POST,function()use($anamnesisService,$patientId,$profId,$isDraft){$saved=$anamnesisService->saveAnamnesis($patientId,$profId,$_POST,$isDraft);return ['resource_id'=>$patientId,'record_id'=>(int)$saved['id']];});
             \ClyoNutri\Domain\Clinical\FormRecovery::clear($patientId,'anamnese');
             $successParam = $isDraft ? 'rascunho_salvo' : 'anamnese_concluida';
             header("Location: /pacientes/{$patientId}/anamnese?success={$successParam}");
@@ -2227,14 +1848,22 @@ class DashboardController
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             $this->anamnesisError(403, 'Acesso ao documento não autorizado.');
             return;
+        } catch (\ClyoNutri\Domain\Clinical\WorkflowConflict $e) {
+            header('Location: /pacientes/'.$patientId.'/anamnese?error=conflict&msg='.urlencode($e->getMessage())); return;
         } catch (\PDOException $e) {
             $this->anamnesisError(503, 'Não foi possível salvar a nova revisão. O preenchimento foi mantido nesta sessão por uma hora. Volte à coleta atual e tente novamente.');
             return;
+        } catch (\ClyoNutri\Domain\Clinical\ClinicalInputException $e) {
+            // NI2-220 (B3): erros por campo voltam para a tela; nada foi gravado.
+            $_SESSION['anamnesis_field_errors'][$patientId] = $e->fieldErrors();
+            header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
+            exit;
         } catch (\InvalidArgumentException $e) {
             header("Location: /pacientes/{$patientId}/anamnese?error=dados_invalidos&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /pacientes/{$patientId}/anamnese?error=falha&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
+            $ref = $this->logClinicalFailure('anamnese.salvar', $e);
+            header("Location: /pacientes/{$patientId}/anamnese?error=falha&ref={$ref}&msg=" . urlencode('Não foi possível salvar. O preenchimento foi mantido nesta sessão por uma hora. Tente novamente.'));
             exit;
         }
     }
@@ -2242,18 +1871,66 @@ class DashboardController
     public function prescriptionSummary(array $params): void
     {
         $patientId = (int)($params['id'] ?? 0);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        // NI2-220 (I5): resumo clínico só para quem pode atuar clinicamente nesta clínica (mesma regra da anamnese).
+        if ($this->clinicalAuthorProfessionalId() === null) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Acesso clínico não autorizado.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
 
         try {
             $summary = $anamnesisService->getClinicalSummaryForPrescription($patientId);
-            header('Content-Type: application/json; charset=utf-8');
             echo json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             exit;
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Paciente não encontrado.'], JSON_UNESCAPED_UNICODE);
+            exit;
         } catch (\Throwable $e) {
-            header('Content-Type: application/json; charset=utf-8', true, 400);
-            echo json_encode(['error' => $e->getMessage()]);
+            $ref = $this->logClinicalFailure('anamnese.resumo', $e);
+            http_response_code(500);
+            echo json_encode(['error' => 'Não foi possível montar o resumo clínico agora.', 'correlation_id' => $ref], JSON_UNESCAPED_UNICODE);
             exit;
         }
+    }
+
+    /**
+     * NI2-233: profissional (CRN) do PRÓPRIO usuário logado, membro ativo da clínica atual. Usado nas gravações
+     * clínicas (prontuário, retificação, antropometria): sem cadastro profissional não há autoria possível, e o
+     * registro NÃO pode cair no CRN de outra pessoa (o fallback de getActiveProfessionalId atribuía a autoria ao
+     * primeiro profissional da clínica ou ao id 1).
+     */
+    private function clinicalAuthorProfessionalId(): ?int
+    {
+        // NI2-220 (I4): papel na clínica + papel global + CRN preenchido + clínica ativa (ClinicalAuthor).
+        return \ClyoNutri\Domain\Clinical\ClinicalAuthor::resolve(Connection::getInstance(), (int)TenantContext::getClinicId(), (int)TenantContext::getUserId());
+    }
+
+    private const SEM_CRN_MSG = \ClyoNutri\Domain\Clinical\ClinicalAuthor::SEM_CRN_MSG;
+
+    /** NI2-707: próximo horário livre (jornada, feriados, ocupação e intervalos) nos próximos 60 dias, formato Y-m-dTH:i. */
+    private function nextValidSlot(int $duration): ?string
+    {
+        try {
+            $svc = new AppointmentService();
+            $prof = $this->getActiveProfessionalId();
+            $tz = new \DateTimeZone(getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo');
+            $now = new \DateTimeImmutable('now', $tz);
+            for ($i = 0; $i < 60; $i++) {
+                $d = $now->modify("+{$i} days")->format('Y-m-d');
+                $prev = $svc->availabilityPreview($prof, $d, max(15, min(240, $duration ?: 60)));
+                foreach ($prev['times'] ?? [] as $t) {
+                    if ($i === 0 && $t <= $now->format('H:i')) continue;
+                    return $d . 'T' . $t;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[agenda] próximo horário indisponível: ' . get_class($e));
+        }
+        return null;
     }
 
     private function getActiveProfessionalId(): int
@@ -2286,13 +1963,13 @@ class DashboardController
         }
 
         $patientId = (int)($_POST['patient_id'] ?? 0);
-        $scheduledAt = trim((string)($_POST['scheduled_at'] ?? ''));
+        $scheduledAt = is_string($_POST['scheduled_at'] ?? null) ? trim($_POST['scheduled_at']) : '';
         $duration = (int)($_POST['duration_minutes'] ?? 60);
         $type = trim((string)($_POST['type'] ?? 'first_visit'));
         $notes = !empty($_POST['notes']) ? trim((string)$_POST['notes']) : null;
         $allowConflict = !empty($_POST['allow_conflict']);
 
-        if ($patientId <= 0 || empty($scheduledAt)) {
+        if ($patientId <= 0) {
             header('Location: /agenda?error=campos_obrigatorios');
             exit;
         }
@@ -2300,7 +1977,27 @@ class DashboardController
         $service = new AppointmentService();
         $profId = $this->getActiveProfessionalId();
 
+        $sameDayBlocked = false;
         try {
+            $scheduledAt = \ClyoNutri\Domain\Appointment\AppointmentScheduleInput::fromArray($_POST);
+            $_POST['scheduled_at'] = $scheduledAt;
+            $appointmentDate = date('Y-m-d', strtotime($scheduledAt));
+
+            // NI2-591: Alerta quando o paciente já tem consulta no mesmo dia
+            // O encaixe (sobreposição de horário) não confirma "mesmo dia": são decisões diferentes.
+            $allowSameDay = !empty($_POST['allow_same_day']);
+            if (!$allowSameDay) {
+                $sameDayApp = $service->findPatientAppointmentOnDate(
+                    \ClyoNutri\Core\Auth\TenantContext::getClinicId(),
+                    $patientId,
+                    $appointmentDate
+                );
+                if ($sameDayApp !== null) {
+                    $existingTime = date('H:i', strtotime($sameDayApp['scheduled_at']));
+                    $sameDayBlocked = true;
+                    throw new AppointmentConflictException("Este paciente já tem consulta neste dia às {$existingTime}. Para manter as duas, marque \"Confirmar mesmo com outra consulta do paciente no mesmo dia\".");
+                }
+            }
             $service->schedule(
                 $patientId,
                 $profId,
@@ -2311,17 +2008,23 @@ class DashboardController
                 $allowConflict
             );
             $targetDate = date('Y-m-d', strtotime($scheduledAt));
+            // NI2-707: agendado a partir do perfil do paciente, volta para o perfil.
+            if (($_POST['return_to'] ?? '') === 'patient' && $patientId > 0) {
+                header("Location: /pacientes/{$patientId}?success=agendado");
+                exit;
+            }
             header("Location: /agenda?date={$targetDate}&success=agendado");
             exit;
         } catch (AppointmentConflictException $e) {
             // UX-05 (v14): conflito mantém o formulário aberto, preenchido e com o horário destacado.
-            $targetDate = date('Y-m-d', strtotime($scheduledAt) ?: time());
-            $this->rememberAgendaForm('new', $e->getMessage(), true);
+            $targetDate = \ClyoNutri\Domain\Appointment\AppointmentScheduleInput::recoveryDate($_POST);
+            $this->rememberAgendaForm('new', $e->getMessage(), empty($sameDayBlocked));
+            if (!empty($sameDayBlocked)) $_SESSION['agenda_form_recovery']['same_day'] = true;
             header("Location: /agenda?date={$targetDate}&novo=1&error=conflito#card-novo-agendamento");
             exit;
         } catch (\Throwable $e) {
-            $targetDate = date('Y-m-d', strtotime($scheduledAt) ?: time());
-            $this->rememberAgendaForm('new', $e->getMessage(), false);
+            $targetDate = \ClyoNutri\Domain\Appointment\AppointmentScheduleInput::recoveryDate($_POST);
+            $this->rememberAgendaForm('new', $this->userFacingError('agenda: novo agendamento', $e), false);
             header("Location: /agenda?date={$targetDate}&novo=1&error=falha#card-novo-agendamento");
             exit;
         }
@@ -2331,7 +2034,7 @@ class DashboardController
     private function rememberAgendaForm(string $scope, string $message, bool $conflict): void
     {
         $values = [];
-        foreach (['patient_id', 'scheduled_at', 'duration_minutes', 'type', 'notes', 'reschedule_reason'] as $k) {
+        foreach (['patient_id', 'scheduled_at', 'scheduled_date', 'scheduled_time', 'duration_minutes', 'type', 'notes', 'reschedule_reason', 'allow_same_day', 'return_to'] as $k) {
             if (isset($_POST[$k]) && is_scalar($_POST[$k])) {
                 $values[$k] = mb_substr((string)$_POST[$k], 0, 2000);
             }
@@ -2369,22 +2072,22 @@ class DashboardController
         $from = (string)($_GET['de'] ?? '');
         $backUrl = $from === 'paciente' ? '/pacientes/' . (int)$app['patient_id'] : '/agenda?date=' . substr((string)$app['scheduled_at'], 0, 10);
 
-        $title = 'Reagendar consulta — ' . ($app['patient_name'] ?? 'Paciente');
+        $title = 'Reagendar consulta · ' . ($app['patient_name'] ?? 'Paciente');
         $activeNav = 'agenda';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
         ob_start();
         ?>
-        <div style="font-size: 0.85rem; margin-bottom: 4px;"><a href="<?= htmlspecialchars($backUrl) ?>" style="color: var(--brand-copper-600);">← Voltar</a></div>
+        <div class="u-text-compact u-mb-1"><a href="<?= htmlspecialchars($backUrl) ?>" class="u-color-botanical-copper-600">← Voltar</a></div>
         <h1>Reagendar consulta</h1>
-        <p style="color: var(--neutral-gray-500);"><?= htmlspecialchars($app['patient_name']) ?> • <?= htmlspecialchars(LabelMap::appointmentType($app['type'] ?? null)) ?> • horário atual: <strong data-testid="current-slot"><?= date('d/m/Y H:i', strtotime((string)$app['scheduled_at'])) ?></strong></p>
+        <p class="u-color-neutral-gray-500"><?= htmlspecialchars($app['patient_name']) ?> • <?= htmlspecialchars(LabelMap::appointmentType($app['type'] ?? null)) ?> • horário atual: <strong data-testid="current-slot"><?= date('d/m/Y H:i', strtotime((string)$app['scheduled_at'])) ?></strong></p>
         <?php if (!$reschedulable): ?>
-          <div role="alert" class="card" style="border-left: 4px solid #DC2626;">Consultas com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong> não podem ser reagendadas. Para um novo atendimento, use <a href="/agenda?novo=1&amp;paciente=<?= (int)$app['patient_id'] ?>">Nova consulta</a>.</div>
+          <div class="op-message op-message--error card u-accent u-accent-semantic-error" role="alert">Consultas com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong> não podem ser reagendadas. Para um novo atendimento, use <a href="/agenda?novo=1&amp;paciente=<?= (int)$app['patient_id'] ?>">Nova consulta</a>.</div>
         <?php else: ?>
-        <div class="card" id="card-reagendar" style="border-top: 4px solid var(--brand-copper-500); max-width: 720px;">
+        <div class="card u-accent-top u-accent-brand-copper-500 u-maxw-prose" id="card-reagendar">
           <?php if ($recovered): ?>
-            <div role="alert" data-testid="agenda-form-error" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; color: #B91C1C;">
+            <div class="op-message op-message--error u-mb-3" role="alert" data-testid="agenda-form-error">
               <strong><?= !empty($recovered['conflict']) ? 'Horário indisponível.' : 'Não foi possível reagendar.' ?></strong> <?= htmlspecialchars((string)$recovered['error']) ?> Seus dados foram mantidos; escolha outro horário<?= !empty($recovered['conflict']) ? ' ou marque o encaixe' : '' ?>.
             </div>
           <?php endif; ?>
@@ -2392,36 +2095,31 @@ class DashboardController
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <input type="hidden" name="origin" value="reagendar">
             <input type="hidden" name="de" value="<?= htmlspecialchars($from === 'paciente' ? 'paciente' : 'agenda') ?>">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
+            <div class="u-grid u-cols-auto-md u-gap-4 u-mb-4">
+              <?php $scheduleFieldPrefix='reschedule-appointment';$scheduleFieldValue=(string)$scheduledValue;$scheduleFieldValues=$v;$scheduleFieldConflict=!empty($recovered['conflict']);require __DIR__.'/../../../views/agenda/_schedule_fields.php'; ?>
               <div>
-                <label for="rs-scheduled_at" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Novo dia e horário *</label>
-                <input id="rs-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= htmlspecialchars($scheduledValue) ?>"
-                  <?= !empty($recovered['conflict']) ? 'aria-invalid="true" aria-describedby="rs-scheduled_at-erro" autofocus data-conflict-highlight style="width: 100%; padding: 8px 12px; border: 2px solid #DC2626; border-radius: 6px; background: #FEF2F2;"' : 'style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"' ?>>
-                <?php if (!empty($recovered['conflict'])): ?><p id="rs-scheduled_at-erro" class="field-error" style="color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0;">Conflita com outra consulta. Escolha outro horário.</p><?php endif; ?>
-              </div>
-              <div>
-                <label for="rs-duration" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
-                <select id="rs-duration" name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="rs-duration" class="u-block u-font-semibold u-text-compact u-mb-1">Duração</label>
+                <select class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input" id="rs-duration" name="duration_minutes">
                   <?php $choices = array_unique([30, 45, 60, 90, 120, $durationValue]); sort($choices); foreach ($choices as $m): ?>
                     <option value="<?= (int)$m ?>" <?= (int)$m === $durationValue ? 'selected' : '' ?>><?= (int)$m ?> minutos</option>
                   <?php endforeach; ?>
                 </select>
               </div>
             </div>
-            <div style="margin-bottom: 16px;">
-              <label for="rs-reason" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Motivo do reagendamento (opcional, fica na trilha da consulta)</label>
-              <input id="rs-reason" type="text" name="reschedule_reason" maxlength="300" value="<?= htmlspecialchars($reasonValue) ?>" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+            <div class="u-mb-4">
+              <label for="rs-reason" class="u-block u-font-semibold u-text-compact u-mb-1">Motivo do reagendamento (opcional, fica na trilha da consulta)</label>
+              <input id="rs-reason" type="text" name="reschedule_reason" maxlength="300" value="<?= htmlspecialchars($reasonValue) ?>" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
             </div>
-            <p style="font-size: 0.8rem; color: var(--neutral-gray-500);">A consulta continua a mesma (mesmo paciente, tipo, histórico e vínculos). Se for teleconsulta, o convite anterior deixa de valer e um novo convite deve ser enviado ao paciente.</p>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: 12px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #64748B;"><input type="checkbox" name="allow_conflict" value="1"> Permitir sobreposição de horário (encaixe)</label>
-              <div style="display: flex; gap: 8px;">
+            <p class="u-text-compact u-color-neutral-gray-500">A consulta continua a mesma (mesmo paciente, tipo, histórico e vínculos). Se for teleconsulta, o convite anterior deixa de valer e um novo convite deve ser enviado ao paciente.</p>
+            <div class="u-flex u-justify-between u-items-center u-border-t u-pt-3">
+              <label class="u-flex u-items-center u-gap-2 u-text-compact u-color-neutral-gray-500"><input type="checkbox" name="allow_conflict" value="1"> Permitir sobreposição de horário (encaixe)</label>
+              <div class="u-flex u-gap-2">
                 <a href="<?= htmlspecialchars($backUrl) ?>" class="btn btn-secondary">Cancelar</a>
                 <button type="submit" class="btn btn-primary" data-testid="reschedule-submit">Confirmar reagendamento</button>
               </div>
             </div>
           </form>
-          <p style="font-size: 0.8rem; margin-top: 10px;"><a href="/ajuda/artigo/como-reagendar-uma-consulta">Como reagendar uma consulta</a></p>
+          <p class="u-text-compact u-mt-2"><a href="/ajuda/artigo/como-reagendar-uma-consulta">Como reagendar uma consulta</a></p>
         </div>
         <?php endif; ?>
         <?php
@@ -2444,6 +2142,7 @@ class DashboardController
         $isReschedule = ($_POST['origin'] ?? '') === 'reagendar';
         $back = "/agenda/{$id}/reagendar" . (($_POST['de'] ?? '') === 'paciente' ? '?de=paciente' : '');
         try {
+            if ($isReschedule || isset($_POST['scheduled_date']) || isset($_POST['scheduled_time'])) $_POST['scheduled_at'] = \ClyoNutri\Domain\Appointment\AppointmentScheduleInput::fromArray($_POST);
             $data = $_POST;
             if ($isReschedule) {
                 // UX-04 (v14): reagendar só altera horário/duração (+ motivo na trilha), apenas de consulta agendada/confirmada e para o futuro.
@@ -2482,7 +2181,7 @@ class DashboardController
                 header("Location: {$back}");
                 exit;
             }
-            header("Location: /agenda?error=falha&msg=" . urlencode($e->getMessage()));
+            header("Location: /agenda?error=falha&msg=" . urlencode($this->userFacingError('agenda', $e)));
             exit;
         }
     }
@@ -2525,9 +2224,172 @@ class DashboardController
             header("Location: /agenda?error=transicao_invalida&msg=" . urlencode($e->getMessage()));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /agenda?error=falha&msg=" . urlencode($e->getMessage()));
+            header("Location: /agenda?error=falha&msg=" . urlencode($this->userFacingError('agenda', $e)));
             exit;
         }
+    }
+
+    /** NI2-705: POST /pacientes/{id}/iniciar-agora — atendimento imediato (sem agendamento prévio). */
+    public function startCareNow(array $params): void
+    {
+        $pid = (int)($params['id'] ?? 0);
+        if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
+            header("Location: /pacientes/{$pid}?error=csrf");
+            exit;
+        }
+        $clinicId = (int)TenantContext::getClinicId();
+        $userId = (int)TenantContext::getUserId();
+        $db = Connection::getInstance();
+        $st = $db->prepare('SELECT id FROM professionals WHERE user_id = ? LIMIT 1');
+        $st->execute([$userId]);
+        $profId = (int)($st->fetchColumn() ?: 0);
+        if ($profId <= 0) {
+            header("Location: /pacientes/{$pid}?error=sem_profissional");
+            exit;
+        }
+        try {
+            $r = (new AppointmentService())->startNow($pid, $profId, $userId);
+        } catch (\Throwable $e) {
+            $this->logClinicalFailure('consulta.iniciar_agora', $e);
+            header("Location: /pacientes/{$pid}?error=iniciar_agora");
+            exit;
+        }
+        header('Location: /consulta/' . (int)$r['id']);
+        exit;
+    }
+
+    /** NI2-712: GET /pacientes/{id}/preparar — painel Preparar consulta (≠ anamnese). */
+    public function prepareConsultation(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $profile = $repo->getProfile360($id);
+        if (!$profile) {
+            header('Location: /pacientes');
+            exit;
+        }
+        $p = $profile['patient'];
+        $title = 'Preparar consulta · ' . $p['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $csrfToken = Csrf::token();
+        $clinicId = (int)TenantContext::getClinicId();
+        $db = Connection::getInstance();
+        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $anamnesisService = new \ClyoNutri\Domain\Anamnesis\AnamnesisService();
+        $latestAnamnesis = $anamnesisService->getEffectiveAnamnesis($id);
+        $clinicalSummary = $anamnesisService->getClinicalSummaryForPrescription($id);
+        $activePlan = null;
+        if (!empty($profile['meal_plans'])) {
+            foreach ($profile['meal_plans'] as $mp) {
+                if (($mp['status'] ?? '') === 'active') { $activePlan = $mp; break; }
+            }
+            if (!$activePlan) $activePlan = $profile['meal_plans'][0];
+        }
+        $assessments = (new AnthropometryService())->getEvolution($id)['assessments'] ?? [];
+        $pendingExamCount = 0;
+        try {
+            $pe = $db->prepare("SELECT COUNT(*) FROM exam_requests WHERE clinic_id = ? AND patient_id = ? AND status IN ('draft','review')");
+            $pe->execute([$clinicId, $id]);
+            $pendingExamCount = (int)$pe->fetchColumn();
+        } catch (\Throwable $e) { $pendingExamCount = 0; }
+        $lastCompleted = null;
+        try {
+            $lc = $db->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY COALESCE(completed_at, scheduled_at) DESC, id DESC LIMIT 1");
+            $lc->execute([$clinicId, $id]);
+            $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) { $lastCompleted = null; }
+        ob_start();
+        echo \ClyoNutri\Application\View\PatientHeader::render($db, $id, 'resumo', $p, $careStep, $clinicalSummary, $activePlan, true);
+        require __DIR__ . '/../../../views/patients/prepare.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /** NI2-711: GET /pacientes/{id}/plano — aba Plano com rota própria. */
+    public function patientPlansTab(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $profile = $repo->getProfile360($id);
+        if (!$profile) {
+            header('Location: /pacientes');
+            exit;
+        }
+        $p = $profile['patient'];
+        $title = 'Plano · ' . $p['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $csrfToken = Csrf::token();
+        $db = Connection::getInstance();
+        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $clinicalSummary = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService())->getClinicalSummaryForPrescription($id);
+        $activePlan = null;
+        if (!empty($profile['meal_plans'])) {
+            foreach ($profile['meal_plans'] as $mp) {
+                if (($mp['status'] ?? '') === 'active') { $activePlan = $mp; break; }
+            }
+            if (!$activePlan) $activePlan = $profile['meal_plans'][0];
+        }
+        ob_start();
+        echo \ClyoNutri\Application\View\PatientHeader::render($db, $id, 'plano', $p, $careStep, $clinicalSummary, $activePlan, true);
+        require __DIR__ . '/../../../views/patients/plans.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /** NI2-711: GET /pacientes/{id}/documentos — aba Documentos com rota própria. */
+    public function patientDocumentsTab(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository();
+        $profile = $repo->getProfile360($id);
+        if (!$profile) {
+            header('Location: /pacientes');
+            exit;
+        }
+        $p = $profile['patient'];
+        $title = 'Documentos · ' . $p['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $csrfToken = Csrf::token();
+        $db = Connection::getInstance();
+        $careStep = (new AppointmentService())->careStepForPatient($id);
+        $clinicalSummary = (new \ClyoNutri\Domain\Anamnesis\AnamnesisService())->getClinicalSummaryForPrescription($id);
+        $activePlan = null;
+        if (!empty($profile['meal_plans'])) {
+            foreach ($profile['meal_plans'] as $mp) {
+                if (($mp['status'] ?? '') === 'active') { $activePlan = $mp; break; }
+            }
+            if (!$activePlan) $activePlan = $profile['meal_plans'][0];
+        }
+        ob_start();
+        echo \ClyoNutri\Application\View\PatientHeader::render($db, $id, 'documentos', $p, $careStep, $clinicalSummary, $activePlan, true);
+        require __DIR__ . '/../../../views/patients/documents.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /** NI2-706: etapas do atendimento que ainda pedem revisão (Revisão pendente / Em andamento). */
+    private function pendingReviewSteps(int $clinicId, int $patientId, int $appointmentId): array
+    {
+        try {
+            $snap = (new \ClyoNutri\Domain\Appointment\CareProgress(Connection::getInstance()))->snapshot($clinicId, $patientId, $appointmentId);
+        } catch (\Throwable $e) {
+            error_log('[consulta] etapas indisponíveis para o gate de conclusão: ' . get_class($e));
+            return [];
+        }
+        $out = [];
+        foreach ($snap['steps'] ?? [] as $step) {
+            if (in_array($step['state'] ?? '', ['review', 'in_progress'], true)) {
+                $out[] = ['key' => (string)$step['key'], 'label' => (string)$step['label'], 'state' => (string)$step['state'],
+                    'state_label' => \ClyoNutri\Domain\Appointment\CareWorkflow::LABELS[$step['state']] ?? '', 'url' => (string)($step['url'] ?? '')];
+            }
+        }
+        return $out;
     }
 
     public function consultationRoom(array $params): void
@@ -2581,6 +2443,7 @@ class DashboardController
             ? (new \DateTimeImmutable((string)$draft['updated_at_utc'], new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('d/m/Y \à\s H:i')
             : null;
 
+        $pendingReview = $inProgress ? $this->pendingReviewSteps($clinicId, (int)$app['patient_id'], $id) : [];
         $repo = new PatientRepository();
         $profile = $repo->getProfile360((int)$app['patient_id']);
         $p = $profile['patient'] ?? [];
@@ -2592,217 +2455,8 @@ class DashboardController
         $csrfToken = Csrf::generate();
 
         ob_start();
-        ?>
-        <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-              <a href="/agenda" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar para a Agenda</a>
-            </div>
-            <h1>Atendimento Clínico — <?= htmlspecialchars($app['patient_name']) ?></h1>
-            <p style="color: var(--neutral-gray-500);">
-              Tipo: <?= htmlspecialchars(LabelMap::appointmentType($app['type'] ?? null)) ?> • Duração prevista: <?= (int)$app['duration_minutes'] ?> min
-            </p>
-            <dl class="cn-consult-times" data-testid="consult-times" style="display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 0; font-size: 0.875rem;">
-              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Agendada para</dt><dd style="margin: 0;" data-time="scheduled"><strong><?= date('d/m/Y H:i', strtotime($app['scheduled_at'])) ?></strong></dd></div>
-              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Iniciada em</dt><dd style="margin: 0;" data-time="started"><strong><?= $timeline['started_at'] ? date('d/m/Y H:i', strtotime($timeline['started_at'])) : 'Não iniciada' ?></strong></dd></div>
-              <div><dt style="color: var(--neutral-gray-500); font-size: 0.75rem;">Concluída em</dt><dd style="margin: 0;" data-time="completed"><strong><?= $timeline['completed_at'] ? date('d/m/Y H:i', strtotime($timeline['completed_at'])) : 'Não concluída' ?></strong></dd></div>
-            </dl>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <span class="badge badge-warning" style="font-size: 0.875rem; padding: 6px 12px;">
-              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #946200; margin-right: 4px;"></span>
-              <?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?>
-            </span>
-            <?php if (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($app['type'] ?? null)): /* NI2-221 F19: só consulta online */ ?>
-            <a href="/teleconsulta/sessao-agenda/<?= (int)$app['id'] ?>" class="btn btn-primary" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
-              <span>Consultório Online</span>
-            </a>
-            <?php endif; ?>
-            <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem;">
-              Ver perfil do paciente ↗
-            </a>
-          </div>
-        </div>
-
-        <div class="consultation-room-layout" style="display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--space-6);">
-          <!-- Coluna 1: Contexto Clínico do Paciente -->
-          <div style="display: flex; flex-direction: column; gap: var(--space-6);">
-            <!-- Card de Dados e Histórico -->
-            <div class="card">
-              <h3 style="margin-top: 0; margin-bottom: var(--space-4);">Contexto do Paciente</h3>
-              <p style="margin-bottom: var(--space-2);"><strong>Telefone:</strong> <?= htmlspecialchars($p['phone'] ?? '—') ?></p>
-              <p style="margin-bottom: var(--space-2);"><strong>E-mail:</strong> <?= htmlspecialchars($p['email'] ?? '—') ?></p>
-              <p style="margin-bottom: var(--space-2);"><strong>Nascimento:</strong> <?= !empty($p['birth_date']) ? date('d/m/Y', strtotime($p['birth_date'])) : '—' ?></p>
-              <p style="margin-bottom: var(--space-2);"><strong>Gênero:</strong> <?= htmlspecialchars(LabelMap::patientGender($p['gender'] ?? null)) ?></p>
-
-              <?php if (!empty($app['notes'])): ?>
-                <div style="margin-top: var(--space-4); padding: var(--space-3); background: #FAF9F4; border-left: 3px solid var(--brand-copper-500); border-radius: 4px;">
-                  <strong style="font-size: 0.8125rem; color: var(--brand-navy-900);">Observações do Agendamento:</strong>
-                  <p style="font-size: 0.875rem; color: var(--neutral-gray-700); margin-top: 4px;"><?= nl2br(htmlspecialchars($app['notes'])) ?></p>
-                </div>
-              <?php endif; ?>
-            </div>
-
-            <!-- Última Antropometria -->
-            <div class="card">
-              <div class="card__header">
-                <h3>Últimas Medidas</h3>
-                <a href="/pacientes/<?= $app['patient_id'] ?>" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Histórico</a>
-              </div>
-              <?php if (empty($profile['assessments'])): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.875rem;">Nenhuma avaliação antropométrica registrada ainda.</p>
-              <?php else: ?>
-                <?php $latest = $profile['assessments'][0]; ?>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 8px;">
-                  <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
-                    <span style="font-size: 0.75rem; color: #64748B;">Peso</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['weight_kg'] ?? null, 1, 'kg')) ?></strong>
-                  </div>
-                  <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
-                    <span style="font-size: 0.75rem; color: #64748B;">Altura</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['height_cm'] ?? null, 1, 'cm')) ?></strong>
-                  </div>
-                  <div style="background: #F8FAFC; padding: 8px; border-radius: 6px;">
-                    <span style="font-size: 0.75rem; color: #64748B;">IMC</span>
-                    <strong style="display: block; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars(LabelMap::num($latest['bmi'] ?? null, 2)) ?></strong>
-                  </div>
-                </div>
-                <small style="color: var(--neutral-gray-500);">Registrado em: <?= date('d/m/Y', strtotime($latest['assessed_at'])) ?></small>
-              <?php endif; ?>
-            </div>
-
-            <!-- Último Plano Alimentar -->
-            <div class="card">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin: 0;">Prescrição Alimentar</h3>
-                <a href="/planos" target="_blank" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Todos os Planos</a>
-              </div>
-              <?php if (empty($profile['meal_plans'])): ?>
-                <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin-bottom: 12px;">Nenhum plano prescrito ainda. Inicie a prescrição desta consulta.</p>
-                <a href="/pacientes/<?= $app['patient_id'] ?>" target="_blank" class="btn btn-sm btn-primary" style="font-size: 0.8rem; text-decoration: none; display: inline-block;">+ Prescrever Plano no Perfil ↗</a>
-              <?php else: ?>
-                <?php $plan = $profile['meal_plans'][0]; ?>
-                <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                  <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($plan['title']) ?> (v<?= $plan['version'] ?>)</strong>
-                  <?= LabelMap::mealPlanStatusBadge($plan['status'] ?? '') ?>
-                </div>
-                <a href="/planos/<?= $plan['id'] ?>" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Abrir Editor da Prescrição ↗</a>
-              <?php endif; ?>
-            </div>
-
-            <!-- Anamnese Nutricional -->
-            <div class="card">
-              <div class="card__header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin: 0;">Anamnese Nutricional</h3>
-                <a href="/pacientes/<?= (int)$app['patient_id'] ?>/anamnese" target="_blank" class="btn btn-secondary" style="font-size: 0.75rem; padding: 2px 8px;">Abrir Anamnese ↗</a>
-              </div>
-              <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin: 0 0 8px 0;">Consulte ou atualize o histórico clínico, alergias e rotina do paciente.</p>
-              <a href="/pacientes/<?= (int)$app['patient_id'] ?>/anamnese" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.8rem; text-decoration: none;">Ver / Preencher Anamnese Estruturada ↗</a>
-            </div>
-          </div>
-
-          <!-- Coluna 2: Formulário de Execução e Conclusão da Consulta -->
-          <div>
-            <div class="card">
-              <h3 style="margin-top: 0; margin-bottom: var(--space-4); color: var(--brand-navy-900);">
-                Evolução Clínica & Conduta do Atendimento
-              </h3>
-              <p style="color: var(--neutral-gray-500); font-size: 0.875rem; margin-bottom: var(--space-4);">
-                Ao concluir a consulta, a evolução será assinada e registrada de forma autêntica no prontuário eletrônico do paciente, garantindo integridade e conformidade com as diretrizes do CFN.
-              </p>
-
-              <?php if ($canStart): ?>
-              <section class="cn-start-consult" data-testid="consult-start-panel" style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 16px; background: <?= $isEarly ? '#FFF7E6' : '#F8FAFC' ?>;">
-                <h4 style="margin: 0 0 6px;">Esta consulta ainda não foi iniciada</h4>
-                <p style="margin: 0 0 10px; font-size: 0.9rem;">Agendada para <strong><?= date('d/m/Y \à\s H:i', strtotime($app['scheduled_at'])) ?></strong>. Ao iniciar, o horário real de início é registrado na trilha de auditoria.</p>
-                <form method="POST" action="/agenda/<?= (int)$app['id'] ?>/status" data-no-dirty style="margin: 0;">
-                  <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                  <input type="hidden" name="status" value="in_progress">
-                  <?php if ($isEarly): ?>
-                    <p role="alert" data-testid="early-start-warning" style="margin: 0 0 8px; color: #8A5300; font-weight: 600;">Início antecipado: faltam <?= htmlspecialchars(AppointmentService::humanUntil((string)$app['scheduled_at'])) ?> para o horário marcado.</p>
-                    <label style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;"><input type="checkbox" name="confirm_early" value="1" required> Confirmo que quero iniciar antes do horário agendado</label>
-                  <?php endif; ?>
-                  <button type="submit" class="btn btn-primary" data-testid="consult-start">Iniciar atendimento agora</button>
-                  <a href="/agenda" class="btn btn-secondary">Voltar à agenda</a>
-                </form>
-              </section>
-              <?php elseif (!$inProgress): ?>
-              <p data-testid="consult-closed" data-draft-scope="<?= htmlspecialchars($draftScope) ?>" style="padding: 12px; background: #F8FAFC; border-radius: 8px;">Consulta com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong>; não há anotações em andamento.</p>
-              <script src="/assets/js/consulta-rascunho.js" defer></script>
-              <?php else: ?>
-              <?php if (!empty($_GET['error'])): ?>
-                <div role="alert" data-testid="consult-submit-error" style="padding: 12px 14px; margin-bottom: 12px; border-radius: 8px; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; font-size: 0.875rem;">
-                  <strong>Não foi possível concluir a consulta:</strong>
-                  <?= ($_GET['error'] === 'resumo_obrigatorio')
-                      ? 'Informe o resumo da evolução clínica antes de assinar o prontuário. Os demais campos preenchidos foram preservados.'
-                      : 'Ocorreu uma falha temporária ao concluir o atendimento. Suas anotações foram preservadas abaixo; revise e tente novamente.' ?>
-                </div>
-              <?php endif; ?>
-              <form action="/consulta/<?= $app['id'] ?>/concluir" method="POST" data-no-dirty data-consult-draft
-                    data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-scope="<?= htmlspecialchars($draftScope) ?>"<?= $draftRecoveredFromPost ? ' data-draft-recovered="1"' : '' ?> data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
-                <p id="consulta-draft-status" role="status" aria-live="polite" data-testid="draft-status" style="font-size: 0.8125rem; color: var(--neutral-gray-600, #475569); margin: 0 0 8px;"><?= $draftRecoveredFromPost ? 'Preenchimento recuperado após tentativa de conclusão. Suas anotações estão preservadas.' : ($draftSavedLocal ? 'Rascunho recuperado (salvo em ' . htmlspecialchars($draftSavedLocal) . '). Continue de onde parou.' : 'As anotações são salvas automaticamente como rascunho enquanto você digita.') ?></p>
-                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-
-                <div class="form-group" style="margin-bottom: var(--space-4);">
-                  <label for="evolution_summary" style="display: block; font-weight: 600; margin-bottom: 6px;">
-                    Anotações Clínicas / Resumo da Evolução <span style="color: #DC2626;">*</span>
-                  </label>
-                  <textarea id="evolution_summary" name="evolution_summary" rows="8" required style="width: 100%; padding: 12px; border: 1px solid var(--neutral-gray-300); border-radius: 8px; font-family: inherit; font-size: 0.9375rem; line-height: 1.5;" placeholder="Descreva os tópicos abordados (anamnese alimentar, queixas gastrointestinais, rotina, metas acordadas e ajustes na prescrição)..."><?= htmlspecialchars((string)($draft['evolution_summary'] ?? '')) ?></textarea>
-                </div>
-
-                <div style="background: #F8FAFC; border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 16px; margin-bottom: var(--space-6);">
-                  <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">
-                    Atualização Antropométrica Desta Consulta (Opcional)
-                  </h4>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
-                    <div>
-                      <label for="dc9-weight_kg" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Peso Atual (kg)</label>
-                      <input id="dc9-weight_kg" type="number" step="0.1" name="weight_kg" value="<?= htmlspecialchars((string)($draft['weight_kg'] ?? '')) ?>" placeholder="Ex: 68,5" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                    </div>
-                    <div>
-                      <label for="dc10-waist_cm" style="font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 4px;">Circunf. Cintura (cm)</label>
-                      <input id="dc10-waist_cm" type="number" step="0.5" name="waist_cm" value="<?= htmlspecialchars((string)($draft['waist_cm'] ?? '')) ?>" placeholder="Ex: 78,0" style="width: 100%; padding: 8px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                    </div>
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-4);">
-                  <a href="/agenda?date=<?= date('Y-m-d', strtotime($app['scheduled_at'])) ?>" class="btn btn-secondary" data-draft-pause>Pausar e Voltar à Agenda</a>
-                  <button type="submit" class="btn btn-primary" style="font-size: 1rem; padding: 10px 24px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    Concluir Consulta & Assinar Prontuário
-                  </button>
-                </div>
-              </form>
-              <script src="/assets/js/consulta-rascunho.js" defer></script>
-              <?php endif; ?>
-            </div>
-
-            <!-- Histórico de Transições da Consulta -->
-            <?php if (!empty($app['history'])): ?>
-              <div class="card" style="margin-top: var(--space-4);">
-                <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">
-                  Trilha de Auditoria Desta Consulta
-                </h4>
-                <div style="font-size: 0.8125rem; color: var(--neutral-gray-700);">
-                  <?php foreach ($app['history'] as $h): ?>
-                    <div style="padding: 6px 0; border-bottom: 1px solid var(--neutral-gray-200); display: flex; justify-content: space-between; align-items: center;">
-                      <div>
-                        <strong><?= htmlspecialchars(!empty($h['from_status']) ? LabelMap::appointmentStatus($h['from_status']) : 'Criação') ?></strong> ➔ 
-                        <?= LabelMap::appointmentStatusBadge($h['to_status'] ?? '') ?>
-                        <?php if (!empty($h['notes'])): ?>
-                          <span style="color: var(--neutral-gray-500);">— <?= htmlspecialchars($h['notes']) ?></span>
-                        <?php endif; ?>
-                      </div>
-                      <span style="color: var(--neutral-gray-500);"><?= date('H:i:s d/m', strtotime($h['created_at'])) ?></span>
-                    </div>
-                  <?php endforeach; ?>
-                </div>
-              </div>
-            <?php endif; ?>
-          </div>
-        </div>
-        <?php
+        // v54.25 (NI2-220 I9): marcação no arquivo de view, no design system.
+        require __DIR__ . '/../../../views/consultation/room.php';
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
@@ -2932,61 +2586,156 @@ class DashboardController
             exit;
         }
 
-        $details = [];
-        $weightNormalized = str_replace(',', '.', $weightRaw);
-        $waistNormalized = str_replace(',', '.', $waistRaw);
-        if ($weightNormalized !== '' && is_numeric($weightNormalized)) {
-            $details['weight_kg'] = (float)$weightNormalized;
+        // NI2-220 (B1): autor é quem conclui, com CRN ativo nesta clínica; sem isso nada é gravado e o rascunho fica.
+        $authorId = \ClyoNutri\Domain\Clinical\ClinicalAuthor::resolve(Connection::getInstance(), $clinicId, $userId);
+        if ($authorId === null) {
+            header("Location: /consulta/{$id}?error=sem_crn");
+            exit;
         }
-        if ($waistNormalized !== '' && is_numeric($waistNormalized)) {
-            $details['waist_cm'] = (float)$waistNormalized;
+
+        // NI2-220 (B3): peso e cintura fora da faixa são recusados com erro no campo, antes do registro imutável.
+        try {
+            $details = AppointmentService::validatedConsultationDetails(['weight_kg' => $weightRaw, 'waist_cm' => $waistRaw]);
+        } catch (\ClyoNutri\Domain\Clinical\ClinicalInputException $e) {
+            $_SESSION['consultation_field_errors'][$id] = $e->fieldErrors();
+            header("Location: /consulta/{$id}?error=medidas_invalidas");
+            exit;
+        }
+
+        // NI2-706: etapas em "Revisão pendente" (ou em rascunho) exigem confirmação explícita, auditada.
+        $pendingReview = $this->pendingReviewSteps($clinicId, (int)$app['patient_id'], $id);
+        if ($pendingReview !== []) {
+            $ackKeys = trim((string)($_POST['pending_review_keys'] ?? ''));
+            $curKeys = implode(',', array_column($pendingReview, 'key'));
+            if (($_POST['confirm_pending_review'] ?? '') !== '1' || $ackKeys !== $curKeys) {
+                header("Location: /consulta/{$id}?error=revisao_pendente#cr-pending-review");
+                exit;
+            }
         }
 
         try {
-            $result = $service->completeConsultation($id, $summary, $details, $userId);
-
-            // Se registrou peso e o paciente já possui estatura registrada, atualiza também anthropometric_assessments sem quebrar a conclusão
-            if (!empty($details['weight_kg'])) {
-                try {
-                    $db = Connection::getInstance();
-                    $hStmt = $db->prepare('SELECT height_cm FROM anthropometric_assessments WHERE clinic_id = ? AND patient_id = ? AND height_cm > 0 ORDER BY assessed_at DESC, id DESC LIMIT 1');
-                    $hStmt->execute([$clinicId, (int)$app['patient_id']]);
-                    $lastHeight = $hStmt->fetchColumn();
-                    if ($lastHeight !== false && (float)$lastHeight > 0) {
-                        (new AnthropometryService($db))->recordAssessment(
-                            (int)$app['patient_id'],
-                            (int)$app['professional_id'],
-                            [
-                                'weight_kg' => (string)$details['weight_kg'],
-                                'height_cm' => (string)$lastHeight,
-                                'waist_cm' => isset($details['waist_cm']) ? (string)$details['waist_cm'] : '',
-                                'notes' => "Registrado na conclusão da consulta #{$id}",
-                            ],
-                            $userId
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    error_log('[consulta] atualização antropométrica opcional ignorada: ' . get_class($e));
-                }
-            }
-
-            unset($_SESSION['consultation_form_recovery'][$id]);
-            try {
-                (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->discard($id, $userId, $clinicId);
-            } catch (\Throwable $e) {
-                error_log('[consulta] rascunho não apagado: ' . get_class($e));
-            }
-
-            header("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8));
+            $result = $service->completeConsultation($id, $summary, $details, $userId, $authorId);
+        } catch (\ClyoNutri\Domain\Clinical\ClinicalInputException $e) {
+            $_SESSION['consultation_field_errors'][$id] = $e->fieldErrors();
+            header("Location: /consulta/{$id}?error=medidas_invalidas");
+            exit;
+        } catch (\InvalidArgumentException | \DomainException $e) {
+            // Mensagens de regra de negócio, escritas para a pessoa (ex.: consulta já encerrada).
+            $_SESSION['consultation_error_msg'][$id] = $e->getMessage();
+            header("Location: /consulta/{$id}?error=regra");
             exit;
         } catch (\Throwable $e) {
-            header("Location: /consulta/{$id}?error=falha&msg=" . urlencode($e->getMessage()));
+            $cid = $this->logClinicalFailure('consulta.concluir', $e);
+            header("Location: /consulta/{$id}?error=falha&ref={$cid}");
             exit;
         }
+
+        // Peso informado e estatura anterior conhecida: grava também a avaliação, com o MESMO autor da evolução.
+        $measuresWarning = false;
+        if (!empty($details['weight_kg'])) {
+            try {
+                $db = Connection::getInstance();
+                $hStmt = $db->prepare('SELECT height_cm FROM anthropometric_assessments WHERE clinic_id = ? AND patient_id = ? AND height_cm > 0 ORDER BY assessed_at DESC, id DESC LIMIT 1');
+                $hStmt->execute([$clinicId, (int)$app['patient_id']]);
+                $lastHeight = $hStmt->fetchColumn();
+                if ($lastHeight !== false && (float)$lastHeight > 0) {
+                    (new AnthropometryService($db))->recordAssessment(
+                        (int)$app['patient_id'],
+                        $authorId,
+                        [
+                            'weight_kg' => (string)$details['weight_kg'],
+                            'height_cm' => (string)$lastHeight,
+                            'waist_cm' => isset($details['waist_cm']) ? (string)$details['waist_cm'] : '',
+                            'notes' => "Registrado na conclusão da consulta #{$id}",
+                        ],
+                        $userId
+                    );
+                }
+            } catch (\Throwable $e) {
+                $this->logClinicalFailure('consulta.antropometria', $e);
+                $measuresWarning = true;
+            }
+        }
+
+        if ($pendingReview !== []) {
+            try {
+                (new \ClyoNutri\Core\Audit\AuditLogger())->log('CONSULTATION_CONCLUDED_WITH_PENDING_REVIEW', 'appointment', (string)$id, [
+                    'patient_id' => (int)$app['patient_id'],
+                    'pending' => array_map(static fn($s) => ['key' => $s['key'], 'label' => $s['label'], 'state' => $s['state']], $pendingReview),
+                    'confirmed_by' => $userId,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[consulta] auditoria de revisão pendente não gravada: ' . get_class($e));
+            }
+        }
+
+        unset($_SESSION['consultation_form_recovery'][$id], $_SESSION['consultation_field_errors'][$id]);
+        try {
+            (new \ClyoNutri\Domain\Appointment\ConsultationDraftService())->discard($id, $userId, $clinicId);
+        } catch (\Throwable $e) {
+            error_log('[consulta] rascunho não apagado: ' . get_class($e));
+        }
+
+        header("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8) . ($measuresWarning ? '&aviso=medidas' : ''));
+        exit;
+    }
+
+    /**
+     * NI2-220 (I8): registra a falha técnica no log (classe, arquivo e linha; nunca dado clínico) e devolve um
+     * código curto para a pessoa citar ao suporte. A tela mostra só mensagem amigável.
+     */
+    /**
+     * NI2-687: mensagem de erro que pode ir para a tela. Regras de negócio (InvalidArgument, Domain,
+     * Runtime do domínio, tenant) já trazem texto pensado para a pessoa; falha técnica (PDO, Error do
+     * PHP, JSON) nunca vai para a tela: vai para o log com código de correlação.
+     */
+    private function userFacingError(string $where, \Throwable $e): string
+    {
+        $technical = $e instanceof \PDOException || $e instanceof \Error || $e instanceof \ErrorException || $e instanceof \JsonException;
+        if (!$technical && trim($e->getMessage()) !== '') {
+            return $e->getMessage();
+        }
+        $cid = $this->logClinicalFailure($where, $e);
+        return 'Não foi possível concluir agora. Tente de novo; se continuar, informe ao suporte o código ' . $cid . '.';
+    }
+
+    private function logClinicalFailure(string $where, \Throwable $e): string
+    {
+        $cid = bin2hex(random_bytes(6));
+        error_log(sprintf(
+            '[clinico] %s falhou correlation_id=%s clinic_id=%d user_id=%d exception=%s em %s:%d',
+            $where,
+            $cid,
+            (int)TenantContext::getClinicId(),
+            (int)TenantContext::getUserId(),
+            get_class($e),
+            basename($e->getFile()),
+            $e->getLine()
+        ));
+        return $cid;
     }
 
     public function agenda(): void
     {
+        // NI2-567 (v53): prévia de disponibilidade enquanto se preenche (restaurada na v54).
+        // NI2-591: com patient_id, informa também se o paciente já tem consulta na data escolhida.
+        if(isset($_GET['availability_preview'])){
+            header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');
+            try{
+                $date=$_GET['date']??'';$time=$_GET['time']??null;$duration=$_GET['duration']??'60';$pid=$_GET['patient_id']??'';
+                if(!is_string($date)||($time!==null&&!is_string($time))||!is_string($duration)||!ctype_digit($duration)||!is_string($pid)||($pid!==''&&!ctype_digit($pid)))throw new \InvalidArgumentException('Informe data, horário e duração válidos.');
+                $preview=(new AppointmentService())->availabilityPreview($this->getActiveProfessionalId(),$date,(int)$duration,$time);
+                $preview['same_day_time']=null;
+                if($pid!==''&&(int)$pid>0){
+                    \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic((int)$pid,TenantContext::getClinicId(),Connection::getInstance());
+                    $same=(new AppointmentService())->findPatientAppointmentOnDate(TenantContext::getClinicId(),(int)$pid,$date);
+                    if($same)$preview['same_day_time']=date('H:i',strtotime((string)$same['scheduled_at']));
+                }
+                echo json_encode($preview,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+            }catch(\InvalidArgumentException $e){http_response_code(422);echo json_encode(['error'=>$e->getMessage()]);}
+            catch(\Throwable $e){http_response_code(503);echo json_encode(['error'=>'Não foi possível conferir a disponibilidade. Os dados do formulário foram mantidos.']);}
+            return;
+        }
         $appointmentService = new AppointmentService();
         $patientRepo = new PatientRepository();
         $patients = $patientRepo->listAll();
@@ -3001,16 +2750,22 @@ class DashboardController
             $this->scheduleError(400, 'Data inválida. Selecione uma data existente no formato AAAA-MM-DD.', 'agenda');
             return;
         }
-        $view = ($_GET['view'] ?? 'day') === 'week' ? 'week' : 'day';
+        $rawView = $_GET['view'] ?? 'day';
+        $view = in_array($rawView, ['day', 'week', 'month'], true) ? $rawView : 'day';
 
-        // NI2-413 (UX-01): passo de navegação depende da visão (7 dias na semanal, 1 na diária)
+        // NI2-413 (UX-01) / NI2-527: passo de navegação depende da visão (mês na mensal, 7 dias na semanal, 1 na diária)
         $todayDate = $appointmentService->todayDate();
         $nav = \ClyoNutri\Core\Time\AgendaNavigation::forView($view, $currentDate, $todayDate);
         $prevDate = $nav['prev'];
         $nextDate = $nav['next'];
 
         try {
-            if ($view === 'week') {
+            $monthData = null;
+            if ($view === 'month') {
+                $monthData = $appointmentService->listByMonth($currentDate);
+                $weekData = null;
+                $appointments = [];
+            } elseif ($view === 'week') {
                 $weekData = $appointmentService->listByWeek($currentDate);
                 $appointments = [];
             } else {
@@ -3022,116 +2777,231 @@ class DashboardController
             return;
         }
 
-        $title = 'Agenda de Atendimentos';
+        $agendaRangeFrom = $view === 'month' ? $monthData['start_date'] : ($view === 'week' ? $weekData['start_date'] : $currentDate);
+        $agendaRangeTo = $view === 'month' ? $monthData['end_date'] : ($view === 'week' ? $weekData['end_date'] : $currentDate);
+        $agendaCalendarRules = (new \ClyoNutri\Domain\Booking\BookingCalendarService(Connection::getInstance()))->agendaRules(TenantContext::getClinicId(), substr($agendaRangeFrom, 0, 10), substr($agendaRangeTo, 0, 10));
+
+        $title = 'Agenda';
         $activeNav = 'agenda';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
 
-        $appointmentPreferences=(new AppointmentService())->practicePreferences($this->getActiveProfessionalId());
+        $appointmentPreferences=null;
+        try {
+            $appointmentPreferences=(new AppointmentService())->practicePreferences($this->getActiveProfessionalId());
+        } catch (\Throwable $e) {
+            $appointmentPreferences = [];
+        }
         $defaultDuration=(int)($appointmentPreferences['default_duration_minutes']??60);
+        $dayAvailability=null;
+        if($view==='day') {
+            try {
+                $dayAvailability=$appointmentService->availabilityPreview($this->getActiveProfessionalId(),$currentDate,$defaultDuration);
+            } catch (\Throwable $e) {
+                $dayAvailability=null;
+            }
+        }
+        $agendaBookingSettings = null;
+        try {
+            $agendaBookingSettings = (new BookingService(Connection::getInstance()))->getSettings(TenantContext::getClinicId());
+        } catch (\Throwable $e) {
+            $agendaBookingSettings = [];
+        }
+        // NI2-612: um aviso só, o mais específico (horários a confirmar, sem dias ou sem horário livre em 14 dias).
+        $agendaBookingNotice = null;
+        $activeProfId = $this->getActiveProfessionalId();
+        if (!empty($agendaBookingSettings['is_enabled']) && $activeProfId > 0) {
+            try {
+                $agendaBookingState = (new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(), $activeProfId);
+                $agendaBookingNotice = \ClyoNutri\Domain\Booking\BookingSetupState::message($agendaBookingState);
+            } catch (\Throwable $e) {
+                $agendaBookingNotice = null;
+            }
+        }
+        $agendaNoSlotsIn14Days = $agendaBookingNotice !== null;
+        $agendaSubmissionId = bin2hex(random_bytes(16));
+        $_SESSION['patient_submissions'][$agendaSubmissionId] = 'pending';
         ob_start();
         ?>
         <!-- Alertas de Feedback -->
+        <?php if (!empty($_GET['error']) && !(($_GET['novo'] ?? '') === '1' && empty($_GET['msg']))): ?>
+          <div role="alert" class="op-message op-message--error u-mb-4">
+            <strong>Erro:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
+          </div>
+        <?php endif; ?>
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ <?= $_GET['success'] === 'agendado' ? 'Consulta agendada com sucesso!' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Consulta atualizada com sucesso!') ?>
+          <div role="status" class="op-message op-message--success u-mb-4">
+            <?= $_GET['success'] === 'agendado' ? 'Consulta agendada.' : ($_GET['success'] === 'reagendado' ? 'Consulta reagendada. O horário anterior e o novo ficam registrados na trilha da consulta.' : 'Consulta atualizada.') ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($_GET['status_updated'])): ?>
-          <div style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #0A7075; font-weight: 500;">
-            ✓ Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
-          </div>
-        <?php endif; ?>
-        <?php if (!empty($_GET['error']) && !(($_GET['novo'] ?? '') === '1' && empty($_GET['msg']))): ?>
-          <div style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: var(--space-4); color: #B91C1C;">
-            <strong>Atenção:</strong> <?= !empty($_GET['msg']) ? htmlspecialchars($_GET['msg']) : 'Ocorreu um erro na operação.' ?>
+          <div class="op-message op-message--success u-mb-4">
+            Status da consulta atualizado. A mudança fica registrada no histórico da consulta.
           </div>
         <?php endif; ?>
 
         <?php $pendingChangeRequests = (new \ClyoNutri\Domain\Appointment\PatientAppointmentService())->countPendingForClinic(); ?>
         <?php if ($pendingChangeRequests > 0): ?>
-          <div role="status" class="card" data-testid="agenda-change-requests" style="border-left: 4px solid #B45309; margin-bottom: var(--space-4);">
+          <div class="op-message op-message--info card u-accent u-accent-semantic-warning u-mb-4" role="status" data-testid="agenda-change-requests">
             <strong><?= $pendingChangeRequests === 1 ? '1 pedido de remarcação' : $pendingChangeRequests . ' pedidos de remarcação' ?></strong> feito<?= $pendingChangeRequests === 1 ? '' : 's' ?> pela paciente no app aguardando resposta. <?php if (\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical(\ClyoNutri\Core\Auth\AuthContext::get()?->toArray() ?? [])): ?><a href="/agenda/pedidos-remarcacao">Responder pedidos</a><?php else: ?>O nutricionista responde em Pedidos de remarcação.<?php endif; ?>
           </div>
         <?php endif; ?>
 
+        <?php if ($agendaNoSlotsIn14Days): ?>
+          <div class="op-message op-message--error card u-mb-4" role="alert" data-testid="agenda-no-slots-alert">
+            <strong>Aviso de autoagendamento:</strong> <?= htmlspecialchars((string)$agendaBookingNotice) ?> <a href="<?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::ACTION_URL) ?>" class="u-color-semantic-warning-strong u-font-semibold u-underline">Configurar horários de atendimento em Configurações →</a>
+          </div>
+        <?php endif; ?>
+
         <!-- Cabeçalho & Controles da Agenda -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <?php if ($view === 'week' && is_array($weekData)):
+          $weekTotal = (int)($weekData['total_appointments'] ?? 0);
+          $agendaTz = getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo';
+          $weekTitleFormatted = 'Semana de ' . date('d/m', strtotime($weekData['start_date'])) . ' a ' . date('d/m/Y', strtotime($weekData['end_date']));
+        ?>
+        <h1 class="sr-only">Agenda de Atendimentos</h1>
+        <div class="card agenda-week-toolbar">
+          <div class="agenda-week-toolbar__left">
+            <div class="agenda-nav-pill" role="group" aria-label="Navegação da semana">
+              <a href="/agenda?view=week&amp;date=<?= $prevDate ?>" class="agenda-nav-pill__arrow" aria-label="<?= htmlspecialchars($nav['prev_label']) ?>" title="<?= htmlspecialchars($nav['prev_label']) ?>"><span aria-hidden="true">‹</span></a>
+              <a href="/agenda?view=week&amp;date=<?= $todayDate ?>" class="agenda-nav-pill__today" aria-label="<?= htmlspecialchars($nav['today_label']) ?>" <?= $nav['is_current'] ? 'aria-current="date"' : '' ?>>Hoje</a>
+              <a href="/agenda?view=week&amp;date=<?= $nextDate ?>" class="agenda-nav-pill__arrow" aria-label="<?= htmlspecialchars($nav['next_label']) ?>" title="<?= htmlspecialchars($nav['next_label']) ?>"><span aria-hidden="true">›</span></a>
+            </div>
+            <div class="agenda-week-toolbar__heading">
+              <h2 class="agenda-week-toolbar__title"><?= htmlspecialchars($weekTitleFormatted) ?></h2>
+              <p class="agenda-week-toolbar__subtitle"><?= $weekTotal ?> <?= $weekTotal === 1 ? 'atendimento' : 'atendimentos' ?> no período · horários em <?= htmlspecialchars($agendaTz) ?></p>
+            </div>
+            <span class="sr-only" role="status" id="agenda-period"><?= htmlspecialchars($nav['period_label']) ?></span>
+            <label class="sr-only" for="agenda-date-picker">Ir para a data</label>
+            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" data-nav-prefix="/agenda?view=week&date=" class="sr-only">
+          </div>
+
+          <div class="agenda-controls-layout agenda-week-toolbar__right">
+            <div class="agenda-view-segmented" role="group" aria-label="Alternar visão da agenda">
+              <a href="/agenda?view=day&amp;date=<?= $currentDate ?>" class="agenda-view-segmented__item <?= $view === 'day' ? 'is-active' : '' ?>">Dia</a>
+              <a href="/agenda?view=week&amp;date=<?= $currentDate ?>" class="agenda-view-segmented__item <?= $view === 'week' ? 'is-active' : '' ?>" aria-current="page">Semana</a>
+              <a href="/agenda?view=month&amp;date=<?= $currentDate ?>" data-testid="agenda-view-month" class="agenda-view-segmented__item <?= $view === 'month' ? 'is-active' : '' ?>">Mês</a>
+            </div>
+
+            <a href="/configuracoes?tab=agenda&amp;secao=feriados" class="btn btn-secondary agenda-week-toolbar__block-btn" title="Cadastrar bloqueio de horário ou feriado">
+              + Bloquear Horário
+            </a>
+            <a href="/configuracoes?tab=agenda" class="sr-only" data-testid="agenda-to-settings-btn">Horários &amp; Regras</a>
+
+            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-primary agenda-week-toolbar__new-btn">
+              + Novo Atendimento
+            </button>
+          </div>
+        </div>
+        <?php $bookingUiState=(new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(),$activeProfId); ?>
+        <p class="op-help sr-only" data-booking-state="<?= htmlspecialchars($bookingUiState) ?>">Agendamento online: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::label($bookingUiState)) ?></strong></p>
+        <?php else: ?>
+        <div class="u-flex u-justify-between u-items-center u-mb-6 u-wrap u-gap-4">
           <div>
             <h1>Agenda de Atendimentos</h1>
-            <p style="color: var(--neutral-gray-500);">
+            <p class="agenda-header-desc u-color-neutral-gray-500">
               Gestão da jornada clínica: agendamento, confirmação, ciclo da consulta e execução.
             </p>
           </div>
 
-          <div class="agenda-controls-layout" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <div class="agenda-controls-layout u-flex u-gap-2 u-items-center u-wrap">
             <!-- Navegação por Data -->
-            <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
-              <a href="/agenda?view=<?= $view ?>&date=<?= $prevDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['prev_label']) ?>" title="<?= htmlspecialchars($nav['prev_label']) ?>" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;"><span aria-hidden="true">←</span></a>
-              <a href="/agenda?view=<?= $view ?>&date=<?= $todayDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['today_label']) ?>" <?= $nav['is_current'] ? 'aria-current="date"' : '' ?> style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px; font-weight: 600;">Hoje</a>
-              <a href="/agenda?view=<?= $view ?>&date=<?= $nextDate ?>" class="btn btn-secondary" aria-label="<?= htmlspecialchars($nav['next_label']) ?>" title="<?= htmlspecialchars($nav['next_label']) ?>" style="border: none; border-radius: 0; min-height: 38px; padding: 0 12px;"><span aria-hidden="true">→</span></a>
+            <div class="u-inline-flex u-border u-bc-neutral-gray-300 u-radius-input u-overflow-hidden u-bg-neutral-white">
+              <a href="/agenda?view=<?= $view ?>&date=<?= $prevDate ?>" class="btn btn-secondary u-border-0 u-radius-0 u-minh-touch u-py-0 u-px-3" aria-label="<?= htmlspecialchars($nav['prev_label']) ?>" title="<?= htmlspecialchars($nav['prev_label']) ?>"><span aria-hidden="true">←</span></a>
+              <a href="/agenda?view=<?= $view ?>&date=<?= $todayDate ?>" class="btn btn-secondary u-border-0 u-radius-0 u-minh-touch u-py-0 u-px-3 u-font-semibold" aria-label="<?= htmlspecialchars($nav['today_label']) ?>" <?= $nav['is_current'] ? 'aria-current="date"' : '' ?>>Hoje</a>
+              <a href="/agenda?view=<?= $view ?>&date=<?= $nextDate ?>" class="btn btn-secondary u-border-0 u-radius-0 u-minh-touch u-py-0 u-px-3" aria-label="<?= htmlspecialchars($nav['next_label']) ?>" title="<?= htmlspecialchars($nav['next_label']) ?>"><span aria-hidden="true">→</span></a>
             </div>
             <span class="sr-only" role="status" id="agenda-period"><?= htmlspecialchars($nav['period_label']) ?></span>
 
             <label class="sr-only" for="agenda-date-picker">Ir para a data</label>
-            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" data-nav-prefix="/agenda?view=<?= $view ?>&date=" style="padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.875rem; background: #fff;">
+            <input type="date" id="agenda-date-picker" value="<?= $currentDate ?>" data-nav-prefix="/agenda?view=<?= $view ?>&date=" class="u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact u-bg-neutral-white">
 
-            <!-- Alternância de Visão Dia / Semana -->
-            <div style="display: inline-flex; border: 1px solid var(--neutral-gray-300); border-radius: 6px; overflow: hidden; background: #fff;">
-              <a href="/agenda?view=day&date=<?= $currentDate ?>" class="btn <?= $view === 'day' ? 'btn-primary' : 'btn-secondary' ?>" style="border: none; border-radius: 0; min-height: 38px;">Visão Diária</a>
-              <a href="/agenda?view=week&date=<?= $currentDate ?>" class="btn <?= $view === 'week' ? 'btn-primary' : 'btn-secondary' ?>" style="border: none; border-radius: 0; min-height: 38px;">Visão Semanal</a>
+            <?php /* Alternância de Visão Dia / Semana / Mês (NI2-527) */ ?>
+            <div class="u-inline-flex u-border u-bc-neutral-gray-300 u-radius-input u-overflow-hidden u-bg-neutral-white">
+              <a href="/agenda?view=day&date=<?= $currentDate ?>" class="btn <?= $view === 'day' ? 'btn-primary' : 'btn-secondary' ?> u-border-0 u-radius-0 u-minh-touch">Visão diária</a>
+              <a href="/agenda?view=week&date=<?= $currentDate ?>" class="btn <?= $view === 'week' ? 'btn-primary' : 'btn-secondary' ?> u-border-0 u-radius-0 u-minh-touch">Visão semanal</a>
+              <a href="/agenda?view=month&date=<?= $currentDate ?>" data-testid="agenda-view-month" class="btn <?= $view === 'month' ? 'btn-primary' : 'btn-secondary' ?> u-border-0 u-radius-0 u-minh-touch">Visão mensal</a>
             </div>
 
+            <?php /* Atalho 1-clique para Configurações da Agenda (NI2-588) */ ?>
+            <a href="/configuracoes?tab=agenda" class="btn btn-secondary u-minh-touch u-inline-flex u-items-center u-gap-1" data-testid="agenda-to-settings-btn" title="Configurar horários de atendimento e regras de agendamento">
+              <?= \ClyoNutri\Application\View\Icon::svg('settings', 16) ?> Horários &amp; Regras
+            </a>
+
             <!-- Botão Novo Agendamento -->
-            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-accent" style="min-height: 38px;">
+            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-accent u-minh-touch">
               + Nova Consulta
             </button>
           </div>
         </div>
 
+        <?php $bookingUiState=(new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(),$activeProfId); ?>
+        <p class="op-help" data-booking-state="<?= htmlspecialchars($bookingUiState) ?>">Agendamento online: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::label($bookingUiState)) ?></strong></p>
+        <p class="agenda-secondary-links"><a class="btn btn-secondary" href="/configuracoes?tab=agenda&amp;secao=feriados">Feriados e bloqueios</a> <a class="btn btn-secondary" href="/configuracoes?tab=agenda">Configurações da agenda</a></p>
+        <?php endif; ?>
+        <?php if($view==='day'): ?>
+          <?php $agendaMarkerDate=$currentDate;$agendaDayRules=$agendaCalendarRules[$currentDate]??[];require __DIR__.'/../../../views/agenda/_calendar_markers.php'; ?>
+          <?php if($agendaDayRules): ?><p class="agenda-calendar-note">As exceções do calendário aplicam-se a novas marcações. Consultas já agendadas são mantidas.</p><?php endif; ?>
+        <?php endif; ?>
         <!-- Formulário Retrátil de Novo Agendamento -->
         <?php $prefillPatient = (isset($_GET['paciente']) && ctype_digit((string)$_GET['paciente'])) ? (int)$_GET['paciente'] : 0; $openNew = ($_GET['novo'] ?? '') === '1';
           // UX-05 (v14): preenchimento devolvido após conflito/falha.
           $agendaRecovered = $this->takeAgendaForm('new'); $rv = $agendaRecovered['values'] ?? [];
           if ($agendaRecovered) { $openNew = true; $prefillPatient = (int)($rv['patient_id'] ?? $prefillPatient); }
           $newConflict = !empty($agendaRecovered['conflict']);
-          $newScheduled = $rv['scheduled_at'] ?? ($currentDate . 'T09:00');
+          $chosenTime = is_string($_GET['time'] ?? null) && preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $_GET['time']) ? $_GET['time'] : '09:00';
+          $newScheduled = $rv['scheduled_at'] ?? ($currentDate . 'T' . $chosenTime);
           if (isset($rv['duration_minutes'])) { $defaultDuration = (int)$rv['duration_minutes']; }
-          $newType = (string)($rv['type'] ?? 'first_visit'); ?>
-        <div id="card-novo-agendamento" data-dialog="inline" class="card" style="display: <?= $openNew ? 'block' : 'none' ?>; border-top: 4px solid var(--brand-copper-500); margin-bottom: var(--space-6);">
+          $newType = (string)($rv['type'] ?? 'first_visit');
+          // NI2-707: agendar retorno a partir do perfil: próximo horário válido, tipo Retorno se já houve consulta, e volta ao perfil.
+          $returnToPatient = $prefillPatient > 0 && ((($_GET['de'] ?? '') === 'paciente') || (($rv['return_to'] ?? '') === 'patient'));
+          $suggestedSlot = null;
+          if ($prefillPatient > 0 && !isset($rv['type'])) {
+              $hadVisit = Connection::getInstance()->prepare("SELECT COUNT(*) FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed'");
+              $hadVisit->execute([(int)TenantContext::getClinicId(), $prefillPatient]);
+              if ((int)$hadVisit->fetchColumn() > 0) { $newType = 'follow_up'; }
+          }
+          if ($returnToPatient && !$agendaRecovered && !isset($_GET['time'])) {
+              $suggestedSlot = $this->nextValidSlot((int)$defaultDuration);
+              if ($suggestedSlot) { $newScheduled = $suggestedSlot; }
+          } ?>
+        <div id="card-novo-agendamento" data-dialog="inline" class="card u-accent-top u-accent-brand-copper-500 u-mb-6<?= $openNew ? '' : ' u-hidden' ?>">
           <div class="card__header">
-            <h3>Agendar Nova Consulta</h3>
-            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" style="background: none; border: none; font-size: 1.25rem; cursor: pointer;">✕</button>
+            <h3>Agendar nova consulta</h3>
+            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" class="u-bg-none u-border-0 u-text-h3 u-pointer">✕</button>
           </div>
           <?php if ($agendaRecovered): ?>
-            <div role="alert" data-testid="agenda-form-error" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 10px 14px; border-radius: 6px; margin-top: 12px; color: #B91C1C;">
+            <div class="op-message op-message--error u-mt-3" role="alert" data-testid="agenda-form-error">
               <strong><?= $newConflict ? 'Horário indisponível.' : 'Não foi possível agendar.' ?></strong> <?= htmlspecialchars((string)$agendaRecovered['error']) ?> Seus dados foram mantidos; ajuste o horário<?= $newConflict ? ' ou marque o encaixe' : '' ?> e confirme de novo.
             </div>
           <?php endif; ?>
-          <form action="/agenda" method="POST" style="margin-top: 16px;" <?= $agendaRecovered ? 'data-start-dirty' : '' ?>>
+          <form action="/agenda" method="POST" data-availability-preview data-agenda-new class="u-mt-4" <?= $agendaRecovered ? 'data-start-dirty' : '' ?>>
             <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
-              <div>
-                <label for="dc11-patient_id" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Paciente *</label>
-                <select id="dc11-patient_id" name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+            <?php if ($returnToPatient): ?><input type="hidden" name="return_to" value="patient"><?php endif; ?>
+            <?php if ($suggestedSlot): ?><p class="op-message op-message--info u-mb-3" data-testid="agenda-suggested-slot">Sugerido o próximo horário livre: <?= date('d/m/Y \\à\\s H:i', strtotime(str_replace('T', ' ', $suggestedSlot))) ?>. Ajuste se preferir.</p><?php endif; ?>
+            <div class="u-grid u-cols-auto-md u-gap-4 u-mb-4">
+              <div class="u-relative">
+                <div class="u-flex u-justify-between u-items-baseline u-mb-1">
+                  <label for="appointment-patient-search" class="u-font-semibold u-text-compact">Paciente *</label>
+                  <button type="button" id="btn-inline-new-patient" class="btn-link u-text-compact u-color-botanical-copper-600 u-bg-none u-border-0 u-pointer u-underline u-p-0" data-call="openPatientModal">+ novo paciente</button>
+                </div>
+                <input type="text" id="appointment-patient-search" placeholder="Digite para buscar paciente (mín. 3 letras)..." autocomplete="off" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-mb-1" aria-autocomplete="list" aria-controls="appointment-patient-matches">
+                <div id="appointment-patient-matches" role="listbox" class="ds-combobox-list u-hidden"></div>
+                <label for="dc11-patient_id" class="visually-hidden">Paciente selecionado (obrigatório)</label><select id="dc11-patient_id" name="patient_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                   <option value="">Selecione o paciente...</option>
                   <?php foreach ($patients as $pt): ?>
-                    <option value="<?= $pt['id'] ?>" <?= ((int)$pt['id'] === $prefillPatient) ? 'selected' : '' ?>><?= htmlspecialchars($pt['name']) ?></option>
+                    <option value="<?= $pt['id'] ?>"<?= ((int)$pt['id'] === $prefillPatient) ? ' selected' : '' ?>><?= htmlspecialchars($pt['name']) ?></option>
                   <?php endforeach; ?>
                 </select>
+                <div id="patient-same-day-warning" class="op-message op-message--error u-hidden u-mt-2 u-text-compact u-hidden" role="alert"></div>
               </div>
 
-              <div>
-                <label for="dc12-scheduled_at" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Data e Horário *</label>
-                <input id="dc12-scheduled_at" type="datetime-local" name="scheduled_at" required value="<?= htmlspecialchars($newScheduled) ?>" <?= $newConflict ? 'aria-invalid="true" aria-describedby="dc12-scheduled_at-erro" autofocus data-conflict-highlight style="width: 100%; padding: 8px 12px; border: 2px solid #DC2626; border-radius: 6px; background: #FEF2F2;"' : 'style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"' ?>>
-                <?php if ($newConflict): ?><p id="dc12-scheduled_at-erro" class="field-error" style="color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0;">Conflita com outra consulta. Escolha outro horário.</p><?php endif; ?>
-              </div>
+              <?php $scheduleFieldPrefix='new-appointment';$scheduleFieldValue=(string)$newScheduled;$scheduleFieldValues=$rv;$scheduleFieldConflict=$newConflict;require __DIR__.'/../../../views/agenda/_schedule_fields.php'; ?>
 
               <div>
-                <label for="dc13-duration_minutes" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Duração</label>
-                <select id="dc13-duration_minutes" name="duration_minutes" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <label for="dc13-duration_minutes" class="u-block u-font-semibold u-text-compact u-mb-1">Duração</label>
+                <select id="dc13-duration_minutes" name="duration_minutes" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                   <?php $durationChoices=array_unique([30,45,60,90,120,$defaultDuration]);sort($durationChoices);foreach($durationChoices as $minutes): ?>
                   <option value="<?= $minutes ?>" <?= $minutes===$defaultDuration?'selected':'' ?>><?= $minutes ?> minutos<?= $minutes===$defaultDuration?' (Padrão)':'' ?></option>
                   <?php endforeach; ?>
@@ -3139,29 +3009,38 @@ class DashboardController
               </div>
 
               <div>
-                <label for="dc14-type" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Tipo de Atendimento</label>
-                <select id="dc14-type" name="type" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <option value="first_visit" <?= $newType === 'first_visit' ? 'selected' : '' ?>>Primeira Consulta / Anamnese</option>
-                  <option value="follow_up" <?= $newType === 'follow_up' ? 'selected' : '' ?>>Retorno / Acompanhamento</option>
+                <label for="dc14-type" class="u-block u-font-semibold u-text-compact u-mb-1">Tipo de Atendimento</label>
+                <select id="dc14-type" name="type" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                  <option value="first_visit" <?= $newType === 'first_visit' ? 'selected' : '' ?>>Primeira consulta / anamnese</option>
+                  <option value="follow_up" <?= $newType === 'follow_up' ? 'selected' : '' ?>>Retorno / acompanhamento</option>
                   <option value="telehealth" <?= $newType === 'telehealth' ? 'selected' : '' ?>>Teleconsulta</option>
                 </select>
               </div>
             </div>
 
-            <div style="margin-bottom: 16px;">
-              <label for="dc15-notes" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 4px;">Observações</label>
-              <textarea id="dc15-notes" name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"><?= htmlspecialchars((string)($rv['notes'] ?? '')) ?></textarea>
+            <div class="op-message op-message--info cn-policy-summary" data-availability-feedback role="status" aria-live="polite">Selecione data, horário e duração para conferir a disponibilidade. A confirmação final é feita ao agendar.</div>
+            <script src="/assets/js/agenda-availability.js?v=v54-30" defer></script>
+            <div class="u-mb-4">
+              <label for="dc15-notes" class="u-block u-font-semibold u-text-compact u-mb-1">Observações</label>
+              <textarea id="dc15-notes" name="notes" rows="2" placeholder="Queixas iniciais, encaminhamentos ou solicitações pré-consulta..." class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"><?= htmlspecialchars((string)($rv['notes'] ?? '')) ?></textarea>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: 12px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #64748B; cursor: pointer;">
-                <input type="checkbox" name="allow_conflict" value="1">
-                <span>Permitir sobreposição de horário (encaixe)</span>
-              </label>
+            <div class="u-flex u-justify-between u-items-center u-border-t u-pt-3 u-wrap u-gap-2">
+              <div class="u-flex u-flex-col u-gap-1">
+                <label class="u-flex u-items-center u-gap-2 u-text-compact u-color-neutral-gray-500 u-pointer">
+                  <input type="checkbox" name="allow_conflict" value="1">
+                  <span>Permitir sobreposição de horário (encaixe)</span>
+                </label>
+                <?php $sameDayVisible = !empty($agendaRecovered['same_day']) || !empty($rv['allow_same_day']); ?>
+                <label id="label-allow-same-day" class="u-items-center u-gap-2 u-text-compact u-color-semantic-warning-strong u-pointer <?= $sameDayVisible ? 'u-flex' : 'u-hidden' ?>">
+                  <input type="checkbox" name="allow_same_day" id="input_allow_same_day" value="1" <?= !empty($rv['allow_same_day']) ? 'checked' : '' ?>>
+                  <span>Confirmar mesmo com outra consulta do paciente no mesmo dia</span>
+                </label>
+              </div>
 
-              <div style="display: flex; gap: 8px;">
+              <div class="u-flex u-gap-2">
                 <button type="button" data-dialog-close data-hide="card-novo-agendamento" class="btn btn-secondary">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Confirmar Agendamento</button>
+                <button type="submit" class="btn btn-primary">Confirmar agendamento</button>
               </div>
             </div>
           </form>
@@ -3172,11 +3051,20 @@ class DashboardController
           <div class="card">
             <div class="card__header">
               <h3>Consultas do Dia (<?= date('d/m/Y', strtotime($currentDate)) ?>)</h3>
-              <span style="font-size: 0.875rem; color: var(--neutral-gray-500);"><?= count($appointments) ?> agendamento(s)</span>
+              <span class="u-text-compact u-color-neutral-gray-500"><?= count($appointments) ?> agendamento(s)</span>
             </div>
 
-            <div class="table-responsive">
-              <table class="table">
+            <?php if (!empty($dayAvailability['times'])): ?>
+              <div class="agenda-quick-slots u-py-2 u-px-4 u-bg-neutral-gray-50 u-border-b u-flex u-items-center u-gap-2 u-wrap">
+                <span class="u-text-compact u-font-semibold u-color-neutral-gray-600">Grade de horários livres:</span>
+                <?php foreach (array_slice($dayAvailability['times'], 0, 8) as $freeTime): ?>
+                  <button type="button" class="btn btn-secondary btn-sm agenda-slot-btn u-text-caption u-py-0 u-px-2 u-minh-touch u-radius-input u-inline-flex u-items-center u-gap-1" data-slot-time="<?= $freeTime ?>"><?= \ClyoNutri\Application\View\Icon::svg('clock', 12) ?> <?= $freeTime ?></button>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+
+            <div class="table-responsive agenda-day-wrap">
+              <table class="table agenda-day-table">
                 <thead>
                   <tr>
                     <th>Horário</th>
@@ -3184,26 +3072,41 @@ class DashboardController
                     <th>Contato</th>
                     <th>Tipo</th>
                     <th>Status</th>
-                    <th style="text-align: right;">Ações da Consulta</th>
+                    <th class="u-text-right">Ações da Consulta</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php if (empty($appointments)): ?>
                     <tr>
-                      <td colspan="6" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-8);">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 8px auto; display: block; color: #94A3B8;"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                        Nenhuma consulta agendada para este dia. Horários disponíveis para novos pacientes.
+                      <td colspan="6" class="u-text-center u-color-neutral-gray-500 u-p-8">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="u-mt-0 u-mb-2 u-mx-auto u-block u-color-neutral-gray-400"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                        Nenhuma consulta agendada para este dia. <?= htmlspecialchars($dayAvailability['message'] ?? 'Horários disponíveis para novos pacientes.') ?>
                       </td>
                     </tr>
                   <?php else: ?>
+                    <?php
+                      // v49: prévias de confirmação do dia numa consulta só (antes era uma por consulta).
+                      $confPreviews = [];
+                      $confIds = [];
+                      foreach ($appointments as $ap) {
+                          if (in_array($ap['status'] ?? '', ['scheduled', 'confirmed'], true)) {
+                              $confIds[] = (int)$ap['id'];
+                          }
+                      }
+                      try {
+                          $confPreviews = $appointmentService->previewConfirmationMessages($confIds);
+                      } catch (\Throwable $e) {
+                          error_log('[ClyoNutri] agenda: prévias de confirmação indisponíveis: ' . $e->getMessage());
+                      }
+                    ?>
                     <?php foreach ($appointments as $a): ?>
                       <tr>
-                        <td class="tabular-nums" style="font-weight: 700; color: var(--brand-navy-900);">
+                        <td class="tabular-nums u-font-bold u-color-botanical-forest-900">
                           <?= date('H:i', strtotime($a['scheduled_at'])) ?>
-                          <small style="display: block; font-size: 0.75rem; font-weight: normal; color: var(--neutral-gray-500);"><?= $a['duration_minutes'] ?> min</small>
+                          <small class="u-block u-text-caption u-font-regular u-color-neutral-gray-500"><?= $a['duration_minutes'] ?> min</small>
                         </td>
                         <td>
-                          <a href="/pacientes/<?= $a['patient_id'] ?>" style="font-weight: 600; color: var(--brand-navy-900); text-decoration: none;">
+                          <a href="/pacientes/<?= $a['patient_id'] ?>" class="u-font-semibold u-color-botanical-forest-900 u-no-underline">
                             <?= htmlspecialchars($a['patient_name']) ?>
                           </a>
                         </td>
@@ -3212,41 +3115,67 @@ class DashboardController
                         <td>
                           <?= LabelMap::appointmentStatusBadge($a['status']) ?>
                         </td>
-                        <td style="text-align: right;">
-                          <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                        <td class="u-text-right">
+                          <div class="u-inline-flex u-gap-1 u-justify-end">
                             <?php if ($a['status'] === 'scheduled'): ?>
                               <!-- Confirmar -->
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;">
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="confirmed">
-                                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px;">Confirmar</button>
+                                <button type="submit" class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch">Confirmar</button>
                               </form>
                               <!-- Iniciar -->
-                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary" style="font-size: 0.75rem; padding: 4px 10px; min-height: 30px;">Iniciar</a>
+                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch">Iniciar</a>
                             <?php elseif ($a['status'] === 'confirmed'): ?>
                               <!-- Iniciar -->
-                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary" style="font-size: 0.75rem; padding: 4px 10px; min-height: 30px;">Iniciar Atendimento</a>
+                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch">Iniciar atendimento</a>
                             <?php elseif ($a['status'] === 'in_progress'): ?>
-                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-accent" style="font-size: 0.75rem; padding: 4px 10px; min-height: 30px;">Continuar Atendimento</a>
+                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-accent u-text-caption u-py-1 u-px-2 u-minh-touch">Continuar atendimento</a>
                             <?php elseif ($a['status'] === 'completed'): ?>
-                              <a href="/pacientes/<?= $a['patient_id'] ?>" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px;">Prontuário ↗</a>
+                              <a href="/pacientes/<?= $a['patient_id'] ?>" class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch">Prontuário ↗</a>
                             <?php endif; ?>
 
-                            <!-- Menu de Estados da Consulta -->
+                            <?php /* Menu de Estados da Consulta ("Mais ações ▾") */ ?>
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
-                              <a href="/agenda/<?= (int)$a['id'] ?>/reagendar" class="btn btn-secondary" data-testid="agenda-reschedule" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px;">Reagendar</a>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Deseja marcar como Não Compareceu?">
-                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                <input type="hidden" name="status" value="no_show">
-                                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #DC2626;" title="Não compareceu">Não compareceu</button>
-                              </form>
-                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" style="display: inline;" data-confirm="Confirmar cancelamento da consulta?">
-                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                <input type="hidden" name="status" value="cancelled">
-                                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; min-height: 30px; color: #64748B;" title="Cancelar consulta">Cancelar</button>
-                              </form>
+                              <details class="agenda-actions-dropdown u-inline-block u-relative" data-more-actions>
+                                <summary class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch u-pointer u-list-none" data-testid="agenda-more-actions">Mais ações ▾</summary>
+                                <div class="agenda-actions-menu ds-menu-panel" data-more-actions-menu role="menu">
+                                  <a href="/agenda/<?= (int)$a['id'] ?>/reagendar" class="agenda-menu-item u-minh-touch u-flex u-items-center u-py-1 u-px-3 u-text-caption u-color-neutral-ink-900 u-no-underline" data-testid="agenda-reschedule">Reagendar</a>
+                                  <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-m-0" data-confirm="Deseja marcar como Não Compareceu?">
+                                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="status" value="no_show">
+                                    <button type="submit" class="agenda-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-1 u-px-3 u-text-caption u-color-semantic-error u-bg-none u-border-0 u-pointer" title="Não compareceu">Não compareceu</button>
+                                  </form>
+                                  <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-m-0" data-confirm="Confirmar cancelamento da consulta?">
+                                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="status" value="cancelled">
+                                    <button type="submit" class="agenda-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-1 u-px-3 u-text-caption u-color-neutral-gray-500 u-bg-none u-border-0 u-pointer" title="Cancelar consulta">Cancelar</button>
+                                  </form>
+                                </div>
+                              </details>
                             <?php endif; ?>
                           </div>
+                          <?php $confPrev = $confPreviews[(int)$a['id']] ?? null; ?>
+                          <?php if (($a['status'] === 'scheduled' || $a['status'] === 'confirmed') && $confPrev === null): ?>
+                            <div data-testid="confirmation-preview-unavailable-<?= (int)$a['id'] ?>" class="u-mt-1 u-text-caption u-color-neutral-gray-500">Prévia de confirmação indisponível para esta consulta.</div>
+                          <?php elseif ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
+                            <details data-testid="confirmation-preview-<?= (int)$a['id'] ?>" class="u-mt-1 u-text-left u-inline-block u-maxw-narrow">
+                              <summary class="u-pointer u-text-caption u-color-botanical-forest-900 u-font-semibold u-text-right">Prévia e envio de confirmação</summary>
+                              <div class="u-mt-1 u-py-2 u-px-3 u-bg-neutral-gray-50 u-border u-radius-input u-text-caption u-color-neutral-gray-700">
+                                <div><strong>Destinatário:</strong> <?= htmlspecialchars($confPrev['recipient_email'] ?? 'Sem e-mail validado') ?></div>
+                                <div><strong>Canal:</strong> <?= htmlspecialchars($confPrev['channel']) ?> · <strong>Fuso:</strong> <?= htmlspecialchars($confPrev['timezone']) ?></div>
+                                <div class="u-mt-1 u-py-1 u-px-2 u-bg-neutral-white u-border u-radius-input"><?= htmlspecialchars($confPrev['body_preview']) ?></div>
+                                <?php if (!$confPrev['can_send']): ?>
+                                  <div data-testid="confirmation-blocked-reason" class="u-mt-1 u-color-semantic-error u-font-semibold"><?= htmlspecialchars((string)$confPrev['blocked_reason']) ?></div>
+                                <?php else: ?>
+                                  <form action="/agenda/<?= (int)$a['id'] ?>/confirmacao-autorizada" method="POST" class="u-mt-2">
+                                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                    <button type="submit" class="btn btn-sm btn-primary" data-testid="btn-send-authorized-confirmation">Enviar confirmação autorizada</button>
+                                  </form>
+                                <?php endif; ?>
+                              </div>
+                            </details>
+                          <?php endif; ?>
                         </td>
                       </tr>
                     <?php endforeach; ?>
@@ -3255,51 +3184,128 @@ class DashboardController
               </table>
             </div>
           </div>
-        <?php else: ?>
-          <!-- Visão Semanal da Agenda -->
-          <div class="card">
-            <div class="card__header">
-              <h3>Semana de <?= date('d/m', strtotime($weekData['start_date'])) ?> a <?= date('d/m/Y', strtotime($weekData['end_date'])) ?></h3>
-              <span style="font-size: 0.875rem; color: var(--neutral-gray-500);"><?= $weekData['total_appointments'] ?> consulta(s) nesta semana</span>
+        <?php elseif ($view === 'month' && is_array($monthData)): ?>
+          <section class="card" data-testid="agenda-month-view" aria-label="Calendário mensal">
+            <div class="card__header"><h3><?= htmlspecialchars($nav['period_label']) ?></h3><span><?= (int)$monthData['total_appointments'] ?> consulta(s) neste mês</span></div>
+            <p class="agenda-month-list-label">Lista do mês por data</p>
+            <div class="agenda-month-grid">
+              <?php foreach(['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] as $weekday): ?><div class="agenda-month-weekday" aria-hidden="true"><?= $weekday ?></div><?php endforeach; ?>
+              <?php $monthStart=new \DateTimeImmutable($monthData['start_date']);for($blank=1;$blank<(int)$monthStart->format('N');$blank++): ?><div class="agenda-month-filler" aria-hidden="true"></div><?php endfor; ?>
+              <?php foreach($monthData['days'] as $mDayDate=>$mDayApps): $agendaDayRules=$agendaCalendarRules[$mDayDate]??[];$holidayDay=(bool)array_filter($agendaDayRules,static fn($rule)=>$rule['kind']==='holiday'); ?>
+              <article class="agenda-month-day <?= $holidayDay?'is-holiday':'' ?> <?= $mDayDate===$todayDate?'is-today':'' ?>" data-testid="agenda-month-day-<?= htmlspecialchars($mDayDate) ?>">
+                <h4><a href="/agenda?view=day&amp;date=<?= htmlspecialchars($mDayDate) ?>" aria-label="Abrir <?= date('d/m/Y',strtotime($mDayDate)) ?>"><?= ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][(int)date('w',strtotime($mDayDate))] ?> <?= date('d/m',strtotime($mDayDate)) ?><?= $mDayDate===$todayDate?' · Hoje':'' ?></a></h4>
+                <?php $agendaMarkerDate=$mDayDate;require __DIR__.'/../../../views/agenda/_calendar_markers.php'; ?>
+                <?php if(!$mDayApps): ?><p class="agenda-calendar-note">Sem consultas</p><?php endif; ?>
+                <?php foreach($mDayApps as $mApp): ?><a class="agenda-month-appointment" href="/consulta/<?= (int)$mApp['id'] ?>"><strong><?= date('H:i',strtotime($mApp['scheduled_at'])) ?></strong> <?= htmlspecialchars($mApp['patient_name']) ?></a><?php endforeach; ?>
+              </article>
+              <?php endforeach; ?>
+              <?php for($blank=(int)(new \DateTimeImmutable($monthData['end_date']))->format('N');$blank<7;$blank++): ?><div class="agenda-month-filler" aria-hidden="true"></div><?php endfor; ?>
             </div>
+          </section>
+        <?php else: ?>
+          <?php require __DIR__ . '/../../../views/agenda/_week_timeline.php'; ?>
+        <?php endif; ?>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px;">
-              <?php foreach ($weekData['days'] as $dayDate => $dayApps): ?>
-                <?php 
-                  $isToday = $dayDate === $todayDate;
-                  $dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][date('w', strtotime($dayDate))];
-                ?>
-                <div style="background: <?= $isToday ? '#FBEADF' : '#F8FAFC' ?>; border: 1px solid <?= $isToday ? 'var(--brand-copper-500)' : 'var(--neutral-gray-200)' ?>; border-radius: 8px; padding: 12px; min-height: 220px; display: flex; flex-direction: column;">
-                  <div style="border-bottom: 1px solid var(--neutral-gray-200); padding-bottom: 8px; margin-bottom: 8px; text-align: center;">
-                    <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: <?= $isToday ? 'var(--brand-copper-600)' : 'var(--brand-navy-900)' ?>;"><?= $dayName ?></span>
-                    <strong style="display: block; font-size: 1rem; color: var(--brand-navy-900);"><?= date('d/m', strtotime($dayDate)) ?></strong>
+        <?php /* Modal Cadastrar Paciente na Agenda */ ?>
+        <div id="patientModal" data-dialog="modal" class="modal-overlay" data-call-self="closePatientModal">
+          <div class="cn-dialog__panel modal-dialog">
+            <div class="modal-header">
+              <h3>Novo paciente</h3>
+              <button type="button" data-dialog-close class="modal-close" data-call="closePatientModal" aria-label="Fechar modal">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <form method="POST" action="/pacientes">
+              <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+              <input type="hidden" name="_submission_id" value="<?= $agendaSubmissionId ?>">
+              <input type="hidden" name="return_to" value="/agenda?date=<?= $currentDate ?>&novo=1">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label class="form-label" for="p_name">Nome completo *</label>
+                  <input type="text" id="p_name" name="name" class="form-control" placeholder="Ex: Juliana Mendes" required autofocus>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="p_email">E-mail</label>
+                  <input type="email" id="p_email" name="email" class="form-control" placeholder="paciente@exemplo.com.br">
+                </div>
+
+                <div class="u-grid u-cols-2 u-gap-4">
+                  <div class="form-group">
+                    <label class="form-label" for="p_phone">Telefone / WhatsApp</label>
+                    <input type="tel" id="p_phone" name="phone" class="form-control" placeholder="(11) 98765-4321">
                   </div>
-
-                  <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-                    <?php if (empty($dayApps)): ?>
-                      <span style="font-size: 0.75rem; color: var(--neutral-gray-500); text-align: center; margin-top: 20px;">Livre</span>
-                    <?php else: ?>
-                      <?php foreach ($dayApps as $dApp): ?>
-                        <div style="background: #fff; border: 1px solid var(--neutral-gray-200); border-radius: 6px; padding: 6px 8px; font-size: 0.75rem;">
-                          <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--brand-navy-900);">
-                            <span><?= date('H:i', strtotime($dApp['scheduled_at'])) ?></span>
-                            <?= LabelMap::appointmentStatusBadge($dApp['status']) ?>
-                          </div>
-                          <a href="/consulta/<?= $dApp['id'] ?>" style="display: block; color: var(--brand-navy-900); text-decoration: none; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <?= htmlspecialchars($dApp['patient_name']) ?>
-                          </a>
-                        </div>
-                      <?php endforeach; ?>
-                    <?php endif; ?>
+                  <div class="form-group">
+                    <label class="form-label" for="p_birth">Data de nascimento</label>
+                    <input type="date" id="p_birth" name="birth_date" class="form-control">
                   </div>
                 </div>
-              <?php endforeach; ?>
-            </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="p_gender">Sexo registrado para referências clínicas (opcional)</label>
+                  <select id="p_gender" name="gender" class="form-control">
+                    <option value="">Selecione...</option>
+                    <option value="Feminino">Feminino</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Outro">Outro / Não informado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer u-flex u-justify-end u-gap-2 u-py-3 u-px-4 u-border-t">
+                <button type="button" data-dialog-close class="btn btn-secondary" data-call="closePatientModal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Cadastrar paciente</button>
+              </div>
+            </form>
           </div>
-        <?php endif; ?>
+        </div>
+
+        <script src="/assets/js/agenda-form.js?v=v54-30" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function previewAppointmentConfirmation(array $params): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $appointmentId = (int)($params['id'] ?? 0);
+        try {
+            $preview = (new AppointmentService())->previewConfirmationMessage($appointmentId);
+            echo json_encode(['data' => $preview], JSON_UNESCAPED_UNICODE);
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(403);
+            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(422);
+            echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri] prévia de confirmação da consulta ' . $appointmentId . ': ' . $e->getMessage());
+            http_response_code(422);
+            echo json_encode(['error' => 'Não foi possível montar a prévia agora. Tente de novo.'], JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    public function sendAuthorizedAppointmentConfirmation(array $params): void
+    {
+        $appointmentId = (int)($params['id'] ?? 0);
+        $token = $_POST['_csrf_token'] ?? '';
+        if (!Csrf::validate($token)) {
+            header('Location: /agenda?error=csrf');
+            exit;
+        }
+        try {
+            $res = (new AppointmentService())->sendAuthorizedConfirmation($appointmentId, TenantContext::getUserId());
+            $dateParam = substr((string)($res['preview']['scheduled_at'] ?? ''), 0, 10);
+            header('Location: /agenda?date=' . urlencode($dateParam) . '&success=confirmacao_enviada');
+            exit;
+        } catch (\InvalidArgumentException $e) {
+            header('Location: /agenda?error=falha&msg=' . urlencode($this->userFacingError('agenda confirmação', $e)));
+            exit;
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri] envio de confirmação da consulta ' . $appointmentId . ': ' . $e->getMessage());
+            header('Location: /agenda?error=falha&msg=' . urlencode('Não foi possível enviar a confirmação agora. Tente de novo.'));
+            exit;
+        }
     }
 
 
@@ -3310,7 +3316,7 @@ class DashboardController
         $stmt = $db->prepare("
             SELECT mp.*, p.name AS patient_name, u.name AS professional_name
             FROM meal_plans mp
-            JOIN patients p ON p.id = mp.patient_id
+            LEFT JOIN patients p ON p.id = mp.patient_id AND p.clinic_id = mp.clinic_id
             LEFT JOIN professionals pr ON pr.id = mp.professional_id
             LEFT JOIN users u ON u.id = pr.user_id
             WHERE mp.clinic_id = :clinic_id
@@ -3334,10 +3340,17 @@ class DashboardController
         $patStmt = $db->prepare("SELECT id, name FROM patients WHERE clinic_id = :clinic_id AND status = 'active' ORDER BY name ASC");
         $patStmt->execute(['clinic_id' => $clinicId]);
         $patients = $patStmt->fetchAll();
+        // NI2-519 (v42): modelos ativos da clínica (e globais) para começar um plano novo.
+        try {
+            $planTemplates = (new \ClyoNutri\Domain\MealPlan\MealPlanTemplateService($db))->listForClinic(false);
+        } catch (\Throwable $e) {
+            error_log('NI2-519 list templates failed: ' . $e->getMessage());
+            $planTemplates = [];
+        }
 
-        $title = 'Planos Alimentares';
+        $title = 'Planos alimentares';
         $activeNav = 'planos';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica Clyo Nutri';
         $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
         $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
 
@@ -3347,25 +3360,28 @@ class DashboardController
 
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
+        <div class="ds-page-header" data-testid="plans-page-header">
           <div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Prescrições e Planos Alimentares</h1>
-            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Monte refeições, alimentos e substituições e acompanhe os totais. Cada publicação gera uma nova versão; as anteriores ficam no histórico.</p>
+            <h1 class="u-text-h2 u-font-bold u-color-botanical-forest-900 u-m-0">Planos alimentares</h1>
+            <p class="u-color-neutral-gray-500 u-mt-1">Monte refeições, alimentos e substituições e acompanhe os totais. Cada publicação gera uma nova versão; as anteriores ficam no histórico.</p>
           </div>
-          <button class="btn btn-primary" data-show="modal-new-plan">
-            + Novo Plano Alimentar
-          </button>
+          <div class="ds-page-actions">
+            <a href="/modelos" class="btn btn-outline" data-testid="plan-templates-link">Modelos de plano</a>
+            <button type="button" class="btn btn-primary" data-show="modal-new-plan" aria-haspopup="dialog">
+              + Novo plano alimentar
+            </button>
+          </div>
         </div>
 
-        <?php if ($feedback): ?>
-          <div style="background: #E3F4F2; color: #0A5F63; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #E3F4F2;">
-            <?= htmlspecialchars($feedback) ?>
+        <?php if ($error): ?>
+          <div role="alert" class="op-message op-message--error u-mb-4" data-testid="page-error-message">
+            <?= htmlspecialchars($error) ?>
           </div>
         <?php endif; ?>
 
-        <?php if ($error): ?>
-          <div style="background: #ffebee; color: #c62828; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ffcdd2;">
-            <?= htmlspecialchars($error) ?>
+        <?php if ($feedback): ?>
+          <div role="status" class="op-message op-message--success u-mb-4">
+            <?= htmlspecialchars($feedback) ?>
           </div>
         <?php endif; ?>
 
@@ -3374,50 +3390,50 @@ class DashboardController
             <a href="/planos<?= $fKey !== '' ? '?status=' . $fKey : '' ?>" class="plan-filters__item<?= $planStatusFilter === $fKey && $planPatientFilter === 0 ? ' is-active' : '' ?>"<?= $planStatusFilter === $fKey && $planPatientFilter === 0 ? ' aria-current="page"' : '' ?>><?= htmlspecialchars($fLabel) ?></a>
           <?php endforeach; ?>
           <?php if ($planPatientFilter > 0): ?>
-            <span class="plan-filters__note">Filtrado por paciente<?= !empty($plans) ? ': ' . htmlspecialchars($plans[0]['patient_name']) : '' ?> · <a href="/planos<?= $planStatusFilter !== '' ? '?status=' . $planStatusFilter : '' ?>">limpar filtro de paciente</a></span>
+            <span class="plan-filters__note">Filtrado por paciente<?= !empty($plans) && $plans[0]['patient_name'] !== null ? ': ' . htmlspecialchars($plans[0]['patient_name']) : '' ?> · <a href="/planos<?= $planStatusFilter !== '' ? '?status=' . $planStatusFilter : '' ?>">limpar filtro de paciente</a></span>
           <?php endif; ?>
         </nav>
 
         <div class="card">
           <div class="table-responsive">
-            <table class="table" style="width: 100%; border-collapse: collapse;">
+            <table class="table u-w-full u-collapse">
               <thead>
-                <tr style="border-bottom: 1px solid var(--neutral-gray-200); text-align: left;">
-                  <th style="padding: 12px;">Título do Plano</th>
-                  <th style="padding: 12px;">Paciente</th>
-                  <th style="padding: 12px;">Versão</th>
-                  <th style="padding: 12px;">Status</th>
-                  <th style="padding: 12px;">Energia</th>
-                  <th style="padding: 12px;">Última Atualização</th>
-                  <th style="padding: 12px; text-align: right;">Ações</th>
+                <tr class="u-border-b u-text-left">
+                  <th class="u-p-3">Título do Plano</th>
+                  <th class="u-p-3">Paciente</th>
+                  <th class="u-p-3">Versão</th>
+                  <th class="u-p-3">Status</th>
+                  <th class="u-p-3">Energia</th>
+                  <th class="u-p-3">Última atualização</th>
+                  <th class="u-p-3 u-text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($plans)): ?>
-                  <tr><td colspan="7" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);"><?= ($planStatusFilter !== '' || $planPatientFilter > 0) ? 'Nenhum plano encontrado para este filtro.' : 'Nenhum plano alimentar cadastrado ainda.' ?></td></tr>
+                  <tr><td colspan="7" class="u-text-center u-color-neutral-gray-500 u-p-6"><?= ($planStatusFilter !== '' || $planPatientFilter > 0) ? 'Nenhum plano encontrado para este filtro.' : 'Nenhum plano alimentar cadastrado ainda.' ?></td></tr>
                 <?php else: ?>
                   <?php foreach ($plans as $pl): ?>
-                    <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
-                      <td style="padding: 12px; font-weight: 600; color: var(--brand-navy-900);">
+                    <tr class="u-border-b u-bc-neutral-gray-100">
+                      <td class="u-p-3 u-font-semibold u-color-botanical-forest-900">
                         <?= htmlspecialchars($pl['title']) ?>
                         <?php if (!empty($pl['parent_plan_id'])): ?>
-                          <span style="font-size: 0.75rem; color: #64748b; display: block; font-weight: normal;">(Derivado de #<?= (int)$pl['parent_plan_id'] ?>)</span>
+                          <span class="u-text-caption u-color-neutral-gray-500 u-block u-font-regular">(Derivado de #<?= (int)$pl['parent_plan_id'] ?>)</span>
                         <?php endif; ?>
                       </td>
-                      <td style="padding: 12px;"><?= htmlspecialchars($pl['patient_name']) ?></td>
-                      <td style="padding: 12px;" class="tabular-nums">v<?= (int)$pl['version'] ?></td>
-                      <td style="padding: 12px;">
+                      <td class="u-p-3"><?= $pl['patient_name'] !== null ? htmlspecialchars($pl['patient_name']) : '<span class="u-color-neutral-gray-500" data-testid="plan-no-patient">Sem paciente (atribuir depois)</span>' ?></td>
+                      <td class="tabular-nums u-p-3">v<?= (int)$pl['version'] ?></td>
+                      <td class="u-p-3">
                         <?= LabelMap::mealPlanStatusBadge($pl['status'] ?? '') ?>
                       </td>
-                      <td style="padding: 12px;" class="tabular-nums"><?= number_format((float)($pl['daily_energy_kcal'] ?? 0), 0, ',', '.') ?> kcal</td>
-                      <td style="padding: 12px; color: #64748b; font-size: 0.85rem;"><?= date('d/m/Y H:i', strtotime($pl['updated_at'] ?? $pl['created_at'])) ?></td>
-                      <td style="padding: 12px; text-align: right; white-space: nowrap;">
-                        <a href="/planos/<?= $pl['id'] ?>" class="btn btn-sm btn-outline" style="text-decoration: none; padding: 4px 10px; font-size: 0.8rem; margin-right: 4px;">
+                      <td class="tabular-nums u-p-3"><?= number_format((float)($pl['daily_energy_kcal'] ?? 0), 0, ',', '.') ?> kcal</td>
+                      <td class="u-p-3 u-color-neutral-gray-500 u-text-compact"><?= date('d/m/Y H:i', strtotime($pl['updated_at'] ?? $pl['created_at'])) ?></td>
+                      <td class="u-p-3 u-text-right u-nowrap">
+                        <a href="/planos/<?= $pl['id'] ?>" class="btn btn-sm btn-outline u-no-underline u-py-1 u-px-2 u-text-compact u-mr-1">
                           <?= $pl['status'] === 'draft' ? 'Editar' : 'Visualizar' ?>
                         </a>
-                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" style="display: inline;" data-confirm="Deseja duplicar este plano para um novo rascunho?">
+                        <form method="POST" action="/planos/<?= $pl['id'] ?>/duplicar" class="u-inline" data-confirm="Deseja duplicar este plano para um novo rascunho?">
                           <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                          <button type="submit" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;">Duplicar</button>
+                          <button type="submit" class="btn btn-sm btn-secondary u-py-1 u-px-2 u-text-compact">Duplicar</button>
                         </form>
                       </td>
                     </tr>
@@ -3429,31 +3445,60 @@ class DashboardController
         </div>
 
         <!-- Modal Novo Plano -->
-        <div id="modal-new-plan" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Novo plano alimentar</h2>
+        <div id="modal-new-plan" data-dialog="modal" class="modal-overlay">
+          <div class="cn-dialog__panel u-bg-neutral-white u-radius-card u-w-full u-maxw-form u-p-6 u-shadow-lg">
+            <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-4">Novo plano alimentar</h2>
             <form method="POST" action="/planos/novo">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <div style="margin-bottom: 16px;">
-                <label for="dc16-patient_id" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Paciente *</label>
-                <select id="dc16-patient_id" name="patient_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
-                  <option value="">Selecione o paciente...</option>
+              <div class="u-mb-4">
+                <label for="dc16-patient_id" class="u-block u-font-semibold u-mb-1 u-text-compact">Paciente (opcional)</label>
+                <select id="dc16-patient_id" name="patient_id" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                  <option value="">Sem paciente por enquanto (atribuo depois)</option>
                   <?php foreach ($patients as $p): ?>
                     <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
                   <?php endforeach; ?>
                 </select>
+                <small class="u-color-neutral-gray-500 u-text-caption u-block u-mt-1">Sem paciente, o plano fica como rascunho de teste. Para publicar, atribua um paciente: a conferência de alergias usa a anamnese dele.</small>
               </div>
-              <div style="margin-bottom: 16px;">
-                <label for="dc17-title" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Título da Prescrição *</label>
-                <input id="dc17-title" type="text" name="title" required placeholder="Ex: Plano Hipertrofia Fase 1" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <div class="u-mb-4">
+                <label for="dc17-title" class="u-block u-font-semibold u-mb-1 u-text-compact">Título da Prescrição *</label>
+                <input id="dc17-title" type="text" name="title" required value="<?= htmlspecialchars('Plano alimentar de ' . date('d/m/Y')) ?>" placeholder="Ex: Plano Hipertrofia Fase 1" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               </div>
-              <div style="margin-bottom: 20px;">
-                <label for="dc18-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Gerais do Plano (Opcional)</label>
-                <textarea id="dc18-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              <?php if ($planTemplates !== []): ?>
+              <div class="u-mb-4">
+                <label for="new-plan-template" class="u-block u-font-semibold u-mb-1 u-text-compact">Começar de um modelo (opcional)</label>
+                <select id="new-plan-template" name="template_id" data-testid="new-plan-template" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                  <option value="">Não, começar do zero</option>
+                  <?php foreach ($planTemplates as $pt): ?>
+                    <option value="<?= (int)$pt['id'] ?>"<?= !empty($pt['is_clinic_default']) ? ' selected' : '' ?>><?= htmlspecialchars($pt['title']) ?> (<?= htmlspecialchars($pt['category']) ?>, <?= (int)$pt['meal_count'] ?> <?= (int)$pt['meal_count'] === 1 ? 'refeição' : 'refeições' ?>)<?= !empty($pt['is_clinic_default']) ? ' · padrão da clínica' : '' ?></option>
+                  <?php endforeach; ?>
+                </select>
+                <small class="u-color-neutral-gray-500 u-text-caption u-block u-mt-1">Com um modelo, as refeições e os alimentos dele entram no plano e a opção das 6 refeições padrão é ignorada. Confira as quantidades para este paciente.</small>
               </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <?php endif; ?>
+              <fieldset class="u-mt-0 u-mb-4 u-mx-0 u-border u-bc-botanical-sage-200 u-radius-input u-py-2 u-px-3" data-testid="new-plan-method">
+                <legend class="u-font-semibold u-text-compact u-py-0 u-px-1">Como prescrever</legend>
+                <?php foreach (\ClyoNutri\Domain\MealPlan\MealPlanTemplateService::METHODS as $mk => $ml): ?>
+                <label class="u-flex u-gap-2 u-items-start u-text-compact u-my-1 u-mx-0 u-minh-touch">
+                  <input type="radio" name="plan_method" value="<?= $mk ?>"<?= $mk === 'alimentos' ? ' checked' : '' ?> class="u-mt-1">
+                  <span><strong><?= htmlspecialchars($ml) ?></strong> · <?= htmlspecialchars(['alimentos' => 'quantidades em gramas ou medidas, com cálculo de nutrientes.', 'equivalentes' => 'trocas por grupo, usando as regras de equivalência da clínica.', 'qualitativo' => 'orientações escritas por refeição, sem quantidades obrigatórias.'][$mk]) ?></span>
+                </label>
+                <?php endforeach; ?>
+                <small class="u-color-neutral-gray-500 u-text-caption u-block u-mt-1">Com um modelo escolhido, vale o método salvo no modelo.</small>
+              </fieldset>
+              <div class="u-mb-4">
+                <label class="u-flex u-gap-2 u-items-start u-text-compact">
+                  <input type="checkbox" name="quick_meals" value="1" checked class="u-mt-1" data-testid="quick-meals">
+                  <span>Começar com 6 refeições padrão (café da manhã, colação, almoço, lanche da tarde, jantar e ceia). Você pode renomear, mudar o horário ou remover.</span>
+                </label>
+              </div>
+              <div class="u-mb-5">
+                <label for="dc18-notes" class="u-block u-font-semibold u-mb-1 u-text-compact">Orientações gerais do plano (opcional)</label>
+                <textarea id="dc18-notes" name="notes" rows="3" placeholder="Recomendações clínicas, horários preferenciais, hidratação..." class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
+              </div>
+              <div class="u-flex u-justify-end u-gap-2">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-new-plan">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Iniciar Prescrição</button>
+                <button type="submit" class="btn btn-primary">Iniciar prescrição</button>
               </div>
             </form>
           </div>
@@ -3474,17 +3519,47 @@ class DashboardController
         }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
+        // NI2-514: paciente opcional; título padrão com a data; 6 refeições padrão sob demanda.
         $patientId = (int)($_POST['patient_id'] ?? 0);
-        $title = trim($_POST['title'] ?? '');
+        $title = trim((string)($_POST['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Plano alimentar de ' . date('d/m/Y');
+        }
         $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
+        $quickMeals = !empty($_POST['quick_meals']) ? \ClyoNutri\Domain\MealPlan\MealPlanService::DEFAULT_MEALS : [];
+        $templateId = (int)($_POST['template_id'] ?? 0);
+
+        // NI2-519 (v42): começar de um modelo; as refeições do modelo substituem as 6 padrão.
+        if ($templateId > 0) {
+            try {
+                $r = (new \ClyoNutri\Domain\MealPlan\MealPlanTemplateService($db))->createPlanFromTemplate($templateId, $professionalId, $patientId > 0 ? $patientId : null, $title, $notes);
+                $_SESSION['feedback_message'] = \ClyoNutri\Application\Controllers\MealPlanTemplateController::usedMessage($r)
+                    . ($patientId > 0 ? '' : ' O plano está sem paciente: atribua antes de publicar.');
+                header("Location: /planos/" . (int)$r['plan_id']);
+                exit;
+            } catch (\InvalidArgumentException | \DomainException | \ClyoNutri\Core\Security\TenantSecurityException $e) {
+                $_SESSION['error_message'] = 'Não foi possível usar o modelo: ' . $e->getMessage();
+            } catch (\Throwable $e) {
+                error_log('NI2-519 create from template failed: ' . $e->getMessage());
+                $_SESSION['error_message'] = 'Não foi possível criar o plano a partir do modelo. Nada foi criado. Tente novamente.';
+            }
+            header("Location: /planos");
+            exit;
+        }
 
         try {
-            $created = $service->createPlan($patientId, $professionalId, $title, $notes);
-            $_SESSION['feedback_message'] = "Plano alimentar '{$title}' criado com sucesso!";
+            $created = $service->createPlan($patientId > 0 ? $patientId : null, $professionalId, $title, $notes, $quickMeals);
+            $method = (string)($_POST['plan_method'] ?? 'alimentos');
+            if ($method !== 'alimentos' && isset(\ClyoNutri\Domain\MealPlan\MealPlanTemplateService::METHODS[$method])) {
+                $service->setPlanMethod((int)$created['plan_id'], $method);
+            }
+            $_SESSION['feedback_message'] = $patientId > 0
+                ? "Plano alimentar '{$title}' criado. Agora é só montar as refeições."
+                : "Plano alimentar '{$title}' criado sem paciente. Monte a prescrição e atribua o paciente antes de publicar.";
             header("Location: /planos/" . $created['plan_id']);
             exit;
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao criar plano: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao criar plano: " . $this->userFacingError('Erro ao criar plano', $e);
             header("Location: /planos");
             exit;
         }
@@ -3496,7 +3571,7 @@ class DashboardController
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         if (!$this->canEditPlanItems($db)) {
             http_response_code(403);
-            echo 'Você não tem permissão para acessar prescrições.';
+            echo 'Você não tem permissão para acessar planos alimentares.';
             return;
         }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
@@ -3523,7 +3598,7 @@ class DashboardController
 
         $title = "Plano Alimentar: " . htmlspecialchars($plan['title']);
         $activeNav = 'planos';
-        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica ClyoNutri';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica Clyo Nutri';
         $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
         $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
 
@@ -3534,86 +3609,137 @@ class DashboardController
         $isDraft = ($plan['status'] === 'draft');
         $canEditItems = $this->canEditPlanItems($db);
 
+        // NI2-514: plano sem paciente (rascunho de primeira prescrição) e meta de energia gravada no plano.
+        $planHasPatient = !empty($plan['patient_id']);
+        $energyService = new \ClyoNutri\Domain\MealPlan\EnergyTargetService($db);
+        $energyTarget = $plan['energy_target'] ?? null;
+        $energySuggest = ($isDraft && $planHasPatient) ? $energyService->suggestInputs($planId) : ['sex' => null, 'age_years' => null, 'weight_kg' => null, 'height_cm' => null, 'ffm_kg' => null, 'source_text' => ''];
+        $energyCompare = $energyTarget ? $energyService->compare($plan) : null;
+        $energyOld = is_array($_SESSION['energy_form_old'] ?? null) ? $_SESSION['energy_form_old'] : [];
+        unset($_SESSION['energy_form_old']);
+        $assignablePatients = [];
+        if ($isDraft && !$planHasPatient) {
+            $apStmt = $db->prepare("SELECT id, name FROM patients WHERE clinic_id = :c AND status = 'active' ORDER BY name ASC LIMIT 500");
+            $apStmt->execute(['c' => TenantContext::getClinicId()]);
+            $assignablePatients = $apStmt->fetchAll();
+        }
+
+        // NI2-600: Contagem de versões publicadas e verificação de itens no plano para ações contextuais
+        $diffService = new \ClyoNutri\Domain\MealPlan\MealPlanVersionDiffService($db);
+        $publishedVersionsCount = $planHasPatient ? count($diffService->listPublishedVersions((int)$plan['patient_id'])) : 0;
+        $hasPlanItems = false;
+        if (!empty($plan['meals'])) {
+            foreach ($plan['meals'] as $m) {
+                if (!empty($m['items'])) {
+                    $hasPlanItems = true;
+                    break;
+                }
+            }
+        }
+
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <?php if ($planHasPatient): ?><?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$plan['patient_id'], 'plano') // NI2-629/661 ?><?php endif; ?>
+        <div class="u-flex u-justify-between u-items-start u-mb-6 u-wrap u-gap-4">
           <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <a href="/planos" style="text-decoration: none; color: #475569; font-size: 0.9rem;">← Voltar para lista</a>
-              <span class="badge" style="background: <?= $isDraft ? '#fef08a' : '#E3F4F2' ?>; color: <?= $isDraft ? '#854d0e' : '#0A5F63' ?>; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">
-                <?= $isDraft ? 'RASCUNHO (Edição aberta)' : 'PUBLICADO (versão ' . (int)$plan['version'] . ', somente leitura)' ?>
+            <div class="u-flex u-items-center u-gap-2 u-mb-1">
+              <a href="/planos" class="u-no-underline u-color-neutral-gray-600 u-text-compact">← Voltar para lista</a>
+              <span class="badge ds-pill <?= $isDraft ? 'ds-pill--warning' : 'ds-pill--success' ?>">
+                <?= $isDraft ? 'Salvo como rascunho' : 'PUBLICADO (versão ' . (int)$plan['version'] . ', somente leitura)' ?>
               </span>
             </div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;"><?= htmlspecialchars($plan['title']) ?></h1>
-            <p style="color: var(--neutral-gray-500); margin-top: 4px;">Paciente: <strong><?= htmlspecialchars($plan['patient_name']) ?></strong> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
+            <?php if ($planHasPatient): ?><p><a class="btn btn-secondary btn-sm" href="/planos/<?= (int)$planId ?>/sugestoes-dieteticas">Sugestões por comorbidade</a></p><?php endif; ?>
+            <?php if ($planHasPatient): ?><h2 class="patient-page-title"><?= htmlspecialchars($plan['title']) ?></h2><?php else: ?><h1 class="u-text-h2 u-font-bold u-color-botanical-forest-900 u-m-0"><?= htmlspecialchars($plan['title']) ?></h1><?php endif; ?>
+            <p class="u-color-neutral-gray-500 u-mt-1">Paciente: <?= $planHasPatient ? '<strong>' . htmlspecialchars((string)$plan['patient_name']) . '</strong>' : '<strong data-testid="plan-patient-pending">a definir</strong>' ?> | Responsável: <?= htmlspecialchars($plan['professional_name']) ?></p>
           </div>
-          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <a href="/planos/<?= (int)$planId ?>/lista-compras" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">🛒 Lista de Compras</a>
-            <a href="/planos/<?= (int)$planId ?>/imprimir" target="_blank" rel="noopener" class="btn btn-outline" style="font-size: 0.875rem;">Imprimir plano</a>
-            <?php if ($canEditItems): ?>
-            <form method="POST" action="/planos/<?= $planId ?>/duplicar" data-confirm="Deseja criar um novo rascunho a partir deste plano?">
-              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-              <button type="submit" class="btn btn-outline" style="font-size: 0.875rem;"><?= $isDraft ? 'Duplicar como Rascunho' : 'Criar nova versão para editar' ?></button>
-            </form>
+          <div class="u-flex u-gap-2 u-items-center u-wrap">
+            <?php if ($hasPlanItems || !$isDraft): ?>
+            <a href="/planos/<?= (int)$planId ?>/imprimir" target="_blank" rel="noopener" class="btn btn-outline u-text-compact">Imprimir plano</a>
+            <?php else: ?>
+            <span class="btn btn-outline u-text-compact u-disabled" aria-disabled="true" data-testid="plan-print-disabled" title="Adicione alimentos para imprimir">Imprimir plano</span>
             <?php endif; ?>
-            <?php if ($isDraft): ?>
+
+            <details class="plan-actions-dropdown u-inline-block u-relative">
+              <summary class="btn btn-outline u-text-compact u-pointer u-list-none" data-testid="plan-more-actions">Mais ações ▾</summary>
+              <div class="plan-actions-menu ds-menu-panel ds-menu-panel--wide">
+                <?php if ($planHasPatient): ?>
+                  <a class="plan-menu-item u-minh-touch u-flex u-items-center u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" href="/pacientes/<?= (int)$plan['patient_id'] ?>/prescricoes?plano=<?= (int)$planId ?>">Manipulados e suplementação</a>
+                <?php endif; ?>
+                <?php if ($planHasPatient && $publishedVersionsCount >= 2): ?>
+                  <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/planos/comparar" class="plan-menu-item u-minh-touch u-flex u-items-center u-gap-2 u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" data-testid="compare-plan-versions-link">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="8 21 3 21 3 16"/><line x1="20" y1="4" x2="3" y2="21"/></svg>
+                    <span>Comparar versões publicadas</span>
+                  </a>
+                <?php endif; ?>
+                <?php if ($hasPlanItems): ?>
+                  <a href="/planos/<?= (int)$planId ?>/lista-compras" target="_blank" rel="noopener" class="plan-menu-item u-minh-touch u-flex u-items-center u-gap-2 u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <span>Lista de compras</span>
+                  </a>
+                <?php endif; ?>
+                <?php if ($canEditItems): ?>
+                  <form method="POST" action="/planos/<?= $planId ?>/duplicar" data-confirm="Deseja criar um novo rascunho a partir deste plano?" class="u-m-0">
+                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                    <button type="submit" class="plan-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-bg-none u-border-0 u-pointer"><?= $isDraft ? 'Duplicar como Rascunho' : 'Criar nova versão para editar' ?></button>
+                  </form>
+                  <?php if (!empty($plan['meals'])): ?>
+                    <button type="button" class="plan-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-bg-none u-border-0 u-pointer" data-show="modal-save-template" data-testid="save-as-template">Salvar como modelo</button>
+                  <?php endif; ?>
+                <?php endif; ?>
+              </div>
+            </details>
+
+            <?php if ($isDraft && $planHasPatient): ?>
               <button class="btn btn-primary" data-show="modal-publish-plan">
-                Revisar & Publicar
+                Revisar e publicar
               </button>
+            <?php elseif ($isDraft): ?>
+              <button type="button" class="btn btn-primary" disabled aria-disabled="true" data-testid="publish-needs-patient" title="Atribua um paciente para publicar">Publicar (falta o paciente)</button>
             <?php endif; ?>
           </div>
         </div>
 
-        <?php if ($feedback): ?>
-          <div style="background: #E3F4F2; color: #0A5F63; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #E3F4F2;">
-            <?= htmlspecialchars($feedback) ?>
-          </div>
-        <?php endif; ?>
-
+        <?php /* NI2-521 (v42): as áreas marcadas com data-live-swap são trocadas sem recarregar a página (plan-live.js). */ ?>
+        <div id="plan-live-status" class="sr-only" aria-live="polite" data-testid="plan-live-status"></div>
+        <div id="plan-live-top" data-live-swap>
         <?php if ($error): ?>
-          <div style="background: #ffebee; color: #c62828; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ffcdd2;">
+          <div class="op-message op-message--error u-mb-4" role="alert" data-plan-flash="error">
             <?= htmlspecialchars($error) ?>
           </div>
         <?php endif; ?>
 
-        <style>
-          @media (max-width: 600px) {
-            .meal-plan-items, .meal-plan-items tbody { display: block; width: 100%; }
-            .meal-plan-items tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .meal-plan-items td { display: block; width: auto !important; padding: var(--space-3) !important; overflow-wrap: anywhere; }
-            .meal-plan-items tr:has(details) { display: block; }
-            .meal-plan-items input, .meal-plan-items textarea { min-width: 0; max-width: 100%; }
-          }
-        </style>
+        <?php if ($feedback): ?>
+          <div class="op-message op-message--info u-mb-4" role="status" data-plan-flash="ok">
+            <?= htmlspecialchars($feedback) ?>
+          </div>
+        <?php endif; ?>
 
-        <!-- Resumo Clínico para Prescrição: Dados Críticos com Origem Rastreável -->
-        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #0284C7; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <strong style="color: var(--brand-navy-900); font-size: 0.95rem;">📋 Resumo Clínico da Anamnese</strong>
-            <?php if ($clinicalSummary['has_data'] && !empty($clinicalSummary['source'])): ?>
-              <span style="font-size: 0.75rem; color: #64748B;">
-                Origem: <a href="<?= $clinicalSummary['source']['url'] ?>" target="_blank" style="color: var(--brand-copper-600); font-weight: 600;">Anamnese v<?= $clinicalSummary['source']['version'] ?> ↗</a> · <?= htmlspecialchars($clinicalSummary['source']['recorded_at']) ?><?= $clinicalSummary['is_draft'] ? ' · Rascunho' : ' · Finalizada' ?>
-              </span>
+
+        <?php if (!empty($clinicalSummary['draft_in_progress'])): ?>
+        <p data-testid="plan-anamnesis-draft" class="op-message op-message--warning">Há anamnese em rascunho. O contexto clínico acima identifica a versão concluída vigente e as pendências; revise antes de publicar.</p>
+        <?php endif; ?>
+
+        <?php if (!$planHasPatient): ?>
+          <div class="op-message op-message--info u-accent u-accent-botanical-copper-600 u-mb-4" role="status" data-testid="allergy-pending">
+            Plano sem paciente: as alergias ainda não foram avaliadas. A ausência de informação não confirma ausência de alergias. Atribua um paciente para que a anamnese dele seja conferida antes da publicação.
+            <?php if ($isDraft && $canEditItems): ?>
+              <form method="POST" action="/planos/<?= (int)$planId ?>/paciente" data-testid="assign-patient-form" class="u-flex u-gap-2 u-items-end u-wrap u-mt-2">
+                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                <div class="u-flex-1 u-minw-lg">
+                  <label for="assign-patient-id" class="u-block u-font-semibold u-mb-1 u-text-compact">Atribuir paciente</label>
+                  <select id="assign-patient-id" name="patient_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                    <option value="">Selecione o paciente...</option>
+                    <?php foreach ($assignablePatients as $ap): ?>
+                      <option value="<?= (int)$ap['id'] ?>"><?= htmlspecialchars($ap['name']) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Atribuir ao plano</button>
+              </form>
             <?php endif; ?>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.85rem;">
-            <div>
-              <span style="color: <?= !empty($clinicalSummary['allergies']) ? '#DC2626' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">ALERGIAS:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars($clinicalSummary['allergy_label']) ?><?= !empty($clinicalSummary['allergies']) ? ': ' . htmlspecialchars($clinicalSummary['allergies']) : '' ?></span>
-            </div>
-            <div>
-              <span style="color: <?= !empty($clinicalSummary['restrictions']) ? '#D97706' : '#64748B' ?>; font-weight: 600; display: block; font-size: 0.75rem;">RESTRIÇÕES:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['restrictions'] ?? null)) ?></span>
-            </div>
-            <div>
-              <span style="color: #0369A1; font-weight: 600; display: block; font-size: 0.75rem;">OBJETIVOS:</span>
-              <span style="color: #1E293B;"><?= htmlspecialchars(LabelMap::recorded($clinicalSummary['objectives'] ?? null)) ?></span>
-            </div>
-          </div>
-        </div>
-
-        <?php if ($clinicalSummary['allergy_pending']): ?>
-          <div role="status" data-testid="allergy-pending" class="card" style="border-left: 4px solid var(--brand-copper-600); margin-bottom: var(--space-4);">
+        <?php elseif ($clinicalSummary['allergy_pending']): ?>
+          <div class="op-message op-message--info u-accent u-accent-botanical-copper-600 u-mb-4" role="status" data-testid="allergy-pending">
             Avaliação de alergias pendente<?= $clinicalSummary['is_draft'] ? ': a anamnese está em rascunho' : '' ?>. A ausência de informação não confirma ausência de alergias.
             <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Revisar anamnese</a>
           </div>
@@ -3621,9 +3747,9 @@ class DashboardController
 
         <!-- Alertas de Segurança Clínica e Alérgenos -->
         <?php if (!empty($preview['allergen_safety']['has_conflict'])): ?>
-          <div style="background: #fff3cd; color: #856404; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeeba;">
-            <strong style="display: block; margin-bottom: 6px;">⚠️ Atenção Clínica: Conflitos Alergênicos Detectados com a Anamnese!</strong>
-            <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+          <div class="op-message op-message--critical" role="alert">
+            <strong class="u-block u-mb-1">Atenção clínica: conflitos alergênicos detectados com a anamnese!</strong>
+            <ul class="u-m-0 u-pl-5 u-text-compact">
               <?php foreach ($preview['allergen_safety']['conflicts'] as $conf): ?>
                 <li>Alimento <strong><?= htmlspecialchars($conf['food_name']) ?></strong> possui grupo alergênico registrado: <em><?= htmlspecialchars(LabelMap::allergen($conf['allergen_group'])) ?></em>.</li>
               <?php endforeach; ?>
@@ -3631,24 +3757,24 @@ class DashboardController
           </div>
         <?php endif; ?>
         <?php if (!empty($preview['allergen_safety']['unverified_foods']) || !empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
-          <div role="status" data-testid="allergen-unverified" style="background: #FBEADF; color: #8F3D14; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #FBEADF;">
-            <strong style="display: block; margin-bottom: 6px;">Alergia registrada: confira os alimentos abaixo</strong>
+          <div class="op-message op-message--info u-bg-botanical-copper-100 u-color-botanical-copper-700 u-p-4 u-radius-input u-mb-5 u-border u-bc-botanical-copper-100" role="status" data-testid="allergen-unverified">
+            <strong class="u-block u-mb-1">Alergia registrada: confira os alimentos abaixo</strong>
             <?php if (!empty($preview['allergen_safety']['unmapped_allergy_text'])): ?>
-              <p style="margin: 0 0 6px; font-size: 0.9rem;">A alergia descrita na anamnese não corresponde a um grupo alergênico conhecido, então nenhum alimento pôde ser conferido automaticamente.</p>
+              <p class="u-mt-0 u-mb-1 u-mx-0 u-text-compact">A alergia descrita na anamnese não corresponde a um grupo alergênico conhecido, então nenhum alimento pôde ser conferido automaticamente.</p>
             <?php endif; ?>
             <?php if (!empty($preview['allergen_safety']['unverified_foods'])): ?>
-              <p style="margin: 0 0 6px; font-size: 0.9rem;">Estes alimentos não têm informação de alérgenos no catálogo. A falta de informação não confirma que são seguros:</p>
-              <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+              <p class="u-mt-0 u-mb-1 u-mx-0 u-text-compact">Estes alimentos não têm informação de alérgenos no catálogo. A falta de informação não confirma que são seguros:</p>
+              <ul class="u-m-0 u-pl-5 u-text-compact">
                 <?php foreach ($preview['allergen_safety']['unverified_foods'] as $uf): ?>
                   <li><?= htmlspecialchars($uf['food_name']) ?></li>
                 <?php endforeach; ?>
               </ul>
             <?php endif; ?>
-            <p style="margin: 6px 0 0; font-size: 0.85rem;">Para publicar, será preciso confirmar e justificar a prescrição.</p>
+            <p class="u-mt-1 u-mb-0 u-mx-0 u-text-compact">Para publicar, será preciso confirmar e justificar a prescrição.</p>
           </div>
         <?php endif; ?>
         <?php if (!empty($preview['estimated_weights'])): ?>
-          <div role="note" data-testid="estimated-weights" style="background: #f8fafc; color: #334155; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; font-size: 0.85rem;">
+          <div role="note" data-testid="estimated-weights" class="u-bg-neutral-gray-50 u-color-neutral-gray-700 u-py-3 u-px-4 u-radius-input u-mb-5 u-border u-text-compact">
             <strong>Peso estimado em <?= count($preview['estimated_weights']) ?> item(ns):</strong> a medida caseira usada não está cadastrada para o alimento, então o cálculo usa um peso padrão (ex.: 1 unidade = 100 g). Prefira gramas ou uma medida cadastrada para o alimento.
           </div>
         <?php endif; ?>
@@ -3667,49 +3793,92 @@ class DashboardController
           $unknownNote = static function (string $n) use ($unknownByNutrient): string {
               if (empty($unknownByNutrient[$n])) return '';
               $names = array_keys($unknownByNutrient[$n]);
-              return '<div data-testid="unknown-' . $n . '" style="font-size: 0.75rem; color: #92400e; margin-top: 4px;" title="' . htmlspecialchars(implode(', ', $names), ENT_QUOTES) . '">Incompleto: ' . count($names) . (count($names) === 1 ? ' alimento sem análise' : ' alimentos sem análise') . '</div>';
+              return '<div data-testid="unknown-' . $n . '" class="u-text-caption u-color-semantic-warning-strong u-mt-1" title="' . htmlspecialchars(implode(', ', $names), ENT_QUOTES) . '">Incompleto: ' . count($names) . (count($names) === 1 ? ' alimento sem análise' : ' alimentos sem análise') . '</div>';
           };
         ?>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px;">
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #3b82f6;">
-            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Energia Diária</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">kcal</span></div><?= $unknownNote('energy_kcal') ?>
+        <div class="u-grid u-cols-auto-sm u-gap-4 u-mb-6">
+          <div class="card u-p-4 u-text-center u-accent u-accent-semantic-info">
+            <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold u-uppercase">Energia diária</div>
+            <div class="u-text-h2 u-font-bold u-color-neutral-ink-900 u-mt-1"><?= number_format((float)$plan['daily_energy_kcal'], 0, ',', '.') ?> <span class="u-text-compact u-font-regular">kcal</span></div><?= $unknownNote('energy_kcal') ?>
           </div>
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #0A7075;">
-            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Carboidratos</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('carbohydrate_g') ?>
+          <div class="card u-p-4 u-text-center u-accent u-accent-semantic-success">
+            <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold u-uppercase">Carboidratos</div>
+            <div class="u-text-h2 u-font-bold u-color-neutral-ink-900 u-mt-1"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> <span class="u-text-compact u-font-regular">g</span></div><?= $unknownNote('carbohydrate_g') ?>
           </div>
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #ef4444;">
-            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Proteínas</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('protein_g') ?>
+          <div class="card u-p-4 u-text-center u-accent u-accent-semantic-error">
+            <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold u-uppercase">Proteínas</div>
+            <div class="u-text-h2 u-font-bold u-color-neutral-ink-900 u-mt-1"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> <span class="u-text-compact u-font-regular">g</span></div><?= $unknownNote('protein_g') ?>
           </div>
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #f59e0b;">
-            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Lipídeos</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('lipid_g') ?>
+          <div class="card u-p-4 u-text-center u-accent u-accent-semantic-warning">
+            <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold u-uppercase">Lipídeos</div>
+            <div class="u-text-h2 u-font-bold u-color-neutral-ink-900 u-mt-1"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> <span class="u-text-compact u-font-regular">g</span></div><?= $unknownNote('lipid_g') ?>
           </div>
-          <div class="card" style="padding: 16px; text-align: center; border-left: 4px solid #8b5cf6;">
-            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Fibras</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-top: 4px;"><?= number_format((float)$plan['fiber_g'], 1, ',', '.') ?> <span style="font-size: 0.9rem; font-weight: normal;">g</span></div><?= $unknownNote('fiber_g') ?>
+          <div class="card u-p-4 u-text-center u-accent u-accent-semantic-info">
+            <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold u-uppercase">Fibras</div>
+            <div class="u-text-h2 u-font-bold u-color-neutral-ink-900 u-mt-1"><?= number_format((float)$plan['fiber_g'], 1, ',', '.') ?> <span class="u-text-compact u-font-regular">g</span></div><?= $unknownNote('fiber_g') ?>
           </div>
         </div>
 
         <?php if ($unknownByNutrient): ?>
-          <div role="note" data-testid="unknown-nutrients" style="background: #fffbeb; color: #78350f; padding: 10px 14px; border-radius: 8px; margin: -12px 0 20px; border: 1px solid #fde68a; font-size: 0.85rem;">
+          <div role="note" data-testid="unknown-nutrients" class="op-message op-message--warning u-mt-0 u-mb-5 u-text-compact">
             <strong>Totais incompletos:</strong> a TACO não traz análise de
             <?= htmlspecialchars(implode('; ', array_map(static fn($n, $foods) => ['energy_kcal' => 'energia', 'protein_g' => 'proteína', 'carbohydrate_g' => 'carboidratos', 'lipid_g' => 'lipídios', 'fiber_g' => 'fibra'][$n] . ' para ' . implode(', ', array_keys($foods)), array_keys($unknownByNutrient), $unknownByNutrient))) ?>.
             Esses valores entram como zero.
           </div>
         <?php endif; ?>
         <?php if (!empty($plan['notes'])): ?>
-          <div class="card" style="padding: 16px; margin-bottom: 24px; background: #f8fafc;">
-            <strong style="color: var(--brand-navy-900); font-size: 0.9rem;">Orientações Gerais do Plano:</strong>
-            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; white-space: pre-line;"><?= htmlspecialchars($plan['notes']) ?></p>
+          <div class="card u-p-4 u-mb-6 u-bg-neutral-gray-50">
+            <strong class="u-color-botanical-forest-900 u-text-compact">Orientações gerais do plano:</strong>
+            <p class="u-mt-1 u-mb-0 u-mx-0 u-color-neutral-gray-600 u-text-compact u-pre-line"><?= htmlspecialchars($plan['notes']) ?></p>
           </div>
         <?php endif; ?>
 
+        </div>
+
+        <?php (static function (array $v): void { extract($v, EXTR_SKIP); require __DIR__ . '/../../../views/meal_plans/_energy_card.php'; })(compact('planId', 'plan', 'isDraft', 'canEditItems', 'csrfToken', 'energyTarget', 'energySuggest', 'energyCompare', 'energyOld')); ?>
+
+        <?php if ($isDraft && $canEditItems) require __DIR__ . '/../../../views/meal_plans/_quick_editor.php'; ?>
+        <div id="plan-live-meals" data-live-swap>
+        <?php
+          // NI2-521 (v42): barra fixa com o total do plano e a meta gravada. Tolerância de adequação pendente de revisão clínica.
+          // NI2-519 (v43): sem meta própria, a barra compara com a meta de referência do modelo (se o modelo trouxe uma).
+          $refTarget = isset($plan['reference_target_json']) && $plan['reference_target_json'] !== null ? json_decode((string)$plan['reference_target_json'], true) : null;
+          $refTarget = is_array($refTarget) && is_numeric($refTarget['vet_kcal'] ?? null) ? $refTarget : null;
+          $usingRefTarget = !is_array($energyTarget) && $refTarget !== null;
+          $planMethod = \ClyoNutri\Domain\MealPlan\MealPlanTemplateService::methodOf($plan['plan_method'] ?? null);
+          $totalsBar = \ClyoNutri\Domain\MealPlan\PlanTotalsBar::build($plan, is_array($energyTarget) ? $energyTarget : $refTarget);
+          $tbColor = ['ok' => 'ds-tone-ok', 'acima' => 'ds-tone-copper', 'abaixo' => 'ds-tone-copper', 'sem-meta' => 'ds-delta--flat'];
+          $tbStatus = ['ok' => 'dentro da tolerância', 'acima' => 'acima', 'abaixo' => 'abaixo', 'sem-meta' => ''];
+        ?>
+        <?php if ($refTarget !== null): ?>
+        <div class="card u-py-3 u-px-4 u-mb-3 u-bg-botanical-cream-50 u-border u-bc-botanical-sage-200 u-text-compact" data-testid="template-reference-target">
+          <strong class="u-color-botanical-forest-900">Meta de referência do modelo</strong>
+          <span class="tabular-nums"> · <?= number_format((float)$refTarget['vet_kcal'], 0, ',', '.') ?> kcal<?php foreach (['protein_g' => 'P', 'carbohydrate_g' => 'C', 'lipid_g' => 'G'] as $rk => $rl): ?><?php if (is_numeric($refTarget[$rk] ?? null)): ?> · <?= $rl ?> <?= number_format((float)$refTarget[$rk], 0, ',', '.') ?> g<?php endif; ?><?php endforeach; ?></span>
+          <span class="u-block u-color-neutral-gray-600 u-mt-0"><?= htmlspecialchars((string)($refTarget['source'] ?? 'Referência do modelo.')) ?><?= $usingRefTarget ? ' A barra abaixo usa esta referência até você calcular a meta do paciente.' : ' A barra abaixo usa a meta calculada deste plano.' ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($planMethod !== 'alimentos'): ?>
+        <p data-testid="plan-method-label" class="u-text-compact u-color-neutral-gray-600 u-mt-0 u-mb-2 u-mx-0">Método: <strong><?= htmlspecialchars(\ClyoNutri\Domain\MealPlan\MealPlanTemplateService::METHODS[$planMethod]) ?></strong><?= $planMethod === 'qualitativo' ? '. Os totais abaixo valem só para os alimentos quantificados; a orientação escrita de cada refeição é o que o paciente recebe.' : '. As trocas usam as regras de equivalência da clínica (Alimentos > Regras de equivalência).' ?></p>
+        <?php endif; ?>
+        <div id="plan-totals-bar" data-testid="plan-totals-bar" role="group" aria-label="Totais do plano em relação à meta" class="ds-sticky-summary u-flex u-wrap u-items-center u-gap-4 u-py-2 u-px-4 u-mb-4 u-text-compact u-shadow-sm<?= $planMethod === 'qualitativo' ? ' ds-is-muted' : '' ?>">
+          <?php foreach ($totalsBar['rows'] as $tbKey => $tbRow): ?>
+            <span data-testid="totals-bar-<?= htmlspecialchars($tbKey) ?>" data-status="<?= htmlspecialchars($tbRow['status']) ?>" class="tabular-nums">
+              <strong class="u-color-botanical-forest-900"><?= htmlspecialchars($tbRow['label']) ?></strong>
+              <?= htmlspecialchars($tbRow['text']) ?>
+              <?php if ($tbStatus[$tbRow['status']] !== ''): ?><span class="u-font-semibold <?= $tbColor[$tbRow['status']] ?>"><?= htmlspecialchars($tbStatus[$tbRow['status']]) ?></span><?php endif; ?>
+            </span>
+          <?php endforeach; ?>
+          <span data-testid="totals-bar-fiber" class="tabular-nums"><strong class="u-color-botanical-forest-900">Fibras</strong> <?= number_format((float)$totalsBar['fiber_g'], 1, ',', '.') ?> g</span>
+          <?php if (!$totalsBar['has_target']): ?>
+            <span class="u-color-neutral-gray-600 u-text-compact">Sem meta gravada: calcule em “Energia e metas do plano” para ver a adequação.</span>
+          <?php elseif ($usingRefTarget): ?>
+            <span data-testid="totals-bar-reference" class="u-color-neutral-gray-600 u-text-compact">Comparando com a meta de referência do modelo.</span>
+          <?php endif; ?>
+        </div>
+
         <!-- Refeições e Alimentos -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Refeições do Dia</h2>
+        <div class="u-flex u-justify-between u-items-center u-mb-4">
+          <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-m-0">Refeições do Dia</h2>
           <?php if ($isDraft): ?>
             <button class="btn btn-sm btn-outline" data-show="modal-add-meal">
               + Adicionar Refeição
@@ -3718,61 +3887,96 @@ class DashboardController
         </div>
 
         <?php if (empty($plan['meals'])): ?>
-          <div class="card" style="padding: 32px; text-align: center; color: #64748b;">
-            <p style="margin-bottom: 12px;">Nenhuma refeição adicionada a esta prescrição.</p>
+          <div class="card u-p-8 u-text-center u-color-neutral-gray-500">
+            <p class="u-mb-3">Nenhuma refeição adicionada a esta prescrição.</p>
             <?php if ($isDraft): ?>
-              <button class="btn btn-primary" data-show="modal-add-meal">Adicionar Primeira Refeição</button>
+              <button class="btn btn-primary" data-show="modal-add-meal">Adicionar primeira refeição</button>
             <?php endif; ?>
           </div>
         <?php else: ?>
           <?php foreach ($plan['meals'] as $m): ?>
-            <div class="card" style="margin-bottom: 20px; overflow: hidden; border: 1px solid var(--neutral-gray-200);">
+            <div class="card u-mb-5 u-overflow-hidden u-border">
               <!-- Cabeçalho da Refeição -->
-              <div style="padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid var(--neutral-gray-200); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <span style="font-weight: 700; font-size: 1.1rem; color: var(--brand-navy-900);"><?= htmlspecialchars($m['name']) ?></span>
+              <div class="u-py-3 u-px-5 u-bg-neutral-gray-50 u-border-b u-flex u-justify-between u-items-center u-wrap u-gap-2">
+                <div class="u-flex u-items-center u-gap-3">
+                  <span class="u-font-bold u-text-card-title u-color-botanical-forest-900"><?= htmlspecialchars($m['name']) ?></span>
                   <?php if (!empty($m['time_of_day'])): ?>
-                    <span style="background: #e2e8f0; color: #334155; font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">⏰ <?= htmlspecialchars($m['time_of_day']) ?></span>
+                    <span class="u-bg-neutral-gray-200 u-color-neutral-gray-700 u-text-compact u-py-0 u-px-2 u-radius-input u-font-semibold u-inline-flex u-items-center u-gap-1"><?= \ClyoNutri\Application\View\Icon::svg('alarm-clock', 14) ?> <?= htmlspecialchars($m['time_of_day']) ?></span>
                   <?php endif; ?>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <span style="font-size: 0.85rem; color: #64748b;">
+                <div class="u-flex u-items-center u-gap-3">
+                  <span class="u-text-compact u-color-neutral-gray-500">
                     <strong><?= number_format((float)$m['totals']['energy_kcal'], 0, ',', '.') ?> kcal</strong> | P: <?= number_format((float)$m['totals']['protein_g'], 1, ',', '.') ?> g | C: <?= number_format((float)$m['totals']['carbohydrate_g'], 1, ',', '.') ?> g | G: <?= number_format((float)$m['totals']['lipid_g'], 1, ',', '.') ?> g
                   </span>
                   <?php if ($isDraft): ?>
-                    <button class="btn btn-sm btn-outline" data-call="openAddItemModal" data-args="[<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 4px 8px; font-size: 0.8rem;">+ Alimento</button>
-                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" style="display: inline;" data-confirm="Deseja excluir esta refeição e seus itens?">
+                    <button class="btn btn-sm btn-outline u-py-1 u-px-2 u-text-compact" data-call="openAddItemModal" data-args="[<?= $m['id'] ?>, <?= htmlspecialchars(json_encode((string)$m['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]">+ Alimento</button>
+                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= $m['id'] ?>/remover" data-live-plan class="u-inline" data-confirm="Deseja excluir esta refeição e seus itens?">
                       <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                      <button type="submit" class="btn btn-sm" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.85rem;">Excluir</button>
+                      <button type="submit" class="btn btn-sm u-color-semantic-error u-minw-touch u-minh-touch u-bg-none u-border-0 u-pointer u-text-compact">Excluir</button>
                     </form>
                   <?php endif; ?>
                 </div>
               </div>
 
               <?php if (!empty($m['notes'])): ?>
-                <div style="padding: 8px 20px; background: #f1f5f9; font-size: 0.85rem; color: #475569; border-bottom: 1px solid #e2e8f0;">
+                <div class="u-py-2 u-px-5 u-bg-neutral-gray-100 u-text-compact u-color-neutral-gray-600 u-border-b">
                   <em>Orientações: <?= htmlspecialchars($m['notes']) ?></em>
                 </div>
               <?php endif; ?>
 
+              <?php if ($isDraft && $canEditItems): ?>
+                <div class="u-py-2 u-px-5 u-bg-neutral-gray-50 u-border-b u-text-compact">
+                  <details data-testid="edit-plan-meal-<?= (int)$m['id'] ?>">
+                    <summary class="u-pointer u-color-botanical-forest-900 u-font-semibold">Editar refeição ou orientação</summary>
+                    <form method="POST" action="/planos/<?= $planId ?>/refeicoes/<?= (int)$m['id'] ?>/editar" class="u-mt-2" data-busy-text="Salvando…" data-live-plan>
+                      <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                      <div class="u-grid u-cols-auto-sm u-gap-2 u-mb-2">
+                        <div class="form-group u-m-0">
+                          <label class="form-label" for="meal-name-<?= (int)$m['id'] ?>">Nome da refeição</label>
+                          <input class="form-control" id="meal-name-<?= (int)$m['id'] ?>" name="name" type="text" required value="<?= htmlspecialchars((string)$m['name'], ENT_QUOTES) ?>">
+                        </div>
+                        <div class="form-group u-m-0">
+                          <label class="form-label" for="meal-time-<?= (int)$m['id'] ?>">Horário (HH:MM)</label>
+                          <input class="form-control" id="meal-time-<?= (int)$m['id'] ?>" name="time_of_day" type="text" pattern="^([01]\d|2[0-3]):[0-5]\d$" placeholder="Ex: 08:00" value="<?= htmlspecialchars($m['time_of_day'] !== null ? substr((string)$m['time_of_day'], 0, 5) : '', ENT_QUOTES) ?>">
+                        </div>
+                      </div>
+                      <div class="form-group u-mb-2">
+                        <label class="form-label" for="meal-notes-<?= (int)$m['id'] ?>">Orientações da refeição</label>
+                        <textarea class="form-control" id="meal-notes-<?= (int)$m['id'] ?>" name="notes" rows="2" placeholder="Orientações gerais ou descrição qualitativa da refeição"><?= htmlspecialchars((string)($m['notes'] ?? ''), ENT_QUOTES) ?></textarea>
+                      </div>
+                      <button type="submit" class="btn btn-sm btn-primary">Salvar refeição</button>
+                      <button type="button" class="btn btn-sm btn-secondary" data-reset-close-details>Cancelar</button>
+                    </form>
+                  </details>
+                </div>
+              <?php endif; ?>
+
               <!-- Lista de Itens -->
-              <div style="padding: 0;">
+              <div class="u-p-0">
                 <?php if (empty($m['items'])): ?>
-                  <div style="padding: 20px; text-align: center; color: #64748b; font-size: 0.9rem;">
+                  <div class="u-p-5 u-text-center u-color-neutral-gray-500 u-text-compact">
                     Nenhum alimento cadastrado nesta refeição.
                   </div>
                 <?php else: ?>
-                  <table class="meal-plan-items" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                  <table class="meal-plan-items u-w-full u-collapse u-text-compact">
                      <tbody>
                       <?php foreach ($m['items'] as $it): ?>
-                        <tr style="border-bottom: 1px solid var(--neutral-gray-100);">
-                          <td style="padding: 12px 20px; width: 40%;">
-                            <strong style="color: var(--brand-navy-900);"><?= htmlspecialchars($it['food_name']) ?></strong>
+                        <tr data-plan-item="<?= (int)$it['id'] ?>" class="u-border-b u-bc-neutral-gray-100">
+                          <td class="u-py-3 u-px-5 u-w-40">
+                            <strong class="u-color-botanical-forest-900"><?= htmlspecialchars($it['food_name']) ?></strong>
                             <?php if (!empty($it['notes'])): ?>
-                              <span style="display: block; font-size: 0.8rem; color: #64748b;"><?= htmlspecialchars($it['notes']) ?></span>
+                              <span class="u-block u-text-compact u-color-neutral-gray-500"><?= htmlspecialchars($it['notes']) ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($it['allergen_alert']['requires_attention'])): ?>
+                              <span data-testid="item-allergen-badge" class="ds-pill u-mt-1 <?= ($it['allergen_alert']['status'] ?? '') === 'conflict' ? 'ds-pill--error ds-pill--critical' : 'ds-pill--warning' ?>" data-severity="<?= ($it['allergen_alert']['status'] ?? '') === 'conflict' ? 'critical' : 'warning' ?>">
+                                <?= htmlspecialchars((string)($it['allergen_alert']['message'] ?? 'Atenção: verifique alérgenos')) ?>
+                              </span>
+                            <?php endif; ?>
+                            <?php if (!empty($it['allergen_ack_reason'])): ?>
+                              <span data-testid="item-allergen-ack" class="u-block u-text-caption u-color-semantic-warning-strong u-mt-0">Justificativa clínica: <?= htmlspecialchars((string)$it['allergen_ack_reason']) ?></span>
                             <?php endif; ?>
                           </td>
-                          <td style="padding: 12px 20px; font-weight: 600; color: #334155; width: 20%;">
+                          <td class="u-py-3 u-px-5 u-font-semibold u-color-neutral-gray-700 u-w-20">
                             <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($it['amount']) ?> <?= htmlspecialchars($it['measure_unit']) ?>
                             <?php
                               $itUnit = trim((string)$it['measure_unit']);
@@ -3790,33 +3994,33 @@ class DashboardController
                               }
                             ?>
                             <?php if ($itGrams !== null): ?>
-                              <span style="display: block; font-size: 0.8rem; font-weight: normal; color: #64748b; margin-top: 2px;"<?= !empty($it['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($itGrams, 0, ',', '.') ?>g<?= !empty($it['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
+                              <span class="u-block u-text-compact u-font-regular u-color-neutral-gray-500 u-mt-0"<?= !empty($it['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($itGrams, 0, ',', '.') ?>g<?= !empty($it['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
                             <?php endif; ?>
                           </td>
-                          <td style="padding: 12px 20px; color: #64748b; width: 25%; font-size: 0.85rem;">
-                            <?= number_format((float)$it['energy_kcal'], 0, ',', '.') ?> kcal <span style="font-size: 0.75rem;">(P:<?= number_format((float)$it['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$it['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$it['lipid_g'], 1, ',', '.') ?>)</span>
+                          <td class="u-py-3 u-px-5 u-color-neutral-gray-500 u-w-25 u-text-compact">
+                            <?= number_format((float)$it['energy_kcal'], 0, ',', '.') ?> kcal <span class="u-text-caption">(P:<?= number_format((float)$it['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$it['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$it['lipid_g'], 1, ',', '.') ?>)</span>
                           </td>
-                          <td style="padding: 12px 20px; text-align: right; width: 15%;">
+                          <td class="u-py-3 u-px-5 u-text-right u-w-15">
                             <?php if ($isDraft): ?>
-                              <button class="btn btn-sm btn-outline" data-call="openAddSubModal" data-args="[<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]" style="padding: 2px 6px; font-size: 0.75rem; margin-right: 4px;">
+                              <button class="btn btn-sm btn-outline u-py-0 u-px-1 u-text-caption u-mr-1" data-call="openAddSubModal" data-args="[<?= $it['id'] ?>, <?= htmlspecialchars(json_encode((string)$it['food_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode(round((float)$it['energy_kcal'], 1)), ENT_QUOTES) ?>]">
                                 + Substituição
                               </button>
-                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" style="display: inline;" data-confirm="Remover este alimento?">
+                              <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" class="u-inline" data-confirm="Remover este alimento?" data-live-plan>
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                <button type="submit" style="color: #B91C1C; min-width: 28px; min-height: 28px; background: none; border: none; cursor: pointer; font-size: 0.8rem;">✕</button>
+                                <button type="submit" class="u-color-semantic-error u-minw-touch u-minh-touch u-bg-none u-border-0 u-pointer u-text-compact">✕</button>
                               </form>
                             <?php endif; ?>
                           </td>
                         </tr>
 
                         <?php if ($isDraft && $canEditItems): ?>
-                        <tr><td colspan="4" style="padding: var(--space-3) var(--space-4);">
+                        <tr><td colspan="4" class="u-py-3 u-px-4">
                           <details data-testid="edit-plan-item-<?= (int)$it['id'] ?>">
-                            <summary style="cursor: pointer; color: var(--brand-navy-900); font-weight: 600;">Editar porção e orientação</summary>
-                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" style="margin-top: var(--space-3);" data-busy-text="Salvando…" data-unit-scope data-food-id="<?= (int)$it['food_id'] ?>">
+                            <summary class="u-pointer u-color-botanical-forest-900 u-font-semibold">Editar porção e orientação</summary>
+                            <form method="POST" action="/planos/<?= $planId ?>/itens/<?= (int)$it['id'] ?>/editar" class="u-mt-3" data-busy-text="Salvando…" data-live-plan data-unit-scope data-food-id="<?= (int)$it['food_id'] ?>">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
-                              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);">
+                              <div class="u-grid u-cols-auto-sm u-gap-3">
                                 <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="number" min="0.01" step="0.01" required value="<?= htmlspecialchars((string)(float)$it['amount'], ENT_QUOTES) ?>"></div>
                                 <div class="form-group"><label class="form-label" for="item-unit-<?= (int)$it['id'] ?>">Unidade ou medida caseira</label><input class="form-control" id="item-unit-<?= (int)$it['id'] ?>" name="measure_unit" required value="<?= htmlspecialchars($it['measure_unit'], ENT_QUOTES) ?>"></div>
                               </div>
@@ -3832,17 +4036,17 @@ class DashboardController
                         <!-- Substituições Vinculadas (Opções Alternativas - Não Cumulativas) -->
                         <?php if (!empty($it['substitutions'])): ?>
                           <?php foreach ($it['substitutions'] as $sub): ?>
-                            <tr style="background: #fafaf9; border-bottom: 1px dashed #e7e5e4;">
-                              <td style="padding: 8px 20px 8px 40px;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                  <span style="color: #92400E; font-size: 0.8rem; font-weight: 600;">↳ Opção Alternativa:</span>
-                                  <span style="color: #44403c;"><?= htmlspecialchars($sub['food_name']) ?></span>
+                            <tr class="u-bg-neutral-gray-50 u-border-b u-border-dashed">
+                              <td class="u-pt-2 u-pr-5 u-pb-2 u-pl-10">
+                                <div class="u-flex u-items-center u-gap-1">
+                                  <span class="u-color-semantic-warning-strong u-text-compact u-font-semibold">↳ Opção alternativa:</span>
+                                  <span class="u-color-neutral-gray-700"><?= htmlspecialchars($sub['food_name']) ?></span>
                                 </div>
                                 <?php if (!empty($sub['notes'])): ?>
-                                  <span style="display: block; font-size: 0.75rem; color: #78716c; margin-left: 20px;"><?= htmlspecialchars($sub['notes']) ?></span>
+                                  <span class="u-block u-text-caption u-color-neutral-gray-500 u-ml-5"><?= htmlspecialchars($sub['notes']) ?></span>
                                 <?php endif; ?>
                               </td>
-                              <td style="padding: 8px 20px; font-size: 0.85rem; color: #44403c;">
+                              <td class="u-py-2 u-px-5 u-text-compact u-color-neutral-gray-700">
                                 <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($sub['amount']) ?> <?= htmlspecialchars($sub['measure_unit']) ?>
                                 <?php
                                   $subUnit = trim((string)$sub['measure_unit']);
@@ -3860,17 +4064,55 @@ class DashboardController
                                   }
                                 ?>
                                 <?php if ($subGrams !== null): ?>
-                                  <span style="display: block; font-size: 0.75rem; color: #78716c; margin-top: 2px;"<?= !empty($sub['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($subGrams, 0, ',', '.') ?>g<?= !empty($sub['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
+                                  <span class="u-block u-text-caption u-color-neutral-gray-500 u-mt-0"<?= !empty($sub['weight_is_estimated']) ? ' title="Medida caseira genérica: não há medida cadastrada para este alimento."' : '' ?>>(~<?= number_format($subGrams, 0, ',', '.') ?>g<?= !empty($sub['weight_is_estimated']) ? ', peso estimado' : '' ?>)</span>
                                 <?php endif; ?>
                               </td>
-                              <td style="padding: 8px 20px; font-size: 0.8rem; color: #78716c;">
+                              <td class="u-py-2 u-px-5 u-text-compact u-color-neutral-gray-500">
                                 <?= number_format((float)$sub['energy_kcal'], 0, ',', '.') ?> kcal (P:<?= number_format((float)$sub['protein_g'], 1, ',', '.') ?> C:<?= number_format((float)$sub['carbohydrate_g'], 1, ',', '.') ?> G:<?= number_format((float)$sub['lipid_g'], 1, ',', '.') ?>)
+                                <?php $subDelta = \ClyoNutri\Domain\MealPlan\SubstitutionComparison::label(\ClyoNutri\Domain\MealPlan\SubstitutionComparison::delta($it, $sub)); ?>
+                                <?php if ($subDelta !== ''): ?>
+                                  <span data-testid="sub-delta" class="u-block u-text-caption u-color-neutral-gray-600 u-mt-0" title="Diferença em relação ao alimento principal desta linha.">Em relação ao principal: <?= htmlspecialchars($subDelta) ?></span>
+                                <?php endif; ?>
+                                <?php
+                                  // NI2-519/520 (v43): veredito só com regra da clínica; sem regra, nunca diz "equivalente".
+                                  $eqSvc ??= new \ClyoNutri\Domain\Food\FoodEquivalenceService($db);
+                                  $eqV = $eqSvc->evaluate(['category' => $it['food_category'] ?? null] + $it, ['category' => $sub['food_category'] ?? null] + $sub);
+                                  $eqColor = ['equivalente' => 'ds-tone-ok', 'fora_da_tolerancia' => 'ds-tone-copper', 'grupos_diferentes' => 'ds-tone-copper', 'sem_regra' => 'ds-delta--flat'][$eqV['verdict']];
+                                ?>
+                                <span data-testid="sub-equivalence" data-verdict="<?= htmlspecialchars($eqV['verdict']) ?>" class="u-block u-text-caption u-font-semibold <?= $eqColor ?>">
+                                  <?= htmlspecialchars($eqV['label']) ?><?php if ($eqV['rule'] !== null): ?> (<?= htmlspecialchars($eqV['rule']['name']) ?><?= $eqV['energy_diff_pct'] !== null ? ', energia ' . number_format((float)$eqV['energy_diff_pct'], 1, ',', '.') . '% de diferença' : '' ?>)<?php if ($eqV['review_pending']): ?> · regra pendente de revisão<?php endif; ?><?php else: ?>: a clínica não tem regra para <?= htmlspecialchars($eqV['item_group'] ?? 'este grupo') ?><?php endif; ?>
+                                </span>
                               </td>
-                              <td style="padding: 8px 20px; text-align: right;">
+                              <td class="u-py-2 u-px-5 u-text-right">
+                                <?php if ($isDraft && $canEditItems): ?>
+                                  <details data-testid="edit-plan-sub-<?= (int)$sub['id'] ?>" class="u-inline-block u-text-left u-mr-2">
+                                    <summary class="u-pointer u-color-botanical-forest-900 u-text-caption u-font-semibold">Editar</summary>
+                                    <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= (int)$sub['id'] ?>/editar" class="u-mt-2 u-p-2 u-bg-neutral-white u-border u-radius-input u-minw-lg" data-busy-text="Salvando…" data-live-plan data-unit-scope data-food-id="<?= (int)$sub['food_id'] ?>">
+                                      <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                      <div class="u-grid u-cols-2 u-gap-2 u-mb-1">
+                                        <div>
+                                          <label class="form-label u-text-caption" for="sub-amount-<?= (int)$sub['id'] ?>">Quantidade</label>
+                                          <input class="form-control" id="sub-amount-<?= (int)$sub['id'] ?>" name="amount" type="number" min="0.01" step="0.01" required value="<?= htmlspecialchars((string)(float)$sub['amount'], ENT_QUOTES) ?>">
+                                        </div>
+                                        <div>
+                                          <label class="form-label u-text-caption" for="sub-unit-<?= (int)$sub['id'] ?>">Unidade</label>
+                                          <input class="form-control" id="sub-unit-<?= (int)$sub['id'] ?>" name="measure_unit" required value="<?= htmlspecialchars((string)$sub['measure_unit'], ENT_QUOTES) ?>">
+                                        </div>
+                                      </div>
+                                      <div class="u-mb-1">
+                                        <label class="form-label u-text-caption" for="sub-notes-<?= (int)$sub['id'] ?>">Orientação</label>
+                                        <input class="form-control" id="sub-notes-<?= (int)$sub['id'] ?>" name="notes" type="text" value="<?= htmlspecialchars((string)($sub['notes'] ?? ''), ENT_QUOTES) ?>">
+                                      </div>
+                                      <?= UnitCheckView::block('sub-confirm-' . (int)$sub['id']) ?>
+                                      <button type="submit" class="btn btn-sm btn-primary">Salvar</button>
+                                      <button type="button" class="btn btn-sm btn-secondary" data-reset-close-details>Cancelar</button>
+                                    </form>
+                                  </details>
+                                <?php endif; ?>
                                 <?php if ($isDraft): ?>
-                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" style="display: inline;" data-confirm="Remover substituição?">
+                                  <form method="POST" action="/planos/<?= $planId ?>/substituicoes/<?= $sub['id'] ?>/remover" class="u-inline" data-confirm="Remover substituição?" data-live-plan>
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                    <button type="submit" style="color: #57534E; background: none; border: none; cursor: pointer; font-size: 0.75rem;">Remover</button>
+                                    <button type="submit" class="u-color-neutral-gray-600 u-bg-none u-border-0 u-pointer u-text-caption">Remover</button>
                                   </form>
                                 <?php endif; ?>
                               </td>
@@ -3886,71 +4128,73 @@ class DashboardController
             </div>
           <?php endforeach; ?>
         <?php endif; ?>
+        </div>
 
         <!-- Modal Adicionar Refeição -->
-        <div id="modal-add-meal" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 500px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 16px;">Adicionar Refeição</h2>
-            <form method="POST" action="/planos/<?= $planId ?>/refeicoes">
+        <div id="modal-add-meal" data-dialog="modal" class="modal-overlay">
+          <div class="cn-dialog__panel u-bg-neutral-white u-radius-card u-w-full u-maxw-form u-p-6 u-shadow-lg">
+            <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-4">Adicionar refeição</h2>
+            <form method="POST" action="/planos/<?= $planId ?>/refeicoes" data-live-plan>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
               <?php
                 // NI2-444: uma lista só alimenta os chips e as sugestões do campo (datalist).
                 $quickMeals = [
-                    ['Café da Manhã', '07:30', '☕'], ['Colação', '10:00', '🍎'], ['Almoço', '12:30', '🍽️'],
-                    ['Lanche da Tarde', '16:00', '🥪'], ['Pré-Treino', '17:30', '⚡'], ['Pós-Treino', '19:00', '💪'],
-                    ['Jantar', '20:00', '🍲'], ['Ceia', '22:00', '🌙'],
+                    ['Café da Manhã', '07:30', 'coffee'], ['Colação', '10:00', 'apple'], ['Almoço', '12:30', 'utensils'],
+                    ['Lanche da Tarde', '16:00', 'sandwich'], ['Pré-Treino', '17:30', 'zap'], ['Pós-Treino', '19:00', 'dumbbell'],
+                    ['Jantar', '20:00', 'soup'], ['Ceia', '22:00', 'moon'],
                 ];
               ?>
-              <!-- Sugestões rápidas pré-selecionáveis (NI2-444) -->
-              <div style="margin-bottom: 16px;">
-                <p id="quick-meal-label" style="font-weight: 600; margin: 0 0 6px; font-size: 0.875rem; color: var(--neutral-gray-700);">Sugestões rápidas (clique para preencher):</p>
-                <div role="group" aria-labelledby="quick-meal-label" style="display: flex; flex-wrap: wrap; gap: 6px;" id="quick-meal-suggestions">
+              <?php /* Sugestões rápidas pré-selecionáveis (NI2-444) */ ?>
+              <div class="u-mb-4">
+                <p id="quick-meal-label" class="u-font-semibold u-mt-0 u-mb-1 u-mx-0 u-text-compact u-color-neutral-gray-700">Sugestões rápidas (clique para preencher):</p>
+                <div role="group" aria-labelledby="quick-meal-label" class="u-flex u-wrap u-gap-1" id="quick-meal-suggestions">
                   <?php foreach ($quickMeals as [$qmName, $qmTime, $qmIcon]): ?>
-                  <button type="button" class="btn btn-sm btn-outline quick-meal-btn" data-meal="<?= htmlspecialchars($qmName, ENT_QUOTES) ?>" data-time="<?= $qmTime ?>" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 16px;"><span aria-hidden="true"><?= $qmIcon ?></span> <?= htmlspecialchars($qmName) ?></button>
+                  <button type="button" class="btn btn-sm btn-outline quick-meal-btn u-py-1 u-px-2 u-text-compact u-radius-modal" data-meal="<?= htmlspecialchars($qmName, ENT_QUOTES) ?>" data-time="<?= $qmTime ?>"><?= \ClyoNutri\Application\View\Icon::svg($qmIcon, 14) ?> <?= htmlspecialchars($qmName) ?></button>
                   <?php endforeach; ?>
                 </div>
               </div>
 
-              <div style="margin-bottom: 16px;">
-                <label for="dc19-name" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Nome da Refeição *</label>
-                <input id="dc19-name" type="text" name="name" required list="common-meals-list" placeholder="Ex: Café da Manhã, Almoço, Ceia ou digite uma personalizada" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <div class="u-mb-4">
+                <label for="dc19-name" class="u-block u-font-semibold u-mb-1 u-text-compact">Nome da Refeição *</label>
+                <input id="dc19-name" type="text" name="name" required list="common-meals-list" placeholder="Ex: Café da Manhã, Almoço, Ceia ou digite uma personalizada" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                 <datalist id="common-meals-list">
                   <?php foreach ($quickMeals as [$qmName]): ?><option value="<?= htmlspecialchars($qmName, ENT_QUOTES) ?>"><?php endforeach; ?>
                 </datalist>
-                <small style="color: var(--neutral-gray-500); font-size: 0.75rem; display: block; margin-top: 4px;">Você pode escolher uma sugestão acima ou digitar qualquer nome personalizado livremente.</small>
+                <small class="u-color-neutral-gray-500 u-text-caption u-block u-mt-1">Você pode escolher uma sugestão acima ou digitar qualquer nome personalizado livremente.</small>
               </div>
-              <div style="margin-bottom: 16px;">
-                <label for="dc20-time_of_day" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Horário Sugerido (HH:MM)</label>
-                <input id="dc20-time_of_day" type="text" name="time_of_day" placeholder="Ex: 08:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <div class="u-mb-4">
+                <label for="dc20-time_of_day" class="u-block u-font-semibold u-mb-1 u-text-compact">Horário Sugerido (HH:MM)</label>
+                <input id="dc20-time_of_day" type="text" name="time_of_day" placeholder="Ex: 08:00" pattern="^([01]\d|2[0-3]):[0-5]\d$" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               </div>
-              <div style="margin-bottom: 20px;">
-                <label for="dc21-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientações Clínicas da Refeição</label>
-                <textarea id="dc21-notes" name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+              <div class="u-mb-5">
+                <label for="dc21-notes" class="u-block u-font-semibold u-mb-1 u-text-compact">Orientações clínicas da refeição</label>
+                <textarea id="dc21-notes" name="notes" rows="2" placeholder="Ex: Ingerir 30 min antes do treino, mastigar devagar..." class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
               </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <div class="u-flex u-justify-end u-gap-2">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-add-meal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar Refeição</button>
+                <button type="submit" class="btn btn-primary">Salvar refeição</button>
               </div>
             </form>
           </div>
         </div>
 
         <!-- Modal Adicionar Alimento -->
-        <div id="modal-add-item" data-dialog="modal" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-item-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div id="modal-add-item" data-dialog="modal" class="food-dialog-overlay modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-item-title">
           <div class="cn-dialog__panel food-dialog-panel">
-            <h2 id="modal-add-item-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar alimento</h2>
-            <p id="add-item-meal-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
-            <form method="POST" action="/planos/<?= $planId ?>/itens" data-unit-scope>
+            <h2 id="modal-add-item-title" class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-1">Adicionar alimento</h2>
+            <p id="add-item-meal-name" class="u-color-neutral-gray-500 u-text-compact u-mb-4"></p>
+            <?php if($planHasPatient): ?><?= \ClyoNutri\Application\View\ClinicalContext::renderData(Connection::getInstance(),$planClinicalContext??=\ClyoNutri\Application\View\ClinicalContext::read(Connection::getInstance(),(int)$plan['patient_id'])) ?><?php endif; ?>
+            <form method="POST" action="/planos/<?= $planId ?>/itens" data-unit-scope data-live-plan>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="meal_id" id="add-item-meal-id" value="">
-              <div style="margin-bottom: 16px;">
-                <div data-food-picker>
+              <div class="u-mb-4">
+                <div data-food-picker data-plan-id="<?= (int)$planId ?>">
                 <label class="form-label" for="item-food-search">Buscar alimento</label>
                 <input class="form-control" id="item-food-search" data-food-query type="search" maxlength="80" placeholder="Ex.: ovo, arroz integral, banana">
-                <p role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
+                <p class="op-message op-message--info" role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
                 <label class="form-label" data-food-results-label for="item-food-select">Resultados da busca</label>
-                <select id="item-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <select id="item-food-select" name="food_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                   <option value="">Selecione o alimento...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
                     <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?> (<?= number_format((float)$fc['energy_kcal'], 0, ',', '.') ?> kcal/100g)</option>
@@ -3959,25 +4203,26 @@ class DashboardController
                 <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>
                 <button type="button" class="btn btn-secondary" data-food-retry hidden>Tentar busca novamente</button>
                 </div>
+                <div data-allergen-item-alert data-testid="allergen-item-alert" hidden class="op-message op-message--warning u-mt-2 u-text-compact"></div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
-                  <label for="dc22-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade *</label>
-                  <input id="dc22-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc22-amount" class="u-block u-font-semibold u-mb-1 u-text-compact">Quantidade *</label>
+                  <input id="dc22-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 100" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                 </div>
                 <div>
-                  <label for="dc23-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
-                  <select id="dc23-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc23-measure_unit" class="u-block u-font-semibold u-mb-1 u-text-compact">Unidade de Medida *</label>
+                  <select id="dc23-measure_unit" name="measure_unit" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                     <?= UnitCheckView::unitOptions() ?>
                   </select>
                 </div>
               </div>
               <?= UnitCheckView::block('item-confirm-estimated') ?>
-              <div style="margin-bottom: 20px;">
-                <label for="dc24-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Observação / Orientação do Item</label>
-                <input id="dc24-notes" type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <div class="u-mb-5">
+                <label for="dc24-notes" class="u-block u-font-semibold u-mb-1 u-text-compact">Observação / orientação do item</label>
+                <input id="dc24-notes" type="text" name="notes" placeholder="Ex: Cozido sem sal, grelhado" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <div class="u-flex u-justify-end u-gap-2">
                 <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
                 <button type="submit" class="btn btn-primary">Adicionar ao Plano</button>
               </div>
@@ -3986,20 +4231,22 @@ class DashboardController
         </div>
 
         <!-- Modal Adicionar Substituição -->
-        <div id="modal-add-sub" data-dialog="modal" class="food-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-sub-title" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div id="modal-add-sub" data-dialog="modal" class="food-dialog-overlay modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-add-sub-title">
           <div class="cn-dialog__panel food-dialog-panel">
-            <h2 id="modal-add-sub-title" style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Adicionar substituição</h2>
-            <p id="add-sub-item-name" style="color: #64748b; font-size: 0.85rem; margin-bottom: 16px;"></p>
-            <form method="POST" action="/planos/<?= $planId ?>/substituicoes" data-unit-scope>
+            <h2 id="modal-add-sub-title" class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-1">Adicionar substituição</h2>
+            <p id="add-sub-item-name" class="u-color-neutral-gray-500 u-text-compact u-mb-4"></p>
+            <?php if($planHasPatient): ?><?= \ClyoNutri\Application\View\ClinicalContext::renderData(Connection::getInstance(),$planClinicalContext??=\ClyoNutri\Application\View\ClinicalContext::read(Connection::getInstance(),(int)$plan['patient_id'])) ?><?php endif; ?>
+            <form method="POST" action="/planos/<?= $planId ?>/substituicoes" data-unit-scope data-live-plan>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
               <input type="hidden" name="item_id" id="add-sub-item-id" value="">
-              <div style="margin-bottom: 16px;">
-                <div data-food-picker>
+              <div class="eq-suggestions" id="add-sub-suggestions" data-testid="eq-suggestions" aria-live="polite" hidden></div>
+              <div class="u-mb-4">
+                <div data-food-picker data-plan-id="<?= (int)$planId ?>">
                 <label class="form-label" for="sub-food-search">Buscar alimento</label>
                 <input class="form-control" id="sub-food-search" data-food-query type="search" maxlength="80" placeholder="Ex.: ovo, arroz integral, banana">
-                <p role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
+                <p class="op-message op-message--info" role="status" aria-live="polite">Busque e selecione um alimento para definir a porção.</p>
                 <label class="form-label" data-food-results-label for="sub-food-select">Resultados da busca</label>
-                <select id="sub-food-select" name="food_id" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                <select id="sub-food-select" name="food_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                   <option value="">Selecione o alimento alternativo...</option>
                   <?php foreach ($foodsCatalog as $fc): ?>
                     <option value="<?= $fc['id'] ?>"><?= htmlspecialchars($fc['name']) ?></option>
@@ -4008,87 +4255,241 @@ class DashboardController
                 <button type="button" class="btn btn-secondary" data-food-next hidden>Mais resultados</button>
                 <button type="button" class="btn btn-secondary" data-food-retry hidden>Tentar busca novamente</button>
                 </div>
+                <div data-allergen-item-alert data-testid="allergen-sub-alert" hidden class="op-message op-message--warning u-mt-2 u-text-compact"></div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
-                  <label for="dc25-amount" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Quantidade Equivalente *</label>
-                  <input id="dc25-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc25-amount" class="u-block u-font-semibold u-mb-1 u-text-compact">Quantidade equivalente *</label>
+                  <input id="dc25-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 80" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                 </div>
                 <div>
-                  <label for="dc26-measure_unit" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Unidade de Medida *</label>
-                  <select id="dc26-measure_unit" name="measure_unit" required style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+                  <label for="dc26-measure_unit" class="u-block u-font-semibold u-mb-1 u-text-compact">Unidade de Medida *</label>
+                  <select id="dc26-measure_unit" name="measure_unit" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                     <?= UnitCheckView::unitOptions() ?>
                   </select>
                 </div>
               </div>
-              <?= UnitCheckView::block('sub-confirm-estimated') ?>
-              <div style="margin-bottom: 20px;">
-                <label for="dc27-notes" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.875rem;">Orientação da Substituição</label>
-                <input id="dc27-notes" type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+              <div class="same-energy-hint" data-same-energy-hint data-testid="same-energy-hint" hidden>
+                <p data-same-energy-text class="u-mt-0 u-mb-1 u-mx-0"></p>
+                <button type="button" class="btn btn-sm btn-outline" data-same-energy-fill>Preencher esta quantidade em gramas</button>
               </div>
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <?= UnitCheckView::block('sub-confirm-estimated') ?>
+              <div class="u-mb-5">
+                <label for="dc27-notes" class="u-block u-font-semibold u-mb-1 u-text-compact">Orientação da Substituição</label>
+                <input id="dc27-notes" type="text" name="notes" placeholder="Ex: Em dias de treino, consumir cozido" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+              </div>
+              <div class="u-flex u-justify-end u-gap-2">
                 <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar Opção</button>
+                <button type="submit" class="btn btn-primary">Salvar opção</button>
               </div>
             </form>
           </div>
         </div>
 
+        <?php if ($canEditItems && !empty($plan['meals'])): ?>
+        <?php /* NI2-519 (v42): salvar a estrutura deste plano como modelo da clínica */ ?>
+        <div id="modal-save-template" data-dialog="modal" class="modal-overlay">
+          <div class="cn-dialog__panel u-bg-neutral-white u-radius-card u-w-full u-maxw-form u-p-6 u-shadow-lg">
+            <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-2">Salvar como modelo</h2>
+            <p class="u-color-neutral-gray-600 u-text-compact u-leading-body u-mb-4">O modelo guarda refeições, horários, alimentos, quantidades, substituições e o método do plano. Paciente, anamnese e dados de cálculo da meta (peso, altura, fórmula) não vão para o modelo. Este plano não muda.</p>
+            <form method="POST" action="/planos/<?= (int)$planId ?>/salvar-como-modelo" data-busy-text="Salvando modelo..." data-testid="save-template-form">
+              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <div class="u-mb-3">
+                <label for="tpl-title" class="u-block u-font-semibold u-mb-1 u-text-compact">Nome do modelo *</label>
+                <input id="tpl-title" name="template_title" required maxlength="255" value="<?= htmlspecialchars((string)$plan['title'], ENT_QUOTES) ?>" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+              </div>
+              <div class="u-mb-3">
+                <label for="tpl-category" class="u-block u-font-semibold u-mb-1 u-text-compact">Categoria</label>
+                <input id="tpl-category" name="template_category" maxlength="100" placeholder="Ex.: Emagrecimento, Gestante, Vegetariano" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+              </div>
+              <div class="u-mb-3">
+                <label for="tpl-description" class="u-block u-font-semibold u-mb-1 u-text-compact">Descrição para a equipe</label>
+                <textarea id="tpl-description" name="template_description" rows="2" maxlength="1000" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
+              </div>
+              <label class="u-flex u-gap-2 u-items-start u-text-compact u-mb-4">
+                <input type="checkbox" name="include_notes" value="1">
+                <span>Levar também as orientações das refeições e dos alimentos. Revise antes: elas não podem citar dados deste paciente.</span>
+              </label>
+              <?php if (!empty($plan['energy_target'])): ?>
+              <label class="u-flex u-gap-2 u-items-start u-text-compact u-mb-4 ds-hint-tight">
+                <input type="checkbox" name="include_target" value="1" checked data-testid="tpl-include-target">
+                <span>Levar a meta como referência (só kcal e macros totais). Quem usar o modelo recalcula para o próprio paciente.</span>
+              </label>
+              <?php endif; ?>
+              <fieldset class="u-mt-0 u-mb-4 u-mx-0 u-border u-bc-botanical-sage-200 u-radius-input u-py-2 u-px-3" data-testid="tpl-visibility">
+                <legend class="u-font-semibold u-text-compact u-py-0 u-px-1">Quem vê este modelo</legend>
+                <label class="u-flex u-gap-2 u-items-start u-text-compact u-my-1 u-mx-0"><input type="radio" name="visibility" value="clinica" checked class="u-mt-1"><span><strong>Equipe da clínica</strong> · qualquer nutricionista da clínica pode usar.</span></label>
+                <label class="u-flex u-gap-2 u-items-start u-text-compact u-my-1 u-mx-0"><input type="radio" name="visibility" value="pessoal" class="u-mt-1"><span><strong>Só eu</strong> · modelo pessoal, fora da lista da equipe.</span></label>
+              </fieldset>
+              <div class="u-flex u-justify-end u-gap-2">
+                <button type="button" class="btn btn-outline" data-dialog-close>Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar modelo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($planHasPatient): ?>
         <!-- Modal Publicar Versão -->
-        <div id="modal-publish-plan" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-          <div class="cn-dialog__panel" style="background: #fff; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 12px;">Revisar e Publicar Versão</h2>
-            <p style="color: #475569; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
+        <div id="modal-publish-plan" data-dialog="modal" class="modal-overlay">
+          <div id="publish-plan-panel" data-live-swap class="cn-dialog__panel u-bg-neutral-white u-radius-card u-w-full u-maxw-form u-p-6 u-shadow-lg">
+            <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-3">Revisar e publicar versão</h2>
+            <p class="u-color-neutral-gray-600 u-text-compact u-leading-body u-mb-4">
               Ao publicar, este plano passa a ser a <strong>prescrição ativa</strong> que o paciente vê no aplicativo. Ele vira uma nova versão numerada e não poderá mais ser editado; para mudar depois, crie uma cópia. As versões anteriores continuam no histórico.
             </p>
 
-            <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
-              <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85rem; border: 1px solid #ffeeba;">
-                <strong>⚠️ <?= !empty($preview['allergen_safety']['has_conflict']) ? 'Conflito de Alérgeno' : 'Alérgenos não verificados' ?>:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa e justificar abaixo. A justificativa fica registrada na versão e na trilha de auditoria.
+            <?php if($planHasPatient): ?><?= \ClyoNutri\Application\View\ClinicalContext::renderData(Connection::getInstance(),$planClinicalContext??=\ClyoNutri\Application\View\ClinicalContext::read(Connection::getInstance(),(int)$plan['patient_id'])) ?><?php endif; ?>
+            <div data-testid="publication-adequacy-summary" class="u-bg-neutral-gray-50 u-border u-radius-input u-p-3 u-mb-4">
+              <div class="u-flex u-justify-between u-items-center u-mb-2">
+                <strong class="u-text-compact u-color-neutral-ink-900">Adequação Nutricional & Estrutura</strong>
+                <span class="u-text-caption u-color-neutral-gray-500"><?= count($plan['meals']) ?> refeição(ões)</span>
+              </div>
+              <div class="u-grid u-cols-auto-sm u-gap-2 u-text-compact">
+                <div>
+                  <span class="u-block u-color-neutral-gray-500">Calorias (VET)</span>
+                  <strong class="u-color-neutral-ink-900"><?= number_format((float)$plan['daily_energy_kcal'], 1, ',', '.') ?> kcal</strong>
+                  <?php if (!empty($preview['target_comparison']['energy'])): ?>
+                    <?php
+                      $adqTarget = (float)$preview['target_comparison']['energy']['target'];
+                      $adqRatio = $adqTarget > 0 ? round(((float)$plan['daily_energy_kcal'] / $adqTarget) * 100, 1) : 0;
+                    ?>
+                    <span class="u-block u-text-caption <?= $preview['target_comparison']['energy']['status'] === 'ok' ? 'ds-tone-ok' : 'ds-tone-warn' ?>">
+                      Meta: <?= number_format($adqTarget, 1, ',', '.') ?> kcal (<?= $adqRatio ?>%)
+                    </span>
+                  <?php endif; ?>
+                </div>
+                <div>
+                  <span class="u-block u-color-neutral-gray-500">Proteínas</span>
+                  <strong class="u-color-neutral-ink-900"><?= number_format((float)$plan['protein_g'], 1, ',', '.') ?> g</strong>
+                </div>
+                <div>
+                  <span class="u-block u-color-neutral-gray-500">Carboidratos</span>
+                  <strong class="u-color-neutral-ink-900"><?= number_format((float)$plan['carbohydrate_g'], 1, ',', '.') ?> g</strong>
+                </div>
+                <div>
+                  <span class="u-block u-color-neutral-gray-500">Lipídios</span>
+                  <strong class="u-color-neutral-ink-900"><?= number_format((float)$plan['lipid_g'], 1, ',', '.') ?> g</strong>
+                </div>
+              </div>
+            </div>
+
+            <?php if (!empty($preview['adequacy']['requires_override'])): ?>
+              <div data-testid="publication-adequacy-alert" class="op-message op-message--warning u-mb-4 u-text-compact">
+                <strong>Alerta de adequação da prescrição:</strong>
+                <ul class="u-mt-1 u-mr-0 u-mb-0 u-ml-4 u-p-0">
+                  <?php foreach ($preview['adequacy']['alerts'] as $adqAlert): ?>
+                    <li><?= htmlspecialchars($adqAlert['message']) ?></li>
+                  <?php endforeach; ?>
+                </ul>
+                <p class="u-mt-1 u-mb-0 u-mx-0">Para prosseguir com o desvio da meta planejada, confirme a autorização clínica e descreva a justificativa abaixo.</p>
               </div>
             <?php endif; ?>
 
-            <div data-testid="publication-allergy-review" style="margin-bottom: var(--space-4);">
+            <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
+              <div class="op-message op-message--warning u-mb-4 u-text-compact">
+                <strong><?= !empty($preview['allergen_safety']['has_conflict']) ? 'Conflito de alérgeno' : 'Alérgenos não verificados' ?>:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa e justificar abaixo. A justificativa fica registrada na versão e na trilha de auditoria.
+              </div>
+            <?php endif; ?>
+
+            <div data-testid="publication-allergy-review" class="u-mb-4">
               <strong>Alergias: <?= htmlspecialchars($clinicalSummary['allergy_label']) ?></strong>
               <?php if ($clinicalSummary['allergy_pending']): ?>
               <p>Avaliação pendente. Revise a anamnese antes de publicar; este plano não confirma ausência de alergias.</p>
               <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Revisar anamnese</a>
               <?php endif; ?>
-              <?php if ($clinicalSummary['source']): ?><p>Origem: anamnese v<?= (int)$clinicalSummary['source']['version'] ?> · <?= htmlspecialchars($clinicalSummary['source']['recorded_at']) ?></p><?php endif; ?>
+              <?php if ($clinicalSummary['source'] && ($clinicalSummary['source']['kind'] ?? '') === 'cadastro'): ?><p data-testid="summary-source">Origem: <?= htmlspecialchars($clinicalSummary['source']['label']) ?></p><?php elseif ($clinicalSummary['source']): ?><p data-testid="summary-source">Origem: anamnese v<?= (int)$clinicalSummary['source']['version'] ?><?= $clinicalSummary['is_draft'] ? ' (rascunho)' : ' (concluída)' ?> · <?= htmlspecialchars((string)$clinicalSummary['source']['recorded_at']) ?></p><?php endif; ?>
+              <?php if (!empty($clinicalSummary['draft_in_progress'])): ?><p data-testid="publication-anamnesis-draft"><?= htmlspecialchars($clinicalSummary['draft_in_progress']['label']) ?>. <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Continuar</a></p><?php endif; ?>
             </div>
             <form method="POST" action="/planos/<?= $planId ?>/publicar">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <?php if (!empty($preview['adequacy']['requires_override'])): ?>
+                <div class="u-mb-4">
+                  <label class="u-flex u-items-start u-gap-2 u-text-compact u-pointer">
+                    <input type="checkbox" name="allow_adequacy_override" value="1" required class="u-mt-1" data-testid="allow-adequacy-override">
+                    <span>Confirmo e autorizo clinicamente a publicação com o desvio em relação à meta planejada.</span>
+                  </label>
+                  <label for="adequacy-override-reason" class="u-block u-font-semibold u-mt-2 u-mb-1 u-mx-0 u-text-compact">Justificativa clínica da adequação *</label>
+                  <textarea id="adequacy-override-reason" name="adequacy_override_reason" rows="2" required minlength="10" maxlength="1000" placeholder="Ex.: Prescrição inicial de transição; próximas refeições serão adicionadas no retorno." class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
+                </div>
+              <?php endif; ?>
               <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
-                <div style="margin-bottom: 16px;">
-                  <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; cursor: pointer;">
-                    <input type="checkbox" name="allow_allergen_override" value="1" required style="margin-top: 3px;">
+                <div class="u-mb-4">
+                  <label class="u-flex u-items-start u-gap-2 u-text-compact u-pointer">
+                    <input type="checkbox" name="allow_allergen_override" value="1" required class="u-mt-1">
                     <span>Confirmo e autorizo clinicamente a prescrição dos alimentos assinalados mesmo com os alertas detectados.</span>
                   </label>
-                  <label for="allergen-override-reason" style="display: block; font-weight: 600; margin: 10px 0 6px; font-size: 0.85rem;">Justificativa clínica *</label>
-                  <textarea id="allergen-override-reason" name="allergen_override_reason" rows="3" required minlength="10" maxlength="1000" placeholder="Ex.: rótulos conferidos com a paciente; produto sem glúten da marca X" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;"></textarea>
+                  <label for="allergen-override-reason" class="u-block u-font-semibold u-mt-2 u-mb-1 u-mx-0 u-text-compact">Justificativa clínica *</label>
+                  <textarea id="allergen-override-reason" name="allergen_override_reason" rows="3" required minlength="10" maxlength="1000" placeholder="Ex.: rótulos conferidos com a paciente; produto sem glúten da marca X" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
                 </div>
               <?php endif; ?>
 
-              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <div class="u-flex u-justify-end u-gap-2">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-publish-plan">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Confirmar e Publicar Versão</button>
+                <button type="submit" class="btn btn-primary">Confirmar e publicar versão</button>
               </div>
             </form>
           </div>
         </div>
 
-        <script src="/assets/js/food-picker.js" defer></script>
-        <script src="/assets/js/unit-check.js" defer></script>
+        <?php endif; ?>
+
+        <script src="/assets/js/food-picker.js?v=v54-30" defer></script>
+        <script src="/assets/js/unit-check.js?v=v54-5" defer></script>
+        <script src="/assets/js/quick-plan.js?v=v54-26" defer></script>
+        <script src="/assets/js/plan-live.js?v=v54-26" defer></script>
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
           document.getElementById('add-item-meal-name').innerText = 'Refeição: ' + mealName;
           window.openFoodDialog('modal-add-item');
         }
-        function openAddSubModal(itemId, foodName) {
+        function openAddSubModal(itemId, foodName, itemKcal) {
           document.getElementById('add-sub-item-id').value = itemId;
+          var subForm = document.getElementById('add-sub-item-id').form;
+          if (subForm) { subForm.dataset.itemKcal = (typeof itemKcal === 'number' && isFinite(itemKcal)) ? String(itemKcal) : ''; subForm.dispatchEvent(new CustomEvent('clyo:sub-item')); }
           document.getElementById('add-sub-item-name').innerText = 'Substituição para o item: ' + foodName;
           window.openFoodDialog('modal-add-sub');
+          loadEqSuggestions(itemId);
+        }
+
+        // NI2-519 (v43): trocas sugeridas pela regra de equivalência da clínica. Sem regra, só o aviso.
+        function loadEqSuggestions(itemId) {
+          var box = document.getElementById('add-sub-suggestions');
+          if (!box) return;
+          box.hidden = false; box.textContent = 'Buscando trocas pela regra da clínica…';
+          fetch('/planos/<?= (int)$planId ?>/itens/' + encodeURIComponent(itemId) + '/equivalentes', { headers: { Accept: 'application/json' } })
+            .then(function (r) { if (!r.ok) throw Error('falha'); return r.json(); })
+            .then(function (d) {
+              box.replaceChildren();
+              var head = document.createElement('p'); head.style.margin = '0';
+              if (d.rule) {
+                head.innerHTML = '';
+                var b = document.createElement('strong'); b.textContent = 'Trocas pela regra "' + d.rule.name + '"';
+                head.append(b, document.createTextNode(' (energia até ' + d.rule.energy_tolerance_pct + '%, macros até ' + d.rule.macro_tolerance_pct + '%). Fonte: ' + d.rule.source_note + (d.rule.review_status !== 'revisada' ? ' Regra pendente de revisão por nutricionista.' : '')));
+              } else { head.textContent = d.reason || 'Sem regra de equivalência para este grupo.'; }
+              box.append(head);
+              if (d.rule && d.reason) { var why = document.createElement('p'); why.style.margin = '4px 0 0'; why.textContent = d.reason; box.append(why); }
+              if (d.suggestions && d.suggestions.length) {
+                var ul = document.createElement('ul');
+                d.suggestions.forEach(function (sg) {
+                  var li = document.createElement('li'), t = document.createElement('span'), use = document.createElement('button');
+                  t.textContent = sg.name + ' · ' + sg.grams + ' g' + (sg.delta_label ? ' · ' + sg.delta_label : '') + (sg.source_label ? ' · ' + sg.source_label : '');
+                  use.type = 'button'; use.className = 'btn btn-sm btn-outline'; use.textContent = 'Usar';
+                  use.setAttribute('aria-label', 'Usar ' + sg.name + ', ' + sg.grams + ' gramas');
+                  use.addEventListener('click', function () {
+                    var picker = document.querySelector('#modal-add-sub [data-food-picker]');
+                    if (picker) picker.dispatchEvent(new CustomEvent('clyo:choose-food', { detail: { id: sg.food_id, name: sg.name, energy_kcal: sg.energy_kcal_100g, source_label: sg.source_label } }));
+                    var amt = document.getElementById('dc25-amount'), unit = document.getElementById('dc26-measure_unit');
+                    if (amt) amt.value = sg.grams; if (unit) { unit.value = 'g'; unit.dispatchEvent(new Event('change', { bubbles: true })); }
+                    if (amt) amt.focus();
+                  });
+                  li.append(t, use); ul.append(li);
+                });
+                box.append(ul);
+              }
+            })
+            .catch(function () { box.textContent = 'Não foi possível carregar as trocas sugeridas. A busca abaixo continua funcionando.'; });
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -4139,9 +4540,35 @@ class DashboardController
 
         try {
             $service->addMeal($planId, $name, $timeOfDay, $notes);
-            $_SESSION['feedback_message'] = "Refeição '{$name}' adicionada com sucesso!";
+            $_SESSION['feedback_message'] = "Refeição '{$name}' adicionada.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao adicionar refeição: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao adicionar refeição: " . $this->userFacingError('Erro ao adicionar refeição', $e);
+        }
+
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function updateMealInPlan(array $params): void
+    {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
+        $planId = (int)($params['id'] ?? 0);
+        $mealId = (int)($params['mealId'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $timeOfDay = !empty($_POST['time_of_day']) ? trim((string)$_POST['time_of_day']) : null;
+        $notes = isset($_POST['notes']) && trim((string)$_POST['notes']) !== '' ? trim((string)$_POST['notes']) : null;
+
+        try {
+            $service->updateMeal($mealId, $name, $timeOfDay, $notes, $planId);
+            $_SESSION['feedback_message'] = "Refeição '{$name}' atualizada.";
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = "Erro ao atualizar refeição: " . $this->userFacingError('Erro ao atualizar refeição', $e);
         }
 
         header("Location: /planos/{$planId}");
@@ -4161,9 +4588,9 @@ class DashboardController
 
         try {
             $service->deleteMeal($mealId);
-            $_SESSION['feedback_message'] = "Refeição removida com sucesso!";
+            $_SESSION['feedback_message'] = "Refeição removida.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao remover refeição: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao remover refeição: " . $this->userFacingError('Erro ao remover refeição', $e);
         }
 
         header("Location: /planos/{$planId}");
@@ -4187,13 +4614,53 @@ class DashboardController
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $service->addItem($mealId, $foodId, $amount, $unit, $notes, !empty($_POST['confirm_estimated']));
-            $_SESSION['feedback_message'] = "Alimento adicionado e totais nutricionais recalculados!";
+            $service->addItem(
+                $mealId,
+                $foodId,
+                $amount,
+                $unit,
+                $notes,
+                !empty($_POST['confirm_estimated']),
+                !empty($_POST['enforce_allergen_gate']),
+                !empty($_POST['confirm_allergen_conflict']),
+                is_string($_POST['allergen_ack_reason'] ?? null) ? $_POST['allergen_ack_reason'] : null
+            );
+            $_SESSION['feedback_message'] = "Alimento adicionado e totais nutricionais recalculados.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $this->userFacingError('Erro ao adicionar alimento', $e);
         }
 
         header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    /** NI2-624: profissional registra que a alergia histórica foi descartada clinicamente (com motivo; nada é apagado). */
+    public function dismissAllergyHistory(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
+            header('Location: /pacientes/' . $id . '?error=csrf');
+            exit;
+        }
+        $db = Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Somente nutricionista da clínica registra revisão de alergia.';
+            return;
+        }
+        $clinicId = (int)TenantContext::getClinicId();
+        $group = is_string($_POST['group'] ?? null) ? $_POST['group'] : '';
+        $reason = is_string($_POST['reason'] ?? null) ? $_POST['reason'] : '';
+        try {
+            $state = (new \ClyoNutri\Domain\Clinical\AllergenSafetyValidator($db))->evaluatePatientAllergyState($id); // também confere a clínica
+            if (!in_array($group, array_column($state['review_findings'] ?? [], 'group'), true)) {
+                throw new \InvalidArgumentException('Esta alergia não está mais em revisão.');
+            }
+            (new \ClyoNutri\Domain\Clinical\AllergyHistoryReview($db))->dismiss($clinicId, $id, $group, (int)TenantContext::getUserId(), $reason);
+            header('Location: /pacientes/' . $id . '?alergia_revisada=1');
+        } catch (\InvalidArgumentException $e) {
+            header('Location: /pacientes/' . $id . '?error=1&msg=' . rawurlencode($e->getMessage()) . '#alergia-revisao');
+        }
         exit;
     }
 
@@ -4224,7 +4691,7 @@ class DashboardController
     private function denyPrescription(): void
     {
         http_response_code(403);
-        echo 'Você não tem permissão para editar prescrições. Apenas nutricionistas com CRN cadastrado na clínica podem prescrever.';
+        echo 'Você não tem permissão para editar planos alimentares. Apenas nutricionistas com CRN cadastrado na clínica podem prescrever.';
     }
 
     public function updatePlanItem(array $params): void
@@ -4233,7 +4700,7 @@ class DashboardController
         $db = Connection::getInstance();
         if (!$this->canEditPlanItems($db)) {
             http_response_code(403);
-            echo 'Você não tem permissão para editar prescrições.';
+            echo 'Você não tem permissão para editar planos alimentares.';
             return;
         }
         try {
@@ -4267,9 +4734,9 @@ class DashboardController
 
         try {
             $service->deleteItem($itemId);
-            $_SESSION['feedback_message'] = "Alimento removido com sucesso!";
+            $_SESSION['feedback_message'] = "Alimento removido.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao remover alimento: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao remover alimento: " . $this->userFacingError('Erro ao remover alimento', $e);
         }
 
         header("Location: /planos/{$planId}");
@@ -4293,12 +4760,51 @@ class DashboardController
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $service->addSubstitution($itemId, $foodId, $amount, $unit, $notes, !empty($_POST['confirm_estimated']));
-            $_SESSION['feedback_message'] = "Opção de substituição cadastrada com sucesso!";
+            $service->addSubstitution(
+                $itemId,
+                $foodId,
+                $amount,
+                $unit,
+                $notes,
+                !empty($_POST['confirm_estimated']),
+                !empty($_POST['enforce_allergen_gate']),
+                !empty($_POST['confirm_allergen_conflict']),
+                is_string($_POST['allergen_ack_reason'] ?? null) ? $_POST['allergen_ack_reason'] : null
+            );
+            $_SESSION['feedback_message'] = "Substituição cadastrada.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao cadastrar substituição: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao cadastrar substituição: " . $this->userFacingError('Erro ao cadastrar substituição', $e);
         }
 
+        header("Location: /planos/{$planId}");
+        exit;
+    }
+
+    public function updateSubstitutionInPlan(array $params): void
+    {
+        $planId = (int)($params['id'] ?? 0);
+        $subId = (int)($params['subId'] ?? 0);
+        $db = Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Você não tem permissão para editar planos alimentares.';
+            return;
+        }
+        try {
+            if (!isset($_POST['amount']) || !is_numeric(str_replace(',', '.', (string)$_POST['amount']))) {
+                throw new \InvalidArgumentException('Informe uma quantidade válida para a substituição.');
+            }
+            $amount = (float)str_replace(',', '.', (string)$_POST['amount']);
+            $unit = trim((string)($_POST['measure_unit'] ?? 'g'));
+            $notes = isset($_POST['notes']) && is_string($_POST['notes']) ? trim($_POST['notes']) : null;
+            (new MealPlanService($db))->updateSubstitution($subId, $amount, $unit, $notes, $planId, !empty($_POST['confirm_estimated']));
+            $_SESSION['feedback_message'] = 'Substituição atualizada.';
+        } catch (\InvalidArgumentException | \DomainException | \RuntimeException $e) {
+            $_SESSION['error_message'] = $this->userFacingError('NI2-521 substituição', $e); // PDOException também é RuntimeException
+        } catch (\Throwable $e) {
+            error_log('NI2-521 update substitution failed: ' . $e->getMessage());
+            $_SESSION['error_message'] = 'Não foi possível salvar a substituição. Tente novamente.';
+        }
         header("Location: /planos/{$planId}");
         exit;
     }
@@ -4316,9 +4822,9 @@ class DashboardController
 
         try {
             $service->deleteSubstitution($subId);
-            $_SESSION['feedback_message'] = "Substituição removida com sucesso!";
+            $_SESSION['feedback_message'] = "Substituição removida.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao remover substituição: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao remover substituição: " . $this->userFacingError('Erro ao remover substituição', $e);
         }
 
         header("Location: /planos/{$planId}");
@@ -4334,15 +4840,17 @@ class DashboardController
         $planId = (int)($params['id'] ?? 0);
         $allowAllergenOverride = !empty($_POST['allow_allergen_override']);
         $overrideReason = is_string($_POST['allergen_override_reason'] ?? null) ? trim($_POST['allergen_override_reason']) : null;
+        $allowAdequacyOverride = !empty($_POST['allow_adequacy_override']);
+        $adequacyOverrideReason = is_string($_POST['adequacy_override_reason'] ?? null) ? trim($_POST['adequacy_override_reason']) : null;
 
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason);
-            $_SESSION['feedback_message'] = "Plano alimentar publicado com sucesso como Versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
+            $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason, $allowAdequacyOverride, $adequacyOverrideReason);
+            $_SESSION['feedback_message'] = "Plano publicado como versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro na publicação: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro na publicação: " . $this->userFacingError('Erro na publicação', $e);
         }
 
         header("Location: /planos/{$planId}");
@@ -4355,21 +4863,74 @@ class DashboardController
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         if (!$this->canEditPlanItems($db)) {
             http_response_code(403);
-            echo 'Você não tem permissão para editar prescrições.';
+            echo 'Você não tem permissão para editar planos alimentares.';
             return;
         }
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
             $res = $service->duplicatePlan($planId);
-            $_SESSION['feedback_message'] = "Plano duplicado com sucesso em um novo rascunho independente!";
+            $_SESSION['feedback_message'] = "Plano duplicado. A cópia é um rascunho novo e pode ser editada à parte.";
             header("Location: /planos/" . $res['plan_id']);
             exit;
         } catch (\Throwable $e) {
-            $_SESSION['error_message'] = "Erro ao duplicar plano: " . $e->getMessage();
+            $_SESSION['error_message'] = "Erro ao duplicar plano: " . $this->userFacingError('Erro ao duplicar plano', $e);
             header("Location: /planos/{$planId}");
             exit;
         }
+    }
+
+    public function compareMealPlanVersions(array $params): void
+    {
+        $patientId = (int)($params['id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        if (!$this->canEditPlanItems($db)) {
+            http_response_code(403);
+            echo 'Você não tem permissão para comparar versões de planos alimentares.';
+            return;
+        }
+        $patientRepo = new PatientRepository();
+        $patient = $patientRepo->findById($patientId);
+        if (!$patient) {
+            http_response_code(404);
+            echo 'Paciente não encontrado.';
+            return;
+        }
+
+        $diffSvc = new \ClyoNutri\Domain\MealPlan\MealPlanVersionDiffService($db);
+        $versions = $diffSvc->listPublishedVersions($patientId);
+        $verA = isset($_GET['v_a']) && ctype_digit((string)$_GET['v_a']) ? (int)$_GET['v_a'] : null;
+        $verB = isset($_GET['v_b']) && ctype_digit((string)$_GET['v_b']) ? (int)$_GET['v_b'] : null;
+
+        $diff = null;
+        $diffError = null;
+        try {
+            $diff = $diffSvc->compareVersions($patientId, $verA, $verB);
+        } catch (\InvalidArgumentException $e) {
+            $diffError = $e->getMessage();
+        }
+
+        if (($_GET['format'] ?? '') === 'json') {
+            header('Content-Type: application/json; charset=utf-8');
+            if ($diffError !== null) {
+                http_response_code(422);
+                echo json_encode(['error' => $diffError, 'versions_count' => count($versions)], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            echo json_encode(['data' => $diff, 'versions' => $versions], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        $title = 'Comparar versões de planos — ' . $patient['name'];
+        $activeNav = 'planos';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Clínica Clyo Nutri';
+        $userName = $_SESSION['user_name'] ?? 'Profissional Nutricionista';
+        $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
+
+        ob_start();
+        require __DIR__ . '/../../../views/meal_plans/compare_versions.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
     public function finance(): void
@@ -4413,12 +4974,20 @@ class DashboardController
 
         $financeService = new \ClyoNutri\Domain\Finance\FinanceService($db);
         $summary = $financeService->getReceivablesSummary();
+        // v54.37: saídas (despesas) e cartões entrada/saída/saldo
+        $expenseService = new \ClyoNutri\Domain\Finance\ExpenseService($db);
+        $expensesAvailable = $expenseService->available();
+        $expenses = $expenseService->list($clinicId);
+        $totals = (new \ClyoNutri\Domain\Finance\FinanceDocumentService($db))->totals($clinicId, $summary);
+        $entryCategories = \ClyoNutri\Domain\Finance\FinanceService::ENTRY_CATEGORIES;
+        $expenseCategories = \ClyoNutri\Domain\Finance\ExpenseService::CATEGORIES;
+        $brl = fn(int $c): string => 'R$ ' . number_format($c / 100, 2, ',', '.');
 
-        $title = 'Gestão Financeira & Honorários';
+        $title = 'Financeiro';
         $activeNav = 'financeiro';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
-        $csrfToken = $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
+        $csrfToken = \ClyoNutri\Core\Security\Csrf::token();
 
         $feedbackMessage = $_SESSION['finance_success'] ?? $_SESSION['success_message'] ?? null;
         $errorMessage = $_SESSION['finance_error'] ?? $_SESSION['error_message'] ?? null;
@@ -4426,109 +4995,108 @@ class DashboardController
 
         ob_start();
         ?>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <div class="u-flex u-justify-between u-items-start u-mb-6 u-wrap u-gap-4">
           <div>
-            <h1 style="color: var(--brand-navy-900); font-family: var(--font-display, serif); margin-bottom: 4px;">Gestão Financeira</h1>
-            <p style="color: var(--neutral-gray-600); margin: 0;">Recebíveis de consultas, controle de honorários, baixas e emissão de recibos.</p>
+            <h1 class="u-color-botanical-forest-900 u-mb-1">Gestão financeira</h1>
+            <p class="u-color-neutral-gray-600 u-m-0">Entradas (honorários de pacientes, baixas e recibos) e saídas da clínica (internet, aluguel, etc.).</p>
           </div>
-          <div>
-            <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel" style="display: inline-flex; align-items: center; gap: 8px;">
+          <div class="u-flex u-items-center u-gap-2 u-wrap">
+            <a href="/financeiro/exportar/csv" class="btn btn-outline u-no-underline" data-testid="finance-export-csv">Exportar CSV</a>
+            <a href="/financeiro/exportar/pdf" class="btn btn-outline u-no-underline" data-testid="finance-export-pdf">Exportar PDF</a>
+            <button type="button" class="btn btn-primary u-inline-flex u-items-center u-gap-2" data-show="modal-novo-recebivel">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              <span>+ Novo Lançamento Financeiro</span>
+              <span>+ Novo lançamento financeiro</span>
             </button>
           </div>
         </div>
 
-        <?php if (!empty($feedbackMessage)): ?>
-          <div class="alert alert-success" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #E3F4F2; border: 1px solid #0A7075; color: #0A5F63; display: flex; align-items: center; gap: 10px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <span><?= htmlspecialchars($feedbackMessage) ?></span>
-          </div>
-        <?php endif; ?>
-
         <?php if (!empty($errorMessage)): ?>
-          <div class="alert alert-danger" style="margin-bottom: var(--space-6); padding: 12px 16px; border-radius: 8px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; display: flex; align-items: center; gap: 10px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div role="alert" class="op-message op-message--error u-mb-6">
             <span><?= htmlspecialchars($errorMessage) ?></span>
           </div>
         <?php endif; ?>
 
-        <!-- Cards de Resumo de Indicadores Financeiros -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: var(--space-6);">
-          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-warning, #f59e0b);">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total a Receber (Pendente)</div>
-            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900);">
-              R$ <?= number_format($summary['total_pending_cents'] / 100, 2, ',', '.') ?>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Aguardando baixa de pagamento</div>
+        <?php if (!empty($feedbackMessage)): ?>
+          <div role="status" class="op-message op-message--success u-mb-6">
+            <span><?= htmlspecialchars($feedbackMessage) ?></span>
           </div>
+        <?php endif; ?>
 
-          <div class="card" style="padding: 20px; border-left: 4px solid var(--semantic-success, #0A7075);">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Recebido (Quitado)</div>
-            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--semantic-success, #0A7075);">
-              R$ <?= number_format($summary['total_paid_cents'] / 100, 2, ',', '.') ?>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Baixas confirmadas no sistema</div>
+        <!-- Cards de Resumo (v54.37: entradas, saídas e saldo) -->
+        <div class="u-grid u-cols-auto-md u-gap-4 u-mb-6" data-testid="finance-cards">
+          <div class="card u-p-5 u-accent u-accent-semantic-warning">
+            <div class="u-text-compact u-font-semibold u-color-neutral-gray-600 u-uppercase u-tracking-wide u-mb-1">A receber</div>
+            <div class="tabular-nums u-text-h2 u-font-bold u-color-botanical-forest-900" data-testid="card-pending"><?= $brl($totals['pending_cents']) ?></div>
+            <div class="u-text-compact u-color-neutral-gray-500 u-mt-1">Entradas aguardando baixa</div>
           </div>
-
-          <div class="card" style="padding: 20px; border-left: 4px solid var(--brand-copper-500, #EF8F4F);">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-gray-600); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total de Lançamentos</div>
-            <div class="tabular-nums" style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900);">
-              <?= (int)$summary['total_count'] ?>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--neutral-gray-500); margin-top: 4px;">Honorários cadastrados nesta clínica</div>
+          <div class="card u-p-5 u-accent u-accent-semantic-success">
+            <div class="u-text-compact u-font-semibold u-color-neutral-gray-600 u-uppercase u-tracking-wide u-mb-1">Recebido</div>
+            <div class="tabular-nums u-text-h2 u-font-bold u-color-semantic-success" data-testid="card-received"><?= $brl($totals['received_cents']) ?></div>
+            <div class="u-text-compact u-color-neutral-gray-500 u-mt-1">Entradas com baixa confirmada</div>
+          </div>
+          <div class="card u-p-5 u-accent u-accent-brand-copper-500">
+            <div class="u-text-compact u-font-semibold u-color-neutral-gray-600 u-uppercase u-tracking-wide u-mb-1">Saídas pagas</div>
+            <div class="tabular-nums u-text-h2 u-font-bold u-color-botanical-forest-900" data-testid="card-expenses"><?= $brl($totals['expenses_paid_cents']) ?></div>
+            <div class="u-text-compact u-color-neutral-gray-500 u-mt-1"><?= $totals['expenses_pending_cents'] > 0 ? 'Mais ' . $brl($totals['expenses_pending_cents']) . ' a pagar' : 'Despesas da clínica' ?></div>
+          </div>
+          <div class="card u-p-5 u-accent <?= $totals['balance_cents'] < 0 ? 'u-accent-semantic-warning' : 'u-accent-semantic-success' ?>">
+            <div class="u-text-compact u-font-semibold u-color-neutral-gray-600 u-uppercase u-tracking-wide u-mb-1">Saldo</div>
+            <div class="tabular-nums u-text-h2 u-font-bold <?= $totals['balance_cents'] < 0 ? 'ds-tone-bad' : 'u-color-botanical-forest-900' ?>" data-testid="card-balance"><?= ($totals['balance_cents'] < 0 ? '− ' : '') . $brl(abs($totals['balance_cents'])) ?></div>
+            <div class="u-text-compact u-color-neutral-gray-500 u-mt-1">Recebido − saídas pagas</div>
           </div>
         </div>
 
-        <?php if (empty($receivables)): ?>
-          <!-- Estado Vazio Explicativo com Design System Ratificado e CTA Operacional Real (PX-12) -->
-          <div class="card" style="padding: 48px 32px; text-align: center; border: 1.5px dashed var(--neutral-gray-300); background: #ffffff; border-radius: var(--radius-lg, 12px);">
-            <div style="width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; background: rgba(239, 143, 79, 0.12); display: flex; align-items: center; justify-content: center; color: var(--brand-copper-600);">
+        <?php if (empty($receivables) && empty($expenses)): ?>
+          <?php /* Estado Vazio Explicativo com Design System Ratificado e CTA Operacional Real (PX-12) */ ?>
+          <div class="card u-py-12 u-px-8 u-text-center u-border u-border-dashed u-bc-neutral-gray-300 u-bg-neutral-white u-radius-card">
+            <div class="ds-icon-badge ds-icon-badge--lg ds-icon-badge--copper u-mx-auto u-mb-5">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect width="20" height="14" x="2" y="5" rx="2"></rect>
                 <line x1="2" x2="22" y1="10" y2="10"></line>
               </svg>
             </div>
-            <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 8px;">Nenhum recebível financeiro registrado</h2>
-            <p style="color: var(--neutral-gray-600); max-width: 640px; margin: 0 auto 24px; line-height: 1.6; font-size: 0.95rem;">
+            <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-2">Nenhum recebível financeiro registrado</h2>
+            <p class="u-color-neutral-gray-600 u-maxw-prose u-mt-0 u-mb-6 u-mx-auto u-leading-body u-text-body">
               Os recebíveis financeiros representam honorários de consultas clínicas e planos de acompanhamento nutricional. Eles são gerados a partir dos agendamentos na agenda ou registrados manualmente aqui para qualquer paciente da sua clínica.
             </p>
-            <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 32px;">
+            <div class="u-flex u-justify-center u-items-center u-gap-3 u-wrap u-mb-8">
               <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel">
                 + Novo Lançamento Financeiro
               </button>
-              <a href="/agenda" class="btn btn-outline" style="text-decoration: none;">
-                Ver Agenda de Atendimentos &rarr;
+              <a href="/agenda" class="btn btn-outline u-no-underline">
+                Ver agenda de atendimentos &rarr;
               </a>
             </div>
             
             <!-- Guia informativo / Próximos passos operacionais -->
-            <div style="background: var(--neutral-gray-50); border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 20px; max-width: 680px; margin: 0 auto; text-align: left;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                Como funciona o fluxo financeiro do ClyoNutri:
+            <div class="u-bg-neutral-gray-50 u-border u-radius-input u-p-5 u-maxw-prose u-my-0 u-mx-auto u-text-left">
+              <div class="u-flex u-items-center u-gap-2 u-mb-3 u-font-semibold u-color-botanical-forest-900 u-text-compact">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="u-color-botanical-copper-600"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Como funciona o fluxo financeiro do Clyo Nutri:
               </div>
-              <ul style="margin: 0; padding-left: 20px; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.6;">
+              <ul class="u-m-0 u-pl-5 u-color-neutral-gray-600 u-text-compact u-leading-body">
                 <li><strong>1. Registro de Honorários:</strong> Cadastre cobranças pontuais ou pacotes vinculando a um paciente cadastrado.</li>
                 <li><strong>2. Baixa com Recibo:</strong> Ao receber via PIX, Cartão ou Dinheiro, confirme a baixa para registrar a transação e emitir código de recibo comprobatório.</li>
                 <li><strong>3. Integração com Atendimentos:</strong> Vincule o recebível diretamente a uma consulta agendada quando desejar rastreabilidade completa.</li>
-                <li><strong>4. Isolamento Seguro:</strong> Todos os dados de faturamento e recibos são estritamente isolados e protegidos por clínica.</li>
+                <li><strong>4. Isolamento seguro:</strong> Todos os dados de faturamento e recibos são estritamente isolados e protegidos por clínica.</li>
               </ul>
             </div>
           </div>
         <?php else: ?>
+          <?php if (!empty($receivables)): ?>
+          <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-3">Entradas</h2>
           <!-- Tabela de Recebíveis com Operações Reais -->
-          <div class="card" style="padding: 0; overflow: hidden;">
+          <div class="card u-p-0 u-overflow-hidden u-mb-6">
             <div class="table-responsive">
-              <table class="table" style="margin-bottom: 0;">
-                <thead style="background: var(--neutral-gray-50);">
+              <table class="table u-mb-0">
+                <thead class="u-bg-neutral-gray-50">
                   <tr>
                     <th>Descrição</th>
                     <th>Paciente</th>
                     <th class="tabular-nums">Valor</th>
                     <th>Vencimento</th>
                     <th>Status</th>
-                    <th style="text-align: right;">Ações</th>
+                    <th class="u-text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4539,46 +5107,49 @@ class DashboardController
                   ?>
                     <tr>
                       <td>
-                        <div style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($rc['description']) ?></div>
+                        <div class="u-font-semibold u-color-botanical-forest-900"><?= htmlspecialchars($rc['description']) ?></div>
+                        <?php if (!empty($rc['category'])): ?>
+                          <span class="u-text-caption u-color-neutral-gray-500">Entrada · <?= htmlspecialchars((string)$rc['category']) ?></span>
+                        <?php endif; ?>
                         <?php if (!empty($rc['appointment_id'])): ?>
-                          <span style="font-size: 0.75rem; color: var(--neutral-gray-500);">Consulta #<?= (int)$rc['appointment_id'] ?></span>
+                          <span class="u-text-caption u-color-neutral-gray-500">Consulta #<?= (int)$rc['appointment_id'] ?></span>
                         <?php endif; ?>
                       </td>
                       <td><?= htmlspecialchars($rc['patient_name']) ?></td>
-                      <td class="tabular-nums" style="font-weight: 600; color: var(--brand-navy-900);">
+                      <td class="tabular-nums u-font-semibold u-color-botanical-forest-900">
                         R$ <?= number_format($rc['amount_cents'] / 100, 2, ',', '.') ?>
                       </td>
                       <td>
-                        <span style="<?= $isOverdue ? 'color: var(--semantic-error); font-weight: 600;' : '' ?>">
+                        <span class="<?= $isOverdue ? 'ds-tone-bad u-font-semibold' : '' ?>">
                           <?= date('d/m/Y', strtotime($rc['due_date'])) ?>
                         </span>
                       </td>
                       <td>
                         <?= LabelMap::receivableStatusBadge($rc['status'], $isOverdue) ?>
                         <?php if ($rc['status'] === 'paid' && !empty($rc['receipt_code'])): ?>
-                          <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 2px;">
-                            Recibo: <?= htmlspecialchars($rc['receipt_code']) ?>
+                          <div class="u-text-caption u-color-neutral-gray-500 u-mt-0">
+                            Recibo: <a href="/financeiro/recibos/<?= rawurlencode($rc['receipt_code']) ?>" target="_blank" rel="noopener" data-testid="receipt-link"><?= htmlspecialchars($rc['receipt_code']) ?></a>
                           </div>
                         <?php endif; ?>
                       </td>
-                      <td style="text-align: right;">
+                      <td class="u-text-right">
                         <?php if (in_array($rc['status'], ['pending', 'partially_paid'], true)): ?>
-                          <div style="display: inline-flex; align-items: center; gap: 8px;">
-                            <button type="button" class="btn btn-sm btn-outline" style="color: var(--semantic-success); border-color: var(--semantic-success);"
+                          <div class="u-inline-flex u-items-center u-gap-2">
+                            <button type="button" class="btn btn-sm btn-outline u-color-semantic-success u-bc-semantic-success"
                                     data-call="openPayModal" data-args="[<?= (int)$rc['id'] ?>, <?= (int)$rc['amount_cents'] ?>, <?= htmlspecialchars(json_encode((string)$rc['description'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES) ?>]">
-                              Dar Baixa
+                              Dar baixa
                             </button>
-                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" style="display: inline;" data-confirm="Deseja realmente cancelar este recebível?">
+                            <form method="POST" action="/financeiro/recebiveis/<?= (int)$rc['id'] ?>/cancelar" class="u-inline" data-confirm="Deseja realmente cancelar este recebível?">
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                              <button type="submit" class="btn btn-sm" style="color: var(--neutral-gray-500); background: transparent; border: none; cursor: pointer; text-decoration: underline; font-size: 0.8rem;">
+                              <button type="submit" class="btn btn-sm u-color-neutral-gray-500 u-bg-none u-border-0 u-pointer u-underline u-text-compact">
                                 Cancelar
                               </button>
                             </form>
                           </div>
                         <?php elseif ($rc['status'] === 'paid'): ?>
-                          <span style="font-size: 0.85rem; color: var(--semantic-success); font-weight: 600;">✓ Quitado</span>
+                          <span class="u-text-compact u-color-semantic-success u-font-semibold">✓ Quitado</span>
                         <?php else: ?>
-                          <span style="font-size: 0.85rem; color: var(--neutral-gray-400);">Cancelado</span>
+                          <span class="u-text-compact u-color-neutral-gray-400">Cancelado</span>
                         <?php endif; ?>
                       </td>
                     </tr>
@@ -4587,27 +5158,100 @@ class DashboardController
               </table>
             </div>
           </div>
+          <?php endif; ?>
+
+          <?php if (!empty($expenses)): ?>
+          <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-3">Saídas</h2>
+          <div class="card u-p-0 u-overflow-hidden" data-testid="expenses-table">
+            <div class="table-responsive">
+              <table class="table u-mb-0">
+                <thead class="u-bg-neutral-gray-50">
+                  <tr><th>Categoria</th><th>Descrição</th><th class="tabular-nums">Valor</th><th>Data</th><th>Status</th><th class="u-text-right">Ações</th></tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($expenses as $ex): ?>
+                    <tr>
+                      <td><span class="u-font-semibold u-color-botanical-forest-900"><?= htmlspecialchars((string)$ex['category']) ?></span></td>
+                      <td><?= htmlspecialchars((string)$ex['description']) ?></td>
+                      <td class="tabular-nums u-font-semibold ds-tone-bad">− <?= $brl((int)$ex['amount_cents']) ?></td>
+                      <td><?= date('d/m/Y', strtotime((string)$ex['due_date'])) ?></td>
+                      <td><?= htmlspecialchars(\ClyoNutri\Domain\Finance\ExpenseService::STATUS[$ex['status']] ?? (string)$ex['status']) ?></td>
+                      <td class="u-text-right">
+                        <?php if ($ex['status'] !== 'canceled'): ?>
+                          <div class="u-inline-flex u-items-center u-gap-2">
+                            <?php if ($ex['status'] === 'pending'): ?>
+                              <form method="POST" action="/financeiro/saidas/<?= (int)$ex['id'] ?>/pagar" class="u-inline">
+                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                <button type="submit" class="btn btn-sm btn-outline u-color-semantic-success u-bc-semantic-success">Marcar como paga</button>
+                              </form>
+                            <?php endif; ?>
+                            <form method="POST" action="/financeiro/saidas/<?= (int)$ex['id'] ?>/cancelar" class="u-inline" data-confirm="Deseja realmente cancelar esta saída?">
+                              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                              <button type="submit" class="btn btn-sm u-color-neutral-gray-500 u-bg-none u-border-0 u-pointer u-underline u-text-compact">Cancelar</button>
+                            </form>
+                          </div>
+                        <?php else: ?>
+                          <span class="u-text-compact u-color-neutral-gray-400">Cancelada</span>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <?php endif; ?>
         <?php endif; ?>
 
         <!-- Modal: Novo Lançamento Financeiro -->
-        <div id="modal-novo-recebivel" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
-          <div class="cn-dialog__panel card" style="width: 100%; max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Novo Lançamento Financeiro</h3>
-              <button type="button" data-dialog-close data-hide="modal-novo-recebivel" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+        <div id="modal-novo-recebivel" data-dialog="modal" class="modal-overlay">
+          <div class="cn-dialog__panel card u-w-full u-maxw-form u-bg-neutral-white u-radius-card u-shadow-lg u-p-6">
+            <div class="u-flex u-justify-between u-items-center u-mb-5">
+              <h3 class="u-m-0 u-text-card-title u-color-botanical-forest-900">Novo lançamento financeiro</h3>
+              <button type="button" data-dialog-close data-hide="modal-novo-recebivel" class="u-bg-none u-border-0 u-text-h2 u-pointer u-color-neutral-gray-400">&times;</button>
             </div>
             
             <form method="POST" action="/financeiro/recebiveis/novo">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
-              <div style="margin-bottom: 16px;">
-                <label for="rcv-patient" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Paciente *</label>
+              <fieldset class="u-mb-4 u-border-0 u-p-0 u-m-0">
+                <legend class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Tipo *</legend>
+                <div class="u-flex u-gap-4">
+                  <label class="u-inline-flex u-items-center u-gap-2"><input type="radio" name="direction" value="entrada" checked data-testid="dir-entrada"> Entrada (recebimento de paciente)</label>
+                  <label class="u-inline-flex u-items-center u-gap-2"><input type="radio" name="direction" value="saida" data-testid="dir-saida" <?= $expensesAvailable ? '' : 'disabled' ?>> Saída (despesa da clínica)</label>
+                </div>
+                <?php if (!$expensesAvailable): ?><div class="u-text-caption u-color-neutral-gray-500 u-mt-1">Saídas ficam disponíveis depois do SQL da v54.37.</div><?php endif; ?>
+              </fieldset>
+
+              <div id="fin-saida-fields" hidden>
+                <div class="u-mb-4">
+                  <label for="exp-category" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Categoria da saída *</label>
+                  <select id="exp-category" name="expense_category" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact" disabled>
+                    <option value="">Selecione...</option>
+                    <?php foreach ($expenseCategories as $cat): ?><option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option><?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="u-mb-4">
+                  <label class="u-inline-flex u-items-center u-gap-2 u-text-compact"><input type="checkbox" name="already_paid" value="1" checked disabled id="exp-paid"> Já paga nesta data (desmarque para deixar "a pagar")</label>
+                </div>
+              </div>
+
+              <div id="fin-entrada-fields">
+              <div class="u-mb-4">
+                <label for="rcv-category" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Categoria (opcional)</label>
+                <select id="rcv-category" name="category" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
+                  <option value="">Sem categoria</option>
+                  <?php foreach ($entryCategories as $cat): ?><option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option><?php endforeach; ?>
+                </select>
+              </div>
+              <div class="u-mb-4">
+                <label for="rcv-patient" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Paciente *</label>
                 <?php if (empty($patients)): ?>
-                  <div style="padding: 10px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 6px; font-size: 0.85rem; color: #991b1b;">
-                    Nenhum paciente ativo cadastrado nesta clínica. <a href="/pacientes/novo" style="font-weight: 600; color: #991b1b; text-decoration: underline;">Cadastre um paciente primeiro</a>.
+                  <div class="op-message op-message--error u-text-compact">
+                    Nenhum paciente ativo cadastrado nesta clínica. <a href="/pacientes/novo" class="u-font-semibold u-color-semantic-error-strong u-underline">Cadastre um paciente primeiro</a>.
                   </div>
                 <?php else: ?>
-                  <select id="rcv-patient" name="patient_id" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <select id="rcv-patient" name="patient_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                     <option value="">Selecione o paciente...</option>
                     <?php foreach ($patients as $p): ?>
                       <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['name']) ?><?= !empty($p['email']) ? ' (' . htmlspecialchars($p['email']) . ')' : '' ?></option>
@@ -4616,26 +5260,28 @@ class DashboardController
                 <?php endif; ?>
               </div>
 
-              <div style="margin-bottom: 16px;">
-                <label for="dc28-description" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Descrição do Lançamento *</label>
-                <input id="dc28-description" type="text" name="description" required placeholder="Ex: Consulta Nutricional Inicial, Plano Trimestral" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div class="u-mb-4">
+                <label for="dc28-description" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Descrição do Lançamento *</label>
+                <input id="dc28-description" type="text" name="description" required placeholder="Ex: Consulta inicial, Plano trimestral, Internet de novembro" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
+              </div>
+
+              <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
-                  <label for="dc29-amount" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor (R$) *</label>
-                  <input id="dc29-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <label for="dc29-amount" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Valor (R$) *</label>
+                  <input id="dc29-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                 </div>
                 <div>
-                  <label for="dc30-due_date" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Data de Vencimento *</label>
-                  <input id="dc30-due_date" type="date" name="due_date" value="<?= date('Y-m-d') ?>" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                  <label for="dc30-due_date" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900"><span id="fin-date-label">Data de vencimento</span> *</label>
+                  <input id="dc30-due_date" type="date" name="due_date" value="<?= date('Y-m-d') ?>" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                 </div>
               </div>
 
               <?php if (!empty($appointments)): ?>
-                <div style="margin-bottom: 20px;">
-                  <label for="dc31-appointment_id" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Vincular à Consulta (Opcional)</label>
-                  <select id="dc31-appointment_id" name="appointment_id" style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+                <div class="u-mb-5" id="fin-appointment-field">
+                  <label for="dc31-appointment_id" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Vincular à consulta (opcional)</label>
+                  <select id="dc31-appointment_id" name="appointment_id" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                     <option value="">Nenhuma consulta vinculada</option>
                     <?php foreach ($appointments as $a): ?>
                       <option value="<?= (int)$a['id'] ?>">#<?= (int)$a['id'] ?> - <?= htmlspecialchars($a['patient_name']) ?> (<?= date('d/m/Y H:i', strtotime($a['scheduled_at'])) ?>)</option>
@@ -4644,34 +5290,34 @@ class DashboardController
                 </div>
               <?php endif; ?>
 
-              <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+              <div class="u-flex u-justify-end u-gap-3 u-mt-6">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-novo-recebivel">Cancelar</button>
-                <button type="submit" class="btn btn-primary" <?= empty($patients) ? 'disabled' : '' ?>>Salvar Lançamento</button>
+                <button type="submit" id="fin-submit" class="btn btn-primary" data-no-patients="<?= empty($patients) ? '1' : '0' ?>" <?= empty($patients) ? 'disabled' : '' ?>>Salvar lançamento</button>
               </div>
             </form>
           </div>
         </div>
 
         <!-- Modal: Dar Baixa / Registrar Pagamento -->
-        <div id="modal-dar-baixa" data-dialog="modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
-          <div class="cn-dialog__panel card" style="width: 100%; max-width: 480px; background: #ffffff; border-radius: 12px; box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0,0,0,0.1)); padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <h3 style="margin: 0; font-size: 1.2rem; color: var(--brand-navy-900);">Dar Baixa no Recebível</h3>
-              <button type="button" data-dialog-close data-hide="modal-dar-baixa" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--neutral-gray-400);">&times;</button>
+        <div id="modal-dar-baixa" data-dialog="modal" class="modal-overlay">
+          <div class="cn-dialog__panel card u-w-full u-maxw-form u-bg-neutral-white u-radius-card u-shadow-lg u-p-6">
+            <div class="u-flex u-justify-between u-items-center u-mb-5">
+              <h3 class="u-m-0 u-text-card-title u-color-botanical-forest-900">Dar baixa no recebível</h3>
+              <button type="button" data-dialog-close data-hide="modal-dar-baixa" class="u-bg-none u-border-0 u-text-h2 u-pointer u-color-neutral-gray-400">&times;</button>
             </div>
             
             <form id="form-dar-baixa" method="POST" action="">
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
 
-              <div style="margin-bottom: 16px; background: var(--neutral-gray-50); padding: 12px; border-radius: 6px; border: 1px solid var(--neutral-gray-200);">
-                <div style="font-size: 0.8rem; color: var(--neutral-gray-500); text-transform: uppercase; font-weight: 600;">Lançamento</div>
-                <div id="pay-modal-description" style="font-weight: 600; color: var(--brand-navy-900); font-size: 1rem; margin-top: 2px;"></div>
+              <div class="u-mb-4 u-bg-neutral-gray-50 u-p-3 u-radius-input u-border">
+                <div class="u-text-compact u-color-neutral-gray-500 u-uppercase u-font-semibold">Lançamento</div>
+                <div id="pay-modal-description" class="u-font-semibold u-color-botanical-forest-900 u-text-body u-mt-0"></div>
               </div>
 
-              <div style="margin-bottom: 16px;">
-                <label for="dc32-payment_method" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Forma de Pagamento *</label>
-                <select id="dc32-payment_method" name="payment_method" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
-                  <option value="pix">PIX (Transferência Instantânea)</option>
+              <div class="u-mb-4">
+                <label for="dc32-payment_method" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Forma de Pagamento *</label>
+                <select id="dc32-payment_method" name="payment_method" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
+                  <option value="pix">PIX (transferência instantânea)</option>
                   <option value="credit_card">Cartão de Crédito</option>
                   <option value="debit_card">Cartão de Débito</option>
                   <option value="cash">Dinheiro em Espécie</option>
@@ -4679,14 +5325,14 @@ class DashboardController
                 </select>
               </div>
 
-              <div style="margin-bottom: 20px;">
-                <label for="pay-modal-amount" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 6px; color: var(--brand-navy-900);">Valor Recebido (R$) *</label>
-                <input id="pay-modal-amount" type="number" step="0.01" min="0.01" name="amount" required style="width: 100%; padding: 10px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px; font-size: 0.9rem;">
+              <div class="u-mb-5">
+                <label for="pay-modal-amount" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Valor Recebido (R$) *</label>
+                <input id="pay-modal-amount" type="number" step="0.01" min="0.01" name="amount" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
               </div>
 
-              <div style="display: flex; justify-content: flex-end; gap: 12px;">
+              <div class="u-flex u-justify-end u-gap-3">
                 <button type="button" data-dialog-close class="btn btn-outline" data-hide="modal-dar-baixa">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="background: var(--semantic-success, #0A7075); border-color: var(--semantic-success, #0A7075);">Confirmar Recebimento</button>
+                <button type="submit" class="btn btn-primary btn-success-solid">Confirmar recebimento</button>
               </div>
             </form>
           </div>
@@ -4700,6 +5346,26 @@ class DashboardController
           document.getElementById('pay-modal-amount').value = (amountCents / 100).toFixed(2);
           document.getElementById('modal-dar-baixa').style.display = 'flex';
         }
+        // v54.37: alterna Entrada/Saída no novo lançamento
+        (function () {
+          var radios = document.querySelectorAll('input[name="direction"]');
+          function sync() {
+            var saida = !!document.querySelector('input[name="direction"][value="saida"]:checked');
+            var ent = document.getElementById('fin-entrada-fields'), sai = document.getElementById('fin-saida-fields');
+            ent.hidden = saida; sai.hidden = !saida;
+            ent.querySelectorAll('select,input').forEach(function (el) { el.disabled = saida; });
+            sai.querySelectorAll('select,input').forEach(function (el) { el.disabled = !saida; });
+            var ap = document.getElementById('fin-appointment-field');
+            if (ap) { ap.hidden = saida; ap.querySelectorAll('select').forEach(function (el) { el.disabled = saida; }); }
+            document.getElementById('exp-category').required = saida;
+            var pat = document.getElementById('rcv-patient'); if (pat) pat.required = !saida;
+            document.getElementById('fin-date-label').textContent = saida ? 'Data da saída' : 'Data de vencimento';
+            var btn = document.getElementById('fin-submit');
+            btn.disabled = !saida && btn.getAttribute('data-no-patients') === '1';
+          }
+          radios.forEach(function (r) { r.addEventListener('change', sync); });
+          if (radios.length) sync();
+        })();
         </script>
         <?php
         $content = ob_get_clean();
@@ -4708,15 +5374,17 @@ class DashboardController
 
     public function createReceivableAction(): void
     {
+        if (($_POST['direction'] ?? 'entrada') === 'saida') {
+            $this->createExpenseAction();
+            return;
+        }
         $patientId = (int)($_POST['patient_id'] ?? 0);
         $description = trim((string)($_POST['description'] ?? ''));
         $rawAmount = (string)($_POST['amount'] ?? '');
         $dueDate = trim((string)($_POST['due_date'] ?? ''));
         $appointmentId = !empty($_POST['appointment_id']) ? (int)$_POST['appointment_id'] : null;
 
-        $cleanAmount = str_replace(['R$', ' ', '.'], '', $rawAmount);
-        $cleanAmount = str_replace(',', '.', $cleanAmount);
-        $amountCents = (int)round(((float)$cleanAmount) * 100);
+        $amountCents = \ClyoNutri\Domain\Finance\Money::parseToCents($rawAmount); // v54.36
 
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $service = new \ClyoNutri\Domain\Finance\FinanceService($db);
@@ -4725,13 +5393,14 @@ class DashboardController
                || (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json'));
 
         try {
-            $created = $service->createReceivable($patientId, $description, $amountCents, $dueDate, $appointmentId);
+            $category = trim((string)($_POST['category'] ?? ''));
+            $created = $service->createReceivable($patientId, $description, $amountCents, $dueDate, $appointmentId, $category !== '' ? $category : null);
             if ($isJson) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['success' => true, 'receivable' => $created]);
                 exit;
             }
-            $_SESSION['finance_success'] = "Lançamento financeiro cadastrado com sucesso!";
+            $_SESSION['finance_success'] = "Lançamento cadastrado.";
             header("Location: /financeiro");
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
@@ -4748,13 +5417,45 @@ class DashboardController
             if ($isJson) {
                 http_response_code(400);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => $e->getMessage()]);
+                echo json_encode(['error' => $this->userFacingError('financeiro', $e)]);
                 exit;
             }
-            $_SESSION['finance_error'] = "Erro ao criar lançamento: " . $e->getMessage();
+            $_SESSION['finance_error'] = "Erro ao criar lançamento: " . $this->userFacingError('Erro ao criar lançamento', $e);
             header("Location: /financeiro");
             exit;
         }
+    }
+
+    /** v54.37: Saída (despesa da clínica, sem paciente). */
+    private function createExpenseAction(): void
+    {
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $isJson = isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json');
+        try {
+            $created = (new \ClyoNutri\Domain\Finance\ExpenseService($db))->create(
+                (string)($_POST['expense_category'] ?? $_POST['category'] ?? ''),
+                (string)($_POST['description'] ?? ''),
+                \ClyoNutri\Domain\Finance\Money::parseToCents((string)($_POST['amount'] ?? '')),
+                (string)($_POST['due_date'] ?? ''),
+                !empty($_POST['already_paid'])
+            );
+            if ($isJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'expense' => $created]);
+                exit;
+            }
+            $_SESSION['finance_success'] = 'Saída cadastrada.';
+        } catch (\Throwable $e) {
+            if ($isJson) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $this->userFacingError('financeiro', $e)]);
+                exit;
+            }
+            $_SESSION['finance_error'] = 'Erro ao criar saída: ' . $this->userFacingError('Erro ao criar saída', $e);
+        }
+        header('Location: /financeiro');
+        exit;
     }
 
     public function payReceivableAction(array $params): void
@@ -4774,9 +5475,7 @@ class DashboardController
             $rec = \ClyoNutri\Core\Security\TenantGuard::assertReceivableBelongsToClinic($receivableId, $clinicId, $db);
 
             if ($rawAmount !== '') {
-                $cleanAmount = str_replace(['R$', ' ', '.'], '', $rawAmount);
-                $cleanAmount = str_replace(',', '.', $cleanAmount);
-                $amountCents = (int)round(((float)$cleanAmount) * 100);
+                $amountCents = \ClyoNutri\Domain\Finance\Money::parseToCents($rawAmount); // v54.36: "400.00" = R$ 400
             } else {
                 $totStmt = $db->prepare("SELECT SUM(amount_cents) FROM payments WHERE receivable_id = :id");
                 $totStmt->execute(['id' => $receivableId]);
@@ -4792,7 +5491,7 @@ class DashboardController
                 exit;
             }
             $valorFormatado = number_format($amountCents / 100, 2, ',', '.');
-            $_SESSION['finance_success'] = "Pagamento de R$ {$valorFormatado} registrado com sucesso! Recibo: {$res['receipt_code']}";
+            $_SESSION['finance_success'] = "Pagamento de R$ {$valorFormatado} registrado. Recibo: {$res['receipt_code']}";
             header("Location: /financeiro");
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
@@ -4809,10 +5508,10 @@ class DashboardController
             if ($isJson) {
                 http_response_code(400);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => $e->getMessage()]);
+                echo json_encode(['error' => $this->userFacingError('financeiro', $e)]);
                 exit;
             }
-            $_SESSION['finance_error'] = "Erro ao registrar pagamento: " . $e->getMessage();
+            $_SESSION['finance_error'] = "Erro ao registrar pagamento: " . $this->userFacingError('Erro ao registrar pagamento', $e);
             header("Location: /financeiro");
             exit;
         }
@@ -4834,7 +5533,7 @@ class DashboardController
                 echo json_encode(['success' => true, 'canceled' => $res]);
                 exit;
             }
-            $_SESSION['finance_success'] = "Lançamento financeiro cancelado com sucesso.";
+            $_SESSION['finance_success'] = "Lançamento cancelado.";
             header("Location: /financeiro");
             exit;
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
@@ -4851,10 +5550,10 @@ class DashboardController
             if ($isJson) {
                 http_response_code(400);
                 header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['error' => $e->getMessage()]);
+                echo json_encode(['error' => $this->userFacingError('financeiro', $e)]);
                 exit;
             }
-            $_SESSION['finance_error'] = "Erro ao cancelar recebível: " . $e->getMessage();
+            $_SESSION['finance_error'] = "Erro ao cancelar recebível: " . $this->userFacingError('Erro ao cancelar recebível', $e);
             header("Location: /financeiro");
             exit;
         }
@@ -4872,7 +5571,7 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? '';
         ob_start();
         ?>
-        <div class="card" role="alert">
+        <div class="op-message op-message--error card" role="alert">
           <h1>Não foi possível carregar a agenda</h1>
           <p><?= htmlspecialchars($message) ?></p>
           <a class="btn btn-primary" href="/<?= $activeNav ?>">Tentar novamente</a>
@@ -4909,6 +5608,11 @@ class DashboardController
         $draftPatientsCount = $draftTotals['patients'];
         $draftPlansTotal = $draftTotals['draft_plans'];
 
+        // NI2-610: rascunhos de anamnese e de exames e o agendamento online pendente entram na mesma lista,
+        // ordenada por prioridade (perigo, aviso, informação).
+        $isClinicalActor = \ClyoNutri\Core\Security\ClinicalAuthorization::isClinical(\ClyoNutri\Core\Auth\AuthContext::get()?->toArray() ?? []);
+        $attentionItems = \ClyoNutri\Domain\Dashboard\PendingWorkSummary::sortByPriority(array_merge($attentionItems,
+            (new \ClyoNutri\Domain\Dashboard\PendingWorkSummary($db))->items($clinicId, $this->getActiveProfessionalId(), $isClinicalActor)));
         // A lista de atenção é limitada (top-N); o restante fica acessível via links "Ver todos".
         $attentionTotal = count($attentionItems);
         $attentionVisible = array_slice($attentionItems, 0, self::DASHBOARD_ATTENTION_LIMIT);
@@ -4928,53 +5632,300 @@ class DashboardController
             $onboardingDone = min(self::ONBOARDING_TOTAL_STEPS, count(array_unique((array)($onboardingProgress['completed_steps'] ?? []))));
             $onboardingPct = (int)round($onboardingDone / self::ONBOARDING_TOTAL_STEPS * 100);
         }
+        // NI2-625: ativação conferida no banco. Aparece enquanto falta item obrigatório; se faltam só primeiros
+        // passos, aparece nos 30 dias depois do onboarding (quem não usa plano alimentar não fica com aviso eterno).
+        $activation = null; $showActivation = false;
+        if ($userId > 0 && $clinicId > 0) {
+            try {
+                $activation = (new \ClyoNutri\Domain\Onboarding\ActivationChecklist($db))->forUser($clinicId, $userId);
+                $recent = !empty($onboardingProgress['updated_at']) && strtotime((string)$onboardingProgress['updated_at']) > time() - 30 * 86400;
+                $showActivation = !empty($onboardingProgress['is_completed']) && (!$activation['ready'] || ($activation['done'] < $activation['applicable'] && $recent));
+            } catch (\Throwable $e) {
+                error_log('NI2-625 dashboard: ' . $e->getMessage());
+            }
+        }
 
         $title = 'Visão geral';
         $activeNav = 'dashboard';
+        $dashboardV5456Styles = true; // v54.56: carrega dashboard-v54-56.css só no Painel geral
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $arrowIcon = '<svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+        // NI2-614: estado da assinatura no painel quando o teste terminou. Regra vigente (Configurações > Assinatura):
+        // nada é bloqueado e a contratação pelo sistema ainda não está disponível.
+        $dashSubscription = null; $dashCanManagePlan = false;
+        try {
+            // Leitura simples: o painel não cria assinatura nem dispara aviso ao backoffice.
+            $dashSubStmt = $db->prepare('SELECT status, trial_ends_at FROM clinic_subscriptions WHERE clinic_id = ? LIMIT 1');
+            $dashSubStmt->execute([TenantContext::getClinicId()]);
+            $dashSubscription = $dashSubStmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+            if ($dashSubscription && $dashSubscription['status'] === 'expired') {
+                $dashCanManagePlan = (new \ClyoNutri\Domain\Subscription\SubscriptionService($db))->canManageSubscription(TenantContext::getClinicId(), (int)TenantContext::getUserId());
+            }
+        } catch (\Throwable $e) {
+            $dashSubscription = null;
+        }
+
+        // v54.56: topo no estilo Talui (saudação, indicadores com comparação real, agenda da semana) e lista acionável logo abaixo.
+        $overview = new \ClyoNutri\Domain\Dashboard\DashboardOverview($db);
+        // Mesmo nome da barra superior (membro ativo do consultório atual); sem identidade, a saudação fica sem vocativo.
+        $dashViewCtx = \ClyoNutri\Core\Auth\ProfessionalViewContext::resolve($db);
+        $dashFirstName = ($dashViewCtx['userName'] ?? '') === 'Identidade indisponível' ? '' : \ClyoNutri\Domain\Dashboard\DashboardOverview::firstName($dashViewCtx['userName'] ?? null);
+        $dashYesterday = (new \DateTimeImmutable($today))->modify('-1 day')->format('Y-m-d');
+        $dashLastWeekDay = (new \DateTimeImmutable($today))->modify('-7 days')->format('Y-m-d');
+        try {
+            $yesterdayStats = $appointmentService->getTodayStats($dashYesterday);
+            $prevWeekStats = $appointmentService->getWeekStats($dashLastWeekDay);
+            $weekAgenda = $overview->weekAgenda($clinicId, $today);
+            $newPatients = $overview->newPatients($clinicId, 30);
+            $prevAdherence = $overview->previousAdherence($clinicId, (int)$adherenceMetrics['period_days']);
+        } catch (\PDOException $e) {
+            $this->scheduleError(503, 'Não foi possível carregar as consultas e pendências. Tente novamente.', 'dashboard');
+            return;
+        }
+        $cmpToday = \ClyoNutri\Domain\Dashboard\DashboardOverview::compareCount((int)$todayStats['total_today'], (int)$yesterdayStats['total_today'], 'vs. ontem');
+        $cmpWeek = \ClyoNutri\Domain\Dashboard\DashboardOverview::compareCount((int)$weekStats['total'], (int)$prevWeekStats['total'], 'vs. semana anterior');
+        $cmpPatients = \ClyoNutri\Domain\Dashboard\DashboardOverview::compareCount((int)$newPatients['current'], (int)$newPatients['previous'], 'vs. 30 dias anteriores');
+        $cmpAdherence = \ClyoNutri\Domain\Dashboard\DashboardOverview::comparePoints($adherenceMetrics['has_data'] ? (float)$adherenceMetrics['average_pct'] : null, $prevAdherence, 'vs. 30 dias anteriores');
+        $dashNowTs = strtotime((new \DateTimeImmutable('now', new \DateTimeZone(getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo')))->format('Y-m-d H:i:s'));
+        $upcomingToday = array_values(array_filter($todayAppointments, static fn($a) => !in_array($a['status'], ['cancelled'], true)));
+        $dashCmp = static function (array $c): string {
+            return '<span class="dash-trend dash-trend--' . htmlspecialchars($c['tone']) . '" data-testid="dash-trend" data-tone="' . htmlspecialchars($c['tone']) . '">'
+                . '<span aria-hidden="true">' . htmlspecialchars($c['label']) . '</span><span class="sr-only">' . htmlspecialchars($c['sr']) . '</span></span>';
+        };
+        $dashIcon = static function (string $name): string {
+            $paths = [
+                'calendar' => '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+                'week' => '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h2M14 14h2M8 18h2"/>',
+                'users' => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+                'chart' => '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+                'plan' => '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>',
+                'leaf' => '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+                'clock' => '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+                'check' => '<polyline points="20 6 9 17 4 12"/>',
+            ];
+            return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . ($paths[$name] ?? '') . '</svg>';
+        };
 
         ob_start();
         ?>
-        <div class="dashboard-intro">
-          <h1>Painel Geral</h1>
-          <p class="dashboard-intro__subtitle">Visão operacional e prioridades clínicas do dia.</p>
-        </div>
+        <div class="dash" data-testid="dashboard-v5456">
+        <header class="dash-greeting" data-testid="dash-greeting">
+          <div class="dash-greeting__icon" aria-hidden="true"><?= $dashIcon('leaf') ?></div>
+          <div>
+            <p class="dash-greeting__date" data-testid="dash-date"><?= htmlspecialchars($overview->dateLabel($today)) ?></p>
+            <h1 class="dash-greeting__title"><?= htmlspecialchars($overview->greeting()) ?><?= $dashFirstName !== '' ? ', ' . htmlspecialchars($dashFirstName) : '' ?></h1>
+            <p class="dash-greeting__subtitle">Painel geral · aqui está o resumo da sua rotina de hoje.</p>
+          </div>
+          <?php /* v54.57 (UX-110): ações de rotina no topo: buscar paciente por nome e nova consulta */ ?>
+          <div class="dash-greeting__actions" data-testid="dash-top-actions">
+            <form class="dash-search" method="GET" action="/pacientes" role="search" aria-label="Buscar paciente">
+              <label class="sr-only" for="dash-patient-search">Buscar paciente por nome, e-mail ou telefone</label>
+              <input type="search" id="dash-patient-search" name="q" class="form-control dash-search__input" placeholder="Buscar paciente" autocomplete="off" maxlength="100" data-testid="dash-patient-search">
+              <button type="submit" class="btn btn-outline dash-search__btn">Buscar</button>
+            </form>
+            <a href="/agenda?novo=1" class="btn btn-primary dash-new-appointment" data-testid="dash-new-appointment">+ Nova consulta</a>
+          </div>
+        </header>
 
-        <?php if (!empty($_GET['onboarding']) && $_GET['onboarding'] === 'concluido'): ?>
-          <div class="card dashboard-banner dashboard-banner--success" role="status">
+        <?php if ($dashSubscription && ($dashSubscription['status'] ?? '') === 'expired'): ?>
+          <?php $dashTrialEnd = !empty($dashSubscription['trial_ends_at']) ? (new \DateTimeImmutable((string)$dashSubscription['trial_ends_at']))->format('d/m/Y') : null; ?>
+          <div class="op-message op-message--info card dashboard-banner" role="status" data-testid="dashboard-trial-expired">
+            <div>
+              <div class="dashboard-banner__title">Seu período de teste terminou<?= $dashTrialEnd ? ' em ' . htmlspecialchars($dashTrialEnd) : '' ?>.</div>
+              <div class="dashboard-banner__text">
+                O sistema continua liberado e seus dados seguem salvos. A contratação de um plano pelo sistema ainda não está disponível.
+                <?php if ($dashCanManagePlan): ?><a href="/configuracoes/assinatura" class="u-font-semibold u-link">Ver assinatura</a><?php else: ?>Fale com o titular do consultório sobre o plano.<?php endif; ?>
+              </div>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <?php if (!empty($_GET['onboarding']) && $_GET['onboarding'] === 'concluido' && (!$activation || $activation['ready'])): ?>
+          <div class="op-message op-message--info card dashboard-banner dashboard-banner--success" role="status">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             <div>
-              <div class="dashboard-banner__title">Consultório ativado com sucesso!</div>
+              <div class="dashboard-banner__title">Consultório ativado. Já dá para agendar e atender.</div>
               <div class="dashboard-banner__text">Suas preferências profissionais e rotinas clínicas foram salvas. Você já pode cadastrar novos pacientes e iniciar consultas.</div>
             </div>
           </div>
+        <?php elseif ($showActivation && $activation): $nx = $activation['next']; ?>
+          <div class="op-message op-message--info card dashboard-banner dashboard-banner--onboarding" data-testid="activation-banner" role="status">
+            <div class="dashboard-banner__body">
+              <div class="dashboard-banner__step tabular-nums" aria-hidden="true"><?= (int)$activation['done'] ?>/<?= (int)$activation['applicable'] ?></div>
+              <div>
+                <div class="dashboard-banner__title"><?= $activation['ready'] ? 'Consultório pronto. Faltam primeiros passos' : 'Ativação do consultório incompleta' ?> (<?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?>)</div>
+                <div class="dashboard-banner__text"><?= $nx ? 'Próximo: ' . htmlspecialchars($nx['label']) . '. ' . htmlspecialchars($nx['detail']) : '' ?></div>
+              </div>
+            </div>
+            <a href="/onboarding?passo=5" class="btn <?= $activation['ready'] ? 'btn-secondary' : 'btn-accent' ?> dashboard-banner__cta" data-testid="activation-banner-cta">Ver o que falta <?= $arrowIcon ?></a>
+          </div>
+        <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed'] && $activation && $activation['ready']): ?>
+          <?php /* v54.57 (UX-109): com a prontidão completa, as preferências são opcionais: linha discreta, sem CTA de destaque e sem "% concluído" competindo com o checklist */ ?>
+          <p class="dash-optional" data-testid="onboarding-banner" data-variant="optional">
+            <span>Personalize suas preferências (opcional) · <span data-testid="onboarding-steps"><?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?></span> revisadas<span class="sr-only"> (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>%)</span></span>
+            <a href="/onboarding" class="dash-optional__link">Revisar preferências</a>
+          </p>
         <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed']): ?>
           <div class="card dashboard-banner dashboard-banner--onboarding" data-testid="onboarding-banner">
             <div class="dashboard-banner__body">
               <div class="dashboard-banner__step tabular-nums" aria-hidden="true" data-testid="onboarding-steps"><?= $onboardingDone ?>/<?= self::ONBOARDING_TOTAL_STEPS ?></div>
               <div>
                 <div class="dashboard-banner__title">
-                  Configuração do seu consultório em andamento (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>% concluído<span class="sr-only">, <?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?> passos</span>)
+                  Preferências revisadas (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>% concluído<span class="sr-only">, <?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?> passos</span>)
                 </div>
                 <div class="dashboard-banner__text">
-                  Complete os <?= self::ONBOARDING_TOTAL_STEPS ?> passos para personalizar totalmente suas preferências de atendimento, especialidades e seu primeiro paciente.
+                  Revise estas preferências quando desejar. Este roteiro não determina se o consultório está pronto para atender.
                 </div>
               </div>
             </div>
             <a href="/onboarding" class="btn btn-accent dashboard-banner__cta">
-              Continuar Onboarding
+              Continuar onboarding
               <?= $arrowIcon ?>
             </a>
           </div>
         <?php endif; ?>
 
-        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
-        <section class="card attention-panel" aria-labelledby="attention-title" data-testid="attention-panel">
-          <div class="card__header">
-            <h2 id="attention-title" class="section-title">Pacientes & Prioridades que Exigem Atenção</h2>
-            <span class="attention-panel__count" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
+        <?php if ($activation): ?>
+          <p class="dash-readiness dash-readiness--<?= $activation['ready'] ? 'ok' : 'pending' ?>" role="status" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">
+            <span class="dash-readiness__dot" aria-hidden="true"></span>
+            <span>Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong> · Checklist <?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></span>
+            <a href="/onboarding?passo=5" class="dash-readiness__link">Ver checklist</a>
+          </p>
+        <?php endif; ?>
+
+        <?php /* Indicadores com ícone e comparação real com o período anterior (neutro quando não há base) */ ?>
+        <div class="dash-metrics" role="region" aria-label="Indicadores da clínica" data-testid="dash-metrics">
+          <div class="dash-kpi">
+            <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('calendar') ?></span><span class="dash-kpi__label">Consultas hoje</span></div>
+            <div class="dash-kpi__value tabular-nums"><span data-testid="appointments-today-count"><?= (int)$todayStats['total_today'] ?></span></div>
+            <div class="dash-kpi__foot"><?= $dashCmp($cmpToday) ?><span class="dash-kpi__note"><?= (int)$todayStats['confirmed'] ?> confirmada(s) · <?= (int)$todayStats['completed'] ?> realizada(s)<?= (int)$todayStats['cancelled'] > 0 ? ' · ' . (int)$todayStats['cancelled'] . ' cancelada(s)' : '' ?></span></div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('users') ?></span><span class="dash-kpi__label">Pacientes ativos</span></div>
+            <div class="dash-kpi__value tabular-nums"><span data-testid="active-patients-count"><?= count($patients) ?></span></div>
+            <div class="dash-kpi__foot"><span class="dash-kpi__note" data-testid="new-patients-30d"><?= (int)$newPatients['current'] ?> novo(s) em 30 dias</span><?= $dashCmp($cmpPatients) ?><a href="/pacientes" class="dash-kpi__link">Ver pacientes</a></div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('chart') ?></span><span class="dash-kpi__label">Adesão média</span></div>
+            <div class="dash-kpi__value tabular-nums<?= $adherenceMetrics['has_data'] ? '' : ' dash-kpi__value--empty' ?>"><span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span></div>
+            <div class="dash-kpi__foot">
+              <?php if ($adherenceMetrics['has_data']): ?>
+                <?= $dashCmp($cmpAdherence) ?><span class="dash-kpi__note"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) · <?= (int)$adherenceMetrics['responding_patients_count'] ?> de <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) · <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
+              <?php else: ?>
+                <span class="dash-trend dash-trend--neutral" data-testid="dash-trend" data-tone="neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span><span class="dash-kpi__note">0 respostas · <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis</span>
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="dash-kpi<?= $draftPatientsCount > 0 ? ' dash-kpi--accent' : '' ?>" data-testid="dash-kpi-drafts">
+            <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('plan') ?></span><span class="dash-kpi__label">Planos a revisar</span></div>
+            <div class="dash-kpi__value tabular-nums"><span data-testid="draft-patients-count"><?= $draftPatientsCount ?></span></div>
+            <div class="dash-kpi__foot">
+              <span class="dash-trend dash-trend--<?= $draftPatientsCount > 0 ? 'warn' : 'ok' ?>"><?= $draftPatientsCount > 0 ? 'paciente(s) com rascunho' : 'todos publicados' ?></span>
+              <?php if ($draftPlansTotal > 0): ?><span class="dash-kpi__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> plano(s) em rascunho · <a href="/planos?status=draft">Ver rascunhos</a></span><?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <section class="dash-card dash-week" aria-labelledby="dash-week-title" data-testid="dash-week">
+            <div class="dash-card__header">
+              <h2 id="dash-week-title" class="dash-card__title">Agenda da semana</h2>
+              <div class="dash-card__tools">
+                <span class="dash-week__range tabular-nums" data-testid="dash-week-range"><?= htmlspecialchars($weekAgenda['label']) ?> · <span data-testid="appointments-week-count"><?= (int)$weekAgenda['total'] ?></span> consulta(s)</span>
+                <?= $dashCmp($cmpWeek) ?>
+                <a href="/agenda?date=<?= htmlspecialchars($today) ?>&amp;view=week" class="dash-link">Ver agenda completa <?= $arrowIcon ?></a>
+              </div>
+            </div>
+            <ol class="dash-week__days">
+              <?php foreach ($weekAgenda['days'] as $wd): ?>
+                <li class="dash-day<?= $wd['is_today'] ? ' dash-day--today' : '' ?><?= $wd['is_past'] ? ' dash-day--past' : '' ?>" data-testid="dash-week-day" data-date="<?= htmlspecialchars($wd['date']) ?>" data-count="<?= (int)$wd['count'] ?>"<?= $wd['is_today'] ? ' aria-current="date"' : '' ?>>
+                  <div class="dash-day__head">
+                    <span class="dash-day__weekday"><abbr title="<?= htmlspecialchars($wd['weekday_long']) ?>"><?= htmlspecialchars($wd['weekday']) ?></abbr></span>
+                    <span class="dash-day__date"><?= htmlspecialchars($wd['day_label']) ?><?= $wd['is_today'] ? ' · hoje' : '' ?></span>
+                  </div>
+                  <?php if (!$wd['items']): ?>
+                    <p class="dash-day__empty">Sem consultas</p>
+                  <?php else: ?>
+                    <ul class="dash-day__list">
+                      <?php foreach ($wd['items'] as $wa): $waDone = in_array($wa['status'], ['completed', 'no_show'], true); ?>
+                        <li>
+                          <a class="dash-appt dash-appt--<?= htmlspecialchars((string)$wa['status']) ?>" data-testid="dash-week-appt" href="<?= $waDone ? '/pacientes/' . (int)$wa['patient_id'] : '/consulta/' . (int)$wa['id'] ?>">
+                            <span class="dash-appt__time tabular-nums"><?= htmlspecialchars(substr((string)$wa['scheduled_at'], 11, 5)) ?></span>
+                            <span class="dash-appt__name" title="<?= htmlspecialchars((string)$wa['patient_name']) ?>"><?= htmlspecialchars((string)$wa['patient_name']) ?></span>
+                            <span class="dash-appt__meta"><?= htmlspecialchars(LabelMap::appointmentType($wa['type'])) ?> · <?= htmlspecialchars(LabelMap::appointmentStatus($wa['status'])) ?></span>
+                          </a>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                    <?php if ($wd['hidden'] > 0): ?><a class="dash-day__more" href="/agenda?date=<?= htmlspecialchars($wd['date']) ?>&amp;view=day">+<?= (int)$wd['hidden'] ?> neste dia</a><?php endif; ?>
+                  <?php endif; ?>
+                </li>
+              <?php endforeach; ?>
+            </ol>
+          </section>
+
+          <section class="dash-card dash-today" aria-labelledby="today-title" data-testid="dash-today">
+            <div class="dash-card__header">
+              <h2 id="today-title" class="dash-card__title">Consultas de hoje</h2>
+              <span class="dash-card__hint" data-testid="dash-today-count"><?= count($upcomingToday) ?> no dia<?= (int)$todayStats['cancelled'] > 0 ? ' · canceladas fora da lista' : '' ?></span>
+            </div>
+            <?php if (empty($upcomingToday)): ?>
+              <div class="dash-empty">
+                <p>Nenhuma consulta agendada para hoje.</p>
+                <a href="/agenda" class="dash-link">Abrir agenda <?= $arrowIcon ?></a>
+              </div>
+            <?php else: ?>
+              <ul class="dash-today__list">
+                <?php foreach ($upcomingToday as $app): $appTs = strtotime((string)$app['scheduled_at']); $appInitials = implode('', array_map(static fn($w) => mb_strtoupper(mb_substr($w, 0, 1)), array_slice(preg_split('/\s+/u', trim((string)$app['patient_name'])) ?: [], 0, 2))); ?>
+                  <li class="dash-today__item<?= $app['status'] !== 'completed' && $appTs < $dashNowTs ? ' dash-today__item--late' : '' ?>" data-testid="dash-today-item">
+                    <span class="dash-avatar" aria-hidden="true"><?= htmlspecialchars($appInitials ?: 'P') ?></span>
+                    <div class="dash-today__info">
+                      <a class="dash-today__name" href="/pacientes/<?= (int)$app['patient_id'] ?>"><?= htmlspecialchars($app['patient_name']) ?></a>
+                      <span class="dash-today__meta tabular-nums"><?= date('H:i', $appTs) ?> · <?= htmlspecialchars(LabelMap::appointmentType($app['type'])) ?></span>
+                      <span class="dash-today__status"><?= LabelMap::appointmentStatusBadge($app['status']) ?></span>
+                    </div>
+                    <?php if ($app['status'] === 'completed' || $app['status'] === 'no_show'): ?>
+                      <a href="/pacientes/<?= (int)$app['patient_id'] ?>" class="btn btn-secondary btn-touch btn-touch--compact" aria-label="Prontuário de <?= htmlspecialchars($app['patient_name']) ?>">Prontuário</a>
+                    <?php else: ?>
+                      <a href="/consulta/<?= (int)$app['id'] ?>" class="btn btn-primary btn-touch btn-touch--compact" aria-label="Atender <?= htmlspecialchars($app['patient_name']) ?> às <?= date('H:i', $appTs) ?>">Atender</a>
+                    <?php endif; ?>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </section>
+        </div>
+
+        <!-- Seção: Pacientes e Prioridades que Exigem Atenção (v54.56: logo abaixo do topo, 4 itens + "Ver todos") -->
+        <section class="dash-card dash-quick" aria-labelledby="quick-actions-title">
+          <div class="dash-card__header">
+            <h2 id="quick-actions-title" class="dash-card__title">Atendimento nutricional</h2>
+          </div>
+          <div class="dash-quick__grid">
+            <a href="/pacientes?novo=1" class="dash-quick__item" data-testid="quick-new-patient">
+              <span class="dash-quick__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              <span><span class="dash-quick__label">Novo paciente</span><span class="dash-quick__hint">Cadastro e consentimento</span></span>
+            </a>
+            <a href="/planos" class="dash-quick__item">
+              <span class="dash-quick__icon" aria-hidden="true"><?= $dashIcon('plan') ?></span>
+              <span><span class="dash-quick__label">Criar plano alimentar</span><span class="dash-quick__hint">Prescrição e modelos</span></span>
+            </a>
+            <a href="/alimentos" class="dash-quick__item">
+              <span class="dash-quick__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+              <span><span class="dash-quick__label">Consultar Tabela TACO</span><span class="dash-quick__hint">Composição dos alimentos</span></span>
+            </a>
+            <a href="/agenda" class="dash-quick__item">
+              <span class="dash-quick__icon" aria-hidden="true"><?= $dashIcon('clock') ?></span>
+              <span><span class="dash-quick__label">Agendar consulta</span><span class="dash-quick__hint">Abrir a agenda</span></span>
+            </a>
+          </div>
+        </section>
+
+        <section class="dash-card attention-panel dash-attention" aria-labelledby="attention-title" data-testid="attention-panel">
+          <div class="dash-card__header">
+            <h2 id="attention-title" class="dash-card__title">Pacientes e prioridades que exigem atenção</h2>
+            <span class="attention-panel__count dash-card__hint" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
           </div>
           <?php if (empty($attentionItems)): ?>
             <div class="attention-panel__empty">
@@ -4982,7 +5933,7 @@ class DashboardController
               Nenhuma pendência crítica ou falta sem retorno identificada no momento. Todas as rotinas estão regulares.
             </div>
           <?php else: ?>
-            <ul class="attention-list">
+            <ul class="attention-list dash-attention__list">
               <?php foreach ($attentionVisible as $att): ?>
                 <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
                   <div class="attention-item__text">
@@ -4993,7 +5944,7 @@ class DashboardController
                       <?= htmlspecialchars($att['description']) ?>
                     </span>
                   </div>
-                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch">
+                  <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch" data-testid="attention-action-<?= htmlspecialchars((string)$att['type']) ?>">
                     <?= htmlspecialchars($att['action_label']) ?>
                     <?= $arrowIcon ?>
                   </a>
@@ -5001,7 +5952,22 @@ class DashboardController
               <?php endforeach; ?>
             </ul>
             <?php if ($attentionHidden > 0): ?>
-              <div class="attention-panel__footer">
+              <?php /* NI2-610: os demais itens ficam a um clique, sem sair do painel */ ?>
+              <details class="attention-more dash-attention__more" data-testid="attention-more">
+                <summary class="btn btn-outline btn-touch">Ver todos (<?= (int)$attentionTotal ?>)<span class="sr-only">: mais <?= (int)$attentionHidden ?> item(ns)</span></summary>
+                <ul class="attention-list dash-attention__list">
+                  <?php foreach (array_slice($attentionItems, count($attentionVisible)) as $att): ?>
+                    <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
+                      <div class="attention-item__text">
+                        <span class="badge badge-<?= $att['severity'] === 'danger' ? 'danger' : ($att['severity'] === 'warning' ? 'warning' : 'info') ?> attention-item__badge"><?= htmlspecialchars($att['title']) ?></span>
+                        <span class="attention-item__description"><?= htmlspecialchars($att['description']) ?></span>
+                      </div>
+                      <a href="<?= htmlspecialchars($att['action_url']) ?>" class="btn btn-secondary btn-touch" data-testid="attention-action-<?= htmlspecialchars((string)$att['type']) ?>"><?= htmlspecialchars($att['action_label']) ?> <?= $arrowIcon ?></a>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              </details>
+              <div class="attention-panel__footer dash-attention__footer">
                 <span>Mostrando <?= count($attentionVisible) ?> de <?= $attentionTotal ?>.</span>
                 <a href="/agenda" class="btn btn-outline btn-touch">Ver agenda</a>
                 <?php if ($draftPatientsCount > 0): ?>
@@ -5012,133 +5978,7 @@ class DashboardController
           <?php endif; ?>
         </section>
 
-        <?php /* Cards de Métricas Consolidadas (NI2-421: depois das prioridades) */ ?>
-        <div class="dashboard-metrics cn-metrics-5" role="region" aria-label="Indicadores da clínica">
-          <div class="card metric-card">
-            <div class="metric-card__label">CONSULTAS HOJE</div>
-            <div class="metric-card__value tabular-nums">
-              <span data-testid="appointments-today-count"><?= (int)$todayStats['total_today'] ?></span>
-            </div>
-            <span class="badge badge-info"><?= (int)$todayStats['confirmed'] ?> confirmada(s) • <?= (int)$todayStats['completed'] ?> realizada(s)</span>
-          </div>
 
-          <div class="card metric-card">
-            <div class="metric-card__label">CONSULTAS NA SEMANA</div>
-            <div class="metric-card__value tabular-nums">
-              <span data-testid="appointments-week-count"><?= (int)$weekStats['total'] ?></span>
-            </div>
-            <span class="badge badge-info"><?= htmlspecialchars((string)$weekStats['start']) ?> a <?= htmlspecialchars((string)$weekStats['end']) ?></span>
-            <div class="metric-card__note">Canceladas não incluídas</div>
-          </div>
-
-          <div class="card metric-card">
-            <div class="metric-card__label">PACIENTES ATIVOS</div>
-            <div class="metric-card__value tabular-nums">
-              <span data-testid="active-patients-count"><?= count($patients) ?></span>
-            </div>
-            <a href="/pacientes" class="metric-card__link">Ver pacientes</a>
-          </div>
-
-          <div class="card metric-card">
-            <div class="metric-card__label">ADESÃO MÉDIA</div>
-            <div class="metric-card__value tabular-nums">
-              <span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span>
-            </div>
-            <?php if ($adherenceMetrics['has_data']): ?>
-              <span class="badge badge-success"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) • <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
-              <div class="metric-card__note">
-                <?= (int)$adherenceMetrics['responding_patients_count'] ?> de <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis responderam
-              </div>
-            <?php else: ?>
-              <span class="badge badge-neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span>
-              <div class="metric-card__note">
-                0 respostas • <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis
-              </div>
-            <?php endif; ?>
-          </div>
-
-          <div class="card metric-card">
-            <div class="metric-card__label">PLANOS A REVISAR</div>
-            <div class="metric-card__value metric-card__value--accent tabular-nums">
-              <span data-testid="draft-patients-count"><?= $draftPatientsCount ?></span>
-            </div>
-            <span class="badge badge-<?= $draftPatientsCount > 0 ? 'warning' : 'success' ?>">
-              <?= $draftPatientsCount > 0 ? 'Paciente(s) com rascunho' : 'Todos publicados' ?>
-            </span>
-            <?php if ($draftPlansTotal > 0): ?>
-              <div class="metric-card__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> plano(s) em rascunho no total · <a href="/planos?status=draft">Ver rascunhos</a></div>
-            <?php endif; ?>
-          </div>
-        </div>
-
-        <!-- Grid de Conteúdo Principal -->
-        <div class="dashboard-main-grid">
-          <section class="card" aria-labelledby="today-title">
-            <div class="card__header">
-              <h2 id="today-title" class="section-title">Consultas do Dia</h2>
-              <a href="/agenda" class="btn btn-secondary btn-touch">Ver agenda completa</a>
-            </div>
-            <?php if (empty($todayAppointments)): ?>
-              <p class="dashboard-empty">Nenhuma consulta agendada para hoje. Horários livres disponíveis.</p>
-            <?php else: ?>
-              <div class="table-responsive">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Horário</th>
-                      <th scope="col">Paciente</th>
-                      <th scope="col">Tipo</th>
-                      <th scope="col">Status</th>
-                      <th scope="col" class="text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($todayAppointments as $app): ?>
-                      <tr>
-                        <td class="tabular-nums dashboard-table__time"><?= date('H:i', strtotime($app['scheduled_at'])) ?></td>
-                        <td class="dashboard-table__patient">
-                          <a href="/pacientes/<?= (int)$app['patient_id'] ?>">
-                            <?= htmlspecialchars($app['patient_name']) ?>
-                          </a>
-                        </td>
-                        <td><?= htmlspecialchars(LabelMap::appointmentType($app['type'])) ?></td>
-                        <td>
-                          <?= LabelMap::appointmentStatusBadge($app['status']) ?>
-                        </td>
-                        <td class="text-right">
-                          <?php if ($app['status'] === 'completed'): ?>
-                            <a href="/pacientes/<?= (int)$app['patient_id'] ?>" class="btn btn-secondary btn-touch btn-touch--compact">Prontuário</a>
-                          <?php else: ?>
-                            <a href="/consulta/<?= (int)$app['id'] ?>" class="btn btn-primary btn-touch btn-touch--compact">Atender</a>
-                          <?php endif; ?>
-                        </td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
-            <?php endif; ?>
-          </section>
-
-          <section class="card" aria-labelledby="quick-actions-title">
-            <div class="card__header">
-              <h2 id="quick-actions-title" class="section-title">Ações Rápidas</h2>
-            </div>
-            <div class="quick-actions">
-              <a href="/pacientes?novo=1" class="btn btn-primary quick-actions__item" data-testid="quick-new-patient">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Novo Paciente</span>
-              </a>
-              <a href="/planos" class="btn btn-accent quick-actions__item">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                <span>Criar Plano Alimentar</span>
-              </a>
-              <a href="/alimentos" class="btn btn-secondary quick-actions__item">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <span>Consultar Tabela TACO</span>
-              </a>
-            </div>
-          </section>
         </div>
         <?php
         $content = ob_get_clean();
@@ -5173,7 +6013,8 @@ class DashboardController
         $patientForm = $_SESSION['patient_form'] ?? [];
         $patientError = $_SESSION['patient_error'] ?? null;
         $createdId = $_SESSION['patient_created_id'] ?? null;
-        unset($_SESSION['patient_created_id']);
+        $createdName = $_SESSION['patient_created_name'] ?? null;
+        unset($_SESSION['patient_created_id'], $_SESSION['patient_created_name']);
         $duplicateId = $_SESSION['patient_duplicate_id'] ?? null;
         // NI2-414 (V4-UX-01): o preenchimento devolvido após erro é exibido uma única vez, junto com o erro.
         // Se o usuário descartar, recarregar ou voltar depois, os dados não reaparecem como se fossem estado limpo.
@@ -5186,39 +6027,52 @@ class DashboardController
         ob_start();
         ?>
         <?php if (!empty($_GET['success'])): ?>
-          <div style="background-color: var(--semantic-success-light); color: var(--semantic-success); padding: var(--space-3) var(--space-4); border-radius: var(--radius-input); margin-bottom: var(--space-4); border: 1px solid rgba(10, 112, 117, 0.2);">
-            ✓ <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados com sucesso!' : 'Paciente cadastrado. Próximo passo: abra o perfil para agendar ou iniciar o atendimento.' ?>
-            <?php if ($createdId): ?><a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a><?php endif; ?>
+          <div class="op-message op-message--success u-mb-4" role="status" data-testid="patient-success-toast">
+            <div class="u-font-semibold u-text-body u-mb-1">
+              <?= $_GET['success'] === 'atualizado' ? 'Dados do paciente atualizados.' : ($createdName ? 'Paciente ' . htmlspecialchars($createdName) . ' cadastrado com sucesso!' : 'Paciente cadastrado com sucesso!') ?>
+            </div>
+            <div class="u-text-compact u-color-semantic-success u-mb-2">
+              Próximo passo: abra o perfil para agendar ou iniciar o atendimento.
+            </div>
+            <div class="u-flex u-gap-2 u-items-center u-wrap">
+              <?php if ($createdId): ?>
+                <a class="btn btn-primary" href="/pacientes/<?= (int)$createdId ?>" data-testid="toast-open-patient-btn">Abrir perfil de <?= htmlspecialchars($createdName ?? 'paciente') ?> →</a>
+                <a class="btn btn-secondary" href="/pacientes/<?= (int)$createdId ?>/anamnese">Iniciar anamnese</a>
+              <?php endif; ?>
+            </div>
           </div>
         <?php endif; ?>
 
-        <?php if ($patientError): ?><div role="alert" class="card"><?= htmlspecialchars($patientError) ?>
+        <?php if ($patientError): ?><div class="op-message op-message--error card" role="alert"><?= htmlspecialchars($patientError) ?>
         <?php if ($duplicateId): ?><a href="/pacientes/<?= (int)$duplicateId ?>/editar">Conferir cadastro existente</a><?php endif; ?></div><?php endif; ?>
-        <?php if ($listError): ?><div role="alert" class="card"><?= htmlspecialchars($listError) ?> <a href="/pacientes">Tentar novamente</a></div><?php endif; ?>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6);">
+        <?php if ($listError): ?><div class="op-message op-message--error card" role="alert"><?= htmlspecialchars($listError) ?> <a href="/pacientes">Tentar novamente</a></div><?php endif; ?>
+        <div class="ds-page-header" data-testid="patients-page-header">
           <div>
             <h1>Gestão de Pacientes</h1>
-            <p style="color: var(--neutral-gray-500);">Cadastro, histórico de acompanhamento e prontuários.</p>
+            <p class="u-color-neutral-gray-500">Cadastro, histórico de acompanhamento e prontuários.</p>
           </div>
-          <button type="button" class="btn btn-primary" aria-haspopup="dialog" aria-controls="patientModal" data-call="openPatientModal">
+          <div class="ds-page-actions">
+            <a href="/pacientes/importar" class="btn btn-outline" data-testid="patient-import-link">Importar planilha</a>
+            <button type="button" class="btn btn-primary" aria-haspopup="dialog" aria-controls="patientModal" data-call="openPatientModal">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Cadastrar Paciente</span>
+            <span>Cadastrar paciente</span>
           </button>
+          </div>
         </div>
 
         <section class="card" aria-labelledby="patient-birthdays-heading">
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
-            <h2 id="patient-birthdays-heading" style="font-size: 1.25rem; margin: 0;">Aniversariantes do mês · <?= $monthNames[$month] ?></h2>
+          <div class="u-flex u-items-center u-justify-between u-gap-3 u-wrap u-mb-4">
+            <h2 id="patient-birthdays-heading" class="u-text-h3 u-m-0">Aniversariantes do mês · <?= $monthNames[$month] ?></h2>
             <span class="badge badge-info"><?= count($birthdays) ?> paciente<?= count($birthdays) === 1 ? '' : 's' ?></span>
           </div>
           <?php if (!$birthdays): ?>
-            <p style="color: var(--neutral-gray-500); margin: 0;">Nenhum paciente com aniversário neste mês. A lista considera as datas de nascimento cadastradas.</p>
+            <p class="u-color-neutral-gray-500 u-m-0">Nenhum paciente com aniversário neste mês. A lista considera as datas de nascimento cadastradas.</p>
           <?php else: ?>
-            <ul style="list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px;">
+            <ul class="u-list-none u-p-0 u-m-0 u-grid u-cols-auto-md u-gap-3">
               <?php foreach ($birthdays as $birthday): $isToday = substr($birthday['birth_date'], 5) === substr($today, 5); ?>
-              <li data-patient-birthday="<?= (int)$birthday['id'] ?>" style="border: 1px solid var(--neutral-gray-300); border-radius: 8px; padding: 16px;">
-                <div style="font-weight: 700; color: var(--brand-navy-900); margin-bottom: 8px;"><?= htmlspecialchars($birthday['name']) ?></div>
-                <div style="margin-bottom: 12px;">
+              <li data-patient-birthday="<?= (int)$birthday['id'] ?>" class="u-border u-bc-neutral-gray-300 u-radius-input u-p-4">
+                <div class="u-font-bold u-color-botanical-forest-900 u-mb-2"><?= htmlspecialchars($birthday['name']) ?></div>
+                <div class="u-mb-3">
                   <span class="badge badge-<?= $isToday ? 'success' : 'info' ?>"><?= substr($birthday['birth_date'], 8, 2) ?>/<?= $month ?><?= $isToday ? ' · Hoje!' : '' ?></span>
                 </div>
                 <a class="btn btn-secondary" href="/pacientes/<?= (int)$birthday['id'] ?>" aria-label="Ver perfil de <?= htmlspecialchars($birthday['name'], ENT_QUOTES) ?>">Ver perfil</a>
@@ -5229,19 +6083,19 @@ class DashboardController
         </section>
 
         <div class="card">
-          <form method="get" action="/pacientes" style="margin-bottom: var(--space-4);">
+          <form method="get" action="/pacientes" class="u-mb-4">
             <label for="patient-search" class="form-label">Buscar paciente por nome, celular ou e-mail</label>
-            <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
-              <input type="search" name="q" value="<?= htmlspecialchars($query, ENT_QUOTES) ?>" id="patient-search" class="form-control" placeholder="Digite o nome, celular ou e-mail" autocomplete="off" aria-controls="patient-list" style="flex: 1; min-width: 180px;">
+            <div class="u-flex u-gap-2 u-items-center u-wrap">
+              <input type="search" name="q" value="<?= htmlspecialchars($query, ENT_QUOTES) ?>" id="patient-search" class="form-control u-flex-1 u-minw-md" placeholder="Digite o nome, celular ou e-mail" autocomplete="off" aria-controls="patient-list">
               <label for="patient-status">Status</label>
-              <select id="patient-status" name="status" class="form-control" style="width:auto">
+              <select id="patient-status" name="status" class="form-control u-w-auto">
                 <?php foreach ([''=>'Todos','active'=>'Ativos','inactive'=>'Inativos','anonymized'=>'Anonimizados'] as $value=>$label): ?>
                 <option value="<?= $value ?>" <?= $statusFilter === $value ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?>
               </select>
               <button type="submit" class="btn btn-primary">Buscar</button>
               <a href="/pacientes" class="btn btn-secondary">Limpar</a>
             </div>
-            <p id="patient-search-count" role="status" aria-live="polite" style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-top: var(--space-2);"><?= (int)$listing['total'] ?> paciente(s) encontrado(s).</p>
+            <p id="patient-search-count" class="op-message op-message--info u-text-compact u-color-neutral-gray-500 u-mt-2" role="status" aria-live="polite"><?= (int)$listing['total'] ?> paciente(s) encontrado(s).</p>
           </form>
           <div class="table-responsive">
             <table class="table">
@@ -5256,39 +6110,83 @@ class DashboardController
               </thead>
               <tbody id="patient-list">
                 <?php if (empty($patients)): ?>
-                  <tr id="patient-list-empty"><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);"><?= $query !== '' || $statusFilter !== '' ? 'Nenhum paciente encontrado para estes filtros.' : 'Nenhum paciente cadastrado nesta clínica.' ?></td></tr>
+                  <tr id="patient-list-empty"><td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6"><?= $query !== '' || $statusFilter !== '' ? 'Nenhum paciente encontrado para estes filtros.' : 'Nenhum paciente cadastrado nesta clínica.' ?></td></tr>
                 <?php else: ?>
                   <?php foreach ($patients as $p): ?>
                     <tr data-patient-row>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($p['name']) ?></td>
+                      <td class="u-font-semibold u-color-botanical-forest-900">
+                        <a href="/pacientes/<?= (int)$p['id'] ?>" class="patient-name-link u-color-botanical-forest-900 u-no-underline u-font-bold" data-testid="patient-row-link-<?= (int)$p['id'] ?>">
+                          <?= htmlspecialchars($p['name']) ?>
+                        </a>
+                      </td>
                       <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
                       <td><?= htmlspecialchars($p['phone'] ?? '—') ?></td>
                       <td><span class="badge <?= $p['status'] === 'active' ? 'badge-success' : 'badge-secondary' ?>"><?= ['active'=>'Ativo','inactive'=>'Inativo','anonymized'=>'Anonimizado'][$p['status']] ?? 'Não informado' ?></span></td>
                       <td>
-                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary" style="min-height: 32px; padding: 0 var(--space-3); font-size: 0.8rem;">Ver perfil</a>
-                        <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary" style="min-height: 32px; font-size: 0.8rem;">Editar</a>
+                        <a href="/pacientes/<?= $p['id'] ?>" class="btn btn-secondary u-minh-touch u-py-0 u-px-3 u-text-compact">Ver perfil</a>
+                        <a href="/pacientes/<?= $p['id'] ?>/editar" class="btn btn-secondary u-minh-touch u-text-compact">Editar</a>
                       </td>
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
-                <tr id="patient-search-empty" hidden><td colspan="5" style="text-align: center; color: var(--neutral-gray-500); padding: var(--space-6);">Nenhum paciente encontrado para esta busca.</td></tr>
+                <tr id="patient-search-empty" hidden><td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6">Nenhum paciente encontrado para esta busca.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <nav aria-label="Paginação de pacientes" style="display:flex;gap:12px;margin:16px 0;align-items:center">
+        <nav aria-label="Paginação de pacientes" class="u-flex u-gap-3 u-my-4 u-mx-0 u-items-center">
           <?php if ($listing['page'] > 1): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']-1])) ?>">Anterior</a><?php endif; ?>
           <span>Página <?= $listing['page'] ?> de <?= $listing['pages'] ?></span>
           <?php if ($listing['page'] < $listing['pages']): ?><a class="btn btn-secondary" href="/pacientes?<?= htmlspecialchars(http_build_query(['q'=>$query,'status'=>$statusFilter,'page'=>$listing['page']+1])) ?>">Próxima</a><?php endif; ?>
         </nav>
-        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">document.querySelector('form[action="/pacientes"][method="get"]').addEventListener('submit', function(){ this.querySelector('button[type="submit"]').disabled=true; this.querySelector('button[type="submit"]').textContent='Buscando…'; });</script>
+        <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
+        (function(){
+          var searchForm = document.querySelector('form[action="/pacientes"][method="get"]');
+          if (searchForm) {
+            searchForm.addEventListener('submit', function(){
+              var btn = this.querySelector('button[type="submit"]');
+              if (btn) { btn.disabled = true; btn.textContent = 'Buscando…'; }
+            });
+          }
+
+          var searchInput = document.getElementById('patient-search');
+          var patientRows = document.querySelectorAll('tbody#patient-list tr[data-patient-row]');
+          var emptyMsg = document.getElementById('patient-search-empty');
+          var countMsg = document.getElementById('patient-search-count');
+          var totalRows = patientRows.length;
+
+          if (searchInput && totalRows > 0) {
+            searchInput.addEventListener('input', function() {
+              var term = (searchInput.value || '').trim().toLowerCase();
+              if (term.length >= 3) {
+                var visibleCount = 0;
+                patientRows.forEach(function(row) {
+                  var text = (row.textContent || '').toLowerCase();
+                  if (text.indexOf(term) !== -1) {
+                    row.style.display = '';
+                    visibleCount++;
+                  } else {
+                    row.style.display = 'none';
+                  }
+                });
+                if (emptyMsg) emptyMsg.hidden = (visibleCount > 0);
+                if (countMsg) countMsg.textContent = visibleCount + ' paciente(s) encontrado(s) na listagem.';
+              } else if (term.length === 0) {
+                patientRows.forEach(function(row) { row.style.display = ''; });
+                if (emptyMsg) emptyMsg.hidden = true;
+                if (countMsg) countMsg.textContent = totalRows + ' paciente(s) encontrado(s).';
+              }
+            });
+          }
+        })();
+        </script>
 
         <!-- Modal Cadastrar Paciente (Design System Premium) -->
         <div id="patientModal" data-dialog="modal" class="modal-overlay" data-call-self="closePatientModal">
           <div class="cn-dialog__panel modal-dialog">
             <div class="modal-header">
-              <h3>Novo Paciente</h3>
+              <h3>Novo paciente</h3>
               <button type="button" data-dialog-close class="modal-close" data-call="closePatientModal" aria-label="Fechar modal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -5298,11 +6196,11 @@ class DashboardController
               <input type="hidden" name="_submission_id" value="<?= $submissionId ?>">
               <div class="modal-body">
                 <?php if ($patientError): ?>
-                  <div role="alert" style="background: #FEF2F2; border-left: 4px solid #DC2626; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; color: #B91C1C;">
-                    <strong>Atenção:</strong> <?= htmlspecialchars($patientError) ?>
+                  <div class="op-message op-message--error u-mb-4" role="alert">
+                    <strong>Erro:</strong> <?= htmlspecialchars($patientError) ?>
                     <?php if ($duplicateId): ?>
-                      <div style="margin-top: 8px;">
-                        <a href="/pacientes/<?= (int)$duplicateId ?>" class="btn btn-sm btn-secondary" style="color: #B91C1C; text-decoration: underline; font-weight: 600;">Conferir cadastro existente ➔</a>
+                      <div class="u-mt-2">
+                        <a href="/pacientes/<?= (int)$duplicateId ?>" class="btn btn-sm btn-secondary u-color-semantic-error u-underline u-font-semibold">Conferir cadastro existente →</a>
                       </div>
                     <?php endif; ?>
                   </div>
@@ -5317,7 +6215,7 @@ class DashboardController
                   <input type="email" id="p_email" name="email" class="form-control" placeholder="paciente@exemplo.com.br">
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                <div class="u-grid u-cols-2 u-gap-4">
                   <div class="form-group">
                     <label class="form-label" for="p_phone">Telefone / WhatsApp</label>
                     <input type="tel" id="p_phone" name="phone" class="form-control" placeholder="(11) 98765-4321">
@@ -5329,25 +6227,34 @@ class DashboardController
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label" for="p_gender">Gênero / Sexo biológico (opcional)</label>
+                  <label class="form-label" for="p_gender">Sexo registrado para referências clínicas (opcional)</label>
                   <select id="p_gender" name="gender" class="form-control" aria-describedby="p_gender_help">
                     <option value="">Selecione...</option>
                     <option value="Feminino">Feminino</option>
                     <option value="Masculino">Masculino</option>
                     <option value="Outro">Outro / Não informado</option>
                   </select>
-                  <small id="p_gender_help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</small>
+                  <small id="p_gender_help" class="u-block u-text-caption u-color-neutral-gray-500 u-mt-1">O parâmetro usado nas equações não define a identidade de gênero. Quando confirmado pelo profissional, pode ser usado na classificação da relação cintura-quadril (RCQ) e na elegibilidade de protocolos de dobras, junto com a idade. Sem os dados exigidos, a classificação ou equação fica indisponível; confirme o parâmetro no contexto da avaliação. Não o deduza da identidade de gênero.</small>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group">
+                  <label class="form-label" for="p_allergies">Alergias e intolerâncias alimentares</label>
+                  <input type="text" id="p_allergies" name="allergies" class="form-control" placeholder="Ex: amendoim, glúten, leite, frutos do mar...">
+                  <label class="u-flex u-items-center u-gap-2 u-text-compact u-mt-1 u-pointer">
+                    <input type="checkbox" id="p_allergy_denied" name="allergy_denied" value="1" data-allergy-toggle="p_allergies">
+                    <span>Nega alergias alimentares conhecidas</span>
+                  </label>
+                </div>
+
+                <div class="form-group u-mb-0">
                   <label class="form-label" for="p_notes">Observações iniciais</label>
-                  <textarea id="p_notes" name="notes" class="form-control" style="min-height: 70px;" placeholder="Objetivo clínico, alergias ou queixa principal..."></textarea>
+                  <textarea id="p_notes" name="notes" class="form-control u-minh-field" placeholder="Objetivo clínico, preferências ou observações gerais..."></textarea>
                 </div>
                 <?php require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               </div>
               <div class="modal-footer">
                 <button data-dialog-close type="button" class="btn btn-secondary" data-call="closePatientModal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar Paciente</button>
+                <button type="submit" class="btn btn-primary">Salvar paciente</button>
               </div>
             </form>
           </div>
@@ -5416,70 +6323,81 @@ class DashboardController
             return http_build_query($merged);
         };
 
-        $title = 'Base de Alimentos';
+        // v54.41: nutricionista da clínica pode adicionar alimento próprio.
+        $canAddFood = \ClyoNutri\Application\Controllers\FoodCatalogController::canManage(\ClyoNutri\Core\Database\Connection::getInstance());
+        $foodFeedback = $_SESSION['feedback_message'] ?? null;
+        unset($_SESSION['feedback_message']);
+        $title = 'Alimentos';
         $activeNav = 'alimentos';
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
 
         ob_start();
         ?>
-        <div class="foods-page-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 16px;">
+        <div class="foods-page-header u-flex u-justify-between u-items-start u-mb-6 u-wrap u-gap-4">
           <div>
-            <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">Tabela de Alimentos (TACO)</h1>
-            <p style="color: var(--neutral-gray-600); margin: 0; font-size: 0.95rem;">Referência analítica por 100g da Tabela Brasileira de Composição de Alimentos com cálculo proporcional por medida caseira.</p>
+            <h1 class="u-text-h2 u-font-bold u-color-botanical-forest-900 u-mb-1">Tabela de Alimentos (TACO)</h1>
+            <p class="u-color-neutral-gray-600 u-m-0 u-text-body">Referência analítica por 100g da Tabela Brasileira de Composição de Alimentos com cálculo proporcional por medida caseira.</p>
+          </div>
+          <div class="u-flex u-gap-2 u-wrap">
+          <?php if ($canAddFood): ?><a href="/alimentos/novo" class="btn btn-primary u-minh-touch u-inline-flex u-items-center u-py-0 u-px-3" data-testid="link-food-create">+ Adicionar alimento</a><?php endif; ?>
+          <a href="/medidas-caseiras" class="btn btn-secondary u-minh-touch u-inline-flex u-items-center u-py-0 u-px-3" data-testid="link-clinic-measures">Medidas caseiras da clínica</a>
+          <a href="/alimentos/buscas" class="btn btn-secondary u-minh-touch u-inline-flex u-items-center u-py-0 u-px-3" data-testid="link-food-search-report">Buscas e trocas de escolha</a>
+          <a href="/alimentos/equivalencias" class="btn btn-secondary u-minh-touch u-inline-flex u-items-center u-py-0 u-px-3" data-testid="link-equivalence-rules">Regras de equivalência</a>
           </div>
         </div>
 
-        <form method="GET" action="/alimentos" class="foods-filters" data-busy-text="Buscando…" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: var(--space-4);">
-          <div style="flex: 1 1 200px; min-width: 160px;">
-            <label for="food-search-input" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Buscar</label>
-            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($listing['q']) ?>" placeholder="Alimento ou categoria…" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+        <?php if ($foodFeedback): ?><div class="op-message op-message--info u-mb-4" role="status" data-testid="food-create-feedback"><?= htmlspecialchars($foodFeedback) ?></div><?php endif; ?>
+        <form method="GET" action="/alimentos" class="foods-filters u-flex u-wrap u-gap-3 u-items-end u-mb-4" data-busy-text="Buscando…">
+          <div class="u-flex-1 u-basis-md u-minw-md">
+            <label for="food-search-input" class="form-label u-block u-text-compact u-mb-1">Buscar</label>
+            <input type="text" id="food-search-input" name="q" value="<?= htmlspecialchars($listing['q']) ?>" placeholder="Alimento ou categoria…" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
           </div>
-          <div style="flex: 0 1 220px; min-width: 140px;">
-            <label for="food-category-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Grupo TACO</label>
-            <select id="food-category-filter" name="category" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+          <div class="u-flex-0 u-basis-md u-minw-sm">
+            <label for="food-category-filter" class="form-label u-block u-text-compact u-mb-1">Grupo TACO</label>
+            <select id="food-category-filter" name="category" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               <option value="">Todos os grupos</option>
               <?php foreach ($categories as $cat): ?>
                 <option value="<?= htmlspecialchars($cat) ?>" <?= $listing['category'] === $cat ? 'selected' : '' ?>><?= htmlspecialchars($cat) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
-          <div style="flex: 0 1 160px; min-width: 120px;">
-            <label for="food-source-filter" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Fonte</label>
-            <select id="food-source-filter" name="source" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+          <div class="u-flex-0 u-basis-md u-minw-sm">
+            <label for="food-source-filter" class="form-label u-block u-text-compact u-mb-1">Fonte</label>
+            <select id="food-source-filter" name="source" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               <option value="" <?= $listing['source'] === '' ? 'selected' : '' ?>>Todas</option>
               <option value="TACO" <?= $listing['source'] === 'TACO' ? 'selected' : '' ?>>TACO</option>
               <option value="clinic" <?= $listing['source'] === 'clinic' ? 'selected' : '' ?>>Minha clínica</option>
             </select>
           </div>
-          <div style="flex: 0 1 120px; min-width: 100px;">
-            <label for="food-per-page" class="form-label" style="display:block; font-size: 0.8rem; margin-bottom: 4px;">Por página</label>
-            <select id="food-per-page" name="per_page" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid var(--neutral-gray-300); border-radius: 6px;">
+          <div class="u-flex-0 u-basis-sm u-minw-sm">
+            <label for="food-per-page" class="form-label u-block u-text-compact u-mb-1">Por página</label>
+            <select id="food-per-page" name="per_page" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
               <?php foreach (FoodCatalogService::PER_PAGE_ALLOWED as $n): ?>
                 <option value="<?= $n ?>" <?= (int)$listing['per_page'] === $n ? 'selected' : '' ?>><?= $n ?></option>
               <?php endforeach; ?>
             </select>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="submit" class="btn btn-primary" style="padding: 8px 16px; min-height: 44px;">Buscar</button>
+          <div class="u-flex u-gap-2 u-wrap">
+            <button type="submit" class="btn btn-primary u-py-2 u-px-4 u-minh-touch">Buscar</button>
             <?php if ($listing['q'] !== '' || $listing['category'] !== '' || $listing['source'] !== '' || (int)$listing['per_page'] !== 50): ?>
-              <a href="/alimentos" class="btn btn-outline" style="padding: 8px 12px; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Limpar</a>
+              <a href="/alimentos" class="btn btn-outline u-py-2 u-px-3 u-no-underline u-minh-touch u-inline-flex u-items-center">Limpar</a>
             <?php endif; ?>
           </div>
         </form>
 
-        <!-- Banner Explicativo de Integridade Clínica (PX-16) -->
-        <div class="card" style="padding: 16px 20px; background: rgba(15, 62, 23, 0.03); border: 1px solid var(--neutral-gray-200); border-radius: 8px; margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--brand-navy-900); font-size: 0.9rem; margin-bottom: 4px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-600);" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            Diferença entre Referência Padrão (100g) e Medida Caseira
+        <?php /* Banner Explicativo de Integridade Clínica (PX-16) */ ?>
+        <div class="card ds-panel-muted">
+          <div class="u-flex u-items-center u-gap-2 u-font-semibold u-color-botanical-forest-900 u-text-compact u-mb-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="u-color-botanical-copper-600" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Diferença entre referência padrão (100g) e medida caseira
           </div>
-          <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.875rem; line-height: 1.5;">
-            Os dados laboratoriais oficiais (TACO) são mensurados na <strong>base fixa de 100g</strong>. Na coluna <em>Medida Caseira</em>, a quantidade em gramas/ml e a energia resultante são calculadas proporcionalmente para orientar prescrições clínicas seguras sem confusão métrica.
+          <p class="u-m-0 u-color-neutral-gray-600 u-text-compact u-leading-body">
+            Os dados laboratoriais oficiais (TACO) são mensurados na <strong>base fixa de 100g</strong>. Na coluna <em>Medida caseira</em>, a quantidade em gramas/ml e a energia resultante são calculadas proporcionalmente para orientar prescrições clínicas seguras sem confusão métrica.
           </p>
         </div>
 
-        <p class="foods-result-summary" style="margin: 0 0 12px; color: var(--neutral-gray-600); font-size: 0.9rem;" aria-live="polite">
+        <p class="foods-result-summary u-mt-0 u-mb-3 u-mx-0 u-color-neutral-gray-600 u-text-compact" aria-live="polite">
           <?php if ($listing['total'] === 0): ?>
             Nenhum alimento encontrado.
           <?php else: ?>
@@ -5487,15 +6405,15 @@ class DashboardController
           <?php endif; ?>
         </p>
 
-        <div class="card" style="padding: 0; overflow: hidden;">
+        <div class="card u-p-0 u-overflow-hidden">
           <div class="table-responsive">
-            <table class="table" style="margin-bottom: 0;">
-              <thead style="background: var(--neutral-gray-50);">
+            <table class="table u-mb-0">
+              <thead class="u-bg-neutral-gray-50">
                 <tr>
-                  <th scope="col" style="min-width: 200px;">Alimento</th>
+                  <th scope="col" class="u-minw-md">Alimento</th>
                   <th scope="col">Categoria</th>
-                  <th scope="col">Medida Caseira</th>
-                  <th scope="col" class="tabular-nums" style="color: var(--brand-navy-900);">Energia na Porção</th>
+                  <th scope="col">Medida caseira</th>
+                  <th scope="col" class="tabular-nums u-color-botanical-forest-900">Energia na Porção</th>
                   <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Energia (100g)</th>
                   <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Proteína (100g)</th>
                   <th scope="col" class="tabular-nums" title="Referência Oficial TACO padronizada por 100g">Carboidratos (100g)</th>
@@ -5505,7 +6423,7 @@ class DashboardController
               <tbody>
                 <?php if (empty($foods)): ?>
                   <tr>
-                    <td colspan="8" style="text-align: center; padding: 48px 16px; color: var(--neutral-gray-500);">
+                    <td colspan="8" class="u-text-center u-py-12 u-px-4 u-color-neutral-gray-500">
                       Nenhum alimento encontrado para o termo pesquisado.
                     </td>
                   </tr>
@@ -5517,19 +6435,21 @@ class DashboardController
                     $servingUnit = htmlspecialchars($f['serving_unit'] ?? 'g');
                   ?>
                     <tr>
-                      <td style="font-weight: 600; color: var(--brand-navy-900);"><?= htmlspecialchars($f['name']) ?><?php if (!empty($f['taco_code'])): ?>
-                        <span style="display: block; font-weight: 400; font-size: 0.75rem; color: var(--neutral-gray-500);">TACO nº <?= (int)$f['taco_code'] ?><?= !empty($f['nutrient_flags']) ? ' · ' . htmlspecialchars(str_replace(['protein_g', 'lipid_g', 'carbohydrate_g', 'fiber_g', 'energy_kcal', 'em_branco', ';', '='], ['proteína', 'lipídios', 'carboidratos', 'fibra', 'energia', 'não analisado', ', ', ': '], (string)$f['nutrient_flags'])) : '' ?></span>
+                      <td class="u-font-semibold u-color-botanical-forest-900"><?= htmlspecialchars($f['name']) ?><?php if (!empty($f['synonym_match'])): ?>
+                        <span class="food-synonym-match u-inline-block u-mt-0 u-mr-0 u-mb-0 u-ml-2 u-py-0 u-px-2 u-radius-pill u-text-caption u-font-medium u-color-botanical-forest-900 u-bg-botanical-cream-50 u-border u-bc-botanical-sage-200" data-testid="food-synonym-match" title="O nome não tem o termo buscado; o alimento apareceu pelo nome regional equivalente.">Por sinônimo: <?= htmlspecialchars((string)$f['synonym_match']) ?></span>
+                      <?php endif; ?><?php if (!empty($f['taco_code'])): ?>
+                        <span class="u-block u-font-regular u-text-caption u-color-neutral-gray-500">TACO nº <?= (int)$f['taco_code'] ?><?= !empty($f['nutrient_flags']) ? ' · ' . htmlspecialchars(str_replace(['protein_g', 'lipid_g', 'carbohydrate_g', 'fiber_g', 'energy_kcal', 'em_branco', ';', '='], ['proteína', 'lipídios', 'carboidratos', 'fibra', 'energia', 'não analisado', ', ', ': '], (string)$f['nutrient_flags'])) : '' ?></span>
                       <?php endif; ?></td>
-                      <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span></td>
+                      <td><span class="badge badge-info"><?= htmlspecialchars($f['category'] ?? 'Geral') ?></span><?php if (!empty($f['is_custom'])): ?> <span class="badge badge-success" data-testid="food-clinic-badge">Minha clínica</span><?php endif; ?></td>
                       <td>
-                        <span style="font-weight: 500; color: var(--neutral-gray-800);">
+                        <span class="u-font-medium u-color-neutral-ink-900">
                           <?= $servingG < 100 || $servingUnit !== 'g' ? '1 ' . $servingUnit . ' (' . $servingG . 'g)' : '100g' ?>
                         </span>
                       </td>
-                      <td class="tabular-nums" style="font-weight: 700; color: var(--brand-navy-900);">
+                      <td class="tabular-nums u-font-bold u-color-botanical-forest-900">
                         <?= number_format($portionKcal, 1, ',', '.') ?> kcal
                       </td>
-                      <td class="tabular-nums" style="color: var(--neutral-gray-600);"><?= number_format($energy100, 1, ',', '.') ?> kcal</td>
+                      <td class="tabular-nums u-color-neutral-gray-600"><?= number_format($energy100, 1, ',', '.') ?> kcal</td>
                       <td class="tabular-nums"><?= number_format((float)$f['protein_g'], 1, ',', '.') ?> g</td>
                       <td class="tabular-nums"><?= number_format((float)$f['carbohydrate_g'], 1, ',', '.') ?> g</td>
                       <td class="tabular-nums"><?= number_format((float)$f['lipid_g'], 1, ',', '.') ?> g</td>
@@ -5542,12 +6462,12 @@ class DashboardController
         </div>
 
         <?php if ($listing['pages'] > 1 || $listing['total'] > 0): ?>
-        <nav class="foods-pagination" aria-label="Paginação da base de alimentos" style="display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; align-items:center; justify-content:space-between;">
-          <span style="color: var(--neutral-gray-600); font-size: 0.9rem;">Página <?= (int)$listing['page'] ?> de <?= (int)$listing['pages'] ?></span>
-          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+        <nav class="foods-pagination u-flex u-wrap u-gap-2 u-my-4 u-mx-0 u-items-center u-justify-between" aria-label="Paginação da base de alimentos">
+          <span class="u-color-neutral-gray-600 u-text-compact">Página <?= (int)$listing['page'] ?> de <?= (int)$listing['pages'] ?></span>
+          <div class="u-flex u-wrap u-gap-1 u-items-center">
             <?php if ($listing['page'] > 1): ?>
-              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => 1])) ?>">Primeira</a>
-              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] - 1])) ?>" rel="prev">Anterior</a>
+              <a class="btn btn-secondary u-minh-touch u-py-0 u-px-3 u-inline-flex u-items-center" href="/alimentos?<?= htmlspecialchars($qs(['page' => 1])) ?>">Primeira</a>
+              <a class="btn btn-secondary u-minh-touch u-py-0 u-px-3 u-inline-flex u-items-center" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] - 1])) ?>" rel="prev">Anterior</a>
             <?php endif; ?>
             <?php
               $window = 2;
@@ -5557,20 +6477,20 @@ class DashboardController
                 $isCurrent = $p === (int)$listing['page'];
             ?>
               <?php if ($isCurrent): ?>
-                <span class="btn btn-primary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; pointer-events:none;" aria-current="page"><?= $p ?></span>
+                <span class="btn btn-primary u-minh-touch u-minw-touch u-py-0 u-px-3 u-inline-flex u-items-center u-justify-center u-disabled" aria-current="page"><?= $p ?></span>
               <?php else: ?>
-                <a class="btn btn-secondary" style="min-height:44px; min-width:44px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $p])) ?>"><?= $p ?></a>
+                <a class="btn btn-secondary u-minh-touch u-minw-touch u-py-0 u-px-3 u-inline-flex u-items-center u-justify-center" href="/alimentos?<?= htmlspecialchars($qs(['page' => $p])) ?>"><?= $p ?></a>
               <?php endif; ?>
             <?php endfor; ?>
             <?php if ($listing['page'] < $listing['pages']): ?>
-              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] + 1])) ?>" rel="next">Próxima</a>
-              <a class="btn btn-secondary" style="min-height:44px; padding:0 14px; display:inline-flex; align-items:center;" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['pages']])) ?>">Última</a>
+              <a class="btn btn-secondary u-minh-touch u-py-0 u-px-3 u-inline-flex u-items-center" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['page'] + 1])) ?>" rel="next">Próxima</a>
+              <a class="btn btn-secondary u-minh-touch u-py-0 u-px-3 u-inline-flex u-items-center" href="/alimentos?<?= htmlspecialchars($qs(['page' => $listing['pages']])) ?>">Última</a>
             <?php endif; ?>
           </div>
         </nav>
         <?php endif; ?>
 
-        <p class="taco-attribution" style="margin: 12px 0 0; color: var(--neutral-gray-500); font-size: 0.8rem; line-height: 1.5;">
+        <p class="taco-attribution u-mt-3 u-mb-0 u-mx-0 u-color-neutral-gray-500 u-text-compact u-leading-body">
           Fonte dos alimentos marcados com nº TACO: NEPA-UNICAMP. <cite>Tabela Brasileira de Composição de Alimentos – TACO</cite>, 4ª ed. revisada e ampliada. Campinas: NEPA-UNICAMP, 2011. Valores por 100 g de parte comestível.
           Tr (traço) e NA (não aplicável) aparecem como 0; "*" (análise em reavaliação na TACO) e "não analisado" também aparecem como 0 e ficam indicados abaixo do nome.
         </p>

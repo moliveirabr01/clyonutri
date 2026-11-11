@@ -1,0 +1,1220 @@
+{
+  "synthetic": true,
+  "backend": "v54.32",
+  "browser": "Chrome/Firefox/WebKit",
+  "axe_version": "4.14.0",
+  "checks": [
+    {
+      "name": "all six original destinations retained",
+      "pass": true
+    },
+    {
+      "name": "meal task precedes secondary links",
+      "pass": true
+    },
+    {
+      "name": "hero opens published plan",
+      "pass": true
+    },
+    {
+      "name": "v54.32 confirmed notes visible",
+      "pass": true
+    },
+    {
+      "name": "food quantity and substitute preserved",
+      "pass": true
+    },
+    {
+      "name": "recipe preparation and base versus dose retained",
+      "pass": true
+    },
+    {
+      "name": "actual consumption survives tab change",
+      "pass": true
+    },
+    {
+      "name": "valid web session restores without credentials",
+      "pass": true
+    },
+    {
+      "name": "diary persists after reload",
+      "pass": true
+    },
+    {
+      "name": "hydration is confirmed by v54.32",
+      "pass": true
+    },
+    {
+      "name": "hydration history opens",
+      "pass": true
+    },
+    {
+      "name": "check-in persists after reload",
+      "pass": true
+    },
+    {
+      "name": "unsent chat draft preserved",
+      "pass": true
+    },
+    {
+      "name": "Hoje-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Hoje-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Hoje-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Plano-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Plano-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Plano-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Diário-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Diário-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Diário-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Chat-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Chat-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Chat-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Evolução-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Evolução-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Evolução-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Perfil-320 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Perfil-320 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Perfil-320 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Hoje-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Hoje-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Hoje-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Plano-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Plano-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Plano-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Diário-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Diário-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Diário-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Chat-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Chat-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Chat-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Evolução-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Evolução-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Evolução-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Perfil-375 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Perfil-375 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Perfil-375 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Hoje-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Hoje-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Hoje-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Plano-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Plano-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Plano-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Diário-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Diário-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Diário-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Chat-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Chat-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Chat-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Evolução-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Evolução-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Evolução-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Perfil-390 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Perfil-390 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Perfil-390 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Hoje-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Hoje-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Hoje-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Plano-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Plano-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Plano-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Diário-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Diário-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Diário-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Chat-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Chat-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Chat-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Evolução-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Evolução-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Evolução-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "Perfil-768 document reflows",
+      "pass": true
+    },
+    {
+      "name": "Perfil-768 axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "Perfil-768 one tab selected",
+      "pass": true
+    },
+    {
+      "name": "evolution-landscape document reflows",
+      "pass": true
+    },
+    {
+      "name": "evolution-landscape axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "evolution-landscape one tab selected",
+      "pass": true
+    },
+    {
+      "name": "plan-textspacing document reflows",
+      "pass": true
+    },
+    {
+      "name": "plan-textspacing axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "plan-textspacing one tab selected",
+      "pass": true
+    },
+    {
+      "name": "offline hydration is pending, never falsely confirmed",
+      "pass": true
+    },
+    {
+      "name": "offline queue resumes against real API",
+      "pass": true
+    },
+    {
+      "name": "logout reaches access screen",
+      "pass": true
+    },
+    {
+      "name": "empty state comes from second clinic, no first patient data",
+      "pass": true
+    },
+    {
+      "name": "empty-other-clinic document reflows",
+      "pass": true
+    },
+    {
+      "name": "empty-other-clinic axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "empty-other-clinic one tab selected",
+      "pass": true
+    },
+    {
+      "name": "firefox-Hoje document reflows",
+      "pass": true
+    },
+    {
+      "name": "firefox-Hoje axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "firefox-Hoje one tab selected",
+      "pass": true
+    },
+    {
+      "name": "firefox-Plano document reflows",
+      "pass": true
+    },
+    {
+      "name": "firefox-Plano axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "firefox-Plano one tab selected",
+      "pass": true
+    },
+    {
+      "name": "firefox-Evolução document reflows",
+      "pass": true
+    },
+    {
+      "name": "firefox-Evolução axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "firefox-Evolução one tab selected",
+      "pass": true
+    },
+    {
+      "name": "webkit-Hoje document reflows",
+      "pass": true
+    },
+    {
+      "name": "webkit-Hoje axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "webkit-Hoje one tab selected",
+      "pass": true
+    },
+    {
+      "name": "webkit-Plano document reflows",
+      "pass": true
+    },
+    {
+      "name": "webkit-Plano axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "webkit-Plano one tab selected",
+      "pass": true
+    },
+    {
+      "name": "webkit-Evolução document reflows",
+      "pass": true
+    },
+    {
+      "name": "webkit-Evolução axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "webkit-Evolução one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native zoom geometry 2",
+      "pass": true
+    },
+    {
+      "name": "native2-Hoje document reflows",
+      "pass": true
+    },
+    {
+      "name": "native2-Hoje axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native2-Hoje one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native2-Plano document reflows",
+      "pass": true
+    },
+    {
+      "name": "native2-Plano axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native2-Plano one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native2-Evolução document reflows",
+      "pass": true
+    },
+    {
+      "name": "native2-Evolução axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native2-Evolução one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native zoom geometry 4",
+      "pass": true
+    },
+    {
+      "name": "native4-Hoje document reflows",
+      "pass": true
+    },
+    {
+      "name": "native4-Hoje axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native4-Hoje one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native4-Plano document reflows",
+      "pass": true
+    },
+    {
+      "name": "native4-Plano axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native4-Plano one tab selected",
+      "pass": true
+    },
+    {
+      "name": "native4-Evolução document reflows",
+      "pass": true
+    },
+    {
+      "name": "native4-Evolução axe detects no WCAG violations",
+      "pass": true
+    },
+    {
+      "name": "native4-Evolução one tab selected",
+      "pass": true
+    },
+    {
+      "name": "no uncaught JavaScript errors",
+      "pass": true
+    }
+  ],
+  "states": [
+    {
+      "label": "Hoje-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "Plano-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Diário-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Chat-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Evolução-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Perfil-320",
+      "width": 320,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Hoje-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "Plano-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Diário-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Chat-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Evolução-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Perfil-375",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Hoje-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "Plano-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Diário-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Chat-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Evolução-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Perfil-390",
+      "width": 390,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 390,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Hoje-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "Plano-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Diário-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Chat-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Evolução-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "Perfil-768",
+      "width": 768,
+      "outerWidth": 768,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 768,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "evolution-landscape",
+      "width": 812,
+      "outerWidth": 812,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 812,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "plan-textspacing",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "empty-other-clinic",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "firefox-Hoje",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "firefox-Plano",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "firefox-Evolução",
+      "width": 375,
+      "outerWidth": 500,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "webkit-Hoje",
+      "width": 375,
+      "outerWidth": 375,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "webkit-Plano",
+      "width": 375,
+      "outerWidth": 375,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "webkit-Evolução",
+      "width": 375,
+      "outerWidth": 375,
+      "dpr": 1,
+      "scale": 1,
+      "scroll": 375,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "native2-Hoje",
+      "width": 640,
+      "outerWidth": 1280,
+      "dpr": 2,
+      "scale": 1,
+      "scroll": 640,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 7
+        }
+      ]
+    },
+    {
+      "label": "native2-Plano",
+      "width": 640,
+      "outerWidth": 1280,
+      "dpr": 2,
+      "scale": 1,
+      "scroll": 640,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "native2-Evolução",
+      "width": 640,
+      "outerWidth": 1280,
+      "dpr": 2,
+      "scale": 1,
+      "scroll": 640,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "native4-Hoje",
+      "width": 320,
+      "outerWidth": 1280,
+      "dpr": 4,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "nodes": 2
+        },
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "native4-Plano",
+      "width": 320,
+      "outerWidth": 1280,
+      "dpr": 4,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    },
+    {
+      "label": "native4-Evolução",
+      "width": 320,
+      "outerWidth": 1280,
+      "dpr": 4,
+      "scale": 1,
+      "scroll": 320,
+      "overflows": [],
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "nodes": 6
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "limitations": "Expo Web and native JS exports; no physical Android/iOS, keyboard/safe-area or assistive reader certification. No chat sent."
+}

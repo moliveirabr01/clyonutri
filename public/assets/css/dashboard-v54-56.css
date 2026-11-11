@@ -1,0 +1,157 @@
+/*
+ * v54.56 — Painel geral (/dashboard) com a hierarquia do Talui e a marca Clyo Nutri.
+ * Saudação + data, indicadores com ícone e comparação, agenda da semana na primeira dobra,
+ * lista acionável logo abaixo. Só tokens da marca (sem cor hex); escopo .dash para não afetar outras telas.
+ */
+.dash { display: flex; flex-direction: column; gap: var(--space-5); max-width: 1440px; }
+.dash .dashboard-banner { margin: 0; }
+
+/* Saudação */
+.dash-greeting { display: flex; align-items: center; gap: var(--space-4); }
+.dash-greeting__icon { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--botanical-sage-100); border: 1px solid var(--botanical-sage-200); color: var(--botanical-green-600); }
+.dash-greeting__icon svg { width: 24px; height: 24px; }
+.dash-greeting__date { margin: 0; font-size: 0.8125rem; font-weight: 500; color: var(--neutral-gray-600); }
+.dash-greeting__title { margin: 2px 0 0; font-size: 1.75rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; color: var(--botanical-forest-900); }
+.dash-greeting__subtitle { margin: 2px 0 0; font-size: 0.8125rem; color: var(--neutral-gray-600); }
+
+/* Prontidão compacta (uma linha) */
+.dash-readiness { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-button); font-size: 0.8125rem;
+  background: var(--neutral-white); border: 1px solid var(--neutral-gray-200); color: var(--neutral-gray-700); }
+.dash-readiness__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--semantic-success); flex: none; }
+.dash-readiness--pending { background: var(--semantic-warning-light); border-color: var(--semantic-warning-border); color: var(--semantic-warning-strong); }
+.dash-readiness--pending .dash-readiness__dot { background: var(--semantic-warning); }
+.dash-readiness__link { font-weight: 600; color: var(--botanical-copper-600); display: inline-flex; align-items: center; min-height: 24px; }
+
+/* Indicadores */
+.dash-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); }
+.dash-kpi { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5);
+  background: var(--neutral-white); border: 1px solid var(--neutral-gray-200); border-radius: 16px; box-shadow: var(--shadow-sm); }
+.dash-kpi__head { display: flex; align-items: center; gap: var(--space-3); }
+.dash-kpi__icon { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--botanical-sage-100); color: var(--botanical-green-600); }
+.dash-kpi--accent .dash-kpi__icon { background: var(--botanical-copper-100); color: var(--botanical-copper-600); }
+.dash-kpi__label { font-size: 0.8125rem; font-weight: 600; color: var(--neutral-gray-600); }
+.dash-kpi__value { font-size: 2rem; line-height: 1; font-weight: 700; color: var(--botanical-forest-900); }
+.dash-kpi--accent .dash-kpi__value { color: var(--botanical-copper-600); }
+.dash-kpi__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-2); font-size: 0.75rem; color: var(--neutral-gray-600); }
+.dash-kpi__note { color: var(--neutral-gray-600); }
+.dash-kpi__note a, .dash-kpi__link { color: var(--botanical-copper-600); font-weight: 600; display: inline-flex; align-items: center; min-height: 24px; }
+.dash-trend { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+  background: var(--neutral-gray-100); color: var(--neutral-gray-700); }
+.dash-trend--up { background: var(--botanical-sage-100); color: var(--botanical-forest-900); }
+.dash-trend--down { background: var(--botanical-copper-100); color: var(--botanical-copper-700); }
+.dash-trend--warn { background: var(--semantic-warning-light); color: var(--semantic-warning-strong); }
+.dash-trend--ok { background: var(--semantic-success-light); color: var(--semantic-success-text); }
+
+/* Cartões genéricos */
+.dash-card { min-width: 0; background: var(--neutral-white); border: 1px solid var(--neutral-gray-200); border-radius: 16px; box-shadow: var(--shadow-sm); padding: var(--space-5) var(--space-6); margin: 0; }
+.dash-card__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-4); border-bottom: 1px solid var(--neutral-gray-200); }
+.dash-card__title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--botanical-forest-900); }
+.dash-card__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.dash-card__hint { font-size: 0.8125rem; color: var(--neutral-gray-600); }
+.dash-link { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; font-size: 0.8125rem; font-weight: 600; color: var(--botanical-copper-600); }
+.dash-link svg { width: 14px; height: 14px; }
+.dash-empty { padding: var(--space-6) 0 var(--space-2); text-align: center; font-size: 0.8125rem; color: var(--neutral-gray-600); }
+.dash-empty p { margin: 0 0 var(--space-2); }
+
+.dash-grid { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: var(--space-5); align-items: start; }
+
+/* Agenda da semana */
+.dash-week__range { font-size: 0.8125rem; font-weight: 600; color: var(--botanical-forest-900); background: var(--botanical-cream-50); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-button); padding: 4px 10px; }
+.dash-week__days { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+.dash-day { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border-radius: 12px; }
+.dash-day--today { background: var(--botanical-sage-100); }
+.dash-day__head { display: flex; flex-direction: column; align-items: center; padding-bottom: var(--space-2); border-bottom: 1px solid var(--neutral-gray-200); color: var(--neutral-gray-600); }
+.dash-day--today .dash-day__head { color: var(--botanical-forest-900); border-bottom-color: var(--botanical-sage-300); }
+.dash-day__weekday { font-size: 0.8125rem; font-weight: 700; }
+.dash-day__weekday abbr { text-decoration: none; }
+.dash-day__date { font-size: 0.75rem; font-weight: 500; }
+.dash-day__empty { margin: 0; padding: var(--space-3) 0; text-align: center; font-size: 0.75rem; color: var(--neutral-gray-500); }
+.dash-day__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dash-appt { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 8px; text-decoration: none;
+  background: var(--neutral-white); border: 1px solid var(--botanical-sage-200); border-left: 3px solid var(--botanical-green-600); color: var(--neutral-ink-900); }
+.dash-appt:hover, .dash-appt:focus-visible { border-color: var(--botanical-green-600); }
+.dash-appt--scheduled { border-left-color: var(--botanical-copper-500); }
+.dash-appt--completed, .dash-appt--no_show { border-left-color: var(--neutral-gray-400); }
+.dash-appt__time { font-size: 0.75rem; font-weight: 700; color: var(--botanical-green-700); }
+.dash-appt__name { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-appt__meta { font-size: 0.6875rem; color: var(--neutral-gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-day__more { font-size: 0.75rem; font-weight: 600; color: var(--botanical-copper-600); text-align: center; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Consultas de hoje */
+.dash-today__list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.dash-today__item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--neutral-gray-100); }
+.dash-today__item:last-child { border-bottom: 0; }
+.dash-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; font-weight: 700;
+  background: var(--botanical-sage-100); color: var(--botanical-forest-900); }
+.dash-today__info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.dash-today__name { font-size: 0.875rem; font-weight: 600; color: var(--botanical-forest-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 24px; display: inline-flex; align-items: center; }
+.dash-today__meta { font-size: 0.75rem; color: var(--neutral-gray-600); }
+.dash-today__status .badge { font-size: 0.6875rem; }
+
+/* Lista acionável */
+.dash-attention { border-left: 4px solid var(--botanical-copper-500); }
+.dash-attention .attention-item { background: var(--botanical-cream-50); border-radius: 10px; }
+.dash-attention__more { margin-top: var(--space-3); }
+.dash-attention__more > summary { list-style: none; cursor: pointer; display: inline-flex; }
+.dash-attention__more > summary::-webkit-details-marker { display: none; }
+
+/* Ações rápidas */
+.dash-quick__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.dash-quick__item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); min-height: 56px; border-radius: 12px; text-decoration: none;
+  border: 1px solid var(--neutral-gray-200); background: var(--neutral-white); color: var(--botanical-forest-900); }
+.dash-quick__item:hover, .dash-quick__item:focus-visible { border-color: var(--botanical-green-600); background: var(--botanical-sage-100); }
+.dash-quick__icon { flex: none; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--botanical-sage-100); color: var(--botanical-green-600); }
+.dash-quick__icon svg { width: 18px; height: 18px; }
+.dash-quick__label { display: block; font-size: 0.8125rem; font-weight: 600; }
+.dash-quick__hint { display: block; font-size: 0.75rem; color: var(--neutral-gray-600); }
+
+/* Responsivo */
+@media (max-width: 1280px) {
+  .dash-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dash-metrics > * { grid-column: span 2; }
+  .dash-metrics > :nth-child(4), .dash-metrics > :nth-child(5) { grid-column: span 3; }
+}
+@media (max-width: 1100px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dash-quick__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .dash { gap: var(--space-4); }
+  .dash-greeting__title { font-size: 1.375rem; }
+  .dash-greeting__icon { width: 40px; height: 40px; }
+  .dash-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .dash-metrics > *, .dash-metrics > :nth-child(4), .dash-metrics > :nth-child(5) { grid-column: auto; }
+  .dash-metrics > :last-child { grid-column: 1 / -1; }
+  .dash-kpi { padding: var(--space-4); }
+  .dash-kpi__value { font-size: 1.625rem; }
+  .dash-card { padding: var(--space-4); }
+  .dash-week__days { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); }
+  .dash-day { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: var(--space-2) var(--space-3); border-bottom: 1px solid var(--neutral-gray-100); border-radius: 10px; }
+  .dash-day__head { grid-row: span 2; align-items: flex-start; border-bottom: 0; padding-bottom: 0; }
+  .dash-day__list, .dash-day__empty, .dash-day__more { grid-column: 2; min-width: 0; }
+  .dash-day__more { justify-content: flex-start; }
+  .dash-day__empty { text-align: left; padding: 2px 0; }
+  .dash-readiness { grid-template-columns: auto minmax(0, 1fr); }
+  .dash-readiness__link { grid-column: 2; min-height: 44px; }
+  .dash-link, .dash-kpi__link, .dash-kpi__note a, .dash-day__more, .dash-today__name { min-height: 44px; }
+  .dash-appt { min-height: 44px; justify-content: center; }
+  /* sobrepõe .app-content summary.btn { min-height: 40px !important } só no painel, no celular (alvo de 44 px) */
+  .app-content .dash summary.btn { min-height: var(--touch-target-min) !important; }
+  .dash .btn { min-height: var(--touch-target-min); height: auto; display: inline-flex; align-items: center; justify-content: center; }
+  .dash-attention .attention-item { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .dash-attention .attention-item .btn-touch { width: 100%; justify-content: center; }
+}
+@media (max-width: 420px) {
+  .dash-kpi { padding: var(--space-3); gap: var(--space-2); }
+  .dash-kpi__icon { width: 30px; height: 30px; }
+  .dash-kpi__value { font-size: 1.5rem; }
+  .dash-trend { white-space: normal; }
+  .dash-quick__grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (forced-colors: active) {
+  .dash-trend, .dash-kpi, .dash-card, .dash-appt, .dash-quick__item { border: 1px solid CanvasText; }
+  .dash-readiness__dot { background: CanvasText; }
+}

@@ -1,0 +1,202 @@
+{
+  "checks": [
+    {
+      "name": "login",
+      "pass": true
+    },
+    {
+      "name": "metrics",
+      "pass": true
+    },
+    {
+      "name": "weekly agenda",
+      "pass": true
+    },
+    {
+      "name": "desktop menu",
+      "pass": true
+    },
+    {
+      "name": "no horizontal overflow desktop",
+      "pass": true
+    },
+    {
+      "name": "mobile dialog",
+      "pass": true
+    },
+    {
+      "name": "background inert",
+      "pass": true
+    },
+    {
+      "name": "focus contained 0",
+      "pass": true
+    },
+    {
+      "name": "focus contained 1",
+      "pass": true
+    },
+    {
+      "name": "focus contained 2",
+      "pass": true
+    },
+    {
+      "name": "focus contained 3",
+      "pass": true
+    },
+    {
+      "name": "focus contained 4",
+      "pass": true
+    },
+    {
+      "name": "focus contained 5",
+      "pass": true
+    },
+    {
+      "name": "focus contained 6",
+      "pass": true
+    },
+    {
+      "name": "focus contained 7",
+      "pass": true
+    },
+    {
+      "name": "focus contained 8",
+      "pass": true
+    },
+    {
+      "name": "focus contained 9",
+      "pass": true
+    },
+    {
+      "name": "focus contained 10",
+      "pass": true
+    },
+    {
+      "name": "focus contained 11",
+      "pass": true
+    },
+    {
+      "name": "focus contained 12",
+      "pass": true
+    },
+    {
+      "name": "focus contained 13",
+      "pass": true
+    },
+    {
+      "name": "focus contained 14",
+      "pass": true
+    },
+    {
+      "name": "focus contained 15",
+      "pass": true
+    },
+    {
+      "name": "focus contained 16",
+      "pass": true
+    },
+    {
+      "name": "focus contained 17",
+      "pass": true
+    },
+    {
+      "name": "focus contained 18",
+      "pass": true
+    },
+    {
+      "name": "focus contained 19",
+      "pass": true
+    },
+    {
+      "name": "focus contained 20",
+      "pass": true
+    },
+    {
+      "name": "focus contained 21",
+      "pass": true
+    },
+    {
+      "name": "focus contained 22",
+      "pass": true
+    },
+    {
+      "name": "focus contained 23",
+      "pass": true
+    },
+    {
+      "name": "focus contained 24",
+      "pass": true
+    },
+    {
+      "name": "focus contained 25",
+      "pass": true
+    },
+    {
+      "name": "focus contained 26",
+      "pass": true
+    },
+    {
+      "name": "focus contained 27",
+      "pass": true
+    },
+    {
+      "name": "focus contained 28",
+      "pass": true
+    },
+    {
+      "name": "focus contained 29",
+      "pass": true
+    },
+    {
+      "name": "escape restores focus",
+      "pass": true
+    },
+    {
+      "name": "close restores background",
+      "pass": true
+    },
+    {
+      "name": "outside closes",
+      "pass": true
+    },
+    {
+      "name": "mobile no overflow",
+      "pass": true
+    },
+    {
+      "name": "patients navigation",
+      "pass": true
+    },
+    {
+      "name": "resize releases inert",
+      "pass": true
+    },
+    {
+      "name": "catalogue active",
+      "pass": true
+    },
+    {
+      "name": "patient search",
+      "pass": true
+    },
+    {
+      "name": "new appointment form",
+      "pass": true
+    },
+    {
+      "name": "desktop accessibility scan",
+      "pass": true
+    },
+    {
+      "name": "mobile menu accessibility scan",
+      "pass": true
+    },
+    {
+      "name": "no JS errors",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "url": "http://127.0.0.1:8081/dashboard"
+}

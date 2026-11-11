@@ -1,0 +1,4 @@
+Falsos positivos da inspeção de PDF: 40 PDFs reais encontrados no ambiente (documentação LaTeX, relatórios etc.).
+aceitos 39, recusados 1
+preview.pdf: O arquivo não chegou inteiro. Tente de novo.
+O único recusado é um atalho (symlink) quebrado, sem arquivo: recusa correta.

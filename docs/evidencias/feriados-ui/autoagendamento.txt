@@ -1,0 +1,29 @@
+PASS: same normalized request reuses its hold
+PASS: key mismatch rejected: 2030-01-03 09:00 first_visit presential
+PASS: key mismatch rejected: 2030-01-02 09:00 follow_up presential
+PASS: key mismatch rejected: 2030-01-02 09:00 first_visit telehealth
+PASS: same key cannot change professional
+PASS: rejected replays create no new hold
+PASS: confirmation rejects changed eligibility: clinics status='inactive'
+PASS: rejection leaves no appointment event or converted hold
+PASS: confirmation rejects changed eligibility: users status='inactive'
+PASS: rejection leaves no appointment event or converted hold
+PASS: confirmation rejects changed eligibility: clinic_members status='inactive'
+PASS: rejection leaves no appointment event or converted hold
+PASS: confirmation rejects changed eligibility: booking_settings is_enabled=0
+PASS: rejection leaves no appointment event or converted hold
+PASS: confirmation rejects changed eligibility: booking_settings allow_presential=0
+PASS: rejection leaves no appointment event or converted hold
+PASS: confirmation revalidates weekly availability
+PASS: existing anonymous contact must sign in
+PASS: authenticated patient is reused without duplicate or body-selected identity
+PASS: body contact does not overwrite existing patient
+PASS: consent belongs to authenticated patient
+PASS: existing patient booking keeps transactional notification
+PASS: authenticated retry is idempotent
+PASS: another patient cannot replay a converted hold
+PASS: cross-clinic authenticated booking rejected
+PASS: trusted patient path requires patient authentication
+PASS: inactive patient cannot use authenticated booking
+PASS: controller uses trusted session and ignores posted patient_id
+All NI2-433 regression checks passed.

@@ -32,6 +32,7 @@ final class PlatformPolicy
             'users.read',
             'users.suspend',
             'users.activate',
+            'users.manage', // v33: criar equipe, redefinir senha, bloquear e liberar (só o superadmin)
             'sessions.read',
             'sessions.revoke',
             'tickets.read',
@@ -42,6 +43,9 @@ final class PlatformPolicy
             'settings.manage',
             'audit.read',
             'search.read',
+            'events.read',
+            'events.manage',
+            'events.export',
         ],
         self::ROLE_ADMIN_OPERACIONAL => [
             'dashboard.read',
@@ -59,6 +63,9 @@ final class PlatformPolicy
             'billing.read',
             'audit.read',
             'search.read',
+            'events.read',
+            'events.manage',
+            'events.export',
         ],
         self::ROLE_OPERATOR => [
             'dashboard.read',
@@ -76,6 +83,9 @@ final class PlatformPolicy
             'billing.read',
             'audit.read',
             'search.read',
+            'events.read',
+            'events.manage',
+            'events.export',
         ],
         self::ROLE_SUPPORT_AGENT => [
             'dashboard.read',
@@ -84,7 +94,7 @@ final class PlatformPolicy
             'tickets.read',
             'tickets.manage',
             'search.read',
-            // Suporte NÃO PODE: clinics.suspend, users.suspend, sessions.revoke, settings.manage, billing.manage, audit.read
+            // Suporte NÃO PODE: clinics.suspend, users.suspend, sessions.revoke, settings.manage, billing.manage, audit.read, events.read
         ],
         self::ROLE_FINANCE_ADMIN => [
             'dashboard.read',
@@ -92,7 +102,7 @@ final class PlatformPolicy
             'billing.read',
             'billing.manage',
             'search.read',
-            // Financeiro NÃO PODE: clinics.suspend, users.suspend, sessions.revoke, settings.manage, tickets.manage
+            // Financeiro NÃO PODE: clinics.suspend, users.suspend, sessions.revoke, settings.manage, tickets.manage, events.read
         ],
         self::ROLE_SECURITY_AUDITOR => [
             'dashboard.read',
@@ -101,6 +111,8 @@ final class PlatformPolicy
             'sessions.read',
             'audit.read',
             'search.read',
+            'events.read',
+            'events.export',
             // Auditor é estritamente LEITURA: nenhuma mutação permitida
         ],
     ];

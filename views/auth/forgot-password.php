@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg">
+  <link rel="icon" type="image/svg+xml" href="/assets/clyonutri-icon.svg?v=botanical-v54-9">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recuperar Acesso — ClyoNutri</title>
+  <title>Recuperar Acesso · Clyo Nutri</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css">
-  <link rel="stylesheet" href="/assets/css/clinical-botanical.css">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <style>
     .auth-wrapper {
       min-height: 100vh;
@@ -15,7 +15,7 @@
       align-items: center;
       justify-content: center;
       padding: var(--space-6);
-      background: linear-gradient(135deg, #FAF9F4 0%, #FAF9F4 100%);
+      background: linear-gradient(135deg, var(--botanical-cream-50, #FAF9F4) 0%, var(--botanical-cream-50, #FAF9F4) 100%);
     }
     .auth-card {
       width: 100%;
@@ -77,16 +77,17 @@
       text-decoration: underline;
     }
   </style>
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
 </head>
 <body>
   <div class="auth-wrapper">
     <div class="auth-card">
       <div class="auth-logo">
-        <img src="/assets/clyonutri-logo-light.svg" alt="Clyo Nutri — Nutrição que transforma" width="260" height="64" style="display: block; width: 100%; max-width: 260px; height: auto;">
+        <img src="/assets/clyonutri-logo-light.svg?v=botanical-v54-9" alt="Clyo Nutri" width="260" height="64" style="display: block; width: 100%; max-width: 260px; height: auto;">
       </div>
 
       <h1 style="font-size: 1.35rem; font-weight: 700; text-align: center; color: var(--brand-navy-900); margin: 0 0 var(--space-2) 0;">
-        Recuperar Acesso
+        Recuperar acesso
       </h1>
       <p class="auth-subtitle">
         Informe seu e-mail profissional cadastrado para receber as instruções e o link seguro de redefinição de senha.
@@ -94,13 +95,13 @@
 
       <?php if (!empty($error)): ?>
         <div class="alert-error">
-          ⚠️ <?= htmlspecialchars($error) ?>
+          <?= htmlspecialchars($error) ?>
         </div>
       <?php endif; ?>
 
       <?php if (!empty($success)): ?>
         <div class="alert-success">
-          ✓ <?= htmlspecialchars($success) ?>
+          <span aria-hidden="true">✓</span> <?= htmlspecialchars($success) ?>
         </div>
       <?php endif; ?>
 
@@ -116,7 +117,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);">
-          <span>Enviar Instruções de Recuperação</span>
+          <span>Enviar instruções de recuperação</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
       </form>
@@ -126,7 +127,7 @@
           Lembrou sua senha? <a href="/login">Voltar ao Login</a>
         </div>
         <div style="margin-top: var(--space-3); font-size: 0.8rem; color: var(--neutral-gray-400);">
-          Precisa de suporte com seu acesso? Fale com <a href="mailto:<?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?>" style="color: var(--neutral-gray-500); text-decoration: underline;"><?= htmlspecialchars((string)(\ClyoNutri\Core\Security\Env::get('APP_SUPPORT_EMAIL') ?: 'suporte@clyonutri.com.br')) ?></a>
+          Precisa de suporte com seu acesso? Fale com <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" style="color: var(--neutral-gray-500); text-decoration: underline;"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>
         </div>
       </div>
     </div>

@@ -1,0 +1,237 @@
+{
+    "build": "v54.17",
+    "driver": "sqlite",
+    "passed": 57,
+    "failed": 0,
+    "clinical_approval": "pending",
+    "tests": [
+        {
+            "test": "publicação sem revisão diabetes",
+            "pass": true
+        },
+        {
+            "test": "publicação sem revisão hipertensao",
+            "pass": true
+        },
+        {
+            "test": "publicação sem revisão crohn",
+            "pass": true
+        },
+        {
+            "test": "publicação sem revisão celiaca",
+            "pass": true
+        },
+        {
+            "test": "publicação sem revisão renal",
+            "pass": true
+        },
+        {
+            "test": "mais de dois diagnósticos: cinco módulos",
+            "pass": true
+        },
+        {
+            "test": "pergunta comum deduplicada",
+            "pass": true
+        },
+        {
+            "test": "combinação diabetes+hipertensao",
+            "pass": true
+        },
+        {
+            "test": "combinação crohn+celiaca",
+            "pass": true
+        },
+        {
+            "test": "combinação renal+diabetes",
+            "pass": true
+        },
+        {
+            "test": "conflito explícito de gravação",
+            "pass": true
+        },
+        {
+            "test": "resumo mantém anamnese v1 concluída",
+            "pass": true
+        },
+        {
+            "test": "resumo mantém respostas concluídas",
+            "pass": true
+        },
+        {
+            "test": "resumo não cruza pacientes de clínicas",
+            "pass": true
+        },
+        {
+            "test": "API resumo preserva origem concluída",
+            "pass": true
+        },
+        {
+            "test": "regressão da trava de alergia específica",
+            "pass": true
+        },
+        {
+            "test": "lista de compras preserva alerta específico",
+            "pass": true
+        },
+        {
+            "test": "dependências ocultas não ativam descendentes",
+            "pass": true
+        },
+        {
+            "test": "texto não confirma: nega diabetes",
+            "pass": true
+        },
+        {
+            "test": "texto não confirma: mãe com diabetes",
+            "pass": true
+        },
+        {
+            "test": "dúvida permanece incerta: suspeita de diabetes",
+            "pass": true
+        },
+        {
+            "test": "dúvida permanece incerta: diabetes?",
+            "pass": true
+        },
+        {
+            "test": "autor não aprova própria versão",
+            "pass": true
+        },
+        {
+            "test": "edição publicada cria v2 e mantém hash v1",
+            "pass": true
+        },
+        {
+            "test": "protocolo privado ausente da clínica B",
+            "pass": true
+        },
+        {
+            "test": "clínica B não lê versão privada A",
+            "pass": true
+        },
+        {
+            "test": "clínica B não altera versão privada A",
+            "pass": true
+        },
+        {
+            "test": "compartilhamento exige licença",
+            "pass": true
+        },
+        {
+            "test": "compartilhamento idempotente",
+            "pass": true
+        },
+        {
+            "test": "cópia compartilhada nasce rascunho privado",
+            "pass": true
+        },
+        {
+            "test": "não importa compartilhamento de outro destinatário",
+            "pass": true
+        },
+        {
+            "test": "conflito do editor não sobrescreve rascunho",
+            "pass": true
+        },
+        {
+            "test": "escopo obrigatório",
+            "pass": true
+        },
+        {
+            "test": "HTML perigoso recusado",
+            "pass": true
+        },
+        {
+            "test": "código arbitrário recusado",
+            "pass": true
+        },
+        {
+            "test": "dependência circular recusada",
+            "pass": true
+        },
+        {
+            "test": "snapshot só inclui perguntas para paciente",
+            "pass": true
+        },
+        {
+            "test": "editar base preserva módulos versionados",
+            "pass": true
+        },
+        {
+            "test": "convite de uso único",
+            "pass": true
+        },
+        {
+            "test": "token do convite não é credencial de retomada",
+            "pass": true
+        },
+        {
+            "test": "retomada por credencial da sessão",
+            "pass": true
+        },
+        {
+            "test": "anti-IDOR por credencial",
+            "pass": true
+        },
+        {
+            "test": "data de nascimento correta",
+            "pass": true
+        },
+        {
+            "test": "rascunho sem aceite de privacidade",
+            "pass": true
+        },
+        {
+            "test": "conflito de pré-consulta mantém respostas",
+            "pass": true
+        },
+        {
+            "test": "envio final sem erros",
+            "pass": true
+        },
+        {
+            "test": "pré-consulta não modifica avaliação vigente",
+            "pass": true
+        },
+        {
+            "test": "paciente não grava respostas clínicas concluídas",
+            "pass": true
+        },
+        {
+            "test": "envio final imutável",
+            "pass": true
+        },
+        {
+            "test": "segredos não expostos no questionário",
+            "pass": true
+        },
+        {
+            "test": "relato chega pendente com proveniência paciente",
+            "pass": true
+        },
+        {
+            "test": "relato não ativa módulo antes da revisão",
+            "pass": true
+        },
+        {
+            "test": "aceite profissional mantém condição relatada",
+            "pass": true
+        },
+        {
+            "test": "reenvio revoga sessão anterior",
+            "pass": true
+        },
+        {
+            "test": "link expirado não abre",
+            "pass": true
+        },
+        {
+            "test": "flag desliga novos módulos",
+            "pass": true
+        },
+        {
+            "test": "flag preserva respostas",
+            "pass": true
+        }
+    ]
+}

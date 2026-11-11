@@ -1,0 +1,60 @@
+-- Clyo Nutri v54.20 candidato · Migração 82 (NI2-663): Clyo Academy. Aplicar só após backup, com a base na migração 81.
+-- Renumerada da "80" do commit fae6581 (a 80 da v54.18 é workflow_receipts). Idempotente; não apaga dados; não grava conteúdo.
+-- Se as tabelas academy_* já existirem (SQL antigo da branch), acrescenta as colunas que faltam.
+SET @db=DATABASE();
+SET @base=(SELECT COUNT(*)=3 FROM information_schema.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME IN ('care_progress_events','care_workflow_policies','migrations') AND ENGINE='InnoDB');
+SELECT IF(@base,'Base 81 encontrada: aplicando a 82','BLOQUEADO: exige a migração 81 (v54.19) e InnoDB') AS preflight;
+SET @q=IF(@base,'CREATE TABLE IF NOT EXISTS academy_articles (id INT AUTO_INCREMENT PRIMARY KEY, pmid VARCHAR(30) NULL, doi VARCHAR(120) NULL, title VARCHAR(500) NOT NULL, authors LONGTEXT NOT NULL, journal VARCHAR(255) NOT NULL, publication_year INT NOT NULL, study_design VARCHAR(50) NOT NULL, access_type VARCHAR(30) NOT NULL DEFAULT ''publisher_link'', abstract LONGTEXT NULL, url VARCHAR(500) NOT NULL, source VARCHAR(50) NOT NULL DEFAULT ''pubmed'', condition_tags VARCHAR(255) NULL, has_evidence_sheet INT NOT NULL DEFAULT 0, retraction_status VARCHAR(20) NOT NULL DEFAULT ''none'', created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base,'CREATE TABLE IF NOT EXISTS academy_evidence_sheets (id INT AUTO_INCREMENT PRIMARY KEY, article_id INT NOT NULL, curator_user_id INT NULL, curator_name VARCHAR(160) NOT NULL, curator_crn VARCHAR(50) NULL, population LONGTEXT NOT NULL, intervention LONGTEXT NOT NULL, comparator LONGTEXT NOT NULL, outcomes LONGTEXT NOT NULL, methodological_limitations LONGTEXT NOT NULL, evidence_certainty VARCHAR(30) NOT NULL, clinical_applicability LONGTEXT NOT NULL, conflict_of_interest LONGTEXT NULL, status VARCHAR(20) NOT NULL DEFAULT ''draft'', reviewed_at DATETIME NULL, created_at DATETIME NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base,'CREATE TABLE IF NOT EXISTS academy_publications (id INT AUTO_INCREMENT PRIMARY KEY, clinic_id INT NOT NULL, author_user_id INT NOT NULL, author_name VARCHAR(160) NOT NULL, author_crn VARCHAR(50) NULL, title VARCHAR(255) NOT NULL, category VARCHAR(50) NOT NULL, summary LONGTEXT NOT NULL, body_markdown LONGTEXT NOT NULL, references_text LONGTEXT NOT NULL, conflict_of_interest_disclosure LONGTEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT ''draft'', editorial_notes LONGTEXT NULL, reviewer_user_id INT NULL, reviewed_at DATETIME NULL, published_at DATETIME NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base,'CREATE TABLE IF NOT EXISTS academy_favorites (id INT AUTO_INCREMENT PRIMARY KEY, clinic_id INT NOT NULL, user_id INT NOT NULL, article_id INT NOT NULL, collection_name VARCHAR(100) NOT NULL DEFAULT ''Geral'', personal_notes LONGTEXT NULL, created_at DATETIME NOT NULL, UNIQUE KEY uq_aca_fav (clinic_id, user_id, article_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base,'CREATE TABLE IF NOT EXISTS academy_protocol_links (id INT AUTO_INCREMENT PRIMARY KEY, protocol_code VARCHAR(60) NOT NULL, article_id INT NOT NULL, relevance_note VARCHAR(255) NULL, created_at DATETIME NOT NULL, UNIQUE KEY uq_aca_prot_link (protocol_code, article_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND COLUMN_NAME='license')=0,'ALTER TABLE academy_articles ADD COLUMN license VARCHAR(60) NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND COLUMN_NAME='retrieved_at')=0,'ALTER TABLE academy_articles ADD COLUMN retrieved_at DATETIME NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND COLUMN_NAME='created_by_user_id')=0,'ALTER TABLE academy_articles ADD COLUMN created_by_user_id INT NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME='submitted_at')=0,'ALTER TABLE academy_evidence_sheets ADD COLUMN submitted_at DATETIME NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME='approved_by_user_id')=0,'ALTER TABLE academy_evidence_sheets ADD COLUMN approved_by_user_id INT NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME='approved_by_name')=0,'ALTER TABLE academy_evidence_sheets ADD COLUMN approved_by_name VARCHAR(160) NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME='approved_by_crn')=0,'ALTER TABLE academy_evidence_sheets ADD COLUMN approved_by_crn VARCHAR(50) NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME='approved_at')=0,'ALTER TABLE academy_evidence_sheets ADD COLUMN approved_at DATETIME NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_publications' AND COLUMN_NAME='submitted_at')=0,'ALTER TABLE academy_publications ADD COLUMN submitted_at DATETIME NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_protocol_links' AND COLUMN_NAME='created_by_user_id')=0,'ALTER TABLE academy_protocol_links ADD COLUMN created_by_user_id INT NULL','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND INDEX_NAME='uq_aca_art_pmid')=0,'CREATE UNIQUE INDEX uq_aca_art_pmid ON academy_articles (pmid)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND INDEX_NAME='uq_aca_art_doi')=0,'CREATE UNIQUE INDEX uq_aca_art_doi ON academy_articles (doi)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND INDEX_NAME='idx_aca_art_design')=0,'CREATE INDEX idx_aca_art_design ON academy_articles (study_design)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND INDEX_NAME='idx_aca_art_year')=0,'CREATE INDEX idx_aca_art_year ON academy_articles (publication_year)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_evidence_sheets' AND INDEX_NAME='idx_aca_ev_art')=0,'CREATE INDEX idx_aca_ev_art ON academy_evidence_sheets (article_id,status)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_publications' AND INDEX_NAME='idx_aca_pub_clinic')=0,'CREATE INDEX idx_aca_pub_clinic ON academy_publications (clinic_id,status,created_at)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_publications' AND INDEX_NAME='idx_aca_pub_status')=0,'CREATE INDEX idx_aca_pub_status ON academy_publications (status,published_at)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_favorites' AND INDEX_NAME='idx_aca_fav_user')=0,'CREATE INDEX idx_aca_fav_user ON academy_favorites (clinic_id,user_id)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @q=IF(@base AND (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_protocol_links' AND INDEX_NAME='idx_aca_prot_link')=0,'CREATE INDEX idx_aca_prot_link ON academy_protocol_links (protocol_code)','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SET @ready=@base AND (SELECT COUNT(*)=5 FROM information_schema.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME IN ('academy_articles','academy_evidence_sheets','academy_publications','academy_favorites','academy_protocol_links') AND ENGINE='InnoDB')
+  AND (SELECT COUNT(*)=10 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND ((TABLE_NAME='academy_articles' AND COLUMN_NAME IN ('license','retrieved_at','created_by_user_id')) OR (TABLE_NAME='academy_evidence_sheets' AND COLUMN_NAME IN ('submitted_at','approved_by_user_id','approved_by_name','approved_by_crn','approved_at')) OR (TABLE_NAME='academy_publications' AND COLUMN_NAME='submitted_at') OR (TABLE_NAME='academy_protocol_links' AND COLUMN_NAME='created_by_user_id')))
+  AND (SELECT COUNT(*)=2 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='academy_articles' AND INDEX_NAME IN ('uq_aca_art_pmid','uq_aca_art_doi') AND SEQ_IN_INDEX=1);
+SET @q=IF(@ready,'INSERT IGNORE INTO migrations(migration) VALUES(''2026_11_03_000082_create_clyo_academy_tables'')','DO 0');
+PREPARE stmt FROM @q;EXECUTE stmt;DEALLOCATE PREPARE stmt;
+SELECT IF(@ready,'MIGRAÇÃO 82 OK (Clyo Academy)','BLOQUEADO: migração 82 incompleta, não liberar o tráfego') AS resultado;

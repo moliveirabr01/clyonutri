@@ -1,0 +1,32 @@
+/* Pedido de exames laboratoriais — documento A4 (página de impressão e PDF via dompdf; só tabelas). Botanical DS. */
+.exd-doc{color:#1f2a24;font-size:10.5pt;line-height:1.4}
+.exd-doc table{width:100%;border-collapse:collapse}
+.exd-head{border-bottom:2px solid #2f5d46;margin-bottom:10px}
+.exd-head td{vertical-align:top;padding:0 0 8px 0}
+.exd-head-meta{text-align:right;width:34%}
+.exd-clinic-name{font-size:14pt;font-weight:bold;color:#2f5d46}
+.exd-number{font-size:11pt;font-weight:bold;letter-spacing:.3px}
+.exd-small{font-size:8.5pt;color:#55635b}
+.exd-pre{white-space:pre-line}
+.exd-title{font-size:15pt;margin:12px 0 0 0;color:#1f2a24;text-align:center}
+.exd-subtitle{text-align:center;font-size:9.5pt;color:#55635b;margin-bottom:12px}
+.exd-alert{border:1.5px solid #b42318;color:#7a1a12;background:#fdf0ee;padding:7px 9px;margin:0 0 10px 0}
+.exd-box{border:1px solid #cfd8d2;margin-bottom:9px}
+.exd-box-title{background:#eef3ef;color:#2f5d46;text-align:left;font-size:9pt;text-transform:uppercase;letter-spacing:.4px;padding:4px 8px}
+.exd-cell{padding:6px 8px;vertical-align:top}
+.exd-label{font-size:8pt;color:#55635b;text-transform:uppercase;letter-spacing:.3px}
+.exd-w35{width:35%}.exd-w22{width:22%}.exd-w6{width:6%}
+.exd-items{margin:4px 0 10px 0}
+.exd-items th{background:#2f5d46;color:#fff;text-align:left;font-size:9pt;padding:5px 7px}
+.exd-items td{border-bottom:1px solid #dde4df;padding:5px 7px;vertical-align:top}
+.exd-section{margin:0 0 9px 0}
+.exd-section-title{font-weight:bold;color:#2f5d46;font-size:9.5pt;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.exd-text{white-space:normal}
+.exd-sign{margin:26px 0 12px 0;page-break-inside:avoid}
+.exd-sign td{vertical-align:bottom}
+.exd-sign-date{width:45%;padding-bottom:30px}
+.exd-sign-cell{text-align:center}
+.exd-sign-line{border-top:1px solid #1f2a24;margin:34px 10% 4px 10%}
+.exd-notice{border:1px solid #d8c38a;background:#fbf6e6;padding:6px 9px;font-size:8.5pt;margin-bottom:8px;page-break-inside:avoid}
+.exd-footer{border-top:1px solid #cfd8d2;padding-top:5px;font-size:7.5pt;color:#6b776f}
+@media screen{.exd-doc{max-width:180mm;margin:0 auto}}

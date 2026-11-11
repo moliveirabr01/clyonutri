@@ -3,6 +3,11 @@
 # ClyoNutri II — Ensaio de Restauração de Backup (Disaster Recovery Rehearsal)
 # ==============================================================================
 # Referência: inventario-migracao-laravel.md § 6.8 e Épico NI2-142
+# NI2-717 / CR-NI2-003 (v54.45):
+#  - Este script é um ENSAIO local (rehearsal) em storage/rehearsal_restore — NÃO toca o banco de produção.
+#  - Para prova de restore na HostGator, siga docs/delivery/BACKUP_RESTORE_DRILL.md e registre evidências.
+#  - Uso check-only: bin/restore_database.sh --verify-only  (valida SHA-256 do .enc vs manifesto, sem importar)
+#
 #
 # Metas de Recuperação:
 #  - RPO (Recovery Point Objective) : <= 24 horas
@@ -62,11 +67,16 @@ echo "  ✓ Arquivo SQL extraído: $(basename "$SQL_FILE")"
 # Simulação de restauração no SQLite de rehearsal
 REHEARSAL_DB="$REHEARSAL_DIR/rehearsal.sqlite"
 rm -f "$REHEARSAL_DB"
-sqlite3 "$REHEARSAL_DB" < "$SQL_FILE"
+if command -v sqlite3 >/dev/null 2>&1; then
+    sqlite3 "$REHEARSAL_DB" < "$SQL_FILE"
+    TABLE_COUNT=$(sqlite3 "$REHEARSAL_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+else
+    TABLE_COUNT=$(php "$ROOT_DIR/bin/sqlite_import_count.php" "$REHEARSAL_DB" "$SQL_FILE")
+    echo "  ✓ Import SQLite via PHP (sqlite3 CLI ausente)."
+fi
 
 # 4. Verificação de Integridade e Contagem de Tabelas
 echo "==> [4/4] Executando queries de auditoria pós-restauração..."
-TABLE_COUNT=$(sqlite3 "$REHEARSAL_DB" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
 echo "  ✓ Tabelas restauradas com sucesso: $TABLE_COUNT"
 
 END_TIME="$(date +%s)"

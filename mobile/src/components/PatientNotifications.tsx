@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError, ApiService, NotificationPreferences, PatientNotification } from '../services/api';
 import { displayLocalDateTime } from '../utils/presentation';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -84,21 +84,22 @@ export default function PatientNotifications({ active }: { active: boolean }) {
         <View style={s.row}>
           <Text style={s.title} accessibilityRole="header">Avisos{unread > 0 ? ` (${unread} novo${unread > 1 ? 's' : ''})` : ''}</Text>
           {unread > 0 && (
-            <TouchableOpacity accessibilityRole="button" onPress={markAll}><Text style={s.link}>Marcar todos como lidos</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={{ minHeight: t.touch, justifyContent: 'center', paddingVertical: 10 }} onPress={markAll}><Text style={s.link}>Marcar todos como lidos</Text></TouchableOpacity>
           )}
         </View>
         {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
         {!error && items.length === 0 && <Text style={s.helper}>Você não tem avisos por enquanto.</Text>}
         {items.map((n) => (
-          <TouchableOpacity key={n.id} accessibilityRole="button" accessibilityLabel={`${n.read ? '' : 'Não lido. '}${n.title}. ${n.body}`}
+          <TouchableOpacity key={n.id} accessibilityRole="button"
             onPress={() => markRead(n)} style={[s.item, !n.read && s.itemUnread]}>
+            {!n.read && <Text style={[s.helper, { color: t.success, fontWeight: '700' }]}>Não lido</Text>}
             <Text style={[s.itemTitle, !n.read && { fontWeight: '700' }]}>{n.title}</Text>
             <Text style={s.body}>{n.body}</Text>
             <Text style={s.helper}>{displayLocalDateTime(n.created_at)}</Text>
           </TouchableOpacity>
         ))}
         {nextBefore && (
-          <TouchableOpacity accessibilityRole="button" onPress={more} style={{ marginTop: 8 }}><Text style={s.link}>Ver avisos mais antigos</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={more} style={{ marginTop: 8, minHeight: t.touch, justifyContent: 'center' }}><Text style={s.link}>Ver avisos mais antigos</Text></TouchableOpacity>
         )}
       </View>
 

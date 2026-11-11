@@ -1,0 +1,53 @@
+/* Materiais educativos (estilo WebDiet) */
+.mat { display: grid; gap: 24px; }
+.mat-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.mat-head h1 { margin: 0; font-size: 1.6rem; }
+.mat-head p { margin: 4px 0 0; color: var(--neutral-gray-600, #475467); }
+.mat-card { background: #fff; border: 1px solid var(--neutral-gray-200, #EAECF0); border-radius: 12px; padding: 20px; }
+.mat-upload { display: grid; gap: 12px 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; }
+.mat-upload .mat-wide { grid-column: 1 / -1; }
+.mat-upload label, .mat-form label { display: grid; gap: 6px; font-weight: 600; font-size: .9rem; color: #344054; }
+.mat-upload input, .mat-upload select, .mat-upload textarea, .mat-form input, .mat-form select, .mat-form textarea, .mat-filters input, .mat-filters select { min-height: 44px; padding: 8px 12px; border: 1px solid #D0D5DD; border-radius: 8px; font: inherit; width: 100%; min-width: 0; box-sizing: border-box; background: #fff; }
+.mat-hint { font-size: .85rem; color: var(--neutral-gray-600, #475467); font-weight: 400; }
+.mat-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mat-filters > * { flex: 1 1 200px; }
+.mat-filters .btn { flex: 0 0 auto; min-height: 44px; }
+.mat-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.mat-item { display: flex; flex-direction: column; gap: 8px; background: #fff; border: 1px solid var(--neutral-gray-200, #EAECF0); border-radius: 12px; padding: 18px; min-width: 0; }
+.mat-item h2 { font-size: 1.05rem; margin: 0; overflow-wrap: anywhere; }
+.mat-item h2 a { color: inherit; text-decoration: none; }
+.mat-item h2 a:hover, .mat-item h2 a:focus-visible { text-decoration: underline; }
+.mat-meta { font-size: .82rem; color: var(--neutral-gray-600, #475467); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.mat-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #E3EEE7; color: #1B4D3E; font-size: .78rem; font-weight: 700; }
+.mat-type { display: inline-block; padding: 2px 8px; border-radius: 6px; background: #F2F4F7; color: #344054; font-size: .78rem; font-weight: 700; }
+.mat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.mat-actions .btn, .mat-actions button { min-height: 40px; }
+.mat-target { background: #FFF6ED; border: 1px solid #F9DBAF; border-radius: 12px; padding: 14px 18px; }
+.mat-picker { max-height: 320px; overflow: auto; border: 1px solid #EAECF0; border-radius: 8px; padding: 8px; display: grid; gap: 2px; }
+.mat-picker label { display: flex; gap: 10px; align-items: center; min-height: 40px; font-weight: 400; padding: 0 6px; border-radius: 6px; }
+.mat-picker label:hover { background: #F9FAFB; }
+.mat-picker input { width: 20px; height: 20px; min-height: 0; }
+.mat-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.mat-table th, .mat-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #EAECF0; vertical-align: top; overflow-wrap: anywhere; }
+.mat-preview { width: 100%; height: 520px; border: 1px solid #EAECF0; border-radius: 8px; background: #F9FAFB; }
+.mat-preview-img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #EAECF0; }
+.mat-flash { padding: 12px 16px; border-radius: 8px; }
+.mat-flash--success { background: #ECFDF3; color: #05603A; border: 1px solid #A6F4C5; }
+.mat-flash--error { background: #FEF3F2; color: #912018; border: 1px solid #FECDCA; }
+.mat-empty { text-align: center; padding: 32px; color: var(--neutral-gray-600, #475467); }
+@media (max-width: 640px) { .mat-preview { height: 360px; } .mat-table th:nth-child(3), .mat-table td:nth-child(3) { display: none; } }
+
+/* Área do paciente (página própria, sem o shell profissional) */
+.mat-patient { margin: 0; background: #f7f8f6; color: #1d2939; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
+.mat-patient h1 { font-size: 1.5rem; margin: 8px 0 4px; }
+.mat-patient h2 { font-size: 1.1rem; margin: 0; }
+.mat-patient a { color: #1f5a2b; }
+.mat-patient .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 18px; border-radius: 10px; font-weight: 600; text-decoration: none; min-height: 44px; border: 1px solid #1f5a2b; }
+.mat-patient .btn-primary { background: #1f5a2b; color: #fff; }
+.mat-patient .btn-secondary { background: #fff; color: #1f5a2b; }
+.mat-patient .btn:focus-visible { outline: 3px solid #86b98f; outline-offset: 2px; }
+
+/* O operational-ui.css baixa o mínimo de botões para 24px com um seletor mais específico; aqui o alvo volta a 44/40px. */
+.mat .btn.btn { min-height: 44px; }
+.mat .btn.btn-sm { min-height: 40px; padding: 0 14px; }
+.mat-form label[for] { margin-top: 2px; }

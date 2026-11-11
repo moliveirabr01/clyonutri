@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { ApiError, ApiService, ChatAccess, ChatAttachmentInput, ChatChannel, ChatMessage, ChatNotice, newChatKey } from '../services/api';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 const MAX_CHARS = 2000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -261,7 +261,7 @@ export default function PatientChat({ active, draft, setDraft }: { active: boole
 
 const s = StyleSheet.create({
   wrap: { paddingBottom: 24 },
-  header: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' },
+  header: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB' },
   title: { fontSize: 17, fontWeight: '700', color: t.navy },
   muted: { fontSize: 13, color: '#4B5563', marginTop: 4 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 8 },
@@ -269,22 +269,22 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: t.navy },
   chipText: { color: t.navy, fontWeight: '600' },
   chipTextOn: { color: t.white, fontWeight: '700' },
-  list: { backgroundColor: t.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', minHeight: 160 },
+  list: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', minHeight: 160 },
   empty: { color: '#4B5563', fontSize: 14, textAlign: 'center', marginVertical: 24 },
-  bubble: { maxWidth: '85%', borderRadius: 12, padding: 10, marginVertical: 4 },
+  bubble: { maxWidth: '85%', borderRadius: t.cardRadius, padding: 10, marginVertical: 4 },
   mine: { alignSelf: 'flex-end', backgroundColor: t.navy },
-  theirs: { alignSelf: 'flex-start', backgroundColor: '#F1F5F9' },
+  theirs: { alignSelf: 'flex-start', backgroundColor: t.background },
   failed: { backgroundColor: '#7A271A' },
   text: { color: t.ink, fontSize: 15 },
   textMine: { color: t.white, fontSize: 15 },
   meta: { color: '#475569', fontSize: 12, marginTop: 4 },
-  metaMine: { color: '#E2E8F0', fontSize: 12, marginTop: 4 },
+  metaMine: { color: t.divider, fontSize: 12, marginTop: 4 },
   failedText: { color: '#FEE4E2', fontSize: 13, marginTop: 4 },
   attach: { minHeight: 44, justifyContent: 'center' },
   attachText: { color: t.navy, textDecorationLine: 'underline', fontWeight: '600' },
   attachTextMine: { color: t.white, textDecorationLine: 'underline', fontWeight: '600', marginTop: 4 },
   composer: { marginTop: 12 },
-  notice: { backgroundColor: '#FFF7ED', borderLeftWidth: 4, borderLeftColor: '#B45309', padding: 10, borderRadius: 8, marginBottom: 8 },
+  notice: { backgroundColor: '#FFF7ED', borderLeftWidth: 4, borderLeftColor: '#B45309', padding: 10, borderRadius: t.inputRadius, marginBottom: 8 },
   noticeText: { color: t.ink, fontSize: 13 },
   noticeStrong: { color: '#7C2D12', fontSize: 13, fontWeight: '700', marginTop: 4 },
   readOnly: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: '#FFF7ED', color: '#7C2D12' },
@@ -293,7 +293,7 @@ const s = StyleSheet.create({
   primaryText: { color: t.white, fontWeight: '700' },
   secondaryBtn: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.buttonRadius, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center' },
   secondaryText: { color: t.navy, fontWeight: '600' },
-  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: 8, minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
+  smallBtn: { borderWidth: 1, borderColor: '#FECDCA', borderRadius: t.inputRadius, minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', marginRight: 8 },
   smallBtnText: { color: t.white, fontWeight: '600' },
   disabled: { opacity: 0.5 },
   errorBox: { backgroundColor: '#FEF3F2', padding: 10, borderRadius: 10, marginBottom: 8 },

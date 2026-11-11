@@ -1,0 +1,65 @@
+COMPARAÇÃO v46 x v47 (por conteúdo: sha256 e permissão de execução de cada arquivo)
+
+v46: clyonutri-v46.zip (sha256 d2dd6a806ee7f0b9e1d0edfb66bf20d674484001980a01ffcde9eedcf908a607)  1451 itens (arquivos e pastas)
+v47: clyonutri-v47.zip  1468 itens (inclui este arquivo)
+
+Iguais: 1421 (vendor/ inteiro, migrações 1 a 65, ExamText, ProfessionalEligibilityValidator, exame-documento.css, COMPARACAO anteriores e o restante)
+Adicionados: 17 (16 + esta COMPARACAO)
+Removidos: 0
+Alterados: 29 (mais RELEASE_INFO.json, fora da lista porque traz o sha256 do zip base)
+Mudança só de permissão de execução: nenhuma
+
+Regressões conhecidas: nenhuma nos testes rodados. Login, isolamento por clínica, geração/guarda/hash do PDF e impressão seguem iguais; ExamRequestPdfService mudou só textos.
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v47.md  -> novo: o que muda, pendências fora do código, ordem do SQL (v41 a v47), conferência, validação e como voltar
+  bin/exam_pdf_integrity.php  -> novo (NI2-542): confere os PDFs guardados (faltando, hash diferente, sobras); só lê
+  database/manual/atualizacao-v47-completa.sql  -> novo: migração 66, idempotente, sem FK/DROP/DELETE/UPDATE, banco fixo
+  database/manual/atualizacao-v47-preflight.sql  -> novo: só lê; exige a 65 aplicada
+  database/manual/atualizacao-v47-verificacao.sql  -> novo: só lê; dez conferências
+  database/migrations/2026_10_29_000066_exam_catalog_favorites_versions_and_links.php  -> novo: migração 66 (classe ExamCatalogFavoritesVersionsAndLinks), MySQL e SQLite
+  docs/evidencias/ni2-529-v47/  -> nova pasta de evidências
+  docs/evidencias/ni2-529-v47/NAVEGADOR-V47.txt  -> novo: navegador real com CSP, 20/20
+  docs/evidencias/ni2-529-v47/SQL-MANUAL-V47-mariadb.txt  -> novo: cadeia v41→v47 com o banco ativo = information_schema
+  docs/evidencias/ni2-529-v47/TESTES-V47.txt  -> novo: saídas dos testes em SQLite e MariaDB
+  src/Application/Controllers/ExamCatalogController.php  -> novo (NI2-530/532): catálogo, favoritos, exames da clínica e validação, política
+  src/Domain/LaboratoryExam/ExamPdfIntegrityChecker.php  -> novo (NI2-542): lógica da conferência dos PDFs
+  views/exams/  -> nova pasta
+  views/exams/catalog.php  -> novo: tela do catálogo
+  views/exams/policy.php  -> novo: versões da política
+  views/patients/partials/exam_timeline.php  -> novo (NI2-537): bloco de solicitações no prontuário e na consulta
+  COMPARACAO-V46-V47.txt  -> este arquivo
+
+== REMOVIDOS ==
+  nenhum
+
+== ALTERADOS ==
+  database/instalacao_mysql8.sql  (501c231289ebba37357c9fd71ea5a6e92a065a4103f087732b73b73dda600437)  -> acrescenta a migração 66 no fim (instalação limpa)
+  database/manual/atualizacao-v41-completa.sql  (528ad897ebe3cdd227b11bbe31def668c7c1f5b27fa2658954808a242cfca7a8)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v41-preflight.sql  (dddc0b3b52b896c4f7d050797a243efb1c885f7cd043f2fe09a90d540ef43c1f)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v41-verificacao.sql  (c6eabb43cce383d16a630d0a691506a4f35e8ae3914997417eda4f6466b3182c)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v42-completa.sql  (a2e4f7988ff8dd8641ee5371699f9c5affb54fec5dbdf3bc0942b4f7d66f3c98)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v42-preflight.sql  (c39651f831d833cc03a3f3ea5100f39dd5910c5cc57511c48df559c74a1d71aa)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v42-verificacao.sql  (bdb36ed9a704836ee113717e805c9a82df9d5e1db885ef6faab333e32b5b1c7d)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v43-completa.sql  (c5462a18f5bd885656515c3d599ba1b0446da02c686f7a54f90be56aba688b9a)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v43-preflight.sql  (0e2b3004d808feab974401f825d7043a048ac0d16dbc52187a99d7cbf13e1ad3)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v43-verificacao.sql  (3a93713c3173bf39c2ef69865c53b0d1d6d995b019cbb315720af8c10653c805)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v46-completa.sql  (1a1a822aea865b35478c164f2c12582199ad716bbdedeab6a3873d7a10cc0341)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v46-preflight.sql  (42174e93251df49083b2e6e6f24659d71d05e1924b5a1a48b5769f902f68bb5f)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  database/manual/atualizacao-v46-verificacao.sql  (890c0bbedd76270b7313264689af6c9b78dcc9e05b16e15b5e8dead3cc2e041b)  -> banco fixo (SET @db) e tabelas com o nome do banco: corrige o #1109 do phpMyAdmin; mesma lógica
+  public/assets/css/exames.css  (7ec78b5fd4e44b29442e015a3ca70bcf45052eca826291ee59ec636c10c04cc3)  -> estilos de favoritos, ordem, catálogo, versões e linha do tempo (só acréscimo no fim)
+  public/assets/js/exames-solicitacao.js  (0f6e6c7dcbf90d7c43b8b9b9a868acc97624e9edd565732543d99e60d7e667ca)  -> filtro de favoritos e quadro de ordem (Subir/Descer); sem script inline
+  public/index.php  (70c4eab1cc585eb6a632bdba80b6e26e9bba321337c31a4e70f45ff7ae75bb01)  -> 6 rotas novas (nova versão, catálogo, favoritos, exames da clínica, validação, política), todas com $requireAuth
+  routes/web.php  (3bf49df5eff6a20eb252d4c254b922180694a086fd3b11ea5c2033456bfa3369)  -> as mesmas 6 rotas no mapa nomeado
+  scripts/build_hostgator_zip.sh  (63d6c5c643b75ddcc1b4adcecb22d3650e3f82faaf21fbbb7634bb5a26ec712f)  -> copia COMPARACAO-*.txt (antes só COMPARACAO-V*: a COMPARACAO-U3-V45 sumia do zip)
+  src/Application/Controllers/DashboardController.php  (d85793379668fc391cf7b21c227f94ee16cecc6b39cb1ad09119c4536b72e590)  -> prontuário e consulta incluem o bloco de solicitações; botão do perfil renomeado. Falha no bloco não derruba a tela
+  src/Application/Controllers/ExamRequestController.php  (fe5303e348c804fa1bdfe41f960eb1fe0161119f568daebcdf08527d615216ae)  -> nova versão, atendimento (?atendimento=), favoritos e ordem no editor, política da versão no documento, trilha de visualização, no-store, textos
+  src/Domain/LaboratoryExam/ExamCatalogService.php  (638f779dc7e310fd9a9e1e154a22261736fe145810a5239d0a66464c19a6dc87)  -> busca por clínica (só validados), favoritos, exames da clínica com validação, isolamento por clínica na elegibilidade
+  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php  (015ba649aaa06fb8f85e1b7205786c2e0e1d509d48ab6b8749e7eee0f6bcc481)  -> política vigente por data, política por versão, lista de versões
+  src/Domain/LaboratoryExam/ExamRequestPdfService.php  (5491814f64449c34d934514adfa8eca60e76e715379aa5236c951280ff569fab)  -> só textos: título do PDF e mensagens de erro
+  src/Domain/LaboratoryExam/ExamRequestService.php  (6256bf93b3ca45a1521553d6459e78d685a578665ba0fb1f5f17d45a56a95880)  -> ordem, atendimento, política vigente, nova versão, linha do tempo, trilha de visualização, textos
+  views/patients/exam_new.php  (f895559a23c614cc84a23469377980a2fd81c3567176c6c140f26b0595170b62)  -> atendimento, favoritos, ordem, aviso após erro, aviso de flash, textos
+  views/patients/exam_print.php  (17e8f19c64099a3a00429edf12955fd642cc00572e662e305e3cbe8576c13ae1)  -> só textos (título e voltar)
+  views/patients/exam_show.php  (068b02e91e1248c1e1c18086cf1e61778186a043eb8da8fad84e2d2cd2e53474)  -> atendimento, versões, "Corrigir (nova versão)", textos
+  views/patients/exams.php  (08816826eed7111349cf6a6bff9ea03f5fe36f13c0b510f8688df5ccabd174d6)  -> versão e consulta na lista, link do catálogo, textos
+  views/patients/partials/exam_document.php  (8f6e7bb05de66c3126f2f89135c166e0977ad3de3db84b84e61016ea0116eb13)  -> "Solicitação nº", linha de versão quando > 1, textos; documentos já emitidos (PDF) não mudam

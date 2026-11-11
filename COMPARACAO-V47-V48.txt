@@ -1,0 +1,46 @@
+COMPARAÇÃO v47 x v48 (por conteúdo: sha256 de cada arquivo)
+
+v47: clyonutri-v47.zip (sha256 7bb68106c1835aa99cbd46782023e766b671dcaa18e327dd3d1f684db6bccd88)  1468 itens
+v48: clyonutri-v48.zip  1484 itens (inclui este arquivo)
+
+Iguais: 1455
+Adicionados: 16
+Removidos: 0
+Alterados: 12 (mais RELEASE_INFO.json)
+
+Regressões conhecidas: nenhuma nos testes rodados (os 119 da v47 rodados de novo em SQLite e MariaDB).
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v48.md  -> novo: o que muda, API do app, segurança do arquivo, SQL, limites do PHP, conferência, validação
+  database/manual/atualizacao-v48-completa.sql  -> novo: migração 67, idempotente, banco fixo
+  database/manual/atualizacao-v48-preflight.sql  -> novo: só lê; exige a 66
+  database/manual/atualizacao-v48-verificacao.sql  -> novo: só lê; 8 conferências
+  database/migrations/2026_10_29_000067_exam_result_documents.php  -> novo: migração 67 (classe ExamResultDocuments), MySQL e SQLite
+  docs/evidencias/ni2-539-v48/  -> nova pasta de evidências
+  docs/evidencias/ni2-539-v48/FALSOS-POSITIVOS-PDF.txt  -> 40 PDFs reais, nenhum falso positivo
+  docs/evidencias/ni2-539-v48/HTTP-NAVEGADOR-V48.txt  -> HTTP 33/33 e navegador 4/4
+  docs/evidencias/ni2-539-v48/SQL-MANUAL-V48-copia-producao.txt  -> ensaio na cópia da produção
+  docs/evidencias/ni2-539-v48/TESTES-V48.txt  -> testes em SQLite e MariaDB
+  src/Application/Controllers/ExamResultController.php  -> novo: anexar, revisar, nova versão, abrir (link de 5 min) e entrega
+  src/Domain/LaboratoryExam/ExamFileInspector.php  -> novo: inspeção do arquivo (tipo real, conteúdo ativo, antivírus)
+  src/Domain/LaboratoryExam/ExamResultDocumentService.php  -> novo: guarda do original, revisão, versões, links, situação por exame, API do app
+  storage/app/dompdf/  -> novo
+  views/patients/partials/exam_results.php  -> novo: seção "Laudos e resultados"
+  COMPARACAO-V47-V48.txt  -> este arquivo
+
+== REMOVIDOS ==
+  nenhum
+
+== ALTERADOS ==
+  bin/exam_pdf_integrity.php  (3bf34aef67425e60d2b3225e2111f324c80883b61835a51c8989f2fb37bb7600)  -> confere também os laudos anexados
+  database/instalacao_mysql8.sql  (d244a7ee21a4b6c2caaa5a99612c6d741b0f473889f7d10292bcf94f559bc2a5)  -> acrescenta a migração 67 no fim
+  public/assets/css/exames.css  (0206ec28c8d2db56541b5173387a89740566dd28731eb3962dea78bc9d96f9b8)  -> estilos da seção de laudos (só acréscimo)
+  public/index.php  (fb731d9acd26d611b97e1a85c3155f95fb12328ed3d55a6691dc0a46efae41d5)  -> 5 rotas da nutricionista ($requireAuth) e 4 da API do app (token de paciente / link assinado)
+  routes/api.php  (153462d72bd25f22dc738b9d7789e60d2e573eae465d2ace1f91fa2ecf86c443)  -> só comentário documentando as rotas do app
+  routes/web.php  (c0cb8af46569fb928af7cc6779388a99b71208c4a99bb83812d3c7aedd47dee5)  -> as 5 rotas no mapa nomeado
+  src/Application/Controllers/ExamRequestController.php  (677cf8245a1fa69703ff21723b54a8ed55eca24b2e83d3c223addb85e589f61c)  -> tela da solicitação recebe laudos e situação por exame; lista recebe contagens
+  src/Domain/LaboratoryExam/ExamPdfIntegrityChecker.php  (883780ddde82f8243d1b70af43560e869a4275d5087387b8ebf838ed3e9c2596)  -> confere também os laudos (faltando, hash diferente, sobras)
+  src/Domain/LaboratoryExam/ExamRequestService.php  (6ccecaebb52cd8172d70c808ad3b552adb4abd6a4d3e4adab92d21d8c171084e)  -> linha do tempo com contagem de laudos (aceitos e aguardando)
+  views/patients/exam_show.php  (ebf81a3ef7c1fc3330bf32c429c177a16ffee0536ea3b3ba1e3114878115eb9a)  -> inclui a seção de laudos
+  views/patients/exams.php  (4d6e12361988195c822f222c7ab98aa6703fa797ccc3d7d68f653097bcd7d866)  -> coluna "Laudos" com aviso "para revisar"
+  views/patients/partials/exam_timeline.php  (86cf0d265834bc96fa4165c22cd91793281e1074e6fcf94b80828a3227fe4cdd)  -> mostra laudos e "aguardando revisão"

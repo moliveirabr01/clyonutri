@@ -1,0 +1,8 @@
+<?php $ui=\ClyoNutri\Application\View\OperationalUI::class; ?>
+<h1>Componentes da interface</h1><p>Paleta Clinical Botanical. Ações principais em verde, cobre como acento e avisos clínicos com texto e ícone.</p>
+<section class="card op-stack"><h2>Ações</h2><div><?= $ui::button('Ação principal','primary') ?> <?= $ui::button('Ação secundária') ?> <?= $ui::button('Ação destrutiva','destructive') ?></div><?= $ui::menu('Mais ações',[['label'=>'Abrir agenda','url'=>'/agenda'],['label'=>'Abrir planos','url'=>'/planos']]) ?></section>
+<section class="card"><h2>Estados de trabalho</h2><?php foreach(['not_started','editing','saving','saved','review','completed','published','issued','conflict','expired'] as $st)echo $ui::state($st); ?></section>
+<section class="card"><h2>Mensagens e alertas</h2><?= $ui::alert('Informação','Confira os dados antes de continuar.') ?><?= $ui::alert('Atenção clínica','A avaliação profissional é necessária antes de continuar.','critical') ?><?= $ui::alert('Operação concluída','O servidor confirmou a gravação.','success') ?></section>
+<section class="card op-stack"><h2>Formulário e progresso</h2><?= $ui::formControl('ds-example-field','Campo de exemplo') ?><?= $ui::progress('ds-example-progress','Etapas de exemplo',2,4) ?><button class="op-button op-button--secondary" data-show="modal-ds-example">Abrir diálogo de exemplo</button></section>
+<?= $ui::modal('ds-example','Diálogo de exemplo','Tab permanece nesta janela; Escape fecha e devolve o foco ao botão de abertura.') ?>
+<?= $ui::card('Cartão operacional','Texto simples e legível, com hierarquia de títulos.') ?><?= $ui::table('Estados e significado',['Estado','Significado'],[['Em edição','Mudanças sem confirmação'],['Salvo como rascunho','Confirmação recebida do servidor']]) ?>

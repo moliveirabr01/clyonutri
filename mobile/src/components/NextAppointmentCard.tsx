@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError, ApiService, Appointment, RescheduleOptions } from '../services/api';
 import { deviceTimezoneDiffers, formatClinicDateTime } from '../utils/presentation';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 type Banner = { kind: 'success' | 'error'; text: string } | null;
 type Mode = 'idle' | 'cancel' | 'reschedule';
@@ -211,7 +211,7 @@ function BannerView({ banner }: { banner: NonNullable<Banner> }) {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+  card: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
   title: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 8 },
   when: { fontSize: 17, fontWeight: '700', color: t.navy },
   muted: { fontSize: 13, color: '#4B5563', marginTop: 4 },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   requestTitle: { fontSize: 14, fontWeight: '700', color: t.ink },
   dayLabel: { fontSize: 13, fontWeight: '700', color: t.ink, marginTop: 4 },
   slotRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  slot: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
+  slot: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 8, paddingHorizontal: 10 },
   slotOn: { backgroundColor: t.navy, borderColor: t.navy },
   slotText: { color: t.ink, fontWeight: '600' },
   slotTextOn: { color: t.white, fontWeight: '700' },

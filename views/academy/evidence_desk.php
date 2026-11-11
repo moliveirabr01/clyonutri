@@ -56,7 +56,7 @@ require __DIR__ . '/_header.php';
             </div>
 
             <form method="POST" action="/academy/artigo/<?= (int)$art['id'] ?>/favoritar" style="margin: 0;">
-              <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+              <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="back" value="<?= htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? '/academy'), ENT_QUOTES, 'UTF-8') ?>">
               <button
                 type="submit"
                 class="btn-icon"
@@ -78,7 +78,7 @@ require __DIR__ . '/_header.php';
             <?= htmlspecialchars($art['authors']) ?> — <em><?= htmlspecialchars($art['journal']) ?></em> (<?= (int)$art['publication_year'] ?>)
           </div>
 
-          <?php if (!empty($art['abstract'])): ?>
+          <?php if (\ClyoNutri\Domain\Academy\AcademyArticleService::abstractVisible($art)): ?>
             <p style="margin: 0 0 16px 0; font-size: 0.9rem; color: var(--neutral-gray-700, #344054); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
               <?= htmlspecialchars($art['abstract']) ?>
             </p>

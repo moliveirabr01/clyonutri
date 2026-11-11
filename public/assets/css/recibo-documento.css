@@ -1,0 +1,55 @@
+/* v54.36: recibo e relatório financeiro (tela, impressão A4 e PDF/dompdf). */
+.rcd{max-width:760px;margin:24px auto;background:#fff;color:#1f2a24;font-family:"DejaVu Sans",system-ui,sans-serif;font-size:11pt;padding:28px 32px;border:1px solid #d9e2dc;border-radius:10px}
+.rcd h1{font-size:16pt;margin:0 0 4px;color:#1d3b2a}
+.rcd .rcd-clinic{font-size:10pt;color:#55635a;margin:0 0 18px}
+.rcd .rcd-code{font-size:10pt;color:#55635a}
+.rcd table{width:100%;border-collapse:collapse;margin:14px 0}
+.rcd th,.rcd td{text-align:left;padding:7px 8px;border-bottom:1px solid #e4ebe6;vertical-align:top}
+.rcd th{color:#55635a;font-weight:600;width:34%}
+.rcd .rcd-amount{font-size:15pt;font-weight:700;color:#1d3b2a}
+.rcd .rcd-text{line-height:1.5}
+.rcd .rcd-sign{margin-top:46px;border-top:1px solid #8a968e;width:60%;padding-top:4px;font-size:9.5pt;color:#55635a}
+.rcd .rcd-foot{margin-top:22px;font-size:8.5pt;color:#7a867e}
+.rcd-actions{max-width:760px;margin:16px auto 0;display:flex;gap:8px;flex-wrap:wrap;font-family:system-ui,sans-serif}
+.rcd-actions a,.rcd-actions button{border:1px solid #1d3b2a;background:#fff;color:#1d3b2a;padding:8px 14px;border-radius:6px;font-size:14px;text-decoration:none;cursor:pointer}
+.rcd-actions .rcd-primary{background:#1d3b2a;color:#fff}
+.rcd-report{max-width:none}
+.rcd-report table.rcd-list th,.rcd-report table.rcd-list td{width:auto;font-size:8.5pt;padding:5px 6px}
+.rcd-report .rcd-num{text-align:right;white-space:nowrap}
+.rcd-cards{width:100%;border-collapse:separate;border-spacing:6px 0;margin:8px 0 12px}
+.rcd-cards td{border:1px solid #d9e2dc;border-radius:6px;padding:8px 10px}
+.rcd-cards .lbl{font-size:7.5pt;text-transform:uppercase;color:#55635a}
+.rcd-cards .val{font-size:13pt;font-weight:700;color:#1d3b2a}
+body.rcd-body{background:#f3f6f4;margin:0;padding:8px}
+@media print{body.rcd-body{background:#fff;padding:0}.rcd-actions{display:none}.rcd{border:0;margin:0;max-width:none;padding:0}@page{size:A4;margin:16mm 15mm}}
+/* v54.38: relatório financeiro com cara de documento da clínica (Dompdf: só tabelas, sem flex). */
+.rfx{font-size:9pt}
+.rfx .rfx-head{margin:0 0 10px;border-bottom:2px solid #2f6f5e}
+.rfx .rfx-head td{border:0;padding:0 0 8px;vertical-align:bottom;width:auto}
+.rfx .rfx-brand{font-size:8pt;letter-spacing:.06em;color:#2f6f5e;font-weight:700;margin-bottom:2px}
+.rfx h1{font-size:17pt;margin:0;color:#1d3b2a;font-weight:700}
+.rfx .rcd-clinic{margin:3px 0 0;font-size:9.5pt;color:#4a5a50}
+.rfx .rfx-date{text-align:right;font-size:8pt;color:#6b786f;white-space:nowrap}
+.rfx .rfx-date strong{font-size:10pt;color:#1d3b2a}
+.rfx .rfx-cards{border-spacing:6px 0;margin:4px 0 14px;width:100%}
+.rfx .rfx-cards td.rfx-card{width:25%;background:#f4f8f5;border:1px solid #dde8e1;border-left:4px solid #9bb8a8;border-radius:6px;padding:8px 12px}
+.rfx .rfx-cards td.rfx-in{border-left-color:#2f6f5e}
+.rfx .rfx-cards td.rfx-out{border-left-color:#c07a3a}
+.rfx .rfx-cards td.rfx-bal{background:#e8f2ec;border-left-color:#1d3b2a}
+.rfx .rfx-lbl{font-size:8.5pt;color:#4a5a50;text-transform:none}
+.rfx .rfx-val{font-size:13pt;font-weight:700;color:#1d3b2a;margin-top:2px;white-space:nowrap}
+.rfx .rfx-neg .rfx-val{color:#b3261e}
+.rfx table.rfx-list{margin:0;border:1px solid #dde8e1}
+.rfx table.rfx-list thead th{background:#2f6f5e;color:#fff;font-weight:600;font-size:8pt;padding:6px 6px;border:0}
+.rfx table.rfx-list td{font-size:8.3pt;padding:5px 6px;border-bottom:1px solid #e6ede8;color:#24322a}
+.rfx tr.rfx-alt td{background:#f8fbf9}
+.rfx .rfx-tag{display:inline-block;padding:1px 6px;border-radius:8px;font-size:7.5pt;font-weight:700}
+.rfx .rfx-tag-in{background:#e1f0e7;color:#2f6f5e}
+.rfx .rfx-tag-out{background:#f8e9dc;color:#9a5a22}
+.rfx .rfx-money-out{color:#9a5a22}
+.rfx .rfx-money-in{color:#1d3b2a;font-weight:600}
+.rfx .rfx-code{font-size:7.5pt;color:#4a5a50;white-space:nowrap}
+.rfx .rfx-empty{text-align:center;color:#6b786f;padding:14px}
+.rfx .rfx-foot{margin-top:12px;font-size:7.5pt;color:#8a968e;border-top:1px solid #e6ede8;padding-top:5px}
+.rfx table.rfx-list{table-layout:auto;width:100%}
+.rfx table.rfx-list td.rcd-num,.rfx table.rfx-list td:nth-child(6),.rfx table.rfx-list td:nth-child(9){white-space:nowrap}

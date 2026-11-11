@@ -29,7 +29,7 @@ $labels = \ClyoNutri\Domain\Analytics\AdherenceAnalytics::LABELS;
       <?php endforeach; ?>
     </nav>
     <?php if (!$report['enabled']): ?>
-      <p class="am-note" role="status" data-testid="am-disabled"><strong>Coleta desligada</strong> em Configurações globais. Os números abaixo são de antes de desligar.</p>
+      <p class="op-message op-message--info am-note" role="status" data-testid="am-disabled"><strong>Coleta desligada</strong> em Configurações globais. Os números abaixo são de antes de desligar.</p>
     <?php endif; ?>
     <p class="am-note" data-testid="am-privacy">
       Sem nome, id de paciente, valores (ml, % de adesão, observações) ou conteúdo do plano.

@@ -112,6 +112,7 @@ assertCheck($consentTermId > 0, "Termo vigente de assistência clínica disponí
 $db->exec("DELETE FROM booking_holds WHERE clinic_id IN (1, 2)");
 $db->exec("DELETE FROM appointments WHERE clinic_id IN (1, 2)");
 $db->exec("DELETE FROM appointment_status_history WHERE clinic_id IN (1, 2)");
+$db->exec("DELETE FROM patients WHERE clinic_id IN (1, 2) AND email IN ('beatriz@email.com', 'felipe@email.com', 'carlos@email.com', 'mariana@email.com')");
 
 // Relógio determinístico: Terça-feira, 20/10/2026 às 07:00 da manhã
 $clock = new DateTimeImmutable('2026-10-20 07:00:00', new DateTimeZone('America/Sao_Paulo'));

@@ -23,9 +23,11 @@
     };
     confirm.addEventListener('change', syncConfirm);
 
-    const setState = (text, needsConfirm, invalid) => {
+    const nutritionBox = scope.querySelector('[data-unit-nutrition]');
+    const measuresBox = box.querySelector('[data-unit-measures]');
+    const setState = (text, needsConfirm, invalid, nutrition) => {
       msg.textContent = text;
-      box.hidden = !text;
+      box.hidden = !text && !nutrition && (!measuresBox || measuresBox.hidden);
       confirmLabel.hidden = !needsConfirm;
       confirm.required = !!needsConfirm;
       if (!needsConfirm) confirm.checked = false;
@@ -33,41 +35,82 @@
       box.classList.toggle('unit-check--warn', !!needsConfirm);
       box.classList.toggle('unit-check--error', !!invalid);
       unit.setCustomValidity(invalid ? text : '');
+      if (nutritionBox) {
+        if (nutrition && nutrition.energy_kcal !== undefined && !invalid) {
+          nutritionBox.hidden = false;
+          nutritionBox.innerHTML = '<strong>' + fmt(nutrition.energy_kcal) + ' kcal</strong> · P ' + fmt(nutrition.protein_g) + ' g · C ' + fmt(nutrition.carbohydrate_g) + ' g · G ' + fmt(nutrition.lipid_g) + ' g <span style="opacity:0.85;">(' + fmt(nutrition.grams) + ' g)</span>';
+        } else {
+          nutritionBox.hidden = true;
+          nutritionBox.innerHTML = '';
+        }
+      }
     };
 
-    function fillMeasures(id, measures) {
+    // NI2-609: lista as medidas do alimento com a origem do peso; sem medida, oferece o cadastro (com fonte).
+    function showMeasures(measures, registerUrl) {
+      if (!measuresBox) return;
+      measuresBox.textContent = '';
+      if (measures.length) {
+        measuresBox.append('Medidas cadastradas: ');
+        measures.forEach((m, i) => {
+          if (i) measuresBox.append('; ');
+          const b = document.createElement('strong'); b.textContent = '1 ' + m.name.replace(/\s*\(.*\)\s*$/, '') + ' = ' + fmt(m.grams) + ' g';
+          measuresBox.append(b, ' (' + (m.source_label || 'medida cadastrada') + ')');
+        });
+        measuresBox.append('. ');
+      } else {
+        measuresBox.append('Este alimento não tem medida caseira cadastrada (unidade, fatia…): use gramas ou ml. ');
+      }
+      if (registerUrl) {
+        const a = document.createElement('a');
+        a.href = registerUrl; a.target = '_blank'; a.rel = 'noopener'; a.dataset.testid = 'unit-register-measure';
+        a.textContent = measures.length ? 'Gerenciar medidas ↗' : 'Cadastrar medida caseira ↗';
+        measuresBox.append(a);
+      }
+      measuresBox.hidden = false;
+    }
+
+    function fillMeasures(id, measures, registerUrl) {
       if (unit.tagName !== 'SELECT' || measuresFor === id) return;
       measuresFor = id;
+      showMeasures(measures, registerUrl);
       unit.querySelector('optgroup[data-unit-food]')?.remove();
       if (!measures.length) return;
       const group = document.createElement('optgroup');
       group.label = 'Medidas deste alimento'; group.dataset.unitFood = '';
-      measures.forEach((m) => { const o = new Option(m.name + ' (' + fmt(m.grams) + ' g)', m.name); group.append(o); });
+      measures.forEach((m) => {
+        const text = m.name.includes('(') && (m.name.includes('g)') || m.name.includes(' g)'))
+          ? m.name
+          : m.name + ' (' + fmt(m.grams) + ' g)';
+        const o = new Option(text, m.name);
+        if (m.source_label) o.title = m.source_label;
+        group.append(o);
+      });
       unit.prepend(group);
     }
 
     async function check() {
       const id = foodId();
-      if (!id || !unit.value) { setState('', false, false); return; }
+      if (!id || !unit.value) { setState('', false, false, null); return; }
       const mySeq = ++seq; controller?.abort(); controller = new AbortController();
       try {
         const q = '?amount=' + encodeURIComponent(amount.value || '1') + '&unit=' + encodeURIComponent(unit.value);
         const res = await fetch('/catalogo/alimentos/' + encodeURIComponent(id) + '/conversao' + q, { signal: controller.signal, headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error('conversao');
         const data = await res.json(); if (mySeq !== seq) return;
-        fillMeasures(id, data.measures || []);
-        if (!data.ok) { setState(data.message, false, true); return; }
-        if (data.needs_confirmation) { setState(data.message, true, false); return; }
-        const origin = data.source === 'mass' ? '' : data.source === 'food_serving' ? ' (porção cadastrada do alimento)' : ' (medida cadastrada para o alimento)';
-        setState('= ' + fmt(data.grams) + ' g' + origin, false, false);
+        fillMeasures(id, data.measures || [], data.register_measure_url || '');
+        if (!data.ok) { setState(data.message, false, true, null); return; }
+        if (data.needs_confirmation) { setState(data.message, true, false, data.nutrition || null); return; }
+        const origin = data.source === 'mass' ? '' : ' (' + (data.source_label || (data.source === 'food_serving' ? 'porção cadastrada do alimento' : 'medida cadastrada para o alimento')) + ')';
+        setState('= ' + fmt(data.grams) + ' g' + origin, false, false, data.nutrition || null);
       } catch (e) {
-        if (e.name !== 'AbortError' && mySeq === seq) setState('', false, false); // o servidor confere ao salvar
+        if (e.name !== 'AbortError' && mySeq === seq) setState('', false, false, null); // o servidor confere ao salvar
       }
     }
     const later = () => { clearTimeout(timer); timer = setTimeout(check, 250); };
     unit.addEventListener('change', check); unit.addEventListener('input', later);
     amount.addEventListener('input', later);
-    foodSelect?.addEventListener('change', () => { measuresFor = null; check(); });
+    foodSelect?.addEventListener('change', () => { measuresFor = null; if (measuresBox && !foodId()) measuresBox.hidden = true; check(); });
     setState('', false, false);
     if (foodId()) check();
   }

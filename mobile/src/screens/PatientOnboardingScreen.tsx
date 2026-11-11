@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import BrandLogo from '../components/BrandLogo';
 import { ApiService, PatientAuthData, PatientInvitationPreview } from '../services/api';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 export default function PatientOnboardingScreen({ onBack, onActivated, initialCode = '' }: { onBack: () => void; onActivated: (auth: PatientAuthData) => void; initialCode?: string }) {
   const [code, setCode] = useState(initialCode);
@@ -59,7 +59,7 @@ const s = StyleSheet.create({
   card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: t.border },
   brand: { padding: 24, backgroundColor: t.navy, alignItems: 'center', gap: 10, borderTopWidth: 4, borderTopColor: t.copperAccent }, caption: { color: '#D7E1E9' },
   body: { padding: 24, gap: 12 }, title: { fontSize: 23, fontWeight: '700', color: t.navy }, description: { fontSize: 14, lineHeight: 22, color: t.muted },
-  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
+  label: { fontWeight: '600', color: t.navy }, input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 12, minHeight: 48, fontSize: 16, color: t.ink },
   button: { backgroundColor: t.copper, padding: 14, borderRadius: 10, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, buttonText: { color: t.white, fontWeight: '600', fontSize: 16 },
   back: { minHeight: 44, alignItems: 'center', justifyContent: 'center' }, link: { color: t.navy, fontWeight: '600' }, error: { color: t.error, fontSize: 14, lineHeight: 22 },
 });

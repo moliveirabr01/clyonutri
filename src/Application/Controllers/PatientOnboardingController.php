@@ -5,6 +5,7 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Domain\PatientPortal\PatientOnboardingService;
+use ClyoNutri\Domain\PatientPortal\PatientInviteNotifier;
 
 final class PatientOnboardingController
 {
@@ -40,11 +41,27 @@ final class PatientOnboardingController
             $error = 'Não foi possível gerar o convite. Tente novamente.';
         }
 
+        // NI2-481: convite commitado -> envia o e-mail de primeiro acesso (link canônico via APP_URL).
+        // Falha de e-mail não invalida o convite; o link copiável abaixo continua como alternativa.
+        $emailStatus = null;
+        $emailReason = null;
+        if (empty($error) && !empty($invitation['invitation_code'])) {
+            $delivery = (new PatientInviteNotifier($db))->sendInvite(
+                TenantContext::getClinicId(),
+                $patientId,
+                (string)$invitation['invitation_code'],
+                (string)($invitation['expires_at'] ?? ''),
+                (int)TenantContext::getUserId()
+            );
+            $emailStatus = $delivery['status'];
+            $emailReason = $delivery['reason'] ?? null;
+        }
+
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'clyonutri.com';
         $code = $invitation['invitation_code'] ?? '';
-        $directLink = $scheme . '://' . $host . '/app?code=' . urlencode($code);
-        $portalBaseUrl = $scheme . '://' . $host . '/app';
+        $directLink = $scheme . '://' . $host . '/paciente/app?code=' . urlencode($code);
+        $portalBaseUrl = $scheme . '://' . $host . '/paciente/app';
 
         $title = 'Primeiro acesso ao app';
         $activeNav = 'pacientes';

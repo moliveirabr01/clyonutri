@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError, ApiService, DailyCheckin } from '../services/api';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 const ADHERENCE = [
   { value: 0, label: 'Quase nada' },
@@ -123,7 +123,7 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: t.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+  card: { backgroundColor: t.white, borderRadius: t.cardRadius, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
   title: { fontSize: 16, fontWeight: '700', color: t.navy, marginBottom: 4 },
   line: { fontSize: 14, color: t.ink, marginTop: 6 },
   strong: { fontWeight: '700' },

@@ -1,0 +1,79 @@
+{
+  "backend": "v54.32",
+  "synthetic": true,
+  "transport": "Actual production TypeScript client compiled to CommonJS; real HTTP to unchanged PHP backend, no response mocks.",
+  "checks": [
+    {
+      "name": "production client authenticates against v54.32",
+      "pass": true
+    },
+    {
+      "name": "published plan read from real snapshot",
+      "pass": true
+    },
+    {
+      "name": "v54.32 confirmed guidance reaches mobile contract",
+      "pass": true
+    },
+    {
+      "name": "authorized substitution amount and notes preserved",
+      "pass": true
+    },
+    {
+      "name": "goal and confirmed hydration come from backend",
+      "pass": true
+    },
+    {
+      "name": "actual appointment read",
+      "pass": true
+    },
+    {
+      "name": "native-client hydration retry is idempotent",
+      "pass": true
+    },
+    {
+      "name": "native-client diary retry is idempotent",
+      "pass": true
+    },
+    {
+      "name": "diary persisted with actual description",
+      "pass": true
+    },
+    {
+      "name": "prescribed recipe available",
+      "pass": true
+    },
+    {
+      "name": "recipe snapshot includes ingredients and preparation",
+      "pass": true
+    },
+    {
+      "name": "clinical history and source available",
+      "pass": true
+    },
+    {
+      "name": "privacy contract loads",
+      "pass": true
+    },
+    {
+      "name": "notifications contract loads",
+      "pass": true
+    },
+    {
+      "name": "other clinic authenticates separately",
+      "pass": true
+    },
+    {
+      "name": "other clinic cannot see first patient plan",
+      "pass": true
+    },
+    {
+      "name": "cross clinic hydration mutation denied",
+      "pass": true
+    },
+    {
+      "name": "logout revokes API access",
+      "pass": true
+    }
+  ]
+}

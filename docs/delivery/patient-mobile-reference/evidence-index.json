@@ -1,0 +1,77 @@
+{
+  "files": [
+    {
+      "path": "evidence/api-build.log",
+      "sha256": "fc687877e72c7d133fd82bae8083ae04885ba44f1e1b6f55193ad7e9058bbf07"
+    },
+    {
+      "path": "evidence/api-client.log",
+      "sha256": "ea5dc0221861d5382f45c27f90b9bb65bccc8a0d84ce5dae43a8d44416f36133"
+    },
+    {
+      "path": "evidence/api-native-client.json",
+      "sha256": "087016e311509eba5714e7b2e6444395f1407b492b22b1b241405e16a0bc1f19"
+    },
+    {
+      "path": "evidence/evolution.png",
+      "sha256": "dd095e66f0747805538cb360ca8144146cafbc369c28d072a09e7f1a96998c60"
+    },
+    {
+      "path": "evidence/fixture.log",
+      "sha256": "fa66d9f0b15ae27451f114f33d8f65788c1ea561315b49c9a92ddd19d289a4de"
+    },
+    {
+      "path": "evidence/legacy-auth.log",
+      "sha256": "3b10920040000f6ed8b734f87805531ed952f244b4decdc497485e26a77ee279"
+    },
+    {
+      "path": "evidence/legacy-client-vm.log",
+      "sha256": "a0ba41bbec86abb75b02754d4b104eed1e6edbe8b73c9b281e5be0b339a197bd"
+    },
+    {
+      "path": "evidence/legacy-hydration.log",
+      "sha256": "c4148e48905a10ebba57c90ad5526e9ed4c536c527bded7f3d6a7a8b6eea6544"
+    },
+    {
+      "path": "evidence/native-export.log",
+      "sha256": "f4367e258161ce633acd7d9e55de0a7392db140a6ae4fa1e094b01709a4ef135"
+    },
+    {
+      "path": "evidence/plan.png",
+      "sha256": "432e3f789c562783c1176d037ad14fb63fdd4363a4116c2bc6158f42e298bb57"
+    },
+    {
+      "path": "evidence/preservation.json",
+      "sha256": "af137d234a0898af6152d65806fcd43ef909e4f1111a0aa9ff0074ae095a77e4"
+    },
+    {
+      "path": "evidence/run.json",
+      "sha256": "38855448c41cf77e1fcb4a1329c91177301458cf8355effcbb98620560dd353e"
+    },
+    {
+      "path": "evidence/today.png",
+      "sha256": "40d4387806566e10893407583dd36c90d6132fe4d9833d8004b6f378bcc2e4da"
+    },
+    {
+      "path": "evidence/typecheck.log",
+      "sha256": "ec5a745e88534f3b7a313de3cac5e93ec88891431bd8da38cf4579ee8b15db63"
+    },
+    {
+      "path": "evidence/ui-progress.json",
+      "sha256": "13a8eac07b331ed0ad11bd413c2f9be6d81b6fcd4f7446771efdf3258d354aed"
+    },
+    {
+      "path": "evidence/ui-report.json",
+      "sha256": "d61a680f1c7d12d65e9d6bc5bd549a33139e201617bf026dd0e681cfd6032a22"
+    },
+    {
+      "path": "evidence/ui.log",
+      "sha256": "a18bd7c032c53a9068e573ba45a31a262dec7edf821788fd624ebd92d9cd0ae3"
+    },
+    {
+      "path": "evidence/web-export.log",
+      "sha256": "90028640504cecd77959a46846c8a51faedc856c2f9247dfb2f88bda3206fed5"
+    }
+  ],
+  "clinical_data": "synthetic only"
+}

@@ -46,9 +46,17 @@
     if (this.opts.onStatus) this.opts.onStatus(text, tone || 'info');
   };
 
+  /** v54.27: estado visual da chamada (connecting|waiting|connected|unstable|left|failed|ended). */
+  Call.prototype.state = function (st) {
+    if (this.uiState === st) return;
+    this.uiState = st;
+    if (this.opts.onState) this.opts.onState(st);
+  };
+
   Call.prototype.start = function () {
     var self = this;
     self.status('Preparando câmera e microfone…');
+    self.state('connecting');
     return jsonFetch(self.opts.credentialUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': self.opts.csrf }
@@ -61,6 +69,7 @@
       self.status(err.status === 503
         ? 'Vídeo indisponível: o provedor de mídia não está configurado.'
         : 'Não foi possível iniciar o vídeo: ' + err.message, 'error');
+      self.state('failed');
       throw err;
     });
   };
@@ -75,6 +84,7 @@
         self.newPeer();
         if (self.role === 'patient') {
           self.status('Aguardando o nutricionista conectar o vídeo…');
+          self.state('waiting');
           // Lê só o que vier depois deste hello: ignora offers de uma conexão anterior (recarga).
           return self.send('hello', {}).then(function (res) {
             if (res && res.id) self.lastSignalId = res.id;
@@ -82,6 +92,7 @@
           });
         }
         self.status('Aguardando a câmera do paciente…');
+        self.state('waiting');
         self.poll();
       })
       .catch(function (err) {
@@ -126,9 +137,11 @@
         self.report('connected');
         self.pollDelay = 2500;
         self.status('Conectado. Áudio e vídeo diretos e criptografados entre vocês.', 'ok');
+        self.state('connected');
       } else if (st === 'disconnected') {
         self.report('reconnecting');
         self.status('Conexão instável — tentando reconectar…', 'warn');
+        self.state('unstable');
         clearTimeout(self.failTimer);
         self.failTimer = setTimeout(function () { if (pc.connectionState !== 'connected') self.recover(); }, 8000);
       } else if (st === 'failed') {
@@ -151,9 +164,11 @@
     this.report(this.recoverAttempts > 4 ? 'gave_up' : 'failed');
     if (this.recoverAttempts > 4) {
       this.status('Não foi possível conectar o vídeo nesta rede. Tente outra rede (Wi-Fi ↔ 4G) ou outro dispositivo e recarregue a página. Se preferir, combine com o(a) nutricionista outra forma de atendimento.', 'error');
+      this.state('failed');
       return;
     }
     this.pollDelay = 1000;
+    this.state('unstable');
     this.status(this.cred.has_turn
       ? 'A conexão caiu. Tentando novamente…'
       : 'Não conseguimos ligar o vídeo nesta rede. Tentando de novo — se persistir, troque de rede (Wi-Fi ↔ 4G) ou use outro dispositivo.', 'warn');
@@ -183,6 +198,7 @@
         if (self.role === 'professional') {
           self.newPeer();
           self.status('Paciente conectado à sala. Estabelecendo vídeo…');
+          self.state('connecting');
           return self.makeOffer(false);
         }
         return null;
@@ -203,13 +219,14 @@
         return pc.addIceCandidate(msg.payload).catch(function () {});
       case 'screen':
         if (self.role === 'patient') {
-          if (self.opts.remoteVideo.style) self.opts.remoteVideo.style.objectFit = msg.payload && msg.payload.on ? 'contain' : 'cover';
+          if (self.opts.remoteVideo.classList) self.opts.remoteVideo.classList.toggle('is-screen', !!(msg.payload && msg.payload.on));
           if (self.opts.onScreenShare) self.opts.onScreenShare(!!(msg.payload && msg.payload.on));
         }
         return null;
       case 'bye':
         self.opts.remoteVideo.srcObject = null;
         self.status(self.role === 'professional' ? 'O paciente saiu da chamada.' : 'O nutricionista saiu da chamada.', 'warn');
+        self.state('left');
         return null;
     }
     return null;
@@ -261,6 +278,7 @@
     if (err && (err.status === 403 || err.status === 409)) {
       this.stop(false);
       this.status('A teleconsulta foi encerrada.', 'info');
+      this.state('ended');
       if (this.opts.onEnded) this.opts.onEnded();
     } else if (err && err.status === 429) {
       this.pollDelay = 5000;
@@ -277,11 +295,12 @@
       s.onerror = function () { reject(new Error('Falha ao carregar o cliente de vídeo.')); };
       document.head.appendChild(s);
     }).then(function () {
+      if (self.opts.dailyContainer) self.opts.dailyContainer.classList.remove('tc-hidden');
       var frame = window.DailyIframe.createFrame(self.opts.dailyContainer, { iframeStyle: { width: '100%', height: '100%', border: '0' } });
       self.daily = frame;
       frame.on('left-meeting', function () { if (self.opts.onEnded) self.opts.onEnded(); });
       return frame.join({ url: cred.room_url, token: cred.token });
-    }).then(function () { self.status('Conectado.', 'ok'); });
+    }).then(function () { self.status('Conectado.', 'ok'); self.state('connected'); });
   };
 
   // ------------------------------------------------------------- controles
@@ -320,6 +339,7 @@
       track.onended = function () { self.stopScreenShare(); };
       return sender.replaceTrack(track).then(function () {
         self.opts.localVideo.srcObject = stream;
+        self.opts.localVideo.classList.add('is-screen');
         self.send('screen', { on: true });
         if (self.opts.onScreenShare) self.opts.onScreenShare(true);
         return true;
@@ -336,6 +356,7 @@
     var sender = self.videoSender();
     return (sender && cam ? sender.replaceTrack(cam) : Promise.resolve()).then(function () {
       self.opts.localVideo.srcObject = self.localStream;
+      self.opts.localVideo.classList.remove('is-screen');
       self.send('screen', { on: false });
       if (self.opts.onScreenShare) self.opts.onScreenShare(false);
     });

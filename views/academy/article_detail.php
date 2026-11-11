@@ -36,7 +36,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <?php endif; ?>
       <?php if (!empty($article['retraction_status']) && $article['retraction_status'] !== 'none'): ?>
         <span style="display: inline-block; padding: 4px 10px; background: #FEF3F2; color: #B42318; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">
-          Sinalização: <?= htmlspecialchars(strtoupper($article['retraction_status'])) ?>
+          Atenção: <?= htmlspecialchars(\ClyoNutri\Domain\Academy\AcademyArticleService::RETRACTION[$article['retraction_status']] ?? (string)$article['retraction_status']) ?>
         </span>
       <?php endif; ?>
     </div>
@@ -57,8 +57,9 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <?php if (!empty($article['pmid'])): ?>
         <div>PMID: <strong><?= htmlspecialchars($article['pmid']) ?></strong></div>
       <?php endif; ?>
-      <div>Fonte de Metadados: <strong><?= htmlspecialchars(strtoupper($article['source'] ?? 'PubMed')) ?></strong></div>
-      <div>Indexado em: <strong><?= htmlspecialchars(date('d/m/Y', strtotime($article['created_at']))) ?></strong></div>
+      <div>Fonte dos metadados: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Academy\AcademyArticleService::SOURCES[$article['source']] ?? (string)$article['source']) ?></strong></div>
+      <div>Conferido na fonte em: <strong><?= !empty($article['retrieved_at']) ? htmlspecialchars(date('d/m/Y', strtotime((string)$article['retrieved_at']))) : 'não informado' ?></strong></div>
+      <div>Acesso: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Academy\AcademyArticleService::ACCESS[$article['access_type']] ?? (string)$article['access_type']) ?></strong></div>
     </div>
 
     <!-- Ações Rápidas -->
@@ -69,7 +70,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       </a>
 
       <form method="POST" action="/academy/artigo/<?= (int)$article['id'] ?>/favoritar" style="margin: 0;">
-        <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="back" value="<?= htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? '/academy'), ENT_QUOTES, 'UTF-8') ?>">
         <button type="submit" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 600;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= $isFavorite ? '#E04F16' : 'none' ?>" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: <?= $isFavorite ? '#E04F16' : 'inherit' ?>;"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
           <span><?= $isFavorite ? 'Salvo na Minha Coleção' : 'Salvar na Minha Coleção' ?></span>
@@ -78,10 +79,10 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
     </div>
 
     <!-- Resumo Oficial -->
-    <?php if (!empty($article['abstract'])): ?>
+    <?php if (\ClyoNutri\Domain\Academy\AcademyArticleService::abstractVisible($article)): ?>
       <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--neutral-gray-200, #EAECF0);">
         <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--neutral-gray-900, #101828); margin-bottom: 10px;">
-          Resumo do Estudo (Abstract)
+          Resumo (<?= htmlspecialchars((string)$article['license']) ?>, conforme a fonte)
         </h2>
         <div style="font-size: 0.95rem; line-height: 1.6; color: var(--neutral-gray-800, #1D2939); white-space: pre-line;">
           <?= htmlspecialchars($article['abstract']) ?>
@@ -152,7 +153,9 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <?php endif; ?>
 
       <div style="font-size: 0.8rem; color: #98A2B3; margin-top: 10px;">
-        Curadoria técnica realizada por: <strong><?= htmlspecialchars($evidenceSheet['curator_name']) ?></strong> (<?= htmlspecialchars($evidenceSheet['curator_crn'] ?? 'CRN verificado') ?>).
+        Ficha escrita por <strong><?= htmlspecialchars($evidenceSheet['curator_name']) ?></strong> (<?= htmlspecialchars((string)$evidenceSheet['curator_crn']) ?>)
+        e aprovada por <strong><?= htmlspecialchars((string)$evidenceSheet['approved_by_name']) ?></strong> (<?= htmlspecialchars((string)$evidenceSheet['approved_by_crn']) ?>)
+        em <?= htmlspecialchars(date('d/m/Y', strtotime((string)$evidenceSheet['approved_at']))) ?>. A certeza é avaliação da curadoria, não decorre só do desenho do estudo.
       </div>
     </div>
   <?php endif; ?>
@@ -167,7 +170,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">Padrão ABNT</span>
-          <button type="button" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.innerText='Copiado!';" style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['abnt']) ?></span>
         </div>
         <div style="padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.88rem; color: #1D2939; font-family: monospace; border: 1px solid #EAECF0;">
@@ -178,7 +181,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">Padrão Vancouver</span>
-          <button type="button" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.innerText='Copiado!';" style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['vancouver']) ?></span>
         </div>
         <div style="padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.88rem; color: #1D2939; font-family: monospace; border: 1px solid #EAECF0;">
@@ -189,7 +192,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">BibTeX</span>
-          <button type="button" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText); this.innerText='Copiado!';" style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['bibtex']) ?></span>
         </div>
         <pre style="margin: 0; padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.82rem; color: #1D2939; border: 1px solid #EAECF0; overflow-x: auto;"><?= htmlspecialchars($citations['bibtex']) ?></pre>

@@ -1,0 +1,56 @@
+[
+  {
+    "path": "RELEASE_INFO.json",
+    "before_sha256": "4379b67270d8e4af6162e8794a88db93b29501ded3a71e0cd2d8301e765edee6",
+    "after_sha256": "c6e49837320d1d9d0fa517f4f02cc4eadb894823fde820866c3cf8ab72fc2270",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/RELEASE_INFO.json"
+  },
+  {
+    "path": "config/build-manifest.json",
+    "before_sha256": "07862b5f4c037d49c30bcaea3f62aefe6ec88f79725e4cf3ca5e808c06e14db1",
+    "after_sha256": "566e8fb5056298354b157dc6f60b2b25698a82e8af1b78a94ca56f08af0638b3",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/config/build-manifest.json"
+  },
+  {
+    "path": "public/assets/js/clinical-journeys.js",
+    "before_sha256": "2153a9591423ed6fbb8d514b4efc28d35ef2fea4da40a81de1a569e6e8dc7602",
+    "after_sha256": "6f27d44dc67cb41adbbac71327e4a8ad293a36c008558fd40f6065fd1ef724ed",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/public/assets/js/clinical-journeys.js"
+  },
+  {
+    "path": "src/Application/Controllers/DashboardController.php",
+    "before_sha256": "ef651d9f899af7a8f56d2dcc2cc5f0f5c458df212959e13356aed5724aee56da",
+    "after_sha256": "041402ab30dcdbcefb3a9f53508a1778523234805d28fce22568765407373eef",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/src/Application/Controllers/DashboardController.php"
+  },
+  {
+    "path": "src/Application/Controllers/ExamCatalogController.php",
+    "before_sha256": "838ba24241f38c936589f4d8d18cdecb0ebccdf84cee32b4e4ff230f208f5eed",
+    "after_sha256": "bd7d663678d173b08f5bdf6b1557ee217243bce0b36282356410ee47b901e3dc",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/src/Application/Controllers/ExamCatalogController.php"
+  },
+  {
+    "path": "src/Core/Release/BuildIdentity.php",
+    "before_sha256": "b527eb171ac46700d7e5ba58a44a5f5571257281ba424390d619f51d1503618e",
+    "after_sha256": "e849c5a5260f57475b5fe09b3c9d83d911654717bb4d502ebd61f62712f97915",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/src/Core/Release/BuildIdentity.php"
+  },
+  {
+    "path": "src/Core/Security/ClinicalAuthorization.php",
+    "before_sha256": "2ba970f0fc591772f14ff97726b4c8ea546837b8b611216e38efc162a3435f08",
+    "after_sha256": "a88a912341d89fe5bfb07523012a69b2e00df2ebc08ecfe9d4e2f3391b9c1cba",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/src/Core/Security/ClinicalAuthorization.php"
+  },
+  {
+    "path": "tests/dashboard_review_fixes_test.php",
+    "before_sha256": "5aa5a0e398d997accc2eebcc3b07ba53f2263d604e94e583921a3de651e54cb9",
+    "after_sha256": "699a1c5af9938565898f5255bf4d98cc9f1f25d2e2ff672f88002582aab6d5b8",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/tests/dashboard_review_fixes_test.php"
+  },
+  {
+    "path": "views/layouts/professional-shell.php",
+    "before_sha256": "c2907201be73e258e1f8891bd26fea3dc435a9f6e4bc2815b43e9cbe71888170",
+    "after_sha256": "d3e61a3aeb7ec97740ce4e69532b658792f4aa348186b25de62ccfe9bfd9579d",
+    "backup": "storage/backups/integracao-v54-58-20261111/antes/views/layouts/professional-shell.php"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "versao": "v40",
+  "cenario": "com paciente",
+  "concluiu": true,
+  "detalhe": "itens no plano: 1",
+  "cliques": 9,
+  "passos": [
+    "Novo plano alimentar",
+    "Escolher o paciente",
+    "Iniciar prescrição",
+    "Adicionar primeira refeição",
+    "Sugestão rápida: Café da Manhã",
+    "Salvar refeição",
+    "+ Alimento na refeição",
+    "Escolher o alimento nos resultados",
+    "Adicionar ao plano"
+  ],
+  "campos_digitados": 3,
+  "digitados": [
+    "título do plano",
+    "busca do alimento",
+    "quantidade"
+  ]
+}

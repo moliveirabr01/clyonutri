@@ -48,7 +48,7 @@ final class ErrorExposure
             return; // ApiErrorBoundary cuida da API (JSON genérico com request_id)
         }
         set_exception_handler(static function (\Throwable $e): void {
-            $id = bin2hex(random_bytes(6));
+            $id = \ClyoNutri\Core\Observability\StructuredLogger::requestId(); // CR-NI2-010: mesmo id do log estruturado
             error_log(json_encode(['request_id' => $id, 'exception' => get_class($e),
                 'file' => basename($e->getFile()), 'line' => $e->getLine(), 'message' => $e->getMessage()]));
             self::renderGeneric500($id);
@@ -56,7 +56,7 @@ final class ErrorExposure
         register_shutdown_function(static function (): void {
             $err = error_get_last();
             if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
-                $id = bin2hex(random_bytes(6));
+                $id = \ClyoNutri\Core\Observability\StructuredLogger::requestId();
                 error_log(json_encode(['request_id' => $id, 'event' => 'FATAL', 'file' => basename((string)$err['file']), 'line' => $err['line']]));
                 self::renderGeneric500($id);
             }
@@ -73,7 +73,7 @@ final class ErrorExposure
             header('Content-Type: text/html; charset=utf-8');
             header('Cache-Control: no-store');
         }
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Erro - ClyoNutri</title></head><body>'
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Erro - Clyo Nutri</title></head><body>'
             . '<h1>Não foi possível concluir a solicitação.</h1><p>Tente novamente em instantes. Código: '
             . htmlspecialchars($id) . '</p></body></html>';
     }

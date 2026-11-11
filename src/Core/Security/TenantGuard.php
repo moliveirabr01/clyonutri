@@ -21,9 +21,7 @@ class TenantGuard
      */
     public static function assertPatientBelongsToClinic(int $patientId, int $clinicId, PDO $db): array
     {
-        $stmt = $db->prepare("SELECT id, clinic_id, name, email FROM patients WHERE id = :id");
-        $stmt->execute(['id' => $patientId]);
-        $patient = $stmt->fetch();
+        $patient = self::findScoped($db, 'patients', $patientId, $clinicId, 'id, clinic_id, name, email'); // CR-NI2-004: id+clinic_id no SQL
 
         $actor = TenantContext::getUser();
         if (!$patient || (int)$patient['clinic_id'] !== $clinicId || (($actor['role']??'')==='patient' && (int)($actor['id']??0)!==$patientId)) {
@@ -67,9 +65,7 @@ class TenantGuard
      */
     public static function assertAppointmentBelongsToClinic(int $appointmentId, int $clinicId, PDO $db): array
     {
-        $stmt = $db->prepare("SELECT id, clinic_id, patient_id, professional_id, status FROM appointments WHERE id = :id");
-        $stmt->execute(['id' => $appointmentId]);
-        $appointment = $stmt->fetch();
+        $appointment = self::findScoped($db, 'appointments', $appointmentId, $clinicId, 'id, clinic_id, patient_id, professional_id, status'); // CR-NI2-004: id+clinic_id no SQL
 
         if (!$appointment || (int)$appointment['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'appointments', $appointmentId, 'Tentativa de acesso a consulta de outro tenant');
@@ -85,9 +81,7 @@ class TenantGuard
      */
     public static function assertReceivableBelongsToClinic(int $receivableId, int $clinicId, PDO $db): array
     {
-        $stmt = $db->prepare("SELECT id, clinic_id, patient_id, amount_cents, status FROM receivables WHERE id = :id");
-        $stmt->execute(['id' => $receivableId]);
-        $receivable = $stmt->fetch();
+        $receivable = self::findScoped($db, 'receivables', $receivableId, $clinicId, 'id, clinic_id, patient_id, amount_cents, status'); // CR-NI2-004: id+clinic_id no SQL
 
         if (!$receivable || (int)$receivable['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'receivables', $receivableId, 'Tentativa de acesso a recebível de outro tenant');
@@ -103,9 +97,7 @@ class TenantGuard
      */
     public static function assertConversationBelongsToClinic(int $conversationId, int $clinicId, PDO $db): array
     {
-        $stmt = $db->prepare("SELECT id, clinic_id, patient_id, professional_id FROM chat_conversations WHERE id = :id");
-        $stmt->execute(['id' => $conversationId]);
-        $conversation = $stmt->fetch();
+        $conversation = self::findScoped($db, 'chat_conversations', $conversationId, $clinicId, 'id, clinic_id, patient_id, professional_id'); // CR-NI2-004: id+clinic_id no SQL
 
         if (!$conversation || (int)$conversation['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'chat_conversations', $conversationId, 'Tentativa de acesso a conversa de outro tenant');
@@ -121,9 +113,7 @@ class TenantGuard
      */
     public static function assertMealPlanBelongsToClinic(int $planId, int $clinicId, PDO $db): array
     {
-        $stmt = $db->prepare("SELECT id, clinic_id, patient_id, status, title FROM meal_plans WHERE id = :id");
-        $stmt->execute(['id' => $planId]);
-        $plan = $stmt->fetch();
+        $plan = self::findScoped($db, 'meal_plans', $planId, $clinicId, 'id, clinic_id, patient_id, status, title'); // CR-NI2-004: id+clinic_id no SQL
 
         if (!$plan || (int)$plan['clinic_id'] !== $clinicId) {
             self::logSecurityViolation($db, $clinicId, 'meal_plans', $planId, 'Tentativa de acesso a plano alimentar de outro tenant');
@@ -153,6 +143,39 @@ class TenantGuard
         }
 
         return $food;
+    }
+
+    /** v54.46 / CR-NI2-004 (NI2-720): tabelas com clinic_id aceitas pelo helper de busca escopada. */
+    public const SCOPED_TABLES = ['patients', 'appointments', 'receivables', 'chat_conversations', 'meal_plans', 'exam_requests', 'anamneses', 'clinical_records', 'anthropometric_assessments'];
+
+    /**
+     * v54.46 / CR-NI2-004 (NI2-720): busca por id SEMPRE com clinic_id no WHERE (não "busca e depois compara").
+     * Linha de outra clínica nem sai do banco. Tabela e colunas por lista fechada (sem SQL dinâmico do usuário).
+     */
+    public static function findScoped(PDO $db, string $table, int $id, int $clinicId, string $columns = '*'): ?array
+    {
+        if (!in_array($table, self::SCOPED_TABLES, true) || !preg_match('/^(\*|[a-z_]+(\s*,\s*[a-z_]+)*)$/', $columns)) {
+            throw new \InvalidArgumentException('TenantGuard::findScoped: tabela/colunas fora da lista permitida.');
+        }
+        if ($id <= 0 || $clinicId <= 0) {
+            return null;
+        }
+        $st = $db->prepare("SELECT {$columns} FROM {$table} WHERE id = :id AND clinic_id = :clinic_id LIMIT 1");
+        $st->execute(['id' => $id, 'clinic_id' => $clinicId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /** v54.46 / CR-NI2-004: pedido de exame da clínica ativa (escopado no SQL). */
+    public static function assertExamRequestBelongsToClinic(int $requestId, int $clinicId, PDO $db): array
+    {
+        $req = self::findScoped($db, 'exam_requests', $requestId, $clinicId, 'id, clinic_id, patient_id, status');
+        if (!$req) {
+            self::logSecurityViolation($db, $clinicId, 'exam_requests', $requestId, 'Tentativa de acesso a pedido de exame de outro tenant');
+            throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403);
+        }
+        if ((TenantContext::getUser()['role']??'')==='patient') self::assertPatientBelongsToClinic((int)$req['patient_id'],$clinicId,$db);
+        return $req;
     }
 
     /** NI2-24: o CrossTenantAccessAuditor não registra de novo o que já foi registrado aqui no mesmo pedido. */

@@ -1,0 +1,150 @@
+Teste de fumaça da v42 em MySQL 5.7.44 (dados sintéticos TESTE)
+Executado em 29/10/2026 01:09 (horário de Brasília) sobre o zip candidato clyonutri-v42 (sha256 a0f0116e…), extraído sem .env, servido com php -S e APP_ENV=production.
+O zip final difere do candidato só em RELEASE_INFO.json, COMPARACAO-V41-V42.txt e neste arquivo; a fumaça foi repetida no zip final (resultado no relatório PACOTE-V42).
+
+  [OK]   login smoke_owner@teste.invalid
+  [OK]   login smoke_nutri@teste.invalid
+  [OK]   login smoke_recep@teste.invalid
+  [OK]   login smoke_owner2@teste.invalid
+  [OK]   login smoke_super@teste.invalid
+  [OK]   login smoke_super2@teste.invalid
+  [OK]   login smoke_fin@teste.invalid
+== PERFIL: PLANO E BOTÕES POR PERFIL
+  [OK]   titular: perfil abre limpo (sem erro, sem script inline, sem fonte externa)
+  [OK]   titular vê o plano e os três botões
+  [OK]   uso contra limite do START (3 membros ativos de 1, 12 pacientes de 50; a contagem legada inclui a recepção)
+  [OK]   nutricionista sem papel de gestão: vê o plano, nenhum botão
+  [OK]   recepção não abre o perfil (403)
+  [OK]   nutricionista na tela da assinatura: 403, sem formulários de troca, cancelamento ou exclusão
+  [OK]   tela da assinatura abre limpa, traz o aviso de exclusão e NÃO traz aviso de revisão de advogado (v40)
+  [OK]   avisa que a cobrança é combinada manualmente
+  [OK]   sem fatura fictícia nem promessa de cobrança automática na tela nova
+== TROCA DE PLANO
+  [OK]   nutricionista comum: 403 e plano intacto
+  [OK]   CSRF inválido: plano intacto
+  [OK]   upgrade START para PRO vale na hora (303)
+  [OK]   histórico gravado como upgrade, cobrança manual
+  [OK]   a tela mostra a mensagem com protocolo TRC-20261029-428E53 e o histórico
+  [OK]   reenvio com a mesma chave não duplica
+  [OK]   os 2 super admins receberam o aviso da troca (e só eles)
+  [OK]   ninguém mais recebeu
+  [OK]   auditoria com o autor
+  [OK]   preço de referência passou a 189,00
+  [OK]   downgrade para o START barrado (2 profissionais, limite 1)
+  [OK]   a mensagem explica o que excede (1 profissional no plano, 3 ativos, desativar 2)
+  [OK]   com a equipe dentro do limite, o downgrade passa e vale na hora
+  [OK]   clínica B sem nenhum registro (isolamento)
+  [OK]   titular da B troca só o plano da própria clínica (o plano da A não muda)
+== CANCELAR O PLANO
+  [OK]   nutricionista comum não cancela
+  [OK]   formulário de cancelamento existe, com CSRF
+  [OK]   cancelamento registrado e acesso segue até o fim do período (canceled|1, 302)
+  [OK]   auditoria do cancelamento
+  [OK]   a tela abre limpa depois do cancelamento
+  [OK]   assinatura cancelada: sem oferta de troca de plano
+  [OK]   plano cancelado não troca por rota direta
+== EXCLUSÃO DA CONTA (pedido, nada é apagado)
+  [OK]   nutricionista comum: 403, nenhum pedido
+  [OK]   senha errada: recusado
+  [OK]   frase errada: recusado
+  [OK]   sem a leitura do aviso: recusado
+  [OK]   CSRF inválido: recusado
+  [OK]   pedido registrado: protocolo, pendente, prazo de 15 dias (EXC-20261029-6472B9|pending|1|15)
+  [OK]   nada foi apagado (pacientes, equipe, clínicas, usuários, assinaturas)
+  [OK]   segundo envio não cria outro pedido
+  [OK]   tela mostra protocolo e o botão de retirar
+  [OK]   o perfil também sinaliza o pedido aberto
+  [OK]   os 2 super admins foram avisados
+  [OK]   financeiro não é avisado
+  [OK]   auditoria: pedido e tentativa com senha errada
+== SUPER ADMIN
+  [OK]   sino do super admin com contador (5)
+  [OK]   Comercial abre limpo com as duas seções
+  [OK]   mostra protocolos e clínicas
+  [OK]   financeiro vê as trocas, não os pedidos de exclusão
+  [OK]   lista de clínicas marca o pedido aberto
+  [OK]   central de notificações mostra o pedido com link para o Comercial
+  [OK]   financeiro não altera o pedido
+  [OK]   titular de clínica não acessa as rotas do backoffice
+  [OK]   CSRF inválido: nada muda
+  [OK]   super admin marca em análise
+  [OK]   em análise, a clínica ainda pode retirar
+  [OK]   clínica retira o pedido
+  [OK]   super admins avisados da retirada
+  [OK]   novo pedido depois da retirada (outro protocolo)
+  [OK]   registro curto demais: recusado
+  [OK]   super admin encerra sem exclusão, com registro
+  [OK]   mesmo encerrado, nada foi apagado pelo sistema
+  [OK]   pedido encerrado não pode mais ser retirado
+== LIMITE DE TENTATIVAS
+  [OK]   tentativas registradas no limitador
+  [OK]   depois de 5 envios errados a tela pede para aguardar
+  [OK]   nenhum pedido criado nas tentativas
+   rate-limit: hash apenas -> 
+== BIBLIOTECA DE RECEITAS (v36) EM MYSQL 5.7
+  [OK]   GET /receitas semeia as receitas de exemplo uma vez só (6 depois de 1 abertura, 6 depois da 2ª)
+  [OK]   a clínica B vê o mesmo catálogo global, sem duplicar (6 receitas no total)
+  [OK]   o contexto da clínica segue correto depois do semeador
+  [OK]   sem conexões penduradas
+== v41 NI2-514: PRIMEIRA PRESCRIÇÃO SEM PACIENTE, META DE ENERGIA E MEDIDAS DA CLÍNICA (MYSQL 5.7)
+  [OK]   banco instalado com a migração 61 (duas tabelas novas, patient_id aceita vazio)
+  [OK]   /planos: paciente opcional e opção de 6 refeições padrão
+  [OK]   plano criado sem paciente (302 -> /planos/1)
+  [OK]   fica como rascunho, sem paciente, com título padrão datado
+  [OK]   6 refeições padrão criadas
+  [OK]   tela do plano: paciente 'a definir' e publicar bloqueado até atribuir
+  [OK]   recepção não grava meta (403)
+  [OK]   outra clínica não grava meta (403)
+  [OK]   CSRF inválido: nada gravado
+  [OK]   meta gravada com fórmula e versão: TMB/GET/VET = ['1755.0', '2720.3', '2220.3']
+  [OK]   auditoria da meta
+  [OK]   cartão mostra VET 2.220 kcal e o rastro do cálculo
+  [OK]   recepção não atribui paciente
+  [OK]   nutricionista atribui o paciente; a meta acompanha
+  [OK]   com paciente, publicar volta a ficar disponível
+  [OK]   lista de planos abre limpa
+  [OK]   /medidas-caseiras abre limpa e começa vazia (nenhum valor inventado)
+  [OK]   CSRF inválido: medida não gravada
+  [OK]   sem fonte, a medida é recusada
+  [OK]   medida da clínica gravada com fonte
+  [OK]   auditoria da medida
+  [OK]   conversão usa a medida da clínica (2 x 12,5 g): {"food_id":1,"measures":[{"name":"colher TESTE smoke","grams":12.5,"source":"food_measure","origin":"clinic"},{"name":"c
+  [OK]   outra clínica não usa nem vê a medida da clínica A na conversão (200)
+  [OK]   outra clínica não vê a medida (tenant)
+  [OK]   recepção não abre medidas (403)
+  [OK]   modelo CSV baixa e pede a fonte
+== v42 NI2-514 FASE 2: MODELOS, BUSCA, TOTAIS E IMPORTAÇÃO DE PACIENTES (MYSQL 5.7)
+  [OK]   banco com a migração 62 aplicada pelo SQL manual v42 (3 tabelas novas, 6 colunas em meal_plan_templates)
+  [OK]   editor: barra de totais, botão salvar como modelo e script externo (sem inline)
+  [OK]   recepção não salva modelo (403)
+  [OK]   outra clínica não salva modelo do plano da clínica A (403)
+  [OK]   CSRF inválido: modelo não gravado
+  [OK]   modelo gravado na clínica A, sem paciente nem meta individual, com auditoria
+  [OK]   /modelos lista o modelo
+  [OK]   outra clínica não vê o modelo (200)
+  [OK]   recepção não abre modelos (403)
+  [OK]   usar modelo com paciente de outra clínica é recusado
+  [OK]   usar o modelo cria rascunho novo com as 6 refeições, com auditoria
+  [OK]   outra clínica não arquiva (302)
+  [OK]   nutricionista arquiva o modelo
+  [OK]   busca 'aipim' encontra mandioca em MySQL (8 resultados)
+  [OK]   busca sem resultado é contada por clínica
+  [OK]   relatório de buscas sem resultado abre e mostra o termo
+  [OK]   outra clínica não vê as buscas da clínica A (200)
+  [OK]   recepção não usa a busca do catálogo (403)
+  [OK]   /pacientes/importar abre limpa
+  [OK]   recepção não importa pacientes (403)
+  [OK]   modelo CSV de pacientes baixa
+  [OK]   CSRF inválido: nenhuma prévia
+  [OK]   prévia: 3 linhas, 2 válidas, 1 com erro, nada gravado ainda
+  [OK]   outra clínica não abre a prévia (404)
+  [OK]   outra clínica não confirma
+  [OK]   confirmar cria 2 pacientes, apaga os dados brutos e audita
+  [OK]   mesmo arquivo de novo: nada duplicado
+  [OK]   desfazer remove os 2 pacientes importados e audita
+== SEM ERRO NOS LOGS
+   ocorrências: []
+  [OK]   nenhum aviso/erro PHP, erro de SQL ou falha de aviso nos logs
+  [OK]   logs sem senhas
+
+RESULTADO: 132 ok / 132 - FALHAS: 0

@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 /**
- * ClyoNutri II — Laravel 13 Bootstrap Foundation
+ * ClyoNutri II — Shim de bootstrap no estilo Laravel (usado só pelo artisan local).
+ * AVISO (v54.46 / CR-NI2-007): o ClyoNutri NÃO roda Laravel nem Sanctum. O roteador real de produção é
+ * public/index.php (roteador PHP próprio). Este arquivo é um shim declarativo carregado só pelo `artisan`
+ * local; não aplica autenticação, CSRF nem tenant em requisições HTTP.
  * Configura o kernel de roteamento, middleware multitenant e exceções da aplicação.
  */
 
@@ -75,7 +78,7 @@ return Application::configure(dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function ($middleware) {
-        // Multi-tenant guard & Sanctum token validation
+        // Ilustrativo: o guard multi-tenant e a validação de token reais ficam em public/index.php
     })
     ->withExceptions(function ($exceptions) {
         // Clinical safety & Fail-Closed exception handlers

@@ -1,0 +1,26 @@
+npm notice run clyonutri-mobile@1.0.0 test:hydration
+npm notice run npm run build:api-test && node ../tests/ni2_92_hydration_queue_test.cjs
+npm notice run clyonutri-mobile@1.0.0 build:api-test
+npm notice run tsc src/services/api.ts src/services/hydrationQueue.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck
+PASS chave casa com o formato do servidor
+PASS chaves de toques diferentes são diferentes
+PASS retentáveis: offline, timeout, 401, 429, 5xx
+PASS definitivos: 409, 422, 404
+PASS offline: nada sai da fila, para no primeiro erro
+PASS offline: tentativa contada no item
+PASS reenvio usa a MESMA chave
+PASS volta a rede: 250 enviado; 500 recusado em definitivo (422) sai da fila com erro
+PASS flush concorrente (timer + online + toque) envia uma vez só
+PASS fila persistida sobrevive a recarregar (mesma chave)
+PASS após recarregar, envia e limpa o armazenamento
+PASS armazenamento corrompido não quebra a tela
+PASS sem rede: ApiError offline, item segue na fila
+PASS rede volta, servidor grava, resposta se perde: item continua pendente
+PASS reenvio com a mesma chave: replay, total 250, ainda 1 linha no banco
+PASS dois toques distintos = dois registros
+PASS cliente: histórico do dia com 3 itens e 1250 ml
+PASS cliente: corrigir 500 → 400
+PASS cliente: excluir
+PASS cliente: 0 ml recusado com 422 e mensagem
+
+NI2-92 fila: 20 PASS, 0 FAIL

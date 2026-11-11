@@ -1,0 +1,27 @@
+Teste em navegador real (Chromium, Playwright) · v47 · dados só de TESTE · php -S local com SQLite (migrações 1 a 66)
+Página com a política de segurança do sistema ativa (CSP script-src 'self' + nonce). 1280x900 e celular 390x844.
+
+  PASS  atendimento da consulta já selecionado
+  PASS  filtro "Meus favoritos" mostra só o favorito (1)
+  PASS  ordem segue a marcação
+  PASS  Subir leva o hemograma para o topo
+  PASS  Subir desabilitado no primeiro
+  PASS  formulário conta como alteração não salva
+  PASS  desmarcar tira da ordem
+  PASS  rascunho salvo
+  PASS  prévia do documento na ordem escolhida
+  PASS  emitida
+  PASS  abre o diálogo de nova versão (sem onclick)
+  PASS  abre a versão 2 para editar
+  PASS  aviso da versão 2 aparece no editor
+  PASS  prontuário mostra as 2 solicitações
+  PASS  consulta mostra as solicitações dela
+  PASS  nenhum aviso antigo vaza para o catálogo
+  PASS  favorito pelo catálogo
+  PASS  página da política
+  PASS  editor sem rolagem lateral no celular
+  PASS  sem erro de JS nem de CSP no console
+
+Ajustes feitos depois da primeira rodada (já incluídos): o botão de favorito do catálogo mostrava estrela cheia e vazia
+quase iguais (agora "★ Favorito" / "Favoritar"); o aviso "Versão 2 criada" só aparecia na tela seguinte (agora no editor).
+As capturas de tela ficam fora do zip.

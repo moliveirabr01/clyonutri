@@ -1,0 +1,231 @@
+diff --git a/bin/seed.php b/bin/seed.php
+index 90deaa3..ffa2861 100755
+--- a/bin/seed.php
++++ b/bin/seed.php
+@@ -6,6 +6,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // v10: script só de
+ require_once __DIR__ . '/../vendor/autoload.php';
+ 
+ use ClyoNutri\Core\Database\CatalogSeeder;
++use ClyoNutri\Core\Database\ExampleRecipeCatalogSeeder;
+ use ClyoNutri\Core\Database\Connection;
+ use ClyoNutri\Core\Database\DemoSeeder;
+ use ClyoNutri\Core\Security\Env;
+@@ -35,6 +36,8 @@ try {
+         echo "Modo Solicitado: CATÁLOGO DE REFERÊNCIA NUTRICIONAL (TACO)\n";
+         $catalog = new CatalogSeeder($db);
+         $count = $catalog->run();
++        $recipes = (new ExampleRecipeCatalogSeeder($db))->run();
++        echo "✓ Catálogo público: {$recipes} receitas de exemplo adicionadas.\n";
+         echo "✓ CatalogSeeder executado com sucesso: {$count} alimentos inseridos/atualizados.\n";
+     }
+ 
+diff --git a/src/Application/Controllers/OnboardingController.php b/src/Application/Controllers/OnboardingController.php
+index 2d3f907..3f3d2ae 100644
+--- a/src/Application/Controllers/OnboardingController.php
++++ b/src/Application/Controllers/OnboardingController.php
+@@ -8,6 +8,7 @@ use ClyoNutri\Core\Auth\TenantContext;
+ use ClyoNutri\Core\Database\Connection;
+ use ClyoNutri\Core\Security\Csrf;
+ use ClyoNutri\Domain\Onboarding\OnboardingService;
++use ClyoNutri\Domain\Subscription\SubscriptionService;
+ use PDO;
+ 
+ class OnboardingController
+@@ -82,6 +83,10 @@ class OnboardingController
+ 
+         $firstPatient = $progress['first_patient_id'] ? $this->onboardingService->getFirstPatient($auth['userId'], $auth['clinicId']) : null;
+ 
++        $subscriptions = new SubscriptionService($this->db);
++        $canChoosePlan = $step === 1 && $subscriptions->canChooseOnboardingPlan($auth['clinicId'], $auth['userId']);
++        $availablePlans = $canChoosePlan ? $subscriptions->getOnboardingPlans() : [];
++
+         $title = 'Configuração do Consultório — Onboarding';
+         $activeNav = 'dashboard';
+         $clinicName = $auth['clinicName'];
+@@ -129,7 +134,7 @@ class OnboardingController
+                   1 => ['title' => 'Boas-vindas', 'desc' => 'Foco clínico'],
+                   2 => ['title' => 'Profissional', 'desc' => 'CRN & Registro'],
+                   3 => ['title' => 'Atendimento', 'desc' => 'Preferências'],
+-                  4 => ['title' => '1º Paciente', 'desc' => 'Cadastro real'],
++                  4 => ['title' => '1º Paciente', 'desc' => 'Opcional'],
+                   5 => ['title' => 'Ativação', 'desc' => 'Pronto para uso'],
+               ];
+               ?>
+@@ -158,6 +163,25 @@ class OnboardingController
+               <input type="hidden" name="step" value="<?= $step ?>">
+ 
+               <?php if ($step === 1): ?>
++                <?php if ($canChoosePlan): ?>
++                  <fieldset style="border: 0; padding: 0; margin: 0 0 var(--space-6);">
++                    <legend style="font-family: var(--font-editorial); font-size: 1.4rem;">Escolha seu plano ClyoNutri</legend>
++                    <p id="onboarding-plan-help">Escolha o plano para seu período de teste. Esta seleção não inicia cobrança nem renova o prazo de avaliação.</p>
++                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
++                      <?php foreach ($availablePlans as $plan): ?>
++                        <label style="display: block; padding: 16px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-card); cursor: pointer;">
++                          <input type="radio" name="plan_code" value="<?= htmlspecialchars($plan['code'], ENT_QUOTES, 'UTF-8') ?>" required aria-describedby="onboarding-plan-help" <?= ($progress['focus_objectives']['plan_code'] ?? '') === $plan['code'] ? 'checked' : '' ?>>
++                          <strong><?= htmlspecialchars($plan['name'], ENT_QUOTES, 'UTF-8') ?></strong>
++                          <p>R$ <?= number_format((int)$plan['price_cents'] / 100, 2, ',', '.') ?> / <?= $plan['billing_cycle'] === 'yearly' ? 'ano' : 'mês' ?></p>
++                          <p><?= (int)$plan['max_patients'] === 0 ? 'Pacientes ilimitados' : (int)$plan['max_patients'] . ' pacientes' ?><br>
++                          <?= (int)$plan['max_professionals'] === 0 ? 'Profissionais ilimitados' : (int)$plan['max_professionals'] . ' profissional(is)' ?><br>
++                          <?= number_format((int)$plan['storage_mb'] / 1024, 0, ',', '.') ?> GB de armazenamento</p>
++                        </label>
++                      <?php endforeach; ?>
++                    </div>
++                    <?php if (!$availablePlans): ?><p role="alert">Nenhum plano disponível. Entre em contato com o suporte para continuar.</p><?php endif; ?>
++                  </fieldset>
++                <?php endif; ?>
+                 <!-- PASSO 1: Boas-vindas & Objetivos -->
+                 <div style="margin-bottom: var(--space-5);">
+                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
+@@ -322,10 +346,10 @@ class OnboardingController
+                 <!-- PASSO 4: Criação do Primeiro Paciente Real -->
+                 <div style="margin-bottom: var(--space-5);">
+                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
+-                    Passo 4 de 5: Cadastre o seu Primeiro Paciente
++                    Passo 4 de 5: Primeiro paciente (opcional)
+                   </h3>
+                   <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">
+-                    Pode ser um paciente real da sua agenda ou um paciente de teste para explorar os cálculos de anamnese, antropometria e planos.
++                    Você pode cadastrar seu primeiro paciente agora ou escolher “Cadastrar paciente depois” para continuar. O cadastro ficará disponível na área Pacientes.
+                   </p>
+                 </div>
+ 
+@@ -393,7 +417,7 @@ class OnboardingController
+                     Parabéns! Seu Consultório Está Ativado!
+                   </h2>
+                   <p style="color: var(--neutral-gray-500); font-size: 1rem; max-width: 620px; margin: 0 auto var(--space-6);">
+-                    Sua conta está 100% configurada, suas regras de agendamento estão ativas e seus primeiros registros clínicos foram criados com segurança e governança LGPD.
++                    Seu consultório está pronto para começar. Você pode cadastrar pacientes e organizar seus atendimentos quando quiser.
+                   </p>
+ 
+                   <?php if ($firstPatient): ?>
+@@ -407,6 +431,8 @@ class OnboardingController
+                         Abrir Prontuário 360 ↗
+                       </a>
+                     </div>
++                  <?php else: ?>
++                    <p>Quando estiver pronto, <a href="/pacientes?novo=1">cadastre seu primeiro paciente</a>.</p>
+                   <?php endif; ?>
+ 
+                   <!-- Cards de Ações Recomendadas -->
+@@ -446,9 +472,13 @@ class OnboardingController
+                 </div>
+ 
+                 <div style="display: flex; gap: var(--space-3); align-items: center;">
++                  <?php if ($step === 4): ?>
++                    <button type="submit" name="skip_patient" value="1" formnovalidate class="btn btn-secondary">Cadastrar paciente depois</button>
++                  <?php else: ?>
+                   <a href="/dashboard" style="color: var(--neutral-gray-500); text-decoration: none; font-size: 0.85rem;">
+                     Pular por enquanto
+                   </a>
++                  <?php endif; ?>
+                   <button type="submit" class="btn btn-accent" style="min-width: 180px;">
+                     <?= ($step === 5) ? 'Concluir & Ir ao Dashboard ✓' : 'Salvar & Próximo Passo →' ?>
+                   </button>
+diff --git a/src/Domain/Onboarding/OnboardingService.php b/src/Domain/Onboarding/OnboardingService.php
+index 52d1892..8d08b43 100644
+--- a/src/Domain/Onboarding/OnboardingService.php
++++ b/src/Domain/Onboarding/OnboardingService.php
+@@ -9,6 +9,7 @@ use ClyoNutri\Core\Database\Connection;
+ use ClyoNutri\Core\Security\TenantGuard;
+ use ClyoNutri\Core\Security\TenantSecurityException;
+ use ClyoNutri\Domain\Patient\PatientRepository;
++use ClyoNutri\Domain\Subscription\SubscriptionService;
+ use InvalidArgumentException;
+ use PDO;
+ 
+@@ -78,7 +79,12 @@ class OnboardingService
+         try {
+             switch ($step) {
+                 case 1:
+-                    // Passo 1: Boas-vindas & Objetivos do Consultório
++                    // Passo 1: Boas-vindas, plano SaaS e objetivos do consultório.
++                    $subscriptions = new SubscriptionService($this->db);
++                    $planCode = trim((string)($data['plan_code'] ?? ''));
++                    if ($planCode !== '' || $subscriptions->canChooseOnboardingPlan($clinicId, $userId)) {
++                        $subscriptions->chooseOnboardingPlan($clinicId, $userId, $planCode);
++                    }
+                     $focusList = is_array($data['focus_objectives'] ?? null)
+                         ? $data['focus_objectives']
+                         : array_filter(array_map('trim', explode(',', (string)($data['focus_objectives'] ?? 'Nutrição Clínica'))));
+@@ -87,6 +93,7 @@ class OnboardingService
+                         'focus_objectives' => !empty($focusList) ? $focusList : ['Nutrição Clínica'],
+                         'monthly_patients_goal' => (int)($data['monthly_patients_goal'] ?? 20),
+                         'clinical_experience_years' => (int)($data['clinical_experience_years'] ?? 1),
++                        'plan_code' => $planCode,
+                         'answered_at' => date('c'),
+                     ];
+ 
+@@ -218,10 +225,14 @@ class OnboardingService
+                     break;
+ 
+                 case 4:
+-                    // Passo 4: Criação do Primeiro Paciente Real de Ativação
++                    // Adiar é uma escolha explícita: avança sem criar ou alterar pacientes.
++                    if (($data['skip_patient'] ?? '') === '1') {
++                        break;
++                    }
++                    // Passo 4: Criação opcional do primeiro paciente.
+                     $patientName = trim((string)($data['name'] ?? ''));
+                     if ($patientName === '') {
+-                        throw new InvalidArgumentException("O nome do primeiro paciente é obrigatório para ativação da rotina clínica.");
++                        throw new InvalidArgumentException("Informe o nome para cadastrar o paciente ou escolha cadastrar depois.");
+                     }
+ 
+                     // Garantir TenantContext para criar paciente com isolamento
+diff --git a/src/Domain/Subscription/SubscriptionService.php b/src/Domain/Subscription/SubscriptionService.php
+index 0e71652..1fd5301 100644
+--- a/src/Domain/Subscription/SubscriptionService.php
++++ b/src/Domain/Subscription/SubscriptionService.php
+@@ -45,6 +45,51 @@ final class SubscriptionService
+         return in_array($role, ['owner', 'admin'], true);
+     }
+ 
++    public function getOnboardingPlans(): array
++    {
++        return $this->db->query("SELECT * FROM saas_plans WHERE is_active = 1 ORDER BY price_cents, id")->fetchAll(PDO::FETCH_ASSOC);
++    }
++
++    public function canChooseOnboardingPlan(int $clinicId, int $userId): bool
++    {
++        if (!$this->canManageSubscription($clinicId, $userId)) {
++            return false;
++        }
++        $stmt = $this->db->prepare("SELECT status FROM clinic_subscriptions WHERE clinic_id = ?");
++        $stmt->execute([$clinicId]);
++        $status = $stmt->fetchColumn();
++        return $status === false || $status === 'trialing';
++    }
++
++    /** Called inside the onboarding transaction; never renews the trial or creates invoices. */
++    public function chooseOnboardingPlan(int $clinicId, int $userId, string $code): void
++    {
++        if (!$this->canChooseOnboardingPlan($clinicId, $userId)) {
++            throw new \DomainException('A seleção de plano exige um titular ou administrador em período de teste.');
++        }
++        $stmt = $this->db->prepare("SELECT * FROM saas_plans WHERE code = ? AND is_active = 1");
++        $stmt->execute([$code]);
++        $plan = $stmt->fetch(PDO::FETCH_ASSOC);
++        if (!$plan) {
++            throw new \InvalidArgumentException('Selecione um plano disponível da ClyoNutri.');
++        }
++        $stmt = $this->db->prepare("SELECT id FROM clinic_subscriptions WHERE clinic_id = ?");
++        $stmt->execute([$clinicId]);
++        if (!$stmt->fetchColumn()) {
++            $this->initializeDefaultSubscription($clinicId, $code);
++            return;
++        }
++        $stmt = $this->db->prepare("UPDATE clinic_subscriptions SET plan_id = ?, billing_cycle = ?, price_cents = ?, updated_at = CURRENT_TIMESTAMP WHERE clinic_id = ? AND status = 'trialing'");
++        $stmt->execute([$plan['id'], $plan['billing_cycle'], $plan['price_cents'], $clinicId]);
++        if ($stmt->rowCount() === 0) {
++            $check = $this->db->prepare("SELECT plan_id FROM clinic_subscriptions WHERE clinic_id = ? AND status = 'trialing'");
++            $check->execute([$clinicId]);
++            if ((int)$check->fetchColumn() !== (int)$plan['id']) {
++                throw new \DomainException('A assinatura mudou. Recarregue a página antes de selecionar o plano.');
++            }
++        }
++    }
++
+     /**
+      * Retorna a assinatura da clínica com plano, limites e consumo real.
+      */

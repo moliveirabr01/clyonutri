@@ -1,132 +1,138 @@
-<div style="max-width: 1040px; margin: 0 auto;">
-  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: var(--space-4);">
+<div class="u-maxw-page u-my-0 u-mx-auto">
+  <div class="u-flex u-items-center u-justify-between u-wrap u-gap-4 u-mb-4">
     <div>
-      <h1 style="font-size: 1.75rem; font-weight: 700; color: var(--brand-navy-900); margin: 0 0 4px 0;">Central de Assinatura &amp; Contrato</h1>
-      <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.95rem;">Transparência total sobre seu plano SaaS, limites contratados, faturas e cancelamento em autosserviço.</p>
+      <h1 class="u-text-h1 u-font-bold u-color-botanical-forest-900 u-mt-0 u-mb-1 u-mx-0">Central de assinatura e contrato</h1>
+      <p class="u-color-neutral-gray-500 u-m-0 u-text-body">Seu plano, uso, faturas e cancelamento em um só lugar.</p>
     </div>
-    <div style="display: flex; gap: 8px;">
-      <a href="/configuracoes" class="btn btn-secondary" style="text-decoration: none;">← Voltar às Configurações</a>
-    </div>
+    <?php if (!empty($asaasOverview['enabled'])): ?>
+      <span class="ds-pill u-text-caption" title="Ambiente de testes do Asaas: nenhuma cobrança é real." data-testid="asaas-sandbox-badge">Sandbox</span>
+    <?php endif; ?>
   </div>
 
   <!-- Navegação por abas em Configurações -->
-  <div style="display: flex; border-bottom: 2px solid var(--neutral-gray-200); margin-bottom: var(--space-6); gap: 1.5rem;">
-    <a href="/configuracoes" style="padding: 10px 4px; text-decoration: none; color: var(--neutral-gray-600); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px;">
+  <div class="u-flex u-border-b-2 u-mb-6 u-gap-6">
+    <a href="/configuracoes" class="ds-tabs__item">
       Perfil e Atendimento
     </a>
-    <a href="/configuracoes/assinatura" style="padding: 10px 4px; text-decoration: none; color: var(--brand-copper-600); font-weight: 600; border-bottom: 2px solid var(--brand-copper-600); margin-bottom: -2px;">
+    <a href="/configuracoes/assinatura" class="ds-tabs__item" aria-current="page">
       Assinatura &amp; Faturamento
     </a>
   </div>
 
   <?php if (!empty($flashSuccess)): ?>
-    <div role="status" style="background: #E3F4F2; border-left: 4px solid var(--semantic-success); padding: 14px 18px; border-radius: 6px; margin-bottom: var(--space-6); color: #0A7075; font-weight: 500;">
+    <div class="op-message op-message--info u-mb-6" role="status">
       <?= htmlspecialchars($flashSuccess) ?>
     </div>
   <?php endif; ?>
 
   <?php if (!empty($flashError)): ?>
-    <div role="alert" style="background: #FEF2F2; border-left: 4px solid var(--semantic-error); padding: 14px 18px; border-radius: 6px; margin-bottom: var(--space-6); color: #B91C1C; font-weight: 500;">
+    <div class="op-message op-message--info u-mb-6" role="status">
       <?= htmlspecialchars($flashError) ?>
     </div>
   <?php endif; ?>
 
   <?php if ($subscription['status'] === 'trialing'): ?>
-    <!-- Banner do Período de Avaliação (NI2-450) -->
-    <div role="status" style="background: #FFFBEB; border-left: 4px solid var(--brand-copper-500); padding: 16px 20px; border-radius: 6px; margin-bottom: var(--space-6); color: #92400E;">
-      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <span style="display: inline-flex; align-items: center; gap: 6px;">
+    <?php /* Banner do Período de Avaliação (NI2-450) */ ?>
+    <div class="op-message op-message--info u-mb-6" role="status">
+      <div class="u-font-bold u-text-body u-mb-1 u-flex u-items-center u-justify-between u-wrap u-gap-2">
+        <span class="u-inline-flex u-items-center u-gap-1">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Período de Avaliação Gratuita (14 dias)
         </span>
-        <span style="background: #FDE68A; color: #78350F; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;">
+        <span class="u-bg-semantic-warning-border u-color-semantic-warning-strong u-text-compact u-font-bold u-py-1 u-px-2 u-radius-pill">
           <?= (int)$subscription['days_left_in_trial'] ?> dia(s) restante(s)
         </span>
       </div>
-      <p style="margin: 0; font-size: 0.92rem; line-height: 1.55; color: #78350F;">
-        Você está usufruindo do teste gratuito com todos os recursos do plano <strong><?= htmlspecialchars($subscription['plan_name']) ?></strong> liberados até <strong><?= !empty($subscription['trial_ends_at']) ? (new \DateTimeImmutable($subscription['trial_ends_at']))->format('d/m/Y') : '' ?></strong>, sem necessidade de cartão de crédito. Nenhuma cobrança é realizada. Ao término dos 14 dias, para continuar criando novos planos e registrando consultas, você poderá escolher o plano de sua preferência. Todos os seus dados cadastrados continuam seguros e disponíveis para exportação.
+      <p class="u-m-0 u-text-compact u-leading-body u-color-semantic-warning-strong">
+        Você está usufruindo do teste gratuito com todos os recursos do plano <strong><?= htmlspecialchars($subscription['plan_name']) ?></strong> liberados até <strong><?= !empty($subscription['trial_ends_at']) ? (new \DateTimeImmutable($subscription['trial_ends_at']))->format('d/m/Y') : '' ?></strong>, sem necessidade de cartão de crédito. Nenhuma cobrança é feita. <?= !empty($asaasOverview['enabled']) ? 'Para continuar depois do teste, escolha um plano abaixo.' : 'A contratação de um plano pelo sistema ainda não está disponível, e o sistema não bloqueia nada quando o teste termina.' ?> Seus dados continuam disponíveis para exportação.
       </p>
     </div>
   <?php elseif ($subscription['status'] === 'expired'): ?>
     <!-- Banner de Período de Teste Expirado -->
-    <div role="alert" style="background: #FEF2F2; border-left: 4px solid var(--semantic-error); padding: 16px 20px; border-radius: 6px; margin-bottom: var(--space-6); color: #991B1B;">
-      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px;">
+    <div class="op-message op-message--error u-mb-6" role="alert">
+      <div class="u-font-bold u-text-body u-mb-1">
         Seu período de teste de 14 dias terminou
       </div>
-      <p style="margin: 0; font-size: 0.92rem; line-height: 1.55; color: #7F1D1D;">
-        Seus dados, pacientes e prontuários estão salvos e preservados. Para voltar a prescrever novos planos, registrar evoluções e agendar consultas, selecione seu plano comercial de preferência na página de planos.
+      <p class="u-m-0 u-text-compact u-leading-body u-color-semantic-error-strong">
+        Você continua usando o sistema normalmente, e seus pacientes e prontuários seguem salvos. <?= !empty($asaasOverview['enabled']) ? 'Escolha um plano abaixo para assinar.' : 'A contratação de um plano pelo sistema ainda não está disponível.' ?> Para falar sobre planos, escreva para <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" class="u-color-inherit u-font-bold"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>.
       </p>
-      <div style="margin-top: 10px;">
-        <a href="/planos" class="btn btn-primary" style="text-decoration: none; display: inline-block; padding: 8px 16px; font-size: 0.875rem;">Conhecer e Assinar Planos</a>
-      </div>
     </div>
   <?php endif; ?>
 
   <!-- Visão Geral do Contrato Vigente -->
-  <div class="card" style="margin-bottom: var(--space-6); border-top: 4px solid <?= $subscription['status'] === 'canceled' ? '#E11D48' : ($subscription['status'] === 'trialing' ? 'var(--brand-copper-500)' : 'var(--brand-botanical-500)') ?>;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: var(--space-4);">
+  <div class="card u-mb-6 u-accent-top <?= $subscription['status'] === 'canceled' ? 'u-accent-semantic-error' : ($subscription['status'] === 'trialing' ? 'u-accent-brand-copper-500' : 'u-accent-botanical-green-600') ?>">
+    <div class="u-flex u-justify-between u-items-start u-wrap u-gap-4 u-mb-4">
       <div>
-        <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--neutral-gray-500);">Plano <?= $subscription['status'] === 'trialing' ? 'em Degustação' : 'Contratado' ?></span>
-        <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--brand-navy-900); margin: 4px 0;">
+        <span class="u-text-compact u-uppercase u-tracking-wide u-font-bold u-color-neutral-gray-500"><?= $subscription['status'] === 'trialing' ? 'Plano em avaliação' : 'Plano contratado' ?></span>
+        <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
           <?= htmlspecialchars($subscription['plan_name']) ?> (<code><?= htmlspecialchars($subscription['plan_code']) ?></code>)
         </h2>
-        <p style="margin: 0; color: var(--neutral-gray-600); font-size: 0.9rem;">
+        <p class="u-m-0 u-color-neutral-gray-600 u-text-compact">
           <?= $subscription['status'] === 'trialing' ? 'Avaliação gratuita de 14 dias sem cartão de crédito cadastrado.' : 'Cobrança ' . ($subscription['billing_cycle'] === 'monthly' ? 'mensal recorrente' : 'anual') . ' sem fidelidade.' ?>
         </p>
       </div>
       <div>
         <?php if ($subscription['status'] === 'canceled'): ?>
-          <span style="display: inline-flex; align-items: center; gap: 6px; background: #FFE4E6; color: #9F1239; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+          <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-error-light u-color-semantic-error-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Assinatura Cancelada
           </span>
         <?php elseif ($subscription['status'] === 'trialing'): ?>
-          <span style="display: inline-flex; align-items: center; gap: 6px; background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+          <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-warning-light u-color-semantic-warning-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Período de Avaliação (Trial)
           </span>
         <?php elseif ($subscription['status'] === 'expired'): ?>
-          <span style="display: inline-flex; align-items: center; gap: 6px; background: #FEE2E2; color: #991B1B; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+          <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-error-light u-color-semantic-error-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Teste Expirado
           </span>
         <?php else: ?>
-          <span style="display: inline-flex; align-items: center; gap: 6px; background: #E3F4F2; color: #0A5F63; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">
+          <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-success-light u-color-semantic-success-text u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Assinatura Ativa
           </span>
         <?php endif; ?>
       </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; background: var(--neutral-gray-50); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--neutral-gray-200);">
+    <div class="u-grid u-cols-auto-md u-gap-6 u-bg-neutral-gray-50 u-p-5 u-radius-input u-border">
       <div>
-        <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">VALOR DA RECORRÊNCIA</div>
+        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold">VALOR DA RECORRÊNCIA</div>
         <?php if ($subscription['status'] === 'trialing'): ?>
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 2px;">
-            R$ 0,00 <span style="font-size: 0.85rem; font-weight: 400; color: var(--neutral-gray-500);">(Período de Teste)</span>
+          <div class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mt-0">
+            R$ 0,00 <span class="u-text-compact u-font-regular u-color-neutral-gray-500">(Período de Teste)</span>
           </div>
-          <div style="font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 2px;">
+          <div class="u-text-caption u-color-neutral-gray-500 u-mt-0">
             R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?>/mês caso decida assinar
           </div>
         <?php else: ?>
-          <div style="font-size: 1.35rem; font-weight: 700; color: var(--brand-navy-900); margin-top: 2px;">
-            R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?> <span style="font-size: 0.85rem; font-weight: 400; color: var(--neutral-gray-500);">/ mês</span>
+          <div class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mt-0">
+            R$ <?= number_format($subscription['price_cents'] / 100, 2, ',', '.') ?> <span class="u-text-compact u-font-regular u-color-neutral-gray-500">/ mês</span>
           </div>
         <?php endif; ?>
       </div>
       <div>
-        <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">VIGÊNCIA DO CICLO ATUAL</div>
-        <div style="font-size: 1.1rem; font-weight: 600; color: var(--brand-navy-900); margin-top: 4px;">
-          <?= $subscription['status'] === 'trialing' ? 'Teste até ' : 'Até ' ?><?= (new \DateTimeImmutable($subscription['trial_ends_at'] ?? $subscription['current_period_end']))->format('d/m/Y') ?>
+        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold"><?= in_array($subscription['status'], ['canceled', 'trialing', 'expired'], true) ? 'VIGÊNCIA' : 'PRÓXIMA COBRANÇA' ?></div>
+        <div class="u-text-card-title u-font-semibold u-color-botanical-forest-900 u-mt-1">
+          <?php
+            // v54.50: a data exibida segue o campo que controla o acesso. Ativa = fim do período (próxima cobrança);
+            // teste/expirado = fim do teste; cancelada = acesso até o fim do período pago.
+            $stNow = (string)$subscription['status'];
+            $endField = in_array($stNow, ['trialing', 'expired'], true)
+              ? ($subscription['trial_ends_at'] ?? $subscription['current_period_end'] ?? null)
+              : ($subscription['current_period_end'] ?? null);
+            $endTxt = $endField ? (new \DateTimeImmutable((string)$endField))->format('d/m/Y') : '—';
+          ?>
+          <?= $stNow === 'trialing' ? 'Teste até ' : ($stNow === 'expired' ? 'Teste encerrado em ' : ($stNow === 'canceled' ? 'Acesso até ' : 'Próxima cobrança em ')) ?><?= $endTxt ?>
         </div>
       </div>
       <div>
-        <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">DATA DE INÍCIO</div>
-        <div style="font-size: 1.1rem; font-weight: 600; color: var(--brand-navy-900); margin-top: 4px;">
+        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold">DATA DE INÍCIO</div>
+        <div class="u-text-card-title u-font-semibold u-color-botanical-forest-900 u-mt-1">
           <?= (new \DateTimeImmutable($subscription['started_at']))->format('d/m/Y') ?>
         </div>
       </div>
       <div>
-        <div style="font-size: 0.8rem; color: var(--neutral-gray-500); font-weight: 600;">TERMOS &amp; CONTRATO</div>
-        <div style="margin-top: 6px;">
-          <a href="/termos" target="_blank" rel="noopener noreferrer" style="color: var(--brand-copper-600); text-decoration: underline; font-size: 0.9rem; font-weight: 500;">
+        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold">TERMOS &amp; CONTRATO</div>
+        <div class="u-mt-1">
+          <a href="/termos" target="_blank" rel="noopener noreferrer" class="u-color-botanical-copper-600 u-underline u-text-compact u-font-medium">
             Ver termos vigentes ↗
           </a>
         </div>
@@ -135,108 +141,112 @@
   </div>
 
   <!-- Consumo de Recursos vs Limites Contratados -->
-  <div class="card" style="margin-bottom: var(--space-6);">
-    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: var(--space-4);">
-      Consumo Operacional &amp; Limites do Plano
+  <div class="card u-mb-6">
+    <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mb-4">
+      Consumo operacional e limites do plano
     </h2>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+    <div class="u-grid u-cols-auto-lg u-gap-6">
       <!-- Profissionais -->
-      <div style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <strong style="color: var(--brand-navy-900);">Profissionais no Consultório</strong>
-          <span style="font-size: 0.9rem; color: var(--neutral-gray-600);">
+      <div class="u-border u-radius-input u-p-5">
+        <div class="u-flex u-justify-between u-mb-2">
+          <strong class="u-color-botanical-forest-900">Profissionais no Consultório</strong>
+          <span class="u-text-compact u-color-neutral-gray-600">
             <?= (int)$subscription['usage']['active_professionals'] ?> / <?= $subscription['max_professionals'] > 0 ? (int)$subscription['max_professionals'] : 'Ilimitado' ?>
           </span>
         </div>
-        <div style="background: var(--neutral-gray-200); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 8px;">
-          <?php 
+        <?php 
             $profPct = $subscription['max_professionals'] > 0 ? min(100, round(($subscription['usage']['active_professionals'] / $subscription['max_professionals']) * 100)) : 20;
           ?>
-          <div style="background: var(--brand-botanical-500); width: <?= $profPct ?>%; height: 100%;"></div>
-        </div>
-        <p style="font-size: 0.8rem; color: var(--neutral-gray-500); margin: 0;">Equipe clínica com acesso ativo.</p>
+        <progress class="ds-meter" max="100" value="<?= (int)($profPct) ?>" aria-label="Uso de profissionais no plano"><?= (int)($profPct) ?>%</progress>
+        <p class="u-text-compact u-color-neutral-gray-500 u-m-0">Equipe clínica com acesso ativo.</p>
       </div>
 
       <!-- Pacientes -->
-      <div style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <strong style="color: var(--brand-navy-900);">Pacientes Ativos</strong>
-          <span style="font-size: 0.9rem; color: var(--neutral-gray-600);">
+      <div class="u-border u-radius-input u-p-5">
+        <div class="u-flex u-justify-between u-mb-2">
+          <strong class="u-color-botanical-forest-900">Pacientes ativos</strong>
+          <span class="u-text-compact u-color-neutral-gray-600">
             <?= (int)$subscription['usage']['active_patients'] ?> / <?= $subscription['max_patients'] > 0 ? (int)$subscription['max_patients'] : 'Ilimitado' ?>
           </span>
         </div>
-        <div style="background: var(--neutral-gray-200); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 8px;">
-          <?php 
+        <?php 
             $patPct = $subscription['max_patients'] > 0 ? min(100, round(($subscription['usage']['active_patients'] / $subscription['max_patients']) * 100)) : 15;
           ?>
-          <div style="background: var(--brand-copper-500); width: <?= $patPct ?>%; height: 100%;"></div>
-        </div>
-        <p style="font-size: 0.8rem; color: var(--neutral-gray-500); margin: 0;">Pacientes cadastrados com prontuário.</p>
+        <progress class="ds-meter ds-meter--copper" max="100" value="<?= (int)($patPct) ?>" aria-label="Uso de pacientes no plano"><?= (int)($patPct) ?>%</progress>
+        <p class="u-text-compact u-color-neutral-gray-500 u-m-0">Pacientes cadastrados com prontuário.</p>
       </div>
 
       <!-- Armazenamento -->
-      <div style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <strong style="color: var(--brand-navy-900);">Armazenamento de Arquivos</strong>
-          <span style="font-size: 0.9rem; color: var(--neutral-gray-600);">
+      <div class="u-border u-radius-input u-p-5">
+        <div class="u-flex u-justify-between u-mb-2">
+          <strong class="u-color-botanical-forest-900">Armazenamento de Arquivos</strong>
+          <span class="u-text-compact u-color-neutral-gray-600">
             <?= $subscription['usage']['storage_mb'] ?> MB / <?= (int)$subscription['storage_mb'] ?> MB
           </span>
         </div>
-        <div style="background: var(--neutral-gray-200); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 8px;">
-          <?php 
+        <?php 
             $storPct = min(100, round(($subscription['usage']['storage_mb'] / max(1, $subscription['storage_mb'])) * 100));
           ?>
-          <div style="background: var(--brand-navy-500); width: <?= max(5, $storPct) ?>%; height: 100%;"></div>
-        </div>
-        <p style="font-size: 0.8rem; color: var(--neutral-gray-500); margin: 0;">Exames, laudos e documentos clínicos.</p>
+        <progress class="ds-meter ds-meter--forest" max="100" value="<?= (int)(max(5, $storPct)) ?>" aria-label="Uso de armazenamento no plano"><?= (int)(max(5, $storPct)) ?>%</progress>
+        <p class="u-text-compact u-color-neutral-gray-500 u-m-0">Exames, laudos e documentos clínicos.</p>
       </div>
     </div>
   </div>
 
+  <?php require __DIR__ . '/_plano_asaas.php';
+require __DIR__ . '/_plano_trocar.php'; ?>
+
   <!-- Histórico de Faturas & Conciliação Financeira -->
-  <div class="card" style="margin-bottom: var(--space-6);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: 8px;">
-      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">
-        Histórico de Faturas &amp; Cobrança
+  <div class="card u-mb-6">
+    <div class="u-flex u-justify-between u-items-center u-mb-4 u-wrap u-gap-2">
+      <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-m-0">
+        Faturas
       </h2>
-      <a href="/ajuda" style="font-size: 0.85rem; color: var(--brand-copper-600); text-decoration: underline;">
-        Precisa contestar uma cobrança? Fale com o suporte ↗
+      <a href="/ajuda" class="u-text-compact u-color-botanical-copper-600 u-underline">
+        Dúvida sobre uma cobrança? Fale com o suporte
       </a>
     </div>
 
     <?php if (empty($subscription['invoices'])): ?>
-      <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin: 0;">
+      <p class="u-color-neutral-gray-500 u-text-compact u-m-0">
         <?= $subscription['status'] === 'trialing' ? 'Nenhuma fatura emitida. O período de avaliação de 14 dias não gera cobranças nem faturas fictícias.' : 'Nenhuma fatura emitida até o momento.' ?>
       </p>
     <?php else: ?>
-      <div style="overflow-x: auto;">
-        <table class="table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+      <div class="u-overflow-x-auto">
+        <table class="table u-w-full u-collapse u-text-compact">
           <thead>
-            <tr style="border-bottom: 2px solid var(--neutral-gray-200); text-align: left;">
-              <th style="padding: 10px 8px;">Fatura</th>
-              <th style="padding: 10px 8px;">Vencimento</th>
-              <th style="padding: 10px 8px;">Data do Pagamento</th>
-              <th style="padding: 10px 8px;">Valor</th>
-              <th style="padding: 10px 8px;">Forma</th>
-              <th style="padding: 10px 8px;">Status</th>
+            <tr class="u-border-b-2 u-text-left">
+              <th class="u-p-2">Fatura</th>
+              <th class="u-p-2">Vencimento</th>
+              <th class="u-p-2">Data do Pagamento</th>
+              <th class="u-p-2">Valor</th>
+              <th class="u-p-2">Forma</th>
+              <th class="u-p-2">Status</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($subscription['invoices'] as $inv): ?>
-              <tr style="border-bottom: 1px solid var(--neutral-gray-200);">
-                <td style="padding: 12px 8px;"><code><?= htmlspecialchars($inv['invoice_number']) ?></code></td>
-                <td style="padding: 12px 8px;"><?= (new \DateTimeImmutable($inv['due_date']))->format('d/m/Y') ?></td>
-                <td style="padding: 12px 8px;"><?= !empty($inv['paid_at']) ? (new \DateTimeImmutable($inv['paid_at']))->format('d/m/Y') : '—' ?></td>
-                <td style="padding: 12px 8px; font-weight: 600;">R$ <?= number_format($inv['amount_cents'] / 100, 2, ',', '.') ?></td>
-                <td style="padding: 12px 8px;"><?= htmlspecialchars($inv['payment_method'] === 'credit_card' ? 'Cartão de Crédito' : $inv['payment_method']) ?></td>
-                <td style="padding: 12px 8px;">
-                  <?php if ($inv['status'] === 'paid'): ?>
-                    <span style="background: #E3F4F2; color: #0A5F63; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Paga</span>
-                  <?php elseif ($inv['status'] === 'void'): ?>
-                    <span style="background: #F1F5F9; color: #64748B; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">Anulada</span>
+              <tr class="u-border-b">
+                <td class="u-py-3 u-px-2">
+                  <?php $invUrl = (string)($inv['receipt_url'] ?? ''); ?>
+                  <?php if (\ClyoNutri\Domain\Billing\AsaasReceiptUrl::isSafe($invUrl)): ?>
+                    <a href="<?= htmlspecialchars($invUrl, ENT_QUOTES) ?>" target="_blank" rel="noopener noreferrer" class="u-color-botanical-copper-600 u-underline" data-invoice-receipt aria-label="Ver recibo da fatura <?= htmlspecialchars($inv['invoice_number'], ENT_QUOTES) ?> no Asaas (abre em nova aba)"><code><?= htmlspecialchars($inv['invoice_number']) ?></code> · Ver recibo</a>
                   <?php else: ?>
-                    <span style="background: #FEF3C7; color: #92400E; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;"><?= htmlspecialchars(ucfirst($inv['status'])) ?></span>
+                    <code><?= htmlspecialchars($inv['invoice_number']) ?></code>
+                  <?php endif; ?>
+                </td>
+                <td class="u-py-3 u-px-2"><?= (new \DateTimeImmutable($inv['due_date']))->format('d/m/Y') ?></td>
+                <td class="u-py-3 u-px-2"><?= !empty($inv['paid_at']) ? (new \DateTimeImmutable($inv['paid_at']))->format('d/m/Y') : '—' ?></td>
+                <td class="u-py-3 u-px-2 u-font-semibold">R$ <?= number_format($inv['amount_cents'] / 100, 2, ',', '.') ?></td>
+                <td class="u-py-3 u-px-2"><?= htmlspecialchars(['credit_card' => 'Cartão de crédito', 'boleto' => 'Boleto', 'pix' => 'Pix', 'undefined' => 'A definir'][strtolower((string)$inv['payment_method'])] ?? (string)$inv['payment_method']) ?></td>
+                <td class="u-py-3 u-px-2">
+                  <?php if ($inv['status'] === 'paid'): ?>
+                    <span class="u-bg-semantic-success-light u-color-semantic-success-text u-py-1 u-px-2 u-radius-input u-text-compact u-font-semibold">Paga</span>
+                  <?php elseif ($inv['status'] === 'void'): ?>
+                    <span class="u-bg-neutral-gray-100 u-color-neutral-gray-500 u-py-1 u-px-2 u-radius-input u-text-compact u-font-semibold">Anulada</span>
+                  <?php else: ?>
+                    <span class="u-bg-semantic-warning-light u-color-semantic-warning-strong u-py-1 u-px-2 u-radius-input u-text-compact u-font-semibold"><?= htmlspecialchars(['open' => 'Em aberto', 'pending' => 'Pendente', 'overdue' => 'Vencida', 'failed' => 'Falhou'][$inv['status']] ?? ucfirst((string)$inv['status'])) ?></span>
                   <?php endif; ?>
                 </td>
               </tr>
@@ -248,63 +258,50 @@
   </div>
 
   <!-- Seção de Cancelamento Autosserviço Sem Barreiras (TRUST-02 & TRUST-11) -->
-  <div class="card" style="border: 1px solid <?= $subscription['status'] === 'canceled' ? '#FDA4AF' : 'var(--neutral-gray-300)' ?>; background: <?= $subscription['status'] === 'canceled' ? '#FFF1F2' : '#FFFFFF' ?>;">
+  <div id="cancelar" class="card u-scroll-margin u-border <?= $subscription['status'] === 'canceled' ? 'u-bc-semantic-error-border u-bg-semantic-error-light' : 'u-bc-neutral-gray-300 u-bg-neutral-white' ?>">
     <?php if ($subscription['status'] === 'canceled'): ?>
-      <div style="padding: 8px 0;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E11D48" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <h2 style="font-size: 1.25rem; font-weight: 700; color: #9F1239; margin: 0;">Assinatura Cancelada</h2>
+      <div class="u-py-2 u-px-0">
+        <div class="u-flex u-items-center u-gap-2 u-mb-2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="u-color-semantic-error" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <h2 class="u-text-h3 u-font-bold u-color-semantic-error-strong u-m-0">Assinatura cancelada</h2>
         </div>
-        <p style="color: #4C0519; font-size: 0.95rem; margin-bottom: 12px;">
-          Sua solicitação de cancelamento foi processada com sucesso em autosserviço. Não haverá novas renovações ou cobranças no seu cartão.
+        <p class="u-color-semantic-error-strong u-text-body u-mb-3">
+          Cancelamento registrado. Não haverá novas renovações ou cobranças no seu cartão.
         </p>
-        <div style="background: #FFFFFF; border: 1px solid #FECDD3; border-radius: 8px; padding: 1rem; max-width: 600px;">
-          <div style="margin-bottom: 6px;">
-            <strong style="color: var(--brand-navy-900);">Protocolo de Cancelamento:</strong>
-            <code style="font-size: 1.05rem; font-weight: 700; color: #BE123C;"><?= htmlspecialchars($subscription['cancellation_protocol'] ?? '—') ?></code>
+        <div class="u-bg-neutral-white u-border u-bc-semantic-error-border u-radius-input u-p-4 u-maxw-form">
+          <div class="u-mb-1">
+            <strong class="u-color-botanical-forest-900">Protocolo de Cancelamento:</strong>
+            <code class="u-text-body u-font-bold u-color-semantic-error"><?= htmlspecialchars($subscription['cancellation_protocol'] ?? '—') ?></code>
           </div>
-          <div style="margin-bottom: 6px;">
-            <strong style="color: var(--brand-navy-900);">Data da Efetivação:</strong>
+          <div class="u-mb-1">
+            <strong class="u-color-botanical-forest-900">Data da Efetivação:</strong>
             <span><?= !empty($subscription['canceled_at']) ? (new \DateTimeImmutable($subscription['canceled_at']))->format('d/m/Y H:i') : '—' ?></span>
           </div>
           <div>
-            <strong style="color: var(--brand-navy-900);">Acesso liberado até:</strong>
+            <strong class="u-color-botanical-forest-900">Acesso liberado até:</strong>
             <span><?= (new \DateTimeImmutable($subscription['current_period_end']))->format('d/m/Y') ?> (fim do ciclo faturado)</span>
           </div>
         </div>
       </div>
     <?php else: ?>
-      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--brand-navy-900); margin-bottom: 4px;">
-        Cancelamento da Assinatura em Autosserviço
-      </h2>
-      <p style="color: var(--neutral-gray-600); font-size: 0.9rem; margin-bottom: var(--space-4);">
-        Aqui no ClyoNutri você tem total autonomia sobre seu contrato. Sem obrigatoriedade de ligar ou conversar com atendentes no chat.
+      <details>
+      <summary class="u-text-h3 u-font-bold u-color-botanical-forest-900">Cancelar a assinatura</summary>
+      <p class="u-color-neutral-gray-600 u-text-compact u-mt-2 u-mb-4 u-leading-body">
+        A renovação para na hora e o acesso continua até <strong><?= (new \DateTimeImmutable($subscription['current_period_end']))->format('d/m/Y') ?></strong>. Seus dados ficam guardados e você recebe um protocolo.
+        Na primeira contratação, em até 7 dias, o reembolso é integral (CDC art. 49).
+        <a href="/termos#reembolso" target="_blank" rel="noopener noreferrer" class="u-color-botanical-copper-600 u-underline">Ver regras nos Termos</a>
       </p>
-
-      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin-bottom: var(--space-4); font-size: 0.9rem;">
-        <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--brand-navy-900); margin: 0 0 6px 0;">O que acontece ao cancelar:</h3>
-        <ul style="margin: 0; padding-left: 20px; color: var(--neutral-gray-700); line-height: 1.5;">
-          <li>A renovação automática é interrompida imediatamente.</li>
-          <li>Nenhuma cobrança futura será realizada no seu cartão.</li>
-          <li>Você e sua equipe mantêm acesso completo a todos os recursos até <strong><?= (new \DateTimeImmutable($subscription['current_period_end']))->format('d/m/Y') ?></strong> (fim do ciclo vigente).</li>
-          <li>Seus prontuários, planos e dados clínicos permanecem guardados em conformidade com a LGPD e o CFN.</li>
-          <li>Você recebe na hora um número oficial de protocolo de cancelamento.</li>
-        </ul>
-      </div>
 
       <form method="POST" action="/configuracoes/assinatura/cancelar" data-confirm="Tem certeza de que deseja cancelar a assinatura do consultório? O acesso permanecerá até o fim do ciclo pago.">
         <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
 
-        <fieldset style="border: 1px solid var(--neutral-gray-200); border-radius: 8px; padding: 1.25rem; margin-bottom: var(--space-4);">
-          <legend style="padding: 0 8px; font-weight: 600; font-size: 0.9rem; color: var(--brand-navy-900);">
-            Pesquisa de Saída <span style="font-weight: 400; font-size: 0.8rem; color: var(--neutral-gray-500);">(100% Opcional)</span>
+        <fieldset class="u-border u-radius-input u-p-5 u-mb-4">
+          <legend class="u-py-0 u-px-2 u-font-semibold u-text-compact u-color-botanical-forest-900">
+            Motivo <span class="u-font-regular u-text-compact u-color-neutral-gray-500">(opcional)</span>
           </legend>
-          <p style="font-size: 0.85rem; color: var(--neutral-gray-600); margin-top: 0; margin-bottom: 12px;">
-            Sua opinião nos ajuda a evoluir. Você pode deixar os campos abaixo em branco se preferir; o cancelamento será concluído da mesma forma.
-          </p>
 
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label" for="cancel-reason" style="font-size: 0.85rem;">Qual o principal motivo da sua saída? (Opcional)</label>
+          <div class="form-group u-mb-3">
+            <label class="form-label u-text-compact" for="cancel-reason">Qual o principal motivo da sua saída? (Opcional)</label>
             <select class="form-control" id="cancel-reason" name="reason_category">
               <option value="">— Não desejo informar —</option>
               <?php foreach ($reasons as $code => $label): ?>
@@ -313,21 +310,24 @@
             </select>
           </div>
 
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="cancel-feedback" style="font-size: 0.85rem;">Comentários ou sugestões para melhorarmos (Opcional):</label>
-            <textarea class="form-control" id="cancel-feedback" name="feedback" rows="3" maxlength="1000" placeholder="Compartilhe o que faltou para o ClyoNutri atender plenamente seu dia a dia..."></textarea>
+          <div class="form-group u-mb-0">
+            <label class="form-label u-text-compact" for="cancel-feedback">Comentários ou sugestões para melhorarmos (Opcional):</label>
+            <textarea class="form-control" id="cancel-feedback" name="feedback" rows="3" maxlength="1000" placeholder="Compartilhe o que faltou para o Clyo Nutri atender plenamente seu dia a dia..."></textarea>
           </div>
         </fieldset>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-          <span style="font-size: 0.85rem; color: var(--neutral-gray-500);">
+        <div class="u-flex u-items-center u-justify-between u-wrap u-gap-4">
+          <span class="u-text-compact u-color-neutral-gray-500">
             Apenas titulares e administradores do consultório podem executar esta ação.
           </span>
-          <button type="submit" class="btn" style="background: #E11D48; color: #FFFFFF; border: none; font-weight: 600; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
-            Confirmar Cancelamento da Assinatura
+          <button type="submit" class="btn btn-danger-solid">
+            Confirmar cancelamento da assinatura
           </button>
         </div>
       </form>
+      </details>
     <?php endif; ?>
   </div>
+
+  <?php require __DIR__ . '/_conta_exclusao.php'; ?>
 </div>

@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 /**
- * ClyoNutri II — Rotas Web Oficiais (Laravel 13 Architecture)
+ * ClyoNutri II — Mapa declarativo das rotas web (estilo Laravel).
+ * AVISO (v54.46 / CR-NI2-007): o ClyoNutri NÃO roda Laravel nem Sanctum. O roteador real de produção é
+ * public/index.php (roteador PHP próprio). Este arquivo é um shim declarativo carregado só pelo `artisan`
+ * local; não aplica autenticação, CSRF nem tenant em requisições HTTP.
  * Mapeamento das rotas canônicas da plataforma clínica e profissional.
  */
 
@@ -17,6 +20,7 @@ $router->get('/', [LandingController::class, 'index'])->name('home');
 $router->get('/termos', [LandingController::class, 'terms'])->name('terms');
 $router->get('/privacidade', [LandingController::class, 'privacy'])->name('privacy');
 $router->get('/planos-assinatura', [LandingController::class, 'plans'])->name('plans.public');
+$router->get('/nutricionistas', [BookingController::class, 'publicDirectoryPage'])->name('booking.directory');
 $router->get('/agendar', [BookingController::class, 'publicBookingPage'])->name('booking.public');
 $router->get('/agendar/{professionalId}', [BookingController::class, 'publicBookingPage'])->name('booking.professional');
 $router->get('/paciente/lista-espera', [BookingController::class, 'waitlistPage'])->name('booking.waitlist');
@@ -37,6 +41,10 @@ $router->post('/pacientes', [DashboardController::class, 'savePatient'])->name('
 $router->get('/pacientes/{id}/editar', [DashboardController::class, 'editPatient'])->name('patients.edit');
 $router->post('/pacientes/{id}/editar', [DashboardController::class, 'editPatient'])->name('patients.update');
 $router->get('/pacientes/{id}', [DashboardController::class, 'profile360'])->name('patients.show');
+$router->post('/pacientes/{id}/iniciar-agora', [DashboardController::class, 'startCareNow']); // NI2-705 (espelho de public/index.php)
+$router->get('/pacientes/{id}/preparar', [DashboardController::class, 'prepareConsultation']); // NI2-712
+$router->get('/pacientes/{id}/plano', [DashboardController::class, 'patientPlansTab']); // NI2-711
+$router->get('/pacientes/{id}/documentos', [DashboardController::class, 'patientDocumentsTab']); // NI2-711
 
 // Antropometria e Avaliação Clínica (NI2-7)
 $router->get('/pacientes/{id}/antropometria', [DashboardController::class, 'patientAnthropometry'])->name('anthropometry.index');
@@ -112,6 +120,8 @@ $router->post('/pacientes/importar/{id}/descartar', [\ClyoNutri\Application\Cont
 $router->post('/pacientes/importar/{id}/desfazer', [\ClyoNutri\Application\Controllers\PatientImportController::class, 'rollback'])->name('patients.import.rollback');
 
 // Prescrição Dietética Avançada, Equivalências, Medidas e Modelos (NI2-514, NI2-519, NI2-520, NI2-521)
+$router->get('/alimentos/novo', [\ClyoNutri\Application\Controllers\FoodCatalogController::class, 'createForm'])->name('foods.create.form');
+$router->post('/alimentos/novo', [\ClyoNutri\Application\Controllers\FoodCatalogController::class, 'create'])->name('foods.create');
 $router->get('/alimentos/equivalencias', [\ClyoNutri\Application\Controllers\FoodEquivalenceController::class, 'index'])->name('food.equivalences.index');
 $router->post('/alimentos/equivalencias', [\ClyoNutri\Application\Controllers\FoodEquivalenceController::class, 'create'])->name('food.equivalences.create');
 $router->post('/alimentos/equivalencias/{id}', [\ClyoNutri\Application\Controllers\FoodEquivalenceController::class, 'update'])->name('food.equivalences.update');
@@ -207,19 +217,3 @@ $router->post('/suporte/chamado/{id}/status', [HelpdeskController::class, 'backo
 $router->get('/configuracoes/protocolos/editor', [\ClyoNutri\Application\Controllers\ClinicProtocolEditorController::class, 'page'])->name('protocol_editor.index');
 $router->post('/configuracoes/protocolos/editor', [\ClyoNutri\Application\Controllers\ClinicProtocolEditorController::class, 'mutate'])->name('protocol_editor.mutate');
 $router->post('/pacientes/{id}/pre-consulta/{qid}/condicoes', [\ClyoNutri\Application\Controllers\PreConsultationController::class, 'suggestConditions'])->name('preconsultation.conditions');
-
-// Clyo Academy (NI2-663): Biblioteca Científica, Evidências e Publicações
-use ClyoNutri\Application\Controllers\AcademyController;
-
-$router->get('/academy', [AcademyController::class, 'index'])->name('academy.index');
-$router->get('/academy/artigo/{id}', [AcademyController::class, 'articleDetail'])->name('academy.article_detail');
-$router->post('/academy/artigo/{id}/favoritar', [AcademyController::class, 'toggleFavorite'])->name('academy.favorite');
-$router->get('/academy/evidencias', [AcademyController::class, 'evidenceDesk'])->name('academy.evidence_desk');
-$router->get('/academy/colecao', [AcademyController::class, 'myCollection'])->name('academy.collection');
-$router->get('/academy/publicacoes', [AcademyController::class, 'publications'])->name('academy.publications');
-$router->get('/academy/publicacoes/nova', [AcademyController::class, 'newPublication'])->name('academy.new_publication');
-$router->post('/academy/publicacoes', [AcademyController::class, 'savePublication'])->name('academy.save_publication');
-$router->get('/academy/publicacoes/{id}', [AcademyController::class, 'publicationDetail'])->name('academy.publication_detail');
-$router->post('/academy/publicacoes/{id}/status', [AcademyController::class, 'updatePublicationStatus'])->name('academy.update_publication_status');
-$router->get('/api/v1/academy/search', [AcademyController::class, 'searchApi'])->name('academy.api_search');
-$router->get('/api/v1/academy/protocols/{code}', [AcademyController::class, 'protocolEvidenceApi'])->name('academy.api_protocol');

@@ -16,7 +16,8 @@ $period = $doc['period']['from'] || $doc['period']['to']
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
   <title>Prontuário — <?= $e($p['name']) ?></title>
-  <link rel="stylesheet" href="/assets/css/prontuario-impressao.css">
+  <link rel="stylesheet" href="/assets/css/prontuario-impressao.css?v=botanical-v54-9">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
 </head>
 <body>
 <div class="pi-toolbar" role="region" aria-label="Opções de impressão">
@@ -45,7 +46,7 @@ $period = $doc['period']['from'] || $doc['period']['to']
   </header>
 
   <?php if (!$doc['integrity']['is_valid']): ?>
-  <div class="pi-alert" role="alert">
+  <div class="op-message op-message--error pi-alert" role="alert">
     <strong>Atenção:</strong> a verificação de integridade do prontuário não foi confirmada. Este documento pode não refletir o histórico original. Comunique o suporte antes de usá-lo como documento oficial.
   </div>
   <?php endif; ?>
@@ -106,7 +107,7 @@ $period = $doc['period']['from'] || $doc['period']['to']
       <article class="pi-entry<?= $r['superseded_by_version'] ? ' pi-superseded' : '' ?>">
         <header>
           <h3><?= $e($r['title']) ?></h3>
-          <div class="pi-muted"><?= $e($r['created_at_local']) ?> · <?= $e($r['author']) ?> · versão <?= (int)$r['version'] ?><?= $r['via_teleconsultation'] ? ' · registrado em teleconsulta' : '' ?></div>
+          <div class="pi-muted"><?= $e($r['created_at_local']) ?> · <?= $e($r['author']) ?> · versão <?= (int)$r['version'] ?><?= $r['via_teleconsultation'] ? ' · registrada durante a teleconsulta' : '' ?></div>
         </header>
         <?php if ($r['superseded_by_version']): ?>
           <p class="pi-tag">Substituído pela versão <?= (int)$r['superseded_by_version'] ?> (retificação). Mantido para histórico.</p>
@@ -132,7 +133,7 @@ $period = $doc['period']['from'] || $doc['period']['to']
 
   <footer class="pi-footer">
     Documento confidencial, com dados de saúde protegidos pela LGPD. Uso restrito ao cuidado do paciente.
-    Emitido pelo ClyoNutri por <?= $e($pr['name']) ?> em <?= $e($doc['printed_at_local']) ?> (<?= $e($doc['timezone']) ?>).
+    Emitido pelo Clyo Nutri por <?= $e($pr['name']) ?> em <?= $e($doc['printed_at_local']) ?> (<?= $e($doc['timezone']) ?>).
     <?php if ($doc['integrity']['is_valid'] && $doc['integrity']['chain_fingerprint']): ?>
       Integridade verificada: <?= (int)$doc['integrity']['total_records'] ?> versões; identificador da cadeia <?= $e($doc['integrity']['chain_fingerprint']) ?>.
     <?php endif; ?>

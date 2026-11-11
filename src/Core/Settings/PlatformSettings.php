@@ -33,7 +33,7 @@ class PlatformSettings
         }
 
         $defaults = [
-            'app_name' => 'ClyoNutri II',
+            'app_name' => 'Clyo Nutri',
             'maintenance_mode' => '0',
             'support_sla_p1_hours' => '4',
             'support_sla_p2_hours' => '24',
@@ -42,6 +42,7 @@ class PlatformSettings
             'feature_flag_telehealth' => '0', // fail-closed (NI2-221/F12): liga só se configurado
             'feature_flag_chat' => '1',
             'feature_flag_audit_immutable' => '1',
+            'security_single_session_enforcement' => '0', // SEC-F005: 0=opcional no login, 1=forçado globalmente
             'analytics_adherence_enabled' => '1', // NI2-96: contadores agregados, legítimo interesse; desligável
         ];
 
@@ -133,5 +134,13 @@ class PlatformSettings
     public static function isAuditImmutable(?PDO $db = null): bool
     {
         return (string)self::get('feature_flag_audit_immutable', '1', $db) === '1';
+    }
+
+    /**
+     * Retorna se o encerramento automático de sessões concorrentes (sessão única ativa) está forçado (SEC-F005).
+     */
+    public static function isSingleSessionEnforced(?PDO $db = null): bool
+    {
+        return (string)self::get('security_single_session_enforcement', '0', $db) === '1';
     }
 }

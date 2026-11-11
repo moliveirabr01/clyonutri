@@ -20,6 +20,7 @@ use PDO;
  *   3. o primeiro termo começa o nome e todos os termos começam palavras ("leite integral" → "Leite, de vaca, integral");
  *   4. todos os termos começam palavras do nome;
  *   5. os demais; dentro de cada grupo, nome mais curto primeiro e depois ordem alfabética.
+ * Desde a v43 os sinônimos contam nos grupos e há desempates de favorito, preparo e uso (ver sql()).
  */
 final class FoodSearchIndex
 {
@@ -29,6 +30,62 @@ final class FoodSearchIndex
         'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
         'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c', 'ñ' => 'n',
     ];
+
+    /**
+     * NI2-520 (v42): nomes regionais do mesmo alimento. Só sinônimos de nome (linguagem), nenhum dado nutricional.
+     * Já no formato de termos (normalizados e no singular). Lista curta de propósito; ampliar com revisão.
+     */
+    public const SYNONYMS = [
+        ['mandioca', 'aipim', 'macaxeira'],
+        ['abobora', 'jerimum'],
+        ['tangerina', 'mexerica', 'bergamota'],
+    ];
+
+    /** Grafia para mostrar os termos normalizados dos sinônimos (só os que têm acento). */
+    private const SYNONYM_DISPLAY = ['abobora' => 'abóbora'];
+
+    /** Palavras de preparo que aparecem no nome dos alimentos do catálogo (rótulo exibido no resultado). */
+    private const PREPARATIONS = [
+        'cru' => 'Cru', 'crua' => 'Cru', 'cozido' => 'Cozido', 'cozida' => 'Cozido', 'grelhado' => 'Grelhado', 'grelhada' => 'Grelhado',
+        'frito' => 'Frito', 'frita' => 'Frito', 'assado' => 'Assado', 'assada' => 'Assado', 'refogado' => 'Refogado', 'refogada' => 'Refogado',
+        'torrado' => 'Torrado', 'torrada' => 'Torrado', 'desidratado' => 'Desidratado', 'desidratada' => 'Desidratado',
+        'congelado' => 'Congelado', 'congelada' => 'Congelado', 'enlatado' => 'Enlatado', 'enlatada' => 'Enlatado',
+        'conserva' => 'Em conserva', 'empanado' => 'Empanado', 'empanada' => 'Empanado', 'ensopado' => 'Ensopado',
+        'braseado' => 'Braseado', 'braseada' => 'Braseado', 'vapor' => 'No vapor',
+    ];
+
+    /** Forma de preparo lida do nome ("Arroz, integral, cozido" → "Cozido"); null quando o nome não informa. */
+    public static function preparation(string $name): ?string
+    {
+        $found = [];
+        foreach (explode(' ', self::normalize($name)) as $w) {
+            if (isset(self::PREPARATIONS[$w]) && !in_array(self::PREPARATIONS[$w], $found, true)) {
+                $found[] = self::PREPARATIONS[$w];
+            }
+        }
+        return $found === [] ? null : implode(' / ', array_slice($found, 0, 2));
+    }
+
+    /** Categoria para exibir: espaços normalizados e primeira letra maiúscula ("  cereais e  derivados" → "Cereais e derivados"). */
+    public static function categoryLabel(?string $category): string
+    {
+        $c = trim(preg_replace('/\s+/u', ' ', (string)$category) ?? '');
+        if ($c === '') {
+            return '';
+        }
+        return mb_strtoupper(mb_substr($c, 0, 1, 'UTF-8'), 'UTF-8') . mb_strtolower(mb_substr($c, 1, null, 'UTF-8'), 'UTF-8');
+    }
+
+    /** @return list<string> o termo e os sinônimos dele (o próprio termo primeiro). */
+    public static function synonymsOf(string $term): array
+    {
+        foreach (self::SYNONYMS as $group) {
+            if (in_array($term, $group, true)) {
+                return array_values(array_unique(array_merge([$term], $group)));
+            }
+        }
+        return [$term];
+    }
 
     /** Texto normalizado, sem espaços nas pontas: "Feijão, carioca (cozido)" → "feijao carioca cozido". */
     public static function normalize(string $text): string
@@ -98,7 +155,11 @@ final class FoodSearchIndex
     public static function sync(PDO $db, int $max = 20000): int
     {
         $sel = $db->prepare('SELECT id, name FROM foods WHERE search_text IS NULL LIMIT 500');
-        $upd = $db->prepare('UPDATE foods SET search_text = ? WHERE id = ? AND search_text IS NULL');
+        // v43: com a migração 63, o preparo lido do nome vai junto (foods.preparation); sem ela, só search_text.
+        $withPrep = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'foods', 'preparation');
+        $upd = $withPrep
+            ? $db->prepare('UPDATE foods SET search_text = ?, preparation = COALESCE(preparation, ?) WHERE id = ? AND search_text IS NULL')
+            : $db->prepare('UPDATE foods SET search_text = ? WHERE id = ? AND search_text IS NULL');
         $done = 0;
         while ($done < $max) {
             $sel->execute();
@@ -114,7 +175,9 @@ final class FoodSearchIndex
             }
             try {
                 foreach ($rows as $r) {
-                    $upd->execute([self::searchText((string)$r['name']), (int)$r['id']]);
+                    $upd->execute($withPrep
+                        ? [self::searchText((string)$r['name']), self::preparation((string)$r['name']), (int)$r['id']]
+                        : [self::searchText((string)$r['name']), (int)$r['id']]);
                 }
                 if ($own) {
                     $db->commit();
@@ -130,38 +193,153 @@ final class FoodSearchIndex
         return $done;
     }
 
+    /** Preparos que indicam alimento pronto para consumo; sobem na ordem quando a busca não cita preparo (v43). */
+    public const READY_PREPARATIONS = ['cozido', 'cozida', 'grelhado', 'grelhada', 'assado', 'assada', 'refogado', 'refogada', 'vapor', 'ensopado', 'braseado', 'braseada'];
+
+    /** A busca cita uma forma de preparo ("arroz cru", "frango grelhado")? */
+    public static function queryHasPreparation(array $terms): bool
+    {
+        foreach ($terms as $t) {
+            if (isset(self::PREPARATIONS[$t]) || isset(self::PREPARATIONS[$t . 'a']) || isset(self::PREPARATIONS[$t . 'o'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Frases alternativas com sinônimos (o termo digitado primeiro). Limite de 12 para não explodir o SQL. */
+    public static function phraseVariants(array $terms, bool $useSynonyms): array
+    {
+        $variants = [[]];
+        foreach ($terms as $t) {
+            $alts = $useSynonyms ? self::synonymsOf($t) : [$t];
+            $next = [];
+            foreach ($variants as $v) {
+                foreach ($alts as $a) {
+                    $next[] = array_merge($v, [$a]);
+                    if (count($next) >= 12) {
+                        break 2;
+                    }
+                }
+            }
+            $variants = $next;
+        }
+        return array_map(static fn(array $v): string => implode(' ', $v), $variants);
+    }
+
     /**
      * Pedaços de SQL para WHERE e ORDER BY. A coluna precisa ser search_text (ou alias.search_text).
+     *
+     * v43 (NI2-520): os sinônimos valem também na ordem. "aipim" procura "mandioca" e "macaxeira" nos mesmos grupos
+     * de relevância, então "Mandioca, cozida" (nome começa com o sinônimo) vem antes de "Bolo, pronto, aipim".
+     * Depois do grupo entram, nesta ordem: $options['favorite'] (expressão 0/1, favoritos da clínica primeiro),
+     * a intenção de preparo (sem preparo na busca, alimento cozido, grelhado ou assado vem antes do cru e do
+     * industrializado do mesmo grupo; com preparo na busca o WHERE já exige a palavra), $options['tie_break']
+     * (uso pela clínica), tamanho do nome e ordem alfabética.
+     *
      * @return array{where:string, order:string, where_params:array<string,string>, order_params:array<string,string>}
      */
-    public static function sql(array $terms, string $column = 'search_text', string $nameColumn = 'name', ?PDO $db = null): array
+    public static function sql(array $terms, string $column = 'search_text', string $nameColumn = 'name', ?PDO $db = null, array $options = []): array
     {
+        $useSynonyms = !empty($options['synonyms']);
+        $tieBreak = isset($options['tie_break']) && is_string($options['tie_break']) && $options['tie_break'] !== '' ? $options['tie_break'] . ', ' : '';
+        $favorite = isset($options['favorite']) && is_string($options['favorite']) && $options['favorite'] !== '' ? $options['favorite'] . ' DESC, ' : '';
+        $intentOn = !array_key_exists('preparation_intent', $options) || $options['preparation_intent'];
         // Desempate por tamanho em caracteres: no MySQL LENGTH conta bytes (acento = 2) e a ordem mudava entre bancos.
         $len = $db !== null && $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? 'CHAR_LENGTH' : 'LENGTH';
         if ($terms === []) {
-            return ['where' => '1=1', 'order' => "{$nameColumn} ASC", 'where_params' => [], 'order_params' => []];
+            return ['where' => '1=1', 'order' => "{$favorite}{$nameColumn} ASC", 'where_params' => [], 'order_params' => []];
         }
         $esc = static fn(string $t): string => str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $t);
         $where = [];
-        $starts = [];
         $wp = [];
         $op = [];
+        $startsW = [];
+        $startsV = [];
         foreach ($terms as $i => $t) {
-            $where[] = "{$column} LIKE :fs_t{$i} ESCAPE '!'";
-            $wp["fs_t{$i}"] = '%' . $esc($t) . '%';
-            $starts[] = "{$column} LIKE :fs_w{$i} ESCAPE '!'";
-            $op["fs_w{$i}"] = '% ' . $esc($t) . '%';
+            $alts = $useSynonyms ? self::synonymsOf($t) : [$t];
+            $or = [];
+            $orW = [];
+            $orV = [];
+            foreach ($alts as $k => $alt) {
+                $key = $k === 0 ? "fs_t{$i}" : "fs_t{$i}s{$k}";
+                $or[] = "{$column} LIKE :{$key} ESCAPE '!'";
+                $wp[$key] = '%' . $esc($alt) . '%';
+                // MySQL não aceita o mesmo nome de parâmetro duas vezes: um nome por uso.
+                $orW[] = "{$column} LIKE :fs_w{$i}a{$k} ESCAPE '!'";
+                $orV[] = "{$column} LIKE :fs_v{$i}a{$k} ESCAPE '!'";
+                $op["fs_w{$i}a{$k}"] = '% ' . $esc($alt) . '%';
+                $op["fs_v{$i}a{$k}"] = '% ' . $esc($alt) . '%';
+            }
+            $where[] = count($or) === 1 ? $or[0] : '(' . implode(' OR ', $or) . ')';
+            $startsW[] = count($orW) === 1 ? $orW[0] : '(' . implode(' OR ', $orW) . ')';
+            $startsV[] = count($orV) === 1 ? $orV[0] : '(' . implode(' OR ', $orV) . ')';
         }
-        $phrase = $esc(implode(' ', $terms));
-        $op['fs_exact'] = ' ' . $phrase . ' %';
-        $op['fs_prefix'] = ' ' . $phrase . '%';
-        $op['fs_first'] = ' ' . $esc($terms[0]) . '%';
-        $allStart = implode(' AND ', $starts);
-        $order = "CASE WHEN {$column} LIKE :fs_exact ESCAPE '!' THEN 0 WHEN {$column} LIKE :fs_prefix ESCAPE '!' THEN 1 WHEN {$column} LIKE :fs_first ESCAPE '!' AND "
-            . $allStart . ' THEN 2 WHEN ' . str_replace(':fs_w', ':fs_v', $allStart) . " THEN 3 ELSE 4 END, {$len}({$nameColumn}) ASC, {$nameColumn} ASC";
-        foreach ($terms as $i => $t) {
-            $op["fs_v{$i}"] = $op["fs_w{$i}"]; // o mesmo valor com outro nome (MySQL não aceita nome repetido)
+        $exact = [];
+        $prefix = [];
+        foreach (self::phraseVariants($terms, $useSynonyms) as $n => $phrase) {
+            $exact[] = "{$column} LIKE :fs_exact{$n} ESCAPE '!'";
+            $prefix[] = "{$column} LIKE :fs_prefix{$n} ESCAPE '!'";
+            $op["fs_exact{$n}"] = ' ' . $esc($phrase) . ' %';
+            $op["fs_prefix{$n}"] = ' ' . $esc($phrase) . '%';
         }
+        $first = [];
+        foreach (($useSynonyms ? self::synonymsOf($terms[0]) : [$terms[0]]) as $k => $alt) {
+            $first[] = "{$column} LIKE :fs_first{$k} ESCAPE '!'";
+            $op["fs_first{$k}"] = ' ' . $esc($alt) . '%';
+        }
+        $order = 'CASE WHEN ' . self::any($exact) . ' THEN 0 WHEN ' . self::any($prefix) . ' THEN 1 WHEN ' . self::any($first)
+            . ' AND ' . implode(' AND ', $startsW) . ' THEN 2 WHEN ' . implode(' AND ', $startsV) . ' THEN 3 ELSE 4 END, ';
+        $intent = '';
+        if ($intentOn && !self::queryHasPreparation($terms)) {
+            $ready = [];
+            foreach (self::READY_PREPARATIONS as $k => $w) {
+                $ready[] = "{$column} LIKE :fs_ready{$k}";
+                $op["fs_ready{$k}"] = '% ' . $w . ' %';
+            }
+            $intent = 'CASE WHEN ' . self::any($ready) . ' THEN 0 ELSE 1 END, ';
+        }
+        $order .= "{$favorite}{$intent}{$tieBreak}{$len}({$nameColumn}) ASC, {$nameColumn} ASC";
         return ['where' => '(' . implode(' AND ', $where) . ')', 'order' => $order, 'where_params' => $wp, 'order_params' => $op];
+    }
+
+    /**
+     * v44: termos que só casaram pelo sinônimo, para mostrar ao lado do resultado ("aipim = mandioca").
+     * Mesma regra do WHERE de sql(): o termo (ou o sinônimo) aparece como trecho do nome normalizado.
+     * @return list<array{typed:string, matched:string}>
+     */
+    public static function synonymHits(array $terms, string $name): array
+    {
+        $text = self::searchText($name);
+        $hits = [];
+        foreach ($terms as $t) {
+            $t = (string)$t;
+            if ($t === '' || str_contains($text, $t)) {
+                continue;
+            }
+            foreach (self::synonymsOf($t) as $alt) {
+                if ($alt !== $t && str_contains($text, $alt)) {
+                    $hits[] = ['typed' => $t, 'matched' => $alt];
+                    break;
+                }
+            }
+        }
+        return $hits;
+    }
+
+    /** Texto curto da correspondência por sinônimo ("aipim = mandioca"); null quando o nome tem o termo digitado. */
+    public static function synonymLabel(array $terms, string $name): ?string
+    {
+        $hits = self::synonymHits($terms, $name);
+        if ($hits === []) {
+            return null;
+        }
+        $show = static fn(string $t): string => self::SYNONYM_DISPLAY[$t] ?? $t;
+        return implode('; ', array_map(static fn(array $h): string => $show($h['typed']) . ' = ' . $show($h['matched']), $hits));
+    }
+
+    private static function any(array $conds): string
+    {
+        return count($conds) === 1 ? $conds[0] : '(' . implode(' OR ', $conds) . ')';
     }
 }

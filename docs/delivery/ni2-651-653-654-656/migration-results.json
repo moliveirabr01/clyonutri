@@ -1,0 +1,12 @@
+{
+  "build": "v54.17",
+  "mysql_version": "8.0.46",
+  "baseline": "v54.16 migrations 1–78 (76 arquivos existentes)",
+  "manual_sql_upgrade": "passed",
+  "repeat_manual_sql": "passed",
+  "incomplete_database_blocked": "passed; zero tables created",
+  "php_migration_idempotence": "passed (SQLite and MySQL)",
+  "hostgator_execution": "not performed",
+  "mariadb_execution": "not performed",
+  "mysql57_execution": "not performed"
+}

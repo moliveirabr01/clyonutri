@@ -1,0 +1,34 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {ApiService,setApiBaseUrl,setAuthToken}=require('../.test-build/api.js');
+const f=JSON.parse(fs.readFileSync(process.env.PATIENT_FIXTURE)),base=process.env.PATIENT_TEST_URL;
+assert(new URL(base).hostname==='127.0.0.1');setApiBaseUrl(base);
+const checks=[];function check(name,ok){checks.push({name,pass:!!ok});assert(ok,name);}
+(async()=>{
+ const a=await ApiService.login({email:f.patient_email,password:'Synthetic-mobile-2026!'});check('production client authenticates against v54.32',a.patient.id===f.mobile_patient);
+ const home=await ApiService.getHome();check('published plan read from real snapshot',home.active_plan.id===f.mobile_plan&&home.active_plan.meals.length===3);
+ check('v54.32 confirmed guidance reaches mobile contract',home.active_plan.notes.includes('TEXTO SINTÉTICO v54.32'));
+ check('authorized substitution amount and notes preserved',home.active_plan.meals[0].items[0].substitutions[0].amount===250&&home.active_plan.meals[0].items[0].substitutions[0].notes.includes('sintética'));
+ check('goal and confirmed hydration come from backend',home.water_goal_ml===2000&&typeof home.water_ml_today==='number');
+ check('actual appointment read',home.next_appointment.id===f.mobile_appointment);
+ const key='ds-native-'+Date.now();
+ const first=await ApiService.logHydration(250,{idempotencyKey:key});const again=await ApiService.logHydration(250,{idempotencyKey:key});
+ check('native-client hydration retry is idempotent',first.id===again.id&&first.total_water_today===again.total_water_today);
+ const when=new Date().toISOString(),mealKey='ds-meal-'+Date.now();
+ const input={meal_name:'Lanche SINTÉTICO',description:'TESTE integração nativa: consumo informado.',consumed_at:when,idempotency_key:mealKey};
+ const entry=await ApiService.logMeal(input),replay=await ApiService.logMeal(input);
+ check('native-client diary retry is idempotent',entry.id===replay.id);
+ const diary=await ApiService.getFoodDiary();check('diary persisted with actual description',diary.entries.some(x=>x.id===entry.id&&x.description===input.description));
+ const recipes=await ApiService.getRecipes();check('prescribed recipe available',recipes.some(x=>x.recipe_id===f.mobile_recipe));
+ const prescribed=recipes.find(x=>x.recipe_id===f.mobile_recipe),recipe=await ApiService.getRecipe(f.mobile_recipe,prescribed.id);
+ check('recipe snapshot includes ingredients and preparation',recipe.ingredients.length>0&&recipe.instructions.includes('SINTÉTICO'));
+ const evo=await ApiService.getEvolution();check('clinical history and source available',evo.clinical_records.length>=4&&evo.series.some(x=>x.points.length>=4));
+ const privacy=await ApiService.getPrivacy();check('privacy contract loads',!!privacy);
+ const notif=await ApiService.getNotifications();check('notifications contract loads',!!notif);
+ const others=await ApiService.login({email:f.patient_other_email,password:'Synthetic-mobile-2026!'});
+ check('other clinic authenticates separately',others.patient.id===f.patient_b);
+ const otherHome=await ApiService.getHome();check('other clinic cannot see first patient plan',otherHome.active_plan===null);
+ await assert.rejects(()=>ApiService.deleteHydration(first.id),e=>[403,404,422].includes(e.status));check('cross clinic hydration mutation denied',true);
+ await ApiService.logout();await assert.rejects(()=>ApiService.getHome(),e=>e.status===401);check('logout revokes API access',true);
+ fs.writeFileSync(process.env.PATIENT_EVIDENCE+'/api-native-client.json',JSON.stringify({backend:'v54.32',synthetic:true,transport:'Actual production TypeScript client compiled to CommonJS; real HTTP to unchanged PHP backend, no response mocks.',checks},null,2));
+ console.log(JSON.stringify({checks:checks.length,failed:checks.filter(x=>!x.pass)}));
+})().catch(e=>{console.error(e);process.exitCode=1});

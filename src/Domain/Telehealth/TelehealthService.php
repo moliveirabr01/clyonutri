@@ -25,7 +25,7 @@ class TelehealthService
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
-        // Descontinuado (NI2-221): gerava URL fictícia (meet.clyonutri.com.br) sem sala real.
+        // Descontinuado (NI2-221): gerava URL fictícia de videochamada (subdomínio "meet" inexistente) sem sala real.
         // Fail-closed: a teleconsulta usa TeleconsultationService + provedor real.
         throw new \LogicException('TelehealthService::generateSession foi descontinuado; use o Consultório Online (TeleconsultationService).');
     }

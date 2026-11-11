@@ -1,0 +1,31 @@
+{
+  "id": "54ec0cb5-dd42-4106-8703-0d80fd853537",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "appIdentifier": "com.moliveirabr.clyonutrimobile",
+  "sdkVersion": "51.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "1",
+  "createdAt": "2026-11-04T23:59:48.363Z",
+  "completedAt": "2026-11-05T00:06:50.666Z",
+  "artifacts": {
+    "buildUrl": "https://expo.dev/artifacts/eas/3PgGaVKdebwCBfGy7Z1qbPxnyfiBg7ki7UCY9l7B8VE.apk",
+    "applicationArchiveUrl": "https://expo.dev/artifacts/eas/3PgGaVKdebwCBfGy7Z1qbPxnyfiBg7ki7UCY9l7B8VE.apk"
+  },
+  "apk_sha256": "60913be3ee8d169257eb6686660c799aa85e4406c111c7ad457f5a0f7d5ffe7d",
+  "apk_bytes": 63220462,
+  "apk_zip_integrity": "PASS",
+  "configured_api": "https://clyonutri.com",
+  "remote_backend_version_verified": false,
+  "physical_device_tested": false,
+  "apk_signature_verification": {
+    "result": "PASS",
+    "schemes": [
+      "v1",
+      "v2"
+    ],
+    "signers": 1
+  }
+}

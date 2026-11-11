@@ -1,0 +1,164 @@
+ClyoNutri v46 · NI2-529 · teste de fumaça em MySQL 5.7.44 (29/10/2026, horário de Brasília)
+Árvore: clyonutri-v46 candidato extraído (sem .env; variáveis do teste só no ambiente), php -S com PHP 8.4.27, banco v46_smoke.
+Banco montado como a produção: instalador da v42, TACO, SQL da v43, SQL avulso da u3 (migração 64, política 1,1), depois o trio v46 (preflight, completa duas vezes, verificação). Dados TESTE sintéticos.
+
+== POLÍTICA ANTES E DEPOIS DO SQL v46 ==
++--------------+----------------+----------------------+-------------------+
+| momento      | policy_version | is_approved_clinical | is_approved_legal |
++--------------+----------------+----------------------+-------------------+
+| antes da v46 | 2026.1         |                    1 |                 1 |
++--------------+----------------+----------------------+-------------------+
++---------------+----------------+----------------------+-------------------+
+| momento       | policy_version | is_approved_clinical | is_approved_legal |
++---------------+----------------+----------------------+-------------------+
+| depois da v46 | 2026.1         |                    1 |                 1 |
++---------------+----------------+----------------------+-------------------+
+
+== PREFLIGHT v46 ==
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
+| situacao                                                                        | tabelas_exames_de_5 | colunas_da_65_de_5 | migracao_63 | migracao_64 | migracao_65 |
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
+| OK: migração 64 já aplicada (como em produção); a completa acrescenta a 65      |                   5 |                  0 |           1 |           1 |           0 |
++---------------------------------------------------------------------------------+---------------------+--------------------+-------------+-------------+-------------+
++----------------+----------------------+-------------------+---------------------+
+| policy_version | is_approved_clinical | is_approved_legal | observacao          |
++----------------+----------------------+-------------------+---------------------+
+| 2026.1         |                    1 |                 1 | não usado pela v46  |
++----------------+----------------------+-------------------+---------------------+
+
+== COMPLETA v46 (1ª execução) ==
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+| situacao                                  | tabelas_exames_de_5 | colunas_da_65_de_5 | exames_no_catalogo | migracoes_64_65_registradas |
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+| OK: banco de exames atualizado para a v46 |                   5 |                  5 |                 22 |                           2 |
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+
+== COMPLETA v46 (2ª execução) ==
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+| situacao                                  | tabelas_exames_de_5 | colunas_da_65_de_5 | exames_no_catalogo | migracoes_64_65_registradas |
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+| OK: banco de exames atualizado para a v46 |                   5 |                  5 |                 22 |                           2 |
++-------------------------------------------+---------------------+--------------------+--------------------+-----------------------------+
+
+== VERIFICAÇÃO v46 ==
++---------------------------------------------+-----------+
+| item                                        | resultado |
++---------------------------------------------+-----------+
+| tabelas de exames                           | OK        |
+| colunas da migração 65                      | OK        |
+| emissor do pedido em BIGINT(20)             | OK        |
+| padrão 0 na ciência do aviso de cobertura   | OK        |
+| índice idx_exam_audit_entity                | OK        |
+| política 2026.1                             | OK        |
+| catálogo com os 22 exames                   | OK        |
+| migração 64 registrada uma vez              | OK        |
+| migração 65 registrada uma vez              | OK        |
+| sem chave estrangeira nas tabelas de exames | OK        |
++---------------------------------------------+-----------+
++----------------+----------------------+-------------------+---------------------+
+| policy_version | is_approved_clinical | is_approved_legal | observacao          |
++----------------+----------------------+-------------------+---------------------+
+| 2026.1         |                    1 |                 1 | não usado pela v46  |
++----------------+----------------------+-------------------+---------------------+
+
+== HTTP (smoke46.py) ==
+catálogo {'FERRITINA_SERICA': '6', 'GLICEMIA_JEJUM': '2', 'HEMOGRAMA_COMPLETO': '1', 'TSH_T4_LIVRE': '21'}
+== SEM SESSÃO
+  [OK]   GET /pacientes/1/exames sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/novo sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1 sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/imprimir sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/pdf sem sessão → login (302)
+  [OK]   GET /pacientes/1/exames/1/editar sem sessão → login (302)
+  [OK]   POST /pacientes/1/exames sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/revisar sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/emitir sem sessão bloqueado (403)
+  [OK]   POST /pacientes/1/exames/1/cancelar sem sessão bloqueado (403)
+  [OK]   API de busca sem sessão → 401 sem dados
+  [OK]   login smoke_nutri@teste.invalid
+  [OK]   login smoke_owner@teste.invalid
+  [OK]   login smoke_recep@teste.invalid
+  [OK]   login smoke_owner2@teste.invalid
+== SEM TRAVA (política como em produção: 1,1, intocada pelo SQL v46)
+  [OK]   pacote sem comando nem classe de liberação
+  [OK]   política 2026.1 continua 1,1 depois do SQL v46
+  [OK]   lista de pedidos abre limpa, sem texto de revisão nem de liberação
+  [OK]   tela de novo pedido limpa (sem script inline) com aviso de cobertura
+  [OK]   novo pedido sem 'vinculada ao prontuário', sem texto de revisão nem de liberação
+  [OK]   novo pedido não pede CPF
+  [OK]   busca 'acucar no sangue' (sem acento) acha a glicemia
+  [OK]   busca 'FERRO' acha a ferritina
+    sinônimo devolvido para FERRO: reserva de ferro
+  [OK]   recepção não cria pedido (403)
+  [OK]   CRN curto demais no perfil ('CRN-3 1' da massa de teste): recusa com link para Configurações
+  [OK]   rascunho salvo (303, pedido 1)
+  [OK]   3 exames no rascunho
+  [OK]   sinônimo usado gravado no item
+  [OK]   rascunho não imprime (volta para o pedido)
+  [OK]   tela do pedido limpa; modal de cancelamento sem onclick
+  [OK]   rascunho → revisão
+  [OK]   pedido em revisão mostra o formulário de emissão para a nutricionista
+  [OK]   pedido em revisão sem aviso de liberação, parecer ou advogado
+== EMISSÃO E PDF
+  [OK]   emitir sem a ciência do aviso: recusado
+  [OK]   emitido direto pela nutricionista, sem aprovação de ninguém, com ciência real e quem emitiu (issued)
+  [OK]   PDF gravado em storage/app/exam_requests/<clínica>/, fora de public/
+  [OK]   SHA-256 e tamanho do arquivo conferem com o registrado
+  [OK]   arquivo 0640 e .htaccess de bloqueio na pasta
+  [OK]   download autenticado do PDF confere com o hash
+  [OK]   PDF traz 'TESTE Clínica Aurora Nutrição'
+  [OK]   PDF traz 'Paciente TESTE 1'
+  [OK]   PDF traz 'TESTE Nutri Aurora'
+  [OK]   PDF traz 'CRN-3'
+  [OK]   PDF traz 'Ferritina'
+  [OK]   PDF traz 'Glicemia'
+  [OK]   PDF traz 'TSH'
+  [OK]   PDF traz 'avaliar reservas de ferro'
+  [OK]   PDF sem CPF, sem texto de revisão nem de liberação
+  [OK]   PDF traz a linha de assinatura e carimbo (assinatura digital fica para a NI2-535)
+  [OK]   outra clínica: PDF 404 (404)
+  [OK]   outra clínica com o próprio paciente e o id do pedido: sem PDF (303)
+  [OK]   outra clínica: impressão 404
+  [OK]   sem sessão: PDF vai para o login
+  [OK]   o PDF não é servido por URL direta
+== IMPRESSÃO
+  [OK]   página de impressão abre limpa (sem onclick, sem script inline)
+  [OK]   botão Imprimir ligado pelo prontuario-impressao.js
+  [OK]   impressão traz 'TESTE Clínica Aurora Nutrição'
+  [OK]   impressão traz 'Paciente TESTE 1'
+  [OK]   impressão traz 'CRN-3'
+  [OK]   impressão traz 'Ferritina'
+  [OK]   impressão traz 'avaliar reservas de ferro'
+  [OK]   impressão sem CPF, sem texto de revisão nem de liberação
+  [OK]   CSP com script-src-attr 'none' continua ativa
+  [OK]   pedido emitido mostra Imprimir e Baixar PDF, sem aviso de liberação
+  [OK]   pedido emitido não edita
+== AUDITORIA
+    audit_logs: EXAM_REQUEST_DRAFT_CREATED,EXAM_REQUEST_SUBMITTED_FOR_REVIEW,EXAM_REQUEST_ISSUED,EXAM_REQUEST_PDF_DOWNLOADED,EXAM_REQUEST_PRINT_VIEWED
+  [OK]   AuditLogger com criação, revisão e emissão
+  [OK]   audit_logs sem texto clínico (justificativa)
+== CANCELAMENTO
+  [OK]   cancelado com motivo
+  [OK]   cancelado: PDF não é mais entregue
+  [OK]   cancelado: impressão mostra o cancelamento
+== POLÍTICA EM 0,0: CONTINUA EMITINDO (o sistema não lê is_approved_*)
+  [OK]   pedido em revisão sem aviso de liberação com a política em 0,0
+  [OK]   política 0,0: emissão funciona igual
+  [OK]   política 0,0: download do PDF confere com o hash
+  [OK]   política 0,0: página de impressão abre limpa
+  [OK]   política 0,0: outra clínica continua sem acesso ao PDF
+RID 1 RID2 2
+  [OK]   log do servidor sem erro de PHP
+  [OK]   nenhum evento de liberação na trilha
+RESULTADO: 77 de 77 OK
+
+== NAVEGADOR (Chrome, CSP ativa; shots46.py) ==
+depois de salvar: http://127.0.0.1:8146/pacientes/1/exames/3
+política no banco (clínica, jurídica): 1,1
+formulário de emissão na tela da nutricionista: 1
+texto de liberação/parecer/advogado na tela: False
+cliques no Imprimir que chamaram window.print(): 1
+modal de cancelamento visível: True
+violações de CSP no console: 0 []
+
+Nada foi rodado em produção.

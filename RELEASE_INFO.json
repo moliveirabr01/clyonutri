@@ -1,0 +1,76 @@
+{
+  "product": "Clyo Nutri",
+  "version": "v54.58-local",
+  "ui_version": "v54.58 local",
+  "base_version": "v54.51",
+  "issue": "NI2-767 — Central de Eventos de Produção no Backoffice, Hardening de Segurança (NI2-794/802) e Governança Clínica (NI2-703)",
+  "prepared_date": "2026-11-07",
+  "status": "integracao-local",
+  "jira_updated": true,
+  "production_deployed": false,
+  "schema_changes": "Migração 091: Tabelas production_events e production_alerts com índices compostos para observabilidade de alta performance.",
+  "release_gate": "ver LEIA-ME-HOSTGATOR-v54-52.md",
+  "technical_validation": {
+    "production_events_checks": 32,
+    "perf_concurrency_checks": 30,
+    "clinical_comorbidity_checks": 25,
+    "security_hardening_checks": 20,
+    "dietary_checks_per_database": 45,
+    "dietary_browser_checks": 43,
+    "cross_browser_checks": 127,
+    "runtime_files_verified": 1630,
+    "release_assertions_passed": 32
+  },
+  "documentation": [
+    "LEIA-ME-HOSTGATOR-v54-52.md",
+    "release-evidence/v54-52/"
+  ],
+  "previous_release_info": {
+    "version": "v54.51",
+    "ui_version": "v54-51",
+    "issue": "NI2-727 — Assinatura: fatura/recibo clicável (link Asaas em nova aba na tabela Faturas)",
+    "release_gate": "ver LEIA-ME-HOSTGATOR-v54-51.md"
+  },
+  "previous_version": "v54.51",
+  "title": "ClyoNutri II",
+  "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk.",
+  "previous_local_release_info": {
+    "product": "Clyo Nutri",
+    "version": "v54.52",
+    "ui_version": "v54-52",
+    "base_version": "v54.51",
+    "issue": "NI2-767 — Central de Eventos de Produção no Backoffice, Hardening de Segurança (NI2-794/802) e Governança Clínica (NI2-703)",
+    "prepared_date": "2026-11-07",
+    "status": "candidata",
+    "jira_updated": true,
+    "production_deployed": false,
+    "schema_changes": "Migração 091: Tabelas production_events e production_alerts com índices compostos para observabilidade de alta performance.",
+    "release_gate": "ver LEIA-ME-HOSTGATOR-v54-52.md",
+    "technical_validation": {
+      "production_events_checks": 32,
+      "perf_concurrency_checks": 30,
+      "clinical_comorbidity_checks": 25,
+      "security_hardening_checks": 20,
+      "dietary_checks_per_database": 45,
+      "dietary_browser_checks": 43,
+      "cross_browser_checks": 127,
+      "runtime_files_verified": 1630,
+      "release_assertions_passed": 32
+    },
+    "documentation": [
+      "LEIA-ME-HOSTGATOR-v54-52.md",
+      "release-evidence/v54-52/"
+    ],
+    "previous_release_info": {
+      "version": "v54.51",
+      "ui_version": "v54-51",
+      "issue": "NI2-727 — Assinatura: fatura/recibo clicável (link Asaas em nova aba na tabela Faturas)",
+      "release_gate": "ver LEIA-ME-HOSTGATOR-v54-51.md"
+    },
+    "previous_version": "v54.51",
+    "title": "ClyoNutri II",
+    "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk."
+  },
+  "integration_scope": "Dashboard, menu e delta UX da v54.58 reconciliados com a codebase local. Não é cópia integral do ZIP e não herda a certificação das suítes do pacote.",
+  "integration_backup": "storage/backups/integracao-v54-58-20261111"
+}

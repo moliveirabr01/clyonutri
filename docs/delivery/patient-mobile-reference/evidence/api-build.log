@@ -1,0 +1,2 @@
+npm notice run clyonutri-mobile@1.0.0 build:api-test
+npm notice run tsc src/services/api.ts src/services/hydrationQueue.ts --outDir .test-build --target ES2022 --module commonjs --esModuleInterop --skipLibCheck

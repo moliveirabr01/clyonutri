@@ -31,13 +31,17 @@ class Csrf
         return self::token();
     }
 
-    public static function validate(?string $token): bool
+    public static function validate(mixed $token): bool
     {
+        if (!is_string($token) || $token === '') {
+            return false;
+        }
+
         if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
             session_start();
         }
 
-        if (empty($token) || empty($_SESSION[self::SESSION_KEY])) {
+        if (empty($_SESSION[self::SESSION_KEY])) {
             return false;
         }
 

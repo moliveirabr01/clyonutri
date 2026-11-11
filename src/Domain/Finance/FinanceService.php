@@ -17,7 +17,10 @@ class FinanceService
         $this->db = $db ?? Connection::getInstance();
     }
 
-    public function createReceivable(int $patientId, string $description, int $amountCents, string $dueDate, ?int $appointmentId = null): array
+    /** v54.37: categorias sugeridas para Entrada (o texto livre fica na descrição). */
+    public const ENTRY_CATEGORIES = ['Consulta', 'Plano', 'Outros'];
+
+    public function createReceivable(int $patientId, string $description, int $amountCents, string $dueDate, ?int $appointmentId = null, ?string $category = null): array
     {
         $clinicId = TenantContext::getClinicId();
         \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
@@ -37,12 +40,26 @@ class FinanceService
             throw new \InvalidArgumentException("A data de vencimento é obrigatória.");
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO receivables (clinic_id, patient_id, appointment_id, description, amount_cents, due_date, status)
-            VALUES (:clinic_id, :patient_id, :appointment_id, :description, :amount_cents, :due_date, 'pending')
-        ");
+        $category = $category !== null ? trim($category) : '';
+        if ($category !== '' && !in_array($category, self::ENTRY_CATEGORIES, true)) {
+            throw new \InvalidArgumentException("Categoria de entrada inválida.");
+        }
+        $hasCategory = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'receivables', 'category');
+        $params = [];
+        if ($hasCategory) {
+            $stmt = $this->db->prepare("
+                INSERT INTO receivables (clinic_id, patient_id, appointment_id, description, amount_cents, due_date, status, category)
+                VALUES (:clinic_id, :patient_id, :appointment_id, :description, :amount_cents, :due_date, 'pending', :category)
+            ");
+            $params['category'] = $category !== '' ? $category : null;
+        } else {
+            $stmt = $this->db->prepare("
+                INSERT INTO receivables (clinic_id, patient_id, appointment_id, description, amount_cents, due_date, status)
+                VALUES (:clinic_id, :patient_id, :appointment_id, :description, :amount_cents, :due_date, 'pending')
+            ");
+        }
 
-        $stmt->execute([
+        $stmt->execute($params + [
             'clinic_id' => $clinicId,
             'patient_id' => $patientId,
             'appointment_id' => $appointmentId,
@@ -89,11 +106,17 @@ class FinanceService
 
         $this->db->beginTransaction();
         try {
-            $pStmt = $this->db->prepare("
+            // v54.37: guarda quem deu a baixa (CRN no recibo), se a migração 88 já rodou.
+            $recorder = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'payments', 'recorded_by_user_id')
+                ? TenantContext::getUserId() : null;
+            $pStmt = $this->db->prepare($recorder !== null ? "
+                INSERT INTO payments (clinic_id, receivable_id, amount_cents, payment_method, paid_at, receipt_code, recorded_by_user_id)
+                VALUES (:clinic_id, :receivable_id, :amount_cents, :method, CURRENT_TIMESTAMP, :receipt_code, :recorder)
+            " : "
                 INSERT INTO payments (clinic_id, receivable_id, amount_cents, payment_method, paid_at, receipt_code)
                 VALUES (:clinic_id, :receivable_id, :amount_cents, :method, CURRENT_TIMESTAMP, :receipt_code)
             ");
-            $pStmt->execute([
+            $pStmt->execute(($recorder !== null ? ['recorder' => $recorder] : []) + [
                 'clinic_id' => $clinicId,
                 'receivable_id' => $receivableId,
                 'amount_cents' => $amountCents,

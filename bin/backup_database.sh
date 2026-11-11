@@ -57,10 +57,15 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
         --no-tablespaces \
         "$DB_NAME" > "$SQL_DUMP_FILE"
 else
-    # SQLite para desenvolvimento/staging
+    # SQLite para desenvolvimento/staging (fallback PHP se sqlite3 CLI ausente — NI2-717)
     SQLITE_PATH="$ROOT_DIR/storage/database.sqlite"
     if [ -f "$SQLITE_PATH" ]; then
-        sqlite3 "$SQLITE_PATH" ".dump" > "$SQL_DUMP_FILE"
+        if command -v sqlite3 >/dev/null 2>&1; then
+            sqlite3 "$SQLITE_PATH" ".dump" > "$SQL_DUMP_FILE"
+        else
+            php "$ROOT_DIR/bin/sqlite_dump.php" "$SQLITE_PATH" "$SQL_DUMP_FILE"
+            echo "  ✓ Dump SQLite via PHP (sqlite3 CLI ausente)."
+        fi
     else
         echo "CREATE TABLE IF NOT EXISTS system_init (id INTEGER PRIMARY KEY);" > "$SQL_DUMP_FILE"
     fi
@@ -105,7 +110,35 @@ cat <<EOF > "$MANIFEST"
 }
 EOF
 echo "  ✓ Manifesto gerado em: $(basename "$MANIFEST")"
+
+# 5. Cópia off-site (NI2-717 / CR-NI2-003) — não deixar o único backup no mesmo host
+# Preferência: BACKUP_OFFSITE_DIR (caminho local/NFS montado) OU BACKUP_OFFSITE_RSYNC (user@host:/path)
+OFFSITE_COPIED=0
+if [ -n "${BACKUP_OFFSITE_DIR:-}" ]; then
+    mkdir -p "$BACKUP_OFFSITE_DIR"
+    cp -f "$ENC_FILE" "$MANIFEST" "$BACKUP_OFFSITE_DIR/"
+    echo "  ✓ Cópia off-site (dir): $BACKUP_OFFSITE_DIR"
+    OFFSITE_COPIED=1
+fi
+if [ -n "${BACKUP_OFFSITE_RSYNC:-}" ]; then
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -a "$ENC_FILE" "$MANIFEST" "$BACKUP_OFFSITE_RSYNC"/
+        echo "  ✓ Cópia off-site (rsync): $BACKUP_OFFSITE_RSYNC"
+        OFFSITE_COPIED=1
+    else
+        echo "  ⚠️ BACKUP_OFFSITE_RSYNC definido, mas rsync não está instalado." >&2
+    fi
+fi
+if [ "$OFFSITE_COPIED" -eq 0 ]; then
+    echo "  ⚠️ Off-site NÃO configurado. Defina BACKUP_OFFSITE_DIR ou BACKUP_OFFSITE_RSYNC."
+    echo "     Sem off-site, o backup fica só em storage/backups no mesmo host (risco CR-NI2-003)."
+fi
+
 echo ""
 echo "========================================================================"
 echo "   ✅ BACKUP CIFRADO E VALIDADO COM SUCESSO!"
+echo "========================================================================"
+echo " SHA-256 : $CHECKSUM"
+echo " Local   : $ENC_FILE"
+[ "$OFFSITE_COPIED" -eq 1 ] && echo " Off-site: configurado" || echo " Off-site: PENDENTE"
 echo "========================================================================"

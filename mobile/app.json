@@ -7,6 +7,13 @@
     },
     "android": {
       "package": "com.moliveirabr.clyonutrimobile"
+    },
+    "name": "Clyo Nutri",
+    "slug": "clyonutri-mobile",
+    "owner": "moliveirabr",
+    "version": "1.0.0",
+    "splash": {
+      "backgroundColor": "#102D28"
     }
   }
 }

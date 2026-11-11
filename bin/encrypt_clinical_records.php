@@ -18,6 +18,10 @@ use ClyoNutri\Core\Security\ClinicalEncryptionService;
 
 $dryRun = in_array('--dry-run', $argv, true);
 
+echo "AVISO (NI2-716 / v54.45): rode este batch SOMENTE depois que o runtime já descriptografa\n";
+echo "  (AnamnesisService / ClinicalContext / LGPD). NÃO executar contra produção sem esse pré-requisito.\n";
+echo "  Preferir --dry-run primeiro. Backup completo + CLINICAL_ENCRYPTION_KEY estável são obrigatórios.\n\n";
+
 echo "========================================================================\n";
 echo ">>> CLYONUTRI II — MIGRAÇÃO DE CRIPTOGRAFIA EM REPOUSO (SEC-02) <<<\n";
 echo "    Algoritmo: AES-256-GCM | Envelope: " . ClinicalEncryptionService::PREFIX . "\n";
@@ -26,7 +30,7 @@ echo "========================================================================\n
 
 $db = Connection::getInstance();
 
-$fields = ClinicalEncryptionService::ANAMNESIS_ENCRYPTED_FIELDS;
+$fields = ClinicalEncryptionService::anamnesisFieldsPresent($db); // v54.46: inclui structured_data_json quando a coluna existe
 $totalScanned = 0;
 $totalEncrypted = 0;
 $totalSkipped = 0;

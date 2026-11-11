@@ -1,0 +1,17 @@
+PASS: src/Application/Controllers/DashboardController.php
+PASS: src/Application/Controllers/SettingsController.php
+PASS: src/Domain/Appointment/AppointmentScheduleInput.php
+PASS: src/Domain/Appointment/AppointmentService.php
+PASS: src/Domain/Booking/BookingCalendarService.php
+PASS: tests/agenda_calendar_flow.php
+PASS: tests/appointment_confirmation.php
+PASS: tests/booking_calendar_sql_mysql.php
+PASS: tests/booking_calendar_waitlist.php
+PASS: tests/booking_self_service.php
+PASS: tests/fixtures/booking.php
+PASS: tests/fixtures/waitlist_mysql_worker.php
+PASS: views/agenda/_calendar_markers.php
+PASS: views/agenda/_calendar_styles.php
+PASS: views/agenda/_schedule_fields.php
+PASS: views/settings/_calendar.php
+PASS: views/settings/_calendar_period_fields.php

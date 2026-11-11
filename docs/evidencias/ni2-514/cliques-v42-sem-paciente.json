@@ -1,0 +1,19 @@
+{
+  "versao": "v42",
+  "cenario": "sem paciente",
+  "concluiu": true,
+  "detalhe": "itens no plano: 1",
+  "cliques": 5,
+  "passos": [
+    "Novo plano alimentar",
+    "Iniciar prescrição",
+    "+ Alimento na refeição",
+    "Escolher o alimento nos resultados",
+    "Adicionar ao plano"
+  ],
+  "campos_digitados": 2,
+  "digitados": [
+    "busca do alimento",
+    "quantidade"
+  ]
+}

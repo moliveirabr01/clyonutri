@@ -21,9 +21,11 @@ import PatientChat from '../components/PatientChat';
 import PatientNotifications from '../components/PatientNotifications';
 import { setupPushNotifications, onPushOpened } from '../services/pushNotifications';
 import BrandLogo from '../components/BrandLogo';
+import PatientOverview from '../components/PatientOverview';
+import Feather from '@expo/vector-icons/Feather';
 import HydrationHistory from '../components/HydrationHistory';
 import { HydrationQueue, QueuedHydration, memoryStorage, webStorage } from '../services/hydrationQueue';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 import { announce, useAnnounce } from '../utils/a11y';
 import {
   ApiService,
@@ -481,19 +483,97 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       >
         {currentTab === 'Hoje' && (
           <>
-            {/* Header com Design System Premium */}
-            <View style={styles.header}>
-              <BrandLogo compact />
-              <Text
-                style={styles.greeting}
-                accessibilityRole="header"
-              >
-                Olá, {patientName}
-              </Text>
-              <Text style={styles.subGreeting}>Acompanhamento nutricional dedicado</Text>
-            </View>
+            <PatientOverview name={patientName} hasPlan={!!activePlan} meals={activePlan?.meals?.length ?? 0} waterMl={waterMl} waterGoal={waterGoal} onPlan={() => setCurrentTab('Plano')} />
+            {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
+            {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
+            <Text style={styles.sectionTitle} accessibilityRole="header">Suas refeições de hoje</Text>
 
-            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')} accessibilityLabel="Minhas receitas. Ver as receitas e orientações do seu nutricionista">
+            {activePlan && activePlan.meals && activePlan.meals.length > 0 ? (
+              activePlan.meals.map((meal) => (
+                <View key={meal.id} style={styles.mealCard}>
+                  <View style={styles.mealHeader}>
+                    <Text style={styles.mealName}>{meal.name}</Text>
+                    <Text style={styles.mealTime}>{meal.time || '--:--'}</Text>
+                  </View>
+
+                  {meal.notes ? <Text style={styles.itemNotesText}>Orientação da refeição: {meal.notes}</Text> : null}
+                  {meal.items && meal.items.length > 0 ? (
+                    meal.items.map((item) => (
+                      <View key={item.id} style={styles.mealItemRow}>
+                        <Text style={styles.mealItem}>
+                          • {item.quantity} {item.unit} de {item.food_name}
+                        </Text>
+                        {item.substitutions && item.substitutions.length > 0 && (
+                          <View style={styles.substitutionContainer}>
+                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
+                            {item.substitutions.map((s) => (
+                              <Text key={s.id} style={styles.substitutionText}>
+                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
+                              </Text>
+                            ))}
+                          </View>
+                        )}
+                        {item.notes ? (
+                          <Text style={styles.itemNotesText}>
+                            Orientação: {item.notes}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
+                  )}
+
+                  {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
+            {mealDraft?.name === meal.name && <View style={styles.card}>
+              <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
+              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
+              <View accessibilityRole="radiogroup">
+                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
+                  <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
+                </TouchableOpacity>)}
+              </View>
+              {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
+                <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
+                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" placeholderTextColor={t.muted} style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, minHeight: 88, marginTop: 8 }]} />
+              </>}
+              {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
+              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
+                <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
+            </View>}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
+                      onPress={() => {
+                        const pending = pendingMealWrites.current[meal.name];
+                        setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
+                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
+                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
+                        setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
+                      }}
+                      disabled={registeringMeal !== null || mealDraft !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={(registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo') + ' da refeição ' + meal.name}
+                    >
+                      <Text style={styles.registerMealText}>
+                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>Nenhum plano publicado</Text>
+                <Text style={styles.emptyDescription}>
+                  Seu nutricionista ainda não publicou um plano alimentar ativo. Assim que a prescrição for disponibilizada, você verá suas refeições aqui.
+                </Text>
+              </View>
+            )}
+            <Text style={styles.sectionTitle} accessibilityRole="header">Seu acompanhamento</Text>
+            <TouchableOpacity style={styles.card} accessibilityRole="button" onPress={() => setCurrentTab('Plano')}>
               <Text style={styles.cardTitle}>Minhas receitas</Text>
               <Text style={styles.helperText}>Veja as receitas e orientações prescritas pelo seu nutricionista</Text>
             </TouchableOpacity>
@@ -502,7 +582,6 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               style={[styles.card, { borderColor: t.success, backgroundColor: t.successBg }]}
               accessibilityRole="button"
               onPress={() => setCurrentTab('Chat')}
-              accessibilityLabel="Mensagens com o nutricionista. Tire dúvidas sobre o plano. Não é canal de urgência"
             >
               <Text style={[styles.cardTitle, { color: t.success }]}>Mensagens com o nutricionista</Text>
               <Text style={[styles.helperText, { color: t.success }]}>
@@ -555,13 +634,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   <Text style={styles.navyButtonText}>+ 250 ml</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.navyButton}
+                  style={[styles.navyButton, { backgroundColor: t.accent }]}
                   onPress={() => handleAddWater(500)}
                   accessibilityRole="button"
                   accessibilityLabel="Adicionar 500 ml de água"
                   testID="water-add-500"
                 >
-                  <Text style={styles.navyButtonText}>+ 500 ml</Text>
+                  <Text style={[styles.navyButtonText, { color: t.accentInk }]}>+ 500 ml</Text>
                 </TouchableOpacity>
               </View>
               {waterFeedback && (
@@ -590,94 +669,6 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               {showWaterHistory && <HydrationHistory refreshToken={waterHistoryToken} onChanged={(r) => applyWaterTotal(r.total_water_today)} />}
             </View>
 
-            {mealFeedback && <Text accessibilityLiveRegion="polite" style={[styles.helperText, { color: t.success }]}>{mealFeedback}</Text>}
-            {/* Refeições de Hoje com dados reais do plano ou Empty State (Critério 2) */}
-            <Text style={styles.sectionTitle} accessibilityRole="header">Prescrição do dia</Text>
-
-            {activePlan && activePlan.meals && activePlan.meals.length > 0 ? (
-              activePlan.meals.map((meal) => (
-                <View key={meal.id} style={styles.mealCard}>
-                  <View style={styles.mealHeader}>
-                    <Text style={styles.mealName}>{meal.name}</Text>
-                    <Text style={styles.mealTime}>{meal.time || '--:--'}</Text>
-                  </View>
-
-                  {meal.notes ? <Text style={styles.itemNotesText}>Orientação da refeição: {meal.notes}</Text> : null}
-                  {meal.items && meal.items.length > 0 ? (
-                    meal.items.map((item) => (
-                      <View key={item.id} style={styles.mealItemRow}>
-                        <Text style={styles.mealItem}>
-                          • {item.quantity} {item.unit} de {item.food_name}
-                        </Text>
-                        {item.substitutions && item.substitutions.length > 0 && (
-                          <View style={styles.substitutionContainer}>
-                            <Text style={styles.substitutionHeader}>Opções de substituição:</Text>
-                            {item.substitutions.map((s) => (
-                              <Text key={s.id} style={styles.substitutionText}>
-                                ou {s.amount ? `${s.amount} ${s.measure_unit || ''} de ` : ''}{s.food_name}{s.notes ? ` • ${s.notes}` : ''}
-                              </Text>
-                            ))}
-                          </View>
-                        )}
-                        {item.notes ? (
-                          <Text style={styles.itemNotesText}>
-                            Orientação: {item.notes}
-                          </Text>
-                        ) : null}
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.emptyItemsText}>Nenhum item cadastrado nesta refeição.</Text>
-                  )}
-
-                  {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
-            {mealDraft?.name === meal.name && <View style={styles.card}>
-              <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
-              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
-              <View accessibilityRole="radiogroup">
-                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
-                  <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
-                </TouchableOpacity>)}
-              </View>
-              {mealMode === 'planned' ? <Text style={styles.mealItem}>{mealDraft.planned}</Text> : <>
-                <Text style={styles.helperText}>Conte o que comeu e a quantidade aproximada *</Text>
-                <TextInput accessibilityLabel="O que você comeu e quantidade aproximada" multiline maxLength={1500} editable={registeringMeal === null && !mealError} value={mealDescription} onChangeText={setMealDescription} placeholder="Ex.: um sanduíche de queijo e um copo de água" placeholderTextColor={t.muted} style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, minHeight: 88, marginTop: 8 }]} />
-              </>}
-              {mealError && <Text accessibilityRole="alert" style={{ color: t.error }}>{mealError}</Text>}
-              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
-                <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
-            </View>}
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
-                      onPress={() => {
-                        const pending = pendingMealWrites.current[meal.name];
-                        setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
-                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
-                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
-                        setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
-                      }}
-                      disabled={registeringMeal !== null || mealDraft !== null}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Registrar consumo da refeição ${meal.name}`}
-                    >
-                      <Text style={styles.registerMealText}>
-                        {registeringMeal === meal.name ? 'Registrando...' : diaryEntries.some(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)) ? 'Registrar outro consumo' : 'Registrar consumo'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>Nenhum plano publicado</Text>
-                <Text style={styles.emptyDescription}>
-                  Seu nutricionista ainda não publicou um plano alimentar ativo. Assim que a prescrição for disponibilizada, você verá suas refeições aqui.
-                </Text>
-              </View>
-            )}
           </>
         )}
 
@@ -877,9 +868,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </View>
                 <TextInput value={metricValue} onChangeText={setMetricValue} keyboardType="decimal-pad" accessibilityLabel="Valor da medida"
                   placeholder={metricType ? `Valor em ${evolutionData.enabled_metrics?.find((m) => m.type === metricType)?.unit}` : 'Escolha a medida acima'} placeholderTextColor={t.muted}
-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 4 }]} />
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, marginTop: 4 }]} />
                 <TextInput value={metricNotes} onChangeText={setMetricNotes} maxLength={500} accessibilityLabel="Observação (opcional)" placeholder="Observação (opcional)" placeholderTextColor={t.muted}
-                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: 8, marginTop: 8 }]} />
+                  style={[styles.chatTextInput, { flex: undefined, borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, marginTop: 8 }]} />
                 {metricError && <Text accessibilityRole="alert" style={styles.errorAlertText}>{metricError}</Text>}
                 {metricFeedback && <Text accessibilityRole="alert" style={styles.mealItem}>{metricFeedback}</Text>}
                 <TouchableOpacity accessibilityRole="button" style={[styles.navyButton, { marginTop: 12 }]} disabled={metricSaving} onPress={submitSelfMetric}>
@@ -1020,9 +1011,11 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
             style={[styles.navItem, currentTab === tab && styles.navItemActive]}
             onPress={() => setCurrentTab(tab)}
             accessibilityRole="tab"
+            accessibilityLabel={tabLabels[tab]}
             aria-selected={currentTab === tab}
             accessibilityState={{ selected: currentTab === tab }}
           >
+            <Feather name={({ Hoje: 'sun', Plano: 'book-open', Diario: 'edit-3', Chat: 'message-circle', Evolucao: 'trending-up', Perfil: 'user' } as const)[tab]} size={19} color={currentTab === tab ? t.success : t.muted} accessible={false} importantForAccessibility="no-hide-descendants" />
             <Text style={[styles.navText, currentTab === tab && styles.navTextActive]} maxFontSizeMultiplier={t.maxNavFontScale} numberOfLines={1}>
               {tabLabels[tab]}
             </Text>
@@ -1053,12 +1046,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   syncBanner: {
-    backgroundColor: '#EBF3FA',
+    backgroundColor: t.mintSoft,
     paddingVertical: 8,
     paddingHorizontal: 16,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#D0E1F2',
+    borderBottomColor: t.border,
   },
   syncBannerOffline: {
     backgroundColor: t.errorBg,
@@ -1077,7 +1070,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginHorizontal: 16,
     marginTop: 10,
-    borderRadius: 8,
+    borderRadius: t.inputRadius,
     borderWidth: 1,
     borderColor: '#FDA29B',
     flexDirection: 'row',
@@ -1113,7 +1106,7 @@ const styles = StyleSheet.create({
   inlineFeedback: {
     marginTop: 10,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: t.inputRadius,
     fontSize: 14,
     borderWidth: 1,
   },
@@ -1129,7 +1122,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: 36,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   header: {
     marginBottom: 20,
@@ -1141,12 +1137,12 @@ const styles = StyleSheet.create({
   },
   subGreeting: {
     fontSize: 14,
-    color: '#526071',
+    color: t.muted,
     marginTop: 4,
   },
   card: {
     backgroundColor: t.white,
-    borderRadius: 14,
+    borderRadius: t.cardRadius,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -1165,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   appointmentDoctor: {
     fontSize: 13,
-    color: '#526071',
+    color: t.muted,
     marginBottom: 12,
   },
   telehealthLink: {
@@ -1178,7 +1174,7 @@ const styles = StyleSheet.create({
     backgroundColor: t.success,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: t.inputRadius,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1208,14 +1204,15 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   navyButton: {
     backgroundColor: t.navy,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    minHeight: 44, // WCAG alvo de toque
+    borderRadius: t.buttonRadius,
+    minHeight: t.touch,
     justifyContent: 'center',
   },
   navyButtonText: {
@@ -1227,9 +1224,9 @@ const styles = StyleSheet.create({
     backgroundColor: t.copper, // copper-600: texto branco 5,0:1 (o #E67A3F dava 2,9:1)
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: t.buttonRadius,
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: t.touch,
     justifyContent: 'center',
   },
   copperButtonText: {
@@ -1238,7 +1235,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '700',
     color: t.navy,
     marginBottom: 12,
@@ -1246,7 +1243,7 @@ const styles = StyleSheet.create({
   },
   mealCard: {
     backgroundColor: t.white,
-    borderRadius: 14,
+    borderRadius: t.cardRadius,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
@@ -1254,6 +1251,8 @@ const styles = StyleSheet.create({
   },
   mealHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     justifyContent: 'space-between',
     marginBottom: 10,
   },
@@ -1263,7 +1262,11 @@ const styles = StyleSheet.create({
     color: t.navy,
   },
   mealTime: {
-    fontSize: 14,
+    backgroundColor: t.mintSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: t.copper,
   },
@@ -1297,7 +1300,7 @@ const styles = StyleSheet.create({
   },
   itemNotesText: {
     fontSize: 12,
-    color: '#0369A1',
+    color: t.info,
     marginLeft: 12,
     marginTop: 2,
     fontStyle: 'italic',
@@ -1318,11 +1321,11 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   registerMealButton: {
-    backgroundColor: t.navy,
+    backgroundColor: t.copper,
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-    minHeight: 44,
+    paddingHorizontal: 18,
+    borderRadius: t.buttonRadius,
+    minHeight: t.touch,
     justifyContent: 'center',
   },
   registerMealButtonDisabled: {
@@ -1338,12 +1341,12 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 13,
-    color: '#526071',
+    color: t.muted,
     marginBottom: 12,
   },
   emptyContainer: {
     backgroundColor: t.white,
-    borderRadius: 14,
+    borderRadius: t.cardRadius,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
@@ -1378,17 +1381,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   feedbackBox: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: t.mintSoft,
     padding: 10,
     borderRadius: 6,
     marginTop: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#0284C7',
+    borderLeftColor: t.success,
   },
   feedbackTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0369A1',
+    color: t.info,
     marginBottom: 2,
   },
   feedbackText: {
@@ -1412,23 +1415,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'stretch',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    minWidth: t.touch,
+    paddingVertical: 9,
+    paddingHorizontal: 7,
+    gap: 4,
+    minWidth: 56,
     minHeight: 48,
     borderBottomWidth: 3,
     borderBottomColor: 'transparent',
   },
   navItemActive: {
-    borderBottomColor: t.copper,
+    borderBottomColor: t.success,
+    backgroundColor: t.mintSoft,
+    borderRadius: 18,
   },
   navText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
     color: t.muted,
   },
@@ -1440,11 +1447,11 @@ const styles = StyleSheet.create({
   // Chat Styles
   chatHeaderCard: {
     backgroundColor: t.white,
-    borderRadius: 12,
+    borderRadius: t.cardRadius,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: t.divider,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,

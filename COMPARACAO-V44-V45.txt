@@ -1,0 +1,116 @@
+COMPARAÇÃO v44 x v45 (por conteúdo: sha256 e permissão de execução de cada arquivo)
+
+v44: clyonutri-v44.zip (sha256 d94bdc0aef49cdcec88c6ca95b29f7637d35cd6ec39d73d59d4e68163b8e0521)  748 itens (arquivos e pastas vazias)
+v45: clyonutri-v45.zip  1236 itens (inclui este arquivo e o COMPARACAO-U3-V45.txt)
+
+Iguais: 735 (migrações 1 a 63, SQL manuais anteriores, LEIA-ME e COMPARACAO anteriores e o restante de src/, views/, public/ e vendor/)
+Adicionados: 488 (486 + as duas COMPARACAO)
+Removidos: 0
+Alterados: 13
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v45.md  -> novo: por que não imprimia, o que muda, liberação fechada, SQL a partir da 64 já em produção, ordem de instalação e como voltar
+  bin/encrypt_clinical_records.php  -> veio na u3: script manual de criptografia de anamnese; não é chamado por nada; não rodar sem decisão e backup
+  bin/exam_gate.php  -> novo: status, approve (só superadmin, com parecer e --confirm) e close da liberação da emissão
+  bin/release.log  -> veio na u3: registro do pipeline de release da máquina do Maicon (sem segredos); mantido como veio
+  database/manual/atualizacao-exames-ni2-529-completa.sql  -> veio na u3: SQL avulso da 64; v45 deixa a liberação nascer fechada (0,0) e aponta para o trio v45; só histórico
+  database/manual/atualizacao-exames-ni2-529-preflight.sql  -> veio na u3: preflight da 64; v45 só acrescenta o aviso de usar o trio v45
+  database/manual/atualizacao-exames-ni2-529-verificacao.sql  -> veio na u3: verificação da 64; v45 só acrescenta o aviso de usar o trio v45
+  database/manual/atualizacao-v45-completa.sql  -> novo: idempotente, sem FK, sem DROP/DELETE; ajusta a 64 (padrões 0), aplica a 65 e fecha a liberação aberta sem registro
+  database/manual/atualizacao-v45-preflight.sql  -> novo: só lê; detecta a 64 já aplicada, a 65 e a liberação aberta sem registro
+  database/manual/atualizacao-v45-verificacao.sql  -> novo: só lê; confere tabelas, colunas, padrões, índice, catálogo, migrações e liberação
+  database/migrations/2026_10_29_000064_create_laboratory_exam_requests_and_catalog.php  -> veio na u3; v45: aprovações com DEFAULT 0 e seed da política 2026.1 fechado (0,0)
+  database/migrations/2026_10_29_000065_exam_requests_pdf_review_and_closed_gate.php  -> novo: colunas de aprovação, revisão, emissor e PDF; índice idx_exam_audit_entity; fecha liberação aberta sem registro
+  database/scripts/saneamento_assinaturas_trial_ni2_450.sql  -> veio na u3: saneamento de assinaturas (NI2-450) que altera dados; fora da instalação; não rodar sem decisão
+  docs/evidencias/ni2-529-v45/SMOKE-V45-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (SQL v45 sobre banco como a produção, HTTP e navegador)
+  public/assets/css/exame-documento.css  -> novo: documento A4 do pedido (tela, impressão e PDF) no Design System
+  public/assets/css/exames.css  -> novo: telas do módulo de exames com as classes do Design System
+  public/assets/js/exames-solicitacao.js  -> novo: busca de exames, sinônimo usado e filtro por categoria, sem script inline (CSP)
+  src/Application/Controllers/ExamRequestController.php  -> veio na u3; v45: rascunho → revisão → emissão, impressão /imprimir, download autenticado do PDF, API 401 sem sessão, isolamento por clínica
+  src/Core/Security/ClinicalEncryptionService.php  -> veio na u3: sem uso por telas ou serviços (só pelo script manual)
+  src/Domain/LaboratoryExam/ExamCatalogService.php  -> veio na u3; v45: busca sem acento e sem caixa, devolve o sinônimo usado
+  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php  -> veio na u3; v45: política carregada com quem/quando/parecer da aprovação
+  src/Domain/LaboratoryExam/ExamReleaseGate.php  -> novo: abre só com superadmin e parecer; fecha mantendo o registro; nunca reabre sozinha
+  src/Domain/LaboratoryExam/ExamRequestPdfService.php  -> novo: PDF com dompdf, fora de public/ (storage/app/exam_requests/<clínica>/), SHA-256, 0640 e .htaccess de bloqueio
+  src/Domain/LaboratoryExam/ExamRequestService.php  -> veio na u3; v45: fluxo rascunho/revisão/emissão, emitido só depois do PDF gravado, ciência real do aviso, sem CPF, AuditLogger
+  src/Domain/LaboratoryExam/ExamText.php  -> novo: normalização de texto (acentos, espaços, caixa) para busca e gravação
+  src/Domain/LaboratoryExam/ProfessionalEligibilityValidator.php  -> veio na u3; v45: região do CRN obrigatória (CRN-1 a CRN-11) e CRN formatado no documento
+  storage/app/exam_requests/  -> nova pasta vazia: onde ficam os PDFs dos pedidos (fora de public/; o sistema cria a subpasta da clínica, os arquivos 0640 e o .htaccess)
+  views/patients/exam_new.php  -> veio na u3; v45: sem script inline, sem "vinculada ao prontuário", classes do Design System
+  views/patients/exam_print.php  -> novo: página A4 de impressão com botão Imprimir via prontuario-impressao.js (a CSP bloqueava o onclick da u3)
+  views/patients/exam_show.php  -> veio na u3; v45: etapas, mensagens da liberação, Imprimir/Baixar PDF e modal de cancelamento por data-dialog-open
+  views/patients/exams.php  -> veio na u3; v45: lista com situação de cada pedido e classes do Design System
+  views/patients/partials/exam_document.php  -> novo: documento único usado na prévia, na impressão e no PDF
+  docs/validation/  (139 arquivos)  -> veio na u3: relatórios de validação do Maicon; documentação, não é chamada pelo sistema
+  vendor/  (315 arquivos)  -> dompdf 3.1.6 e dependências (php-font-lib, php-svg-lib, masterminds/html5, sabberworm/php-css-parser) e o autoload do Composer refeito
+  COMPARACAO-V44-V45.txt  -> novo: esta lista
+  COMPARACAO-U3-V45.txt  -> novo: o que a v45 mudou em relação à u3 recebida
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  RELEASE_INFO.json  -> alterado: versão v45, base clyonutri-v44.zip (d94bdc0a…), schema_changes true, 64/65, arquivos com hashes
+  composer.json  -> alterado: dompdf/dompdf ^3.1
+  composer.lock  -> alterado: dompdf 3.1.6 e dependências PHP puro
+  database/instalacao_mysql8.sql  -> alterado: instalação limpa com as tabelas de exames, a 64 e a 65 registradas e a liberação fechada
+  public/index.php  -> veio na u3 com as rotas; v45: todas as rotas de exames com $requireAuth, incluindo revisar, emitir, imprimir, pdf e editar
+  routes/web.php  -> veio na u3; v45: mesmas rotas, todas com login
+  src/Application/Controllers/DashboardController.php  -> veio na u3: atalho para os pedidos de exames do paciente; v45: texto "Pedidos de exames"
+  vendor/  (6 arquivos)  -> dompdf 3.1.6 e dependências (php-font-lib, php-svg-lib, masterminds/html5, sabberworm/php-css-parser) e o autoload do Composer refeito
+
+== FORA DO ZIP (testes e imagens, no repositório) ==
+  tests/ni2_529_exam_requests_test.php  -> novo: módulo de exames (fluxo, liberação, PDF, impressão, isolamento, rotas, auditoria), reexecutável
+  tests/ni2_529_v45_sql_manual_test.php  -> novo: SQL v45 e instalador (colunas, idempotência, sem FK, só fecha a liberação, catálogo)
+  tests/admin_comercial_assinantes_test.php  -> alterado: a última migração agora é a 65
+  tests/assinaturas_faltantes_sql_test.php  -> alterado: o instalador agora vai até a 65
+  tests/v34_central_notificacoes_test.php  -> alterado: a última migração agora é a 65
+  docs/evidencias/ni2-529-v45/*.png  -> novas: capturas da v45; o empacotador tira as imagens do zip, cópias em v45-evidencias
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS FORA DE vendor/ E docs/validation/ (no zip) ==
+39a7d9441496586ebdb441c4ea395034b19478f48959c1ab145b653361e1bba0  LEIA-ME-HOSTGATOR-v45.md
+eca125ad646c1347c7cc67f808938bcec6856c6b2047cde1f0e99294f91dbc5e  bin/encrypt_clinical_records.php
+68007ae166a04853ed442bbc0d6f4cade087b8e67012208082ad7893738c18f1  bin/exam_gate.php
+cf67631ff7614c93f9dd4ae515bb030e2d7e135a65e3d7e0404faea174e4fc9c  bin/release.log
+d696e64a44de2e78622ac5fc6fe5ffa966ebe40b2c29f87bb7628376e201a343  database/manual/atualizacao-exames-ni2-529-completa.sql
+5178fd28da27621633f8324a945a00e651297563deea4af89f18954feea2f60d  database/manual/atualizacao-exames-ni2-529-preflight.sql
+0a7bfd92ea8ee3cef683193f94c5dc4de815738e1c092140cdadf4a715dd305e  database/manual/atualizacao-exames-ni2-529-verificacao.sql
+3f40f84f6277ef04e78ea79c7507248d4e2bd49e7e8b8d0a0be91cae3185689e  database/manual/atualizacao-v45-completa.sql
+481ce3e4679cc5f34c6f94668526492c3896d929a7e0d4bd743ca009a2c5a01e  database/manual/atualizacao-v45-preflight.sql
+b1f0d0f61411ce709f35d23949c4e1d9fc31373819c7bfb23a4e8cb48a7e0fc5  database/manual/atualizacao-v45-verificacao.sql
+f0e0bacc65e1e85c7068d10640d1ffddca8bc9a87c797abc0627062ceaaaf785  database/migrations/2026_10_29_000064_create_laboratory_exam_requests_and_catalog.php
+21373c3e429041f730cb18ce13f486b15fe5112600053c47eef79c52a61523a9  database/migrations/2026_10_29_000065_exam_requests_pdf_review_and_closed_gate.php
+a39de1ec2bf4a5ed862818e1df327526d6d7628482c0015eb063ea4f15c455ad  database/scripts/saneamento_assinaturas_trial_ni2_450.sql
+0af3a20edcd635ac54757cb41191820528ce97ee2d4aa9e40a9325f3b6ac427a  docs/evidencias/ni2-529-v45/SMOKE-V45-mysql57.txt
+358049522b0cffea2f50b56be9bfffa7609816ad8fd39f2a1be6a9d6a5226771  public/assets/css/exame-documento.css
+4ddba155589c0552624dc5a3b3c5340abb25d4f91843ecfe0aba2d90da54020a  public/assets/css/exames.css
+181508bb4302c03138dcc4cc6359daf7e045b6bf6c76e20257b30aab5fb46732  public/assets/js/exames-solicitacao.js
+07f369a4fae3737e36597d98435e46d05960cc9cdd14f4331bac072a623f11ca  src/Application/Controllers/ExamRequestController.php
+8cf135a322b80de575bc9b2680d6c15262b8361404210211a29d2cf5b1ae9178  src/Core/Security/ClinicalEncryptionService.php
+77784b98d6b209aee6c058914b632631ac5ed871e26aec9dd701361b9ef7101a  src/Domain/LaboratoryExam/ExamCatalogService.php
+7d6ba25b5564a7a038c734986c31b5fd30d3c6d957e3e8aa3531466b2c08ce9c  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php
+2f7e6a03923c29af10938c1b51371db103fbf0e3329cb531dfea14215c05dea3  src/Domain/LaboratoryExam/ExamReleaseGate.php
+e54957e85cd11ba59fde5e14655e7f172b170dab9349778405e79b25945f3406  src/Domain/LaboratoryExam/ExamRequestPdfService.php
+cdc11fc93a18d62903df50f85775767924a5377bae4f350547d098b043620c75  src/Domain/LaboratoryExam/ExamRequestService.php
+7ffd2205d474417345b3ba61d235448bc541926e77e62d695ccc068f9137940c  src/Domain/LaboratoryExam/ExamText.php
+dfa7d7db5443797ab11176575e737709c894b203f03d0055f5bbc7cd5737e00e  src/Domain/LaboratoryExam/ProfessionalEligibilityValidator.php
+DIR  storage/app/exam_requests/
+73fbc384ca12d17fabbb714b0f49a3e4405fd3fc15b19fc71d8228bb7261ed70  views/patients/exam_new.php
+d3dfc0380fd970a18099d2fe92e2457c95bddea1c473444594bd0947578d67da  views/patients/exam_print.php
+93104d2c6c2bc63e098435ca2bc6846ab061ebcf8689a820d4684304a6dd81f4  views/patients/exam_show.php
+c564e6153a8abd5a88879ac4bdd181a2796f289d46636645ecd0e3756f16acde  views/patients/exams.php
+d7bab4d3c9a2694a3d68c40834e01ef157be4b58bd6a2d0e037c346aa4e661f6  views/patients/partials/exam_document.php
+3513dbeb0ed4add5e612d0c48595e1904665fcbdd0e1a5f63ef9bb2630ad4f9f  RELEASE_INFO.json
+79043c4d8639fb9704a351b5843ad0667675486ed539d70aa020dbc68708ea00  composer.json
+a3075701a37a9b4ce355023ab9c67aa5852c3fcde55bbc444e1a84ee0af09ef4  composer.lock
+ad3ebede6f9a157479b3a8e411111ad5455a7ace46839fa91ae38f8648a679d2  database/instalacao_mysql8.sql
+f414ef46aeda23a00a6877fc223e1ace4803658025747f389fe291735ef0a563  public/index.php
+8b608f286ba149bea450c5e0ed4317dcd897b4643ab0726f2112d64d02e9bc32  routes/web.php
+40169c79955ef19fa315e4889b9866710783d0a8d6cdad7c5253dd91914b37cf  src/Application/Controllers/DashboardController.php
+
+== SHA256 DOS TESTES FORA DO ZIP ==
+dcdc87d20e20d80302487e8fdc55b3d423391677c8ec1f21f0f100ac796eef29  tests/ni2_529_exam_requests_test.php
+dfcc7bbbe894e1d628d391072a81a91539a9b8afdc42fbc9f897504953bfad37  tests/ni2_529_v45_sql_manual_test.php
+be716bd10e8d2e6d3b8839a83b50cfae4bafa9ff7a59522c96bb88220d24ee8c  tests/admin_comercial_assinantes_test.php
+2d1584282b169e76609ded86a68b1e801fb8efbb6df61b1a4181badeb4d5e7f9  tests/assinaturas_faltantes_sql_test.php
+dcd93758fc88a49188bc990d0c1e5d883973839e80e0ded4fec8422cfeecce79  tests/v34_central_notificacoes_test.php

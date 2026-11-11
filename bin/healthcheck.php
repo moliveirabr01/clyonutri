@@ -316,6 +316,50 @@ if ($mode === 'liveness') {
     ];
 }
 
+// 5b. NI2-716: cobertura enc:v1 (informativo; NÃO crítico — plaintext legado é esperado até o batch)
+try {
+    $covDb = isset($db) && $db instanceof \PDO ? $db : Connection::getInstance();
+    $cov = \ClyoNutri\Core\Security\ClinicalEncryptionService::anamnesisCoverageStats($covDb);
+    if ($cov === null) {
+        $checks['clinical_encryption_coverage'] = ['status' => 'SKIPPED', 'critical' => false, 'note' => 'stats indisponíveis'];
+    } else {
+        $note = sprintf('rows=%d enc_slots=%d plaintext_slots=%d (%.1f%% enc:v1)', $cov['total'], $cov['encrypted'], $cov['plaintext'], $cov['pct_encrypted']);
+        $checks['clinical_encryption_coverage'] = ['status' => 'OK', 'critical' => false, 'note' => $note];
+    }
+    if (\ClyoNutri\Core\Security\ClinicalEncryptionService::isProductionEnv()) {
+        try {
+            \ClyoNutri\Core\Security\ClinicalEncryptionService::resolveKey();
+            $checks['clinical_encryption_key'] = ['status' => 'OK', 'critical' => true, 'note' => 'CLINICAL_ENCRYPTION_KEY presente'];
+        } catch (\Throwable $e) {
+            $checks['clinical_encryption_key'] = ['status' => 'FAIL', 'critical' => true, 'note' => 'chave ausente em produção'];
+        }
+    } else {
+        $checks['clinical_encryption_key'] = ['status' => 'OK', 'critical' => false, 'note' => 'APP_ENV não-produção (fail-open DEV permitido)'];
+    }
+} catch (\Throwable $e) {
+    $checks['clinical_encryption_coverage'] = ['status' => 'SKIPPED', 'critical' => false, 'note' => get_class($e)];
+}
+
+// 5c. SEC-F004: Diagnóstico e prontidão de antivírus nos laudos de exames (ClamAV)
+if ($mode === 'readiness') {
+    try {
+        $avInfo = \ClyoNutri\Domain\LaboratoryExam\ExamFileInspector::describeAntivirus();
+        $isCriticalAv = $avInfo['mode'] === 'required';
+        $avStatus = $avInfo['status'] === 'error' ? 'FAIL' : ($avInfo['status'] === 'warning' ? 'WARNING' : 'OK');
+        $checks['antivirus_scanner'] = [
+            'critical' => $isCriticalAv,
+            'status' => $avStatus,
+            'note' => $avInfo['message'],
+        ];
+    } catch (\Throwable $e) {
+        $checks['antivirus_scanner'] = [
+            'critical' => false,
+            'status' => 'WARNING',
+            'note' => 'Não foi possível verificar status do antivírus: ' . $e->getMessage(),
+        ];
+    }
+}
+
 // 6. Exibir resultado e avaliar gate (FAIL CLOSED)
 $allowedStatuses = ['OK', 'WARNING', 'FAIL', 'BLOCKED', 'UNKNOWN', 'SKIPPED'];
 $allOk = true;

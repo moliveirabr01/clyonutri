@@ -1,0 +1,255 @@
+/* shopping-list.css — NI2-687: estilos da lista de compras (página própria, também impressa). Só tokens. */
+:root {
+  --color-primary: var(--semantic-success-text);
+  --color-primary-light: var(--semantic-success-light);
+  --color-secondary: var(--neutral-ink-900);
+  --color-accent: var(--semantic-warning);
+  --color-warning-bg: var(--semantic-warning-light);
+  --color-warning-border: var(--semantic-warning-border);
+  --color-warning-text: var(--semantic-warning-strong);
+  --color-danger-bg: var(--semantic-error-light);
+  --color-danger-border: var(--semantic-error-border);
+  --color-danger-text: var(--semantic-error-strong);
+  --color-border: var(--neutral-gray-200);
+  --color-bg-subtle: var(--neutral-gray-50);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--neutral-gray-100);
+  color: var(--neutral-ink-900);
+  line-height: 1.5;
+}
+
+.sl-container {
+  max-width: 860px;
+  margin: 24px auto;
+  padding: 0 16px 48px;
+}
+
+.sl-card {
+  background: var(--neutral-white);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.sl-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sl-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sl-badge--published { background: var(--semantic-success-light); color: var(--semantic-success-text); }
+.sl-badge--draft { background: var(--semantic-warning-light); color: var(--semantic-warning-strong); }
+
+.sl-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sl-days-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  background: var(--neutral-white);
+  color: var(--neutral-gray-700);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.sl-days-btn.active {
+  background: var(--color-primary);
+  color: var(--neutral-white);
+  border-color: var(--color-primary);
+}
+
+.sl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+.sl-btn-primary { background: var(--color-primary); color: var(--neutral-white); }
+.sl-btn-outline { background: var(--neutral-white); color: var(--neutral-gray-700); border-color: var(--color-border); }
+
+.sl-alert {
+  padding: 14px 20px;
+  margin: 16px 28px 0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.sl-alert-danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+.sl-alert-warning {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+.sl-aisle {
+  border-bottom: 1px solid var(--color-border);
+}
+.sl-aisle:last-child {
+  border-bottom: none;
+}
+
+.sl-aisle-header {
+  background: var(--color-bg-subtle);
+  padding: 12px 28px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--color-border);
+}
+.sl-aisle:first-child .sl-aisle-header {
+  border-top: none;
+}
+
+.sl-item {
+  padding: 12px 28px;
+  border-top: 1px solid var(--neutral-gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: background 0.1s;
+}
+.sl-item:hover {
+  background: var(--neutral-gray-50);
+}
+.sl-item.checked {
+  background: var(--neutral-gray-50);
+  opacity: 0.55;
+}
+.sl-item.checked .sl-item-name {
+  text-decoration: line-through;
+}
+
+.sl-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+.sl-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.sl-item-name {
+  font-weight: 600;
+  color: var(--neutral-ink-900);
+  font-size: 0.95rem;
+}
+.sl-item-meta {
+  font-size: 0.8rem;
+  color: var(--neutral-gray-500);
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sl-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.sl-tag-recipe { background: var(--semantic-info-light); color: var(--semantic-info); }
+.sl-tag-sub { background: var(--semantic-info-light); color: var(--semantic-info); }
+.sl-tag-alert { background: var(--semantic-error-light); color: var(--semantic-error-strong); }
+
+.sl-item-right {
+  text-align: right;
+  white-space: nowrap;
+}
+.sl-item-amount {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.sl-item-daily {
+  font-size: 0.75rem;
+  color: var(--neutral-gray-400);
+}
+
+.sl-manual-form {
+  padding: 16px 28px;
+  background: var(--neutral-gray-50);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.sl-manual-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.sl-recipes-section {
+  padding: 20px 28px;
+}
+.sl-recipes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.sl-recipe-card {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--neutral-white);
+  box-shadow: var(--shadow-sm);
+}
+
+@media print {
+  body { background: var(--neutral-white); }
+  .sl-container { max-width: 100%; margin: 0; padding: 0; }
+  .sl-card { border: none; box-shadow: none; }
+  .sl-controls, .sl-manual-form, .no-print { display: none !important; }
+  .sl-header { padding: 12px 0; }
+  .sl-aisle-header { padding: 8px 0; background: none; border-bottom: 1px solid var(--neutral-ink-900); }
+  .sl-item { padding: 8px 0; }
+}
+  

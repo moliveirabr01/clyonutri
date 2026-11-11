@@ -311,7 +311,7 @@ class ChatController
         $hhmm = static fn(?string $iso) => $iso ? substr($iso, 11, 5) : '';
         $totalUnread = array_reduce($conversations, fn($acc, $c) => $acc + (int)($c['unread_count'] ?? 0), 0);
 
-        $title = 'Chat & Mensagens Seguras';
+        $title = 'Mensagens';
         $activeNav = 'chat';
         $clinicName = $auth['clinicName'];
         $userName = $auth['userName'];
@@ -320,8 +320,8 @@ class ChatController
         ?>
     <style>
         :root {
-            --patient-bubble: #f1f5f9;
-            --nutri-bubble: #39734A; /* NI2-138: contraste AA com texto branco */
+            --patient-bubble: var(--neutral-gray-100, #F4F5F6);
+            --nutri-bubble: var(--botanical-green-600, #39734A); /* NI2-138: contraste AA com texto branco */
             --nutri-bubble-text: #ffffff;
         }
 
@@ -375,10 +375,10 @@ class ChatController
             display: block;
             transition: background 0.15s ease;
         }
-        .conv-card:hover { background: #f8fafc; }
+        .conv-card:hover { background: var(--neutral-gray-50, #F9FAFB); }
         .conv-card.active {
-            background: #E5F0E5;
-            border-left: 4px solid #39734A;
+            background: var(--botanical-sage-100, #E5F0E5);
+            border-left: 4px solid var(--botanical-green-600, #39734A);
         }
         .conv-card-title {
             display: flex;
@@ -390,12 +390,12 @@ class ChatController
         }
         .conv-card-time {
             font-size: 0.75rem;
-            color: #475569;
+            color: var(--neutral-gray-600, #475467);
             font-weight: normal;
         }
         .conv-card-preview {
             font-size: 0.85rem;
-            color: #475569;
+            color: var(--neutral-gray-600, #475467);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -404,7 +404,7 @@ class ChatController
             align-items: center;
         }
         .badge-unread {
-            background: #39734A;
+            background: var(--botanical-green-600, #39734A);
             color: white;
             font-size: 0.7rem;
             font-weight: 700;
@@ -418,7 +418,7 @@ class ChatController
             display: flex;
             flex-direction: column;
             height: 100%;
-            background: #fafafa;
+            background: var(--neutral-gray-50, #F9FAFB);
             min-width: 0;
         }
         .chat-topbar {
@@ -437,12 +437,12 @@ class ChatController
         }
         .chat-topbar-info p {
             font-size: 0.8rem;
-            color: #64748b;
+            color: var(--neutral-gray-500, #667085);
             margin: 0;
         }
         .chat-security-tag {
-            background: #E5F0E5;
-            color: #39734A;
+            background: var(--botanical-sage-100, #E5F0E5);
+            color: var(--botanical-green-600, #39734A);
             padding: 4px 10px;
             border-radius: 6px;
             font-size: 0.75rem;
@@ -472,7 +472,7 @@ class ChatController
         .chat-bubble.patient {
             align-self: flex-start;
             background: var(--patient-bubble);
-            color: #0F3E17;
+            color: var(--botanical-forest-900, #0F3E17);
             border-bottom-left-radius: 4px;
         }
         .chat-bubble.professional {
@@ -518,7 +518,7 @@ class ChatController
         .chat-textarea {
             flex: 1;
             padding: 12px 16px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid var(--border-input, #828B9B);
             border-radius: 8px;
             font-family: inherit;
             font-size: 0.95rem;
@@ -527,9 +527,9 @@ class ChatController
             height: 48px;
             transition: border-color 0.15s ease;
         }
-        .chat-textarea:focus { border-color: #39734A; }
+        .chat-textarea:focus { border-color: var(--botanical-green-600, #39734A); }
         .btn-send {
-            background: #39734A;
+            background: var(--botanical-green-600, #39734A);
             color: white;
             border: none;
             padding: 0 20px;
@@ -539,18 +539,18 @@ class ChatController
             cursor: pointer;
             transition: background 0.15s ease;
         }
-        .btn-send:hover { background: #2F6140; }
+        .btn-send:hover { background: var(--botanical-green-700, #2F6140); }
         .file-label {
             cursor: pointer;
             padding: 10px;
             border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            color: #64748b;
+            border: 1px solid var(--neutral-gray-300, #D1D5DB);
+            color: var(--neutral-gray-500, #667085);
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        .file-label:hover { background: #f8fafc; color: #0F3E17; }
+        .file-label:hover { background: var(--neutral-gray-50, #F9FAFB); color: var(--botanical-forest-900, #0F3E17); }
         .file-input { display: none; }
 
         /* Empty State */
@@ -560,11 +560,11 @@ class ChatController
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #64748b;
+            color: var(--neutral-gray-500, #667085);
             padding: 40px;
             text-align: center;
         }
-        .empty-chat h3 { font-size: 1.2rem; color: #0F3E17; margin-bottom: 8px; }
+        .empty-chat h3 { font-size: 1.2rem; color: var(--botanical-forest-900, #0F3E17); margin-bottom: 8px; }
 
         /* Responsividade */
         @media (max-width: 1024px) {
@@ -572,7 +572,7 @@ class ChatController
         }
         @media (max-width: 768px) {
             .chat-layout { flex-direction: column; height: auto; min-height: calc(100vh - 160px); }
-            .conv-list-panel { width: 100%; border-right: none; border-bottom: 1px solid #e2e8f0; }
+            .conv-list-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--neutral-gray-200, #E5E7EB); }
             .conv-main-panel {
                 display: <?= ($activeConv !== null) ? 'flex' : 'none' ?>;
             }
@@ -584,7 +584,7 @@ class ChatController
         }
     </style>
 
-    <?php if ($chatFlash): ?><p role="alert" class="card" data-testid="chat-flash" style="border-left: 4px solid #B45309;"><?= htmlspecialchars($chatFlash) ?></p><?php endif; ?>
+    <?php if ($chatFlash): ?><p role="alert" class="card" data-testid="chat-flash" style="border-left: 4px solid var(--semantic-warning, #946200);"><?= htmlspecialchars($chatFlash) ?></p><?php endif; ?>
     <!-- Layout de Comunicação Segura -->
     <div class="chat-layout">
         <!-- Lista de Conversas -->
@@ -598,7 +598,7 @@ class ChatController
             </div>
             <ul class="conv-list-items">
                 <?php if (empty($conversations)): ?>
-                    <li style="padding: 24px; text-align: center; color: #64748b; font-size: 0.9rem;">
+                    <li style="padding: 24px; text-align: center; color: var(--neutral-gray-500, #667085); font-size: 0.9rem;">
                         Nenhuma conversa ativa no momento.<br>Use <strong>Nova conversa</strong> para escolher o paciente (o atalho no perfil do paciente continua disponível).
                     </li>
                 <?php else: ?>
@@ -668,12 +668,12 @@ class ChatController
                 </div>
 
                 <?php if (!$access['can_send']): ?>
-                <div class="chat-input-bar" role="note" data-testid="chat-read-only"><p style="margin: 0; color: #92400E;"><?= htmlspecialchars((string)$access['reason']) ?></p></div>
+                <div class="chat-input-bar" role="note" data-testid="chat-read-only"><p style="margin: 0; color: var(--semantic-warning-strong, #7A4A00);"><?= htmlspecialchars((string)$access['reason']) ?></p></div>
                 <?php else: ?>
-                <p class="chat-notice" data-testid="chat-notice" style="margin: 0; padding: 8px 16px; font-size: 0.8rem; color: #475569; border-top: 1px solid #e2e8f0;">
-                    A paciente vê: “<?= htmlspecialchars($chatNotice['response_time_text']) ?>” e “<?= htmlspecialchars($chatNotice['emergency_text']) ?>” <a href="/configuracoes#chat-settings">Alterar o tempo de resposta</a>
+                <p class="chat-notice" data-testid="chat-notice" style="margin: 0; padding: 8px 16px; font-size: 0.8rem; color: var(--neutral-gray-600, #475467); border-top: 1px solid var(--neutral-gray-200, #E5E7EB);">
+                    A paciente vê: “<?= htmlspecialchars($chatNotice['response_time_text']) ?>” e “<?= htmlspecialchars($chatNotice['emergency_text']) ?>” <a href="/configuracoes?tab=paciente-app#chat-settings">Alterar o tempo de resposta</a>
                 </p>
-                <p id="chatSendError" role="alert" data-testid="chat-send-error" style="margin: 0 16px; color: #B42318; font-size: 0.85rem;"></p>
+                <p id="chatSendError" role="alert" data-testid="chat-send-error" style="margin: 0 16px; color: var(--semantic-error, #B42318); font-size: 0.85rem;"></p>
                 <div class="chat-input-bar">
                     <form method="POST" action="/chat/<?= $activeConvId ?>/enviar" enctype="multipart/form-data" class="chat-input-form" id="chatSendForm">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
@@ -683,7 +683,7 @@ class ChatController
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                             <input type="file" name="attachment" class="file-input" id="attachmentInput" accept=".pdf,.png,.jpg,.jpeg">
                         </label>
-                        <span id="selectedFileName" style="font-size: 0.8rem; color: #64748b; display: none;"></span>
+                        <span id="selectedFileName" style="font-size: 0.8rem; color: var(--neutral-gray-500, #667085); display: none;"></span>
 
                         <textarea name="message" class="chat-textarea" id="chatMessageTextarea" maxlength="<?= \ClyoNutri\Domain\Chat\ChatService::MAX_MESSAGE_CHARS ?>" aria-label="Mensagem para <?= htmlspecialchars($activeConv['patient_name']) ?>" placeholder="Escreva uma mensagem para a paciente"></textarea>
                         <button type="submit" class="btn-send" id="btnSend">Enviar</button>
@@ -691,7 +691,7 @@ class ChatController
                 </div>
                 <?php endif; ?>
 
-                <!-- Polling com cursor e envio assíncrono. NI2-138 (A4): todo texto vindo da API entra por textContent. -->
+                <?php /* Polling com cursor e envio assíncrono. NI2-138 (A4): todo texto vindo da API entra por textContent. */ ?>
                 <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
                     (function() {
                         const convId = <?= (int)$activeConvId ?>;
@@ -855,7 +855,7 @@ class ChatController
           <input type="hidden" name="patient_id" id="new-conv-patient" value="">
           <label class="form-label" for="new-conv-search">Buscar paciente da clínica</label>
           <input class="form-control" type="search" id="new-conv-search" maxlength="80" autocomplete="off" placeholder="Digite parte do nome" aria-describedby="new-conv-status">
-          <p id="new-conv-status" role="status" aria-live="polite" style="font-size: 0.8rem; color: #475569; margin: 6px 0;"></p>
+          <p id="new-conv-status" role="status" aria-live="polite" style="font-size: 0.8rem; color: var(--neutral-gray-600, #475467); margin: 6px 0;"></p>
           <div id="new-conv-results" role="group" aria-label="Pacientes encontrados" style="display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto;"></div>
           <button type="button" class="btn btn-secondary" id="new-conv-more" hidden style="margin-top: 6px;">Mais pacientes</button>
           <p id="new-conv-chosen" style="margin: 12px 0 0; font-weight: 600;" aria-live="polite">Nenhum paciente selecionado.</p>

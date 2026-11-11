@@ -1,0 +1,33 @@
+  [PASS] Teste não usa o banco de desenvolvimento (testing.sqlite)
+[1] Deduplicação por paciente e definição única de contagem
+  [PASS] Card conta pacientes com rascunho (2), não linhas de plano
+  [PASS] Total complementar de rascunhos = 4 (sem vazar outra clínica)
+  [PASS] Lista de atenção traz um item por paciente (2), não um por plano (4)
+  [PASS] Contador do card e itens de rascunho da lista usam a mesma definição
+  [PASS] Item agrupado informa "3 planos em rascunho"
+  [PASS] Paciente com vários rascunhos aponta para /planos filtrado por paciente
+  [PASS] Paciente com um rascunho aponta para a revisão do plano
+  [PASS] Rótulo "Paciente faltoso" não é mais usado
+[2] Dashboard renderizado: card, lista limitada e links
+  [PASS] Card "Planos a revisar" exibe 2 pacientes
+  [PASS] HTML exibe 2 itens de rascunho
+  [PASS] Lista de atenção limitada a no máximo 5 itens
+  [PASS] Há link para /planos?status=draft
+  [PASS] "Novo Paciente" aponta para o fluxo de criação
+  [PASS] Badge fixo e "em tempo real" removidos
+  [PASS] Sem seta decorativa textual e títulos de seção em h2
+[3] Filtro /planos?status=draft&paciente=N
+  [PASS] Filtro retorna apenas os 3 rascunhos do paciente
+  [PASS] Sem filtro, /planos lista todos os 5 planos da clínica (inclusive sem filtro de paciente)
+  [PASS] Status fora da lista branca é ignorado (sem filtro)
+[4] Logout exige POST + CSRF
+  [PASS] Login demo no banco de testes (302)
+  [PASS] Shell renderiza logout como formulário POST com CSRF
+  [PASS] GET /logout responde 405 (não encerra sessão)
+  [PASS] Sessão continua ativa após GET /logout
+  [PASS] POST /logout sem CSRF é bloqueado (403)
+  [PASS] Sessão continua ativa após POST sem CSRF
+  [PASS] POST /logout com CSRF encerra sessão e redireciona para /login
+  [PASS] Após logout o dashboard exige login (com ou sem contexto de retorno)
+
+Resultado: 27 passaram, 0 falharam

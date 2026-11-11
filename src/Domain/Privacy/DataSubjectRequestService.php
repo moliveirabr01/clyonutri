@@ -18,14 +18,14 @@ class DataSubjectRequestService
     private LgpdService $lgpdService;
     private AuditLogger $audit;
 
-    public const LEGAL_HOLD_NOTICE = "Dados cadastrais e canais de contato foram anonimizados com sucesso. O prontuário clínico e as prescrições foram descaracterizados e preservados sob guarda legal obrigatória mínima de 20 anos, em estrito cumprimento ao Art. 6º da Lei Federal nº 13.787/2018 e normativas do Conselho Federal de Nutricionistas (CFN), sendo vedada a destruição física antes do término do prazo legal.";
+    public const LEGAL_HOLD_NOTICE = "Dados cadastrais e canais de contato foram anonimizados. O prontuário clínico e as prescrições foram descaracterizados e preservados sob guarda legal obrigatória mínima de 20 anos, em estrito cumprimento ao Art. 6º da Lei Federal nº 13.787/2018 e normativas do Conselho Federal de Nutricionistas (CFN), sendo vedada a destruição física antes do término do prazo legal.";
 
     public const CHANNEL_PROFESSIONAL = 'professional';
     public const CHANNEL_PATIENT_APP = 'patient_app';
     public const OPEN_STATUSES = ['pending', 'in_review'];
     /** Tabelas que compõem o prontuário sob guarda legal (Lei 13.787/2018). */
     private const CLINICAL_HOLD_TABLES = ['clinical_records', 'anamneses', 'anthropometric_assessments', 'meal_plans', 'nutrition_records', 'skinfold_measurements'];
-    private const DEADLINE_DAYS = 15;
+    public const DEADLINE_DAYS = 15;
 
     public function __construct(?PDO $db = null)
     {
@@ -166,7 +166,7 @@ class DataSubjectRequestService
 
         $upd = $this->db->prepare("
             UPDATE data_subject_requests
-            SET status = 'completed', reviewed_by = :reviewer, completed_at = :now, response_notes = 'Dados exportados com sucesso.'
+            SET status = 'completed', reviewed_by = :reviewer, completed_at = :now, response_notes = 'Dados exportados.'
             WHERE id = :id AND clinic_id = :clinic_id AND status IN ('pending','in_review')
         ");
         $upd->execute(['reviewer' => $reviewerId, 'now' => date('Y-m-d H:i:s'), 'id' => $requestId, 'clinic_id' => $clinicId]);

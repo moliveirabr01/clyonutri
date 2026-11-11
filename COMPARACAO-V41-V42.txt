@@ -1,0 +1,106 @@
+COMPARAÇÃO v41 x v42 (por conteúdo, sha256 de cada arquivo)
+
+v41: clyonutri-v41.zip (sha256 35b443c980ea3d7776a327beb4625105c7edf1ff70418b95cce11ffb79eb7c3e)  709 itens (arquivos e pastas vazias)
+v42: clyonutri-v42.zip  730 itens (esta lista inclui o próprio COMPARACAO-V41-V42.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 697 (vendor/ inteiro, as migrações 1 a 61 e os SQL manuais da v39 e da v41, os LEIA-ME e COMPARACAO anteriores, SubscriptionService.php e o restante de src/ e views/)
+Adicionados: 21 (20 + este arquivo)
+Removidos: 0
+Alterados: 12
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v42.md  -> novo: o que muda, SQL da migração 62 aguardando OK, ordem v39, v41 e v42, aviso clínico, conferências depois de subir e como voltar
+  database/manual/atualizacao-v42-preflight.sql  -> novo: só leitura; diz se o banco está pronto para a migração 62 (exige a 61) ou se ela já foi aplicada
+  database/manual/atualizacao-v42-completa.sql  -> novo: 6 colunas em meal_plan_templates, tabelas food_search_metrics, patient_import_batches e patient_import_rows (BIGINT, sem FKs) e registro da 62; pode rodar duas vezes
+  database/manual/atualizacao-v42-verificacao.sql  -> novo: confere colunas, tabelas, índices e o registro da 62
+  database/migrations/2026_10_29_000062_plan_templates_food_search_and_patient_import.php  -> novo: migração 62 (mesma estrutura do SQL manual)
+  docs/benchmark-webdiet/ROTEIRO-AVALIACAO-CLINICA-V42.md  -> novo: roteiro da NI2-523 (5 nutricionistas, cenários C1 a C11, termo de liberação); sessões não feitas
+  docs/evidencias/ni2-514/SMOKE-V42-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (dados TESTE)
+  docs/evidencias/ni2-514/cliques-v42-com-paciente.json  -> novo: resultado bruto da contagem (v42 com paciente)
+  docs/evidencias/ni2-514/cliques-v42-sem-paciente.json  -> novo: resultado bruto da contagem (v42 sem paciente)
+  public/assets/js/plan-live.js  -> novo: formulários de alimentos e substituições do editor salvam sem recarregar e atualizam totais, barra de metas e cartão de energia
+  src/Application/Controllers/MealPlanTemplateController.php  -> novo: /modelos (lista, usar, arquivar, padrão) e /planos/{id}/salvar-como-modelo, com escopo de clínica e auditoria
+  src/Application/Controllers/PatientImportController.php  -> novo: /pacientes/importar (modelo CSV, prévia, relatório, confirmar, descartar, desfazer)
+  src/Domain/MealPlan/MealPlanTemplateService.php  -> novo: modelo a partir do plano sem paciente, anamnese, meta ou observações; usar gera rascunho novo
+  src/Domain/MealPlan/PlanTotalsBar.php  -> novo: totais do plano contra a meta (energia e macros) para a barra do editor
+  src/Domain/MealPlan/SubstitutionComparison.php  -> novo: diferença de energia e macros entre item e substituição e gramas para a mesma energia (só aritmética)
+  src/Domain/Patient/PatientImportService.php  -> novo: leitura do CSV, validação por linha, sem duplicar o mesmo arquivo, desfazer e apagamento dos dados brutos
+  views/foods/search_report.php  -> novo: tela de buscas sem resultado (últimos 30 dias, por clínica)
+  views/meal_plans/templates.php  -> novo: tela de modelos da clínica
+  views/patients/import.php  -> novo: tela de envio do CSV de pacientes
+  views/patients/import_show.php  -> novo: prévia e relatório por linha da importação
+  COMPARACAO-V41-V42.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  database/instalacao_mysql8.sql  -> alterado: colunas novas de meal_plan_templates, as três tabelas novas e o registro da migração 62
+  docs/benchmark-webdiet/CONTAGEM-DE-CLIQUES-NI2-514.md  -> alterado: linhas da v42 (com paciente 6/2, sem paciente 5/2) e nota sobre salvar sem recarregar
+  public/assets/css/clinical-journeys.css  -> alterado: selo de preparo, selo "Já usado em planos da clínica" e aviso de mesma energia
+  public/assets/js/food-picker.js  -> alterado: mostra forma de preparo e uso na clínica; avisa o editor do alimento escolhido
+  public/index.php  -> alterado: rotas novas (/pacientes/importar*, /alimentos/buscas, /modelos*, /planos/{id}/salvar-como-modelo)
+  src/Application/Controllers/DashboardController.php  -> alterado: respostas JSON para o editor sem recarregar, barra de totais, comparação por substituição, modelo padrão no novo plano e salvar como modelo
+  src/Application/Controllers/FoodSearchController.php  -> alterado: busca com nomes regionais e uso na clínica, registro do termo normalizado das buscas e relatório /alimentos/buscas
+  src/Application/Controllers/OnboardingController.php  -> alterado: link para Importar pacientes no passo do primeiro paciente
+  src/Domain/Food/FoodSearchIndex.php  -> alterado: sinônimos regionais, rótulo de preparo lido do nome e ordem com alimentos já usados pela clínica
+  src/Domain/Privacy/LgpdService.php  -> alterado: patient_import_rows entra no inventário de tabelas
+  views/meal_plans/_energy_card.php  -> alterado: tabela de comparação com id para ser trocada sem recarregar
+  RELEASE_INFO.json  -> alterado: versão v42, base clyonutri-v41.zip (sha256 35b443c9…), arquivos novos e alterados com hashes, SQL aguardando OK
+
+== FORA DO ZIP (testes, no repositório) ==
+  tests/ni2_514_v42_units_test.php  -> novo: unidades (comparação, barra de totais, sinônimos, preparo, CSV)
+  tests/ni2_514_v42_clinical_scenarios_test.php  -> novo: cenários clínicos com dados TESTE
+  tests/ni2_514_v42_phase2_http_test.php  -> novo: rotas da Fase 2 por HTTP, incluindo isolamento por clínica
+  tests/ni2_514_v42_sql_manual_test.php  -> novo: SQL manual da v42 (estrutura igual à migração, segunda execução)
+  tests/ni2_514_energy_http_test.php  -> alterado: limpa os dados que cria
+  tests/ni2_514_click_count.cjs  -> alterado: ramo da v42 na contagem de cliques
+  tests/admin_comercial_assinantes_test.php  -> alterado: última migração agora é a 62
+  tests/assinaturas_faltantes_sql_test.php  -> alterado: última migração agora é a 62
+  tests/v34_central_notificacoes_test.php  -> alterado: última migração agora é a 62
+  docs/evidencias/ni2-514/01 a 09 (*.png)  -> novos: capturas da v42; o empacotador tira as imagens do zip, cópias em v42-evidencias
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+2e3a1cf20a161167ef77df0cb631d425530bffcb0afbb470155cb023869597cc  LEIA-ME-HOSTGATOR-v42.md
+40ed85c74d4040099f466c5de1c1c39ef45e9d0735bbd879ae9b91bb4a1d92ea  database/manual/atualizacao-v42-preflight.sql
+d35ba3966b7cd65f28e958b25a9ca3b8cbe51a91f1a90c2dc8bccda56ec1ab62  database/manual/atualizacao-v42-completa.sql
+2cdf10ec5bd820d543652b32a1c9cfbd9c26d89ce382046533a7d22a828e4a67  database/manual/atualizacao-v42-verificacao.sql
+e7d5642d31fd54c3689e31639c2d07466a936879f4c4be39e4586165f9f4c004  database/migrations/2026_10_29_000062_plan_templates_food_search_and_patient_import.php
+d599082a5d969c5d7cb40322ce9d3e69a99fa61637f5a241f221dd83a667f3d5  docs/benchmark-webdiet/ROTEIRO-AVALIACAO-CLINICA-V42.md
+56c6ee71b6241c81321256b6765e2a35bfa38b18ff98018ab5aa7d9c4b72520f  docs/evidencias/ni2-514/SMOKE-V42-mysql57.txt
+eddd7b687caaa5afaead418bf65f804b013bec094f6c505698b22a20468c76ce  docs/evidencias/ni2-514/cliques-v42-com-paciente.json
+e8980485125894987c4bd7853dc630209a96327817f9a4cf0c45af392d597df5  docs/evidencias/ni2-514/cliques-v42-sem-paciente.json
+7c898584ecefbeca989b0d2d1d048603518f469bf5ab6790ee1eda2cdcedddb2  public/assets/js/plan-live.js
+69b1e487c227a960f1501bbac5107adc8bf502cb40102a71698f179e1952af71  src/Application/Controllers/MealPlanTemplateController.php
+af248a91ddb9e0fcfa9f40bfd4b2e5e8903751c92c5f0645a42c44a8c82bdc24  src/Application/Controllers/PatientImportController.php
+49998046977bf411cf9ad052c79723a1c64a8ce2da3da63d0df318661c5b30a6  src/Domain/MealPlan/MealPlanTemplateService.php
+268a0f08cb8d2c0d55c87ccb93e4f1c1cfc9753ba5d7fbe46ebcd3622e0f2b76  src/Domain/MealPlan/PlanTotalsBar.php
+643c8821f94dcdbba1c578c24f8edd6c6f74da2cdefb68e9a7ce94b841bcfffd  src/Domain/MealPlan/SubstitutionComparison.php
+49473b2d5961774cac68235a5e1d5052e266777c9a8eb2ae970decf9bb06f469  src/Domain/Patient/PatientImportService.php
+dfad98146b959dcbf19b5e7f43d438588a6e80f08806485752aacfd67c5f9160  views/foods/search_report.php
+73c7a5e76bbb0b6ef5b05f2ec657e077faa3e5c5f86e9c6bbbb4bf84f7ec2a46  views/meal_plans/templates.php
+ca1cd85b2996ad1c014cb085611915ac438fe5611686f57362877b45c30944b5  views/patients/import.php
+ae39c9a4f66663eec8e23360f3f9e2c7597f5158232e9ad562ab5ff0f77cd44e  views/patients/import_show.php
+b0fd83525e55ccaf6ef4020afba5cdd88141b447b738cfcfa6c15054467b784d  database/instalacao_mysql8.sql
+259a0450c7073b3e7655c1d3b504aa5c98593929dfda60c8fe11abe95dd35721  docs/benchmark-webdiet/CONTAGEM-DE-CLIQUES-NI2-514.md
+acbd9b2215e8c7194863bb6f51fa9c03522d743f72e09f6add51d1aa1336e30d  public/assets/css/clinical-journeys.css
+3a5e30ccc9779e8f68316adc5e1ddb1beba5197295869829930d3f28cd262bf8  public/assets/js/food-picker.js
+a04ac305197ef3c030a565165e7c1f72827bc415e473258218dd02f3b83f0e70  public/index.php
+67695f0afaf6e2848074c130a0ee94d5435b6d0eb2e361c796f7be0ea804e22f  src/Application/Controllers/DashboardController.php
+d1124ac5b6f24bdf5c2fd5da616e454ee84710ee3d7557a9e50ae6f31706ac3b  src/Application/Controllers/FoodSearchController.php
+0ed0682a114977dd56c704c68b9b5153427616ebfeae0d45ff9c79aa2ce26166  src/Application/Controllers/OnboardingController.php
+07be7f7bd8e281fd8f04b1133a73faf04b14c577c67ca8c895fb857c4dbee840  src/Domain/Food/FoodSearchIndex.php
+eedec41487a1a048500457efdeb9fb0da71fa3690ca4b90c8f59b36eb3e491c2  src/Domain/Privacy/LgpdService.php
+5264b12d5c0a933edef49f74ba92df4bdfc07ae457477e01a938851907a7718f  views/meal_plans/_energy_card.php
+42b2832b0f7f6ce54e0fb6112781dada7d50840d61fc0d93c6ef97746b27a215  RELEASE_INFO.json
+
+== SHA256 DOS TESTES FORA DO ZIP ==
+df8bab1bd26dde7e28eb9d4b61f7916848c934199f76e7980fecbd3f0d3a36f2  tests/ni2_514_v42_units_test.php
+edab92079eee247069394f78ec71b1849d7bb099fa749b981ec27fc225e4a83e  tests/ni2_514_v42_clinical_scenarios_test.php
+dd2b2d869ce998f18ab62f4bbb766e0a3f881f9e8c71f30b8a619d72fdee9630  tests/ni2_514_v42_phase2_http_test.php
+b3be23b0d6d95631fa7d9fe7ddba63ec23b78a46102c81b530c453a9c5a7e2ef  tests/ni2_514_v42_sql_manual_test.php
+d7336fd6d5542c3381ce7b8e3c961a77134674cd2b8f7cb7ac484b663289029a  tests/ni2_514_energy_http_test.php
+57f90dd88c95544bf44100b4ecf8106558af396b6b14be192c9ea8fd639a2d92  tests/ni2_514_click_count.cjs
+20d619e559cf78fa17e7294107b5b794e81cf0025252fbae7fa8308af6fc1243  tests/admin_comercial_assinantes_test.php
+620435f894d1e37f83259659ee7b8ee176945ff19c1714547ddfa917be71ca21  tests/assinaturas_faltantes_sql_test.php
+7a98883e177ec3725c8f22c957f16ccc4885b1d6c356b44e4a554565bc4809e6  tests/v34_central_notificacoes_test.php

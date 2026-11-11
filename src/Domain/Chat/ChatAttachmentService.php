@@ -83,12 +83,7 @@ class ChatAttachmentService
 
         $sha256 = hash_file('sha256', $fileInfo['tmp_name']);
 
-        $moved = false;
-        if (is_uploaded_file($fileInfo['tmp_name'])) {
-            $moved = move_uploaded_file($fileInfo['tmp_name'], $destinationPath);
-        } else {
-            $moved = copy($fileInfo['tmp_name'], $destinationPath);
-        }
+        $moved = \ClyoNutri\Core\Http\UploadMover::move((string)$fileInfo['tmp_name'], $destinationPath); // CR-NI2-011
 
         if (!$moved) {
             throw new RuntimeException('Falha interna ao persistir o arquivo no armazenamento seguro.');

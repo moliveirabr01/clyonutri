@@ -20,6 +20,23 @@ final class AgendaNavigation
     {
         $d = self::parse($date);
         $t = self::parse($today);
+        if ($view === 'month') {
+            $start = $d->modify('first day of this month');
+            $end = $d->modify('last day of this month');
+            $tStart = $t->modify('first day of this month');
+            $prev = $start->modify('-1 month');
+            $next = $start->modify('+1 month');
+            $period = ucfirst(self::MONTHS[(int)$start->format('n')]) . ' de ' . $start->format('Y');
+            return [
+                'view' => 'month', 'start' => $start->format('Y-m-d'), 'end' => $end->format('Y-m-d'),
+                'prev' => $prev->format('Y-m-d'), 'next' => $next->format('Y-m-d'),
+                'prev_label' => 'Mês anterior (' . self::MONTHS[(int)$prev->format('n')] . ' de ' . $prev->format('Y') . ')',
+                'next_label' => 'Próximo mês (' . self::MONTHS[(int)$next->format('n')] . ' de ' . $next->format('Y') . ')',
+                'today_label' => 'Hoje: voltar para o mês atual',
+                'period_label' => $period,
+                'is_current' => $start == $tStart,
+            ];
+        }
         if ($view === 'week') {
             $start = $d->modify('-' . ((int)$d->format('N') - 1) . ' days');
             $end = $start->modify('+6 days');

@@ -1,0 +1,71 @@
+COMPARAÇÃO v36 x v37 (por conteúdo, sha256 de cada arquivo)
+
+v36: clyonutri-v36.zip (sha256 4949fa630adb5ee287c030c23b8820417cdc37d4e8a33344768174ee2da3dc6c)  669 itens (arquivos e pastas vazias)
+v37: clyonutri-v37.zip  683 itens (esta lista inclui o próprio COMPARACAO-V36-V37.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 656 (vendor/ inteiro, SubscriptionService.php e tudo o que a v36 mudou na biblioteca de receitas e no onboarding)
+Adicionados: 14 (13 + este arquivo)
+Removidos: 0
+Alterados: 13
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v37.md  -> novo: instruções da v37 (SQL novo da migração 60 só após o OK; troca de plano, cancelamento e pedido de exclusão; decisões e limites; como voltar para a v36)
+  database/manual/atualizacao-v37-completa.sql  -> novo: cria as duas tabelas novas e registra a migração 60; roda mais de uma vez sem efeito; MySQL 5.7
+  database/manual/atualizacao-v37-preflight.sql  -> novo: só lê; confere tabelas-base, InnoDB e se a migração já foi aplicada
+  database/manual/atualizacao-v37-verificacao.sql  -> novo: confere as duas tabelas e a migração 60
+  database/migrations/2026_10_28_000060_create_plan_changes_and_account_deletion_requests.php  -> novo: migração 60 (subscription_plan_changes e account_deletion_requests)
+  src/Core/Security/AccountActionRateLimiter.php  -> novo: limite de tentativas por clínica e usuário por hora (troca, cancelamento, pedido de exclusão e retirada), sobre a tabela login_attempts
+  src/Domain/Privacy/AccountDeletionRequestService.php  -> novo: pedido de exclusão da conta e dos dados (senha, frase, protocolo, prazo de 15 dias, retirada, análise e encerramento; nada é apagado)
+  src/Domain/Subscription/PlanChangeBlockedException.php  -> novo: motivo estruturado de uma troca barrada
+  src/Domain/Subscription/PlanChangeService.php  -> novo: troca de plano (direção pelo preço, limites do destino, histórico, idempotência, aviso); usa SubscriptionService sem alterá-lo
+  views/admin/_comercial_trocas_pedidos.php  -> novo: seções "Trocas de plano" e "Pedidos de exclusão de conta" do Comercial
+  views/settings/_conta_exclusao.php  -> novo: bloco de exclusão da conta e dos dados (rascunho jurídico marcado)
+  views/settings/_plano_resumo.php  -> novo: resumo do plano e do uso contra os limites, no perfil e na assinatura
+  views/settings/_plano_trocar.php  -> novo: cartões de plano, troca, mensagem de cobrança manual e histórico
+  COMPARACAO-V36-V37.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  RELEASE_INFO.json  -> alterado: versão v37, base clyonutri-v36.zip (sha256 4949fa63…), migração 60, arquivos da v37 e resultados; a ficha da v36 ficou em previous_release_v36
+  database/instalacao_mysql8.sql  -> alterado: instalação limpa passa a criar as duas tabelas novas e registrar a migração 60 (editado à mão, estilo MySQL 8; testado em MySQL 5.7.44)
+  public/index.php  -> alterado: cinco rotas novas (POST /configuracoes/assinatura/plano, /configuracoes/conta/exclusao, /configuracoes/conta/exclusao/cancelar, /admin/pedidos-exclusao/{id}/analise e /encerrar); resto igual
+  scripts/build_hostgator_zip.sh  -> alterado: o script de montagem passa a levar os documentos da raiz (LEIA-ME, COMPARACAO, VALIDACAO, RELEASE_INFO), manter docs/validation e criar as pastas vazias de storage/
+  src/Application/Controllers/AdminController.php  -> alterado: Comercial e Clínicas leem trocas e pedidos de exclusão; ações de análise e encerramento do pedido (users.manage, CSRF, auditoria)
+  src/Application/Controllers/SettingsController.php  -> alterado: o perfil carrega o resumo do plano e o pedido de exclusão aberto (3 linhas)
+  src/Application/Controllers/SubscriptionController.php  -> alterado: ações de trocar plano, pedir e retirar a exclusão (titular/administrador, CSRF, limite de tentativas, auditoria); o cancelamento existente não mudou
+  src/Domain/Notification/StaffNotificationService.php  -> alterado: três avisos novos (troca de plano, pedido de exclusão, pedido retirado; total de 17) e a varredura que refaz o aviso de pedido de exclusão perdido
+  src/Domain/Privacy/DataSubjectRequestService.php  -> alterado: a constante DEADLINE_DAYS (15) passou de private para public, para reaproveitar o prazo (1 linha)
+  views/admin/clinicas.php  -> alterado: selo "Pedido de exclusão em aberto/em análise" na linha da clínica
+  views/admin/comercial.php  -> alterado: inclui as duas seções novas
+  views/settings/profile.php  -> alterado: inclui o bloco Plano e conta
+  views/settings/subscription.php  -> alterado: inclui resumo, troca e exclusão; textos antigos de cartão e reembolso mantidos
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+b7ae5d0fa30b237b0a027eda5705867c8faf1730f44d43d90fee7f7c680d9505  LEIA-ME-HOSTGATOR-v37.md
+b7daf8c8f2d1aa6a109bf6b41f3872effadf0e50e73b867da9db41f8042b1239  RELEASE_INFO.json
+a54a45fce57d2c20db16bf7f47babd9606c87e8180f6023f070e577afa4fe6c0  database/instalacao_mysql8.sql
+2050b8fb2e4de8c58805fd25f1c7705cf96b8fac51a2dde4a4ef1cd275bfda02  database/manual/atualizacao-v37-completa.sql
+e662c4b7808f97a35cbced22f0a08c9e26283c01a1a1a4f84f1a2d9a5446b4af  database/manual/atualizacao-v37-preflight.sql
+a38396ce9af9ba9220f6a5490c4f27a83221db9d795eddbdb58ee89ef4a0f530  database/manual/atualizacao-v37-verificacao.sql
+2f46b25958a6ba12eb379d914870e44067e3e542b0008fec1cfd15512484f2a2  database/migrations/2026_10_28_000060_create_plan_changes_and_account_deletion_requests.php
+74c5d57334803e728d38e07b5ca9617282d18ed87335a75ffdf28f1db2603d50  public/index.php
+45c5c5d9d9e2de7131cf18c6d2b7064c104f37fda69be7d00fa5b29ebe36b3f8  scripts/build_hostgator_zip.sh
+3665c369d62ed30e26ec297178f82a2e12b11f3c1622353bf99f118938247ec1  src/Application/Controllers/AdminController.php
+ccc19155e52c9320790677fbc655d00dd726a1281ec2c282c9d9620ea072868f  src/Application/Controllers/SettingsController.php
+fd524c84e36b67b6f9d03779ca48c024f6fc08efdca72de560014ef0f06520e7  src/Application/Controllers/SubscriptionController.php
+815e1c005ce31f49e825c5757bbc52c7680b9ea0067adb95eb90788c61033d50  src/Core/Security/AccountActionRateLimiter.php
+ecac071364dd40a2510767c8861199940163d0a4b8dd16e61bc77d55faf26d59  src/Domain/Notification/StaffNotificationService.php
+4c2bd980c1e0f993404b3f09c6fbf0b309b6a950e8c406a74797fecca387b424  src/Domain/Privacy/AccountDeletionRequestService.php
+6d48c482d6aaf532f454e63e4f97742c36d3136ea41114c06fe84f0e8ce4f2e0  src/Domain/Privacy/DataSubjectRequestService.php
+ce89f5d32881fbd995d9a1c1cf9404d76a19cdb8ba91a9ddabb96b5ea2a48e87  src/Domain/Subscription/PlanChangeBlockedException.php
+c696e81cf10cccf8455d1eba63ace7480991454014fb1d927ddcc0b2d85a740d  src/Domain/Subscription/PlanChangeService.php
+c5eb0c5324e9fe096adeef1aeefe07ca3b332bf3636b9f7f99b5c4de39581eb2  views/admin/_comercial_trocas_pedidos.php
+a757166a6dad7bd31c8036e79eb8b2740987189fc6a7c1413aa8025247e398f5  views/admin/clinicas.php
+f2cb616dfd91f3357bc1abba8777ac121293d12facdaeff02e41430fb91f553a  views/admin/comercial.php
+a83587545f2aec3545a3bc112e2c48320c2623101c23ba425b5b50f1a081fe32  views/settings/_conta_exclusao.php
+b4b4cdc832ca25873c18602e700f56c2d87624b7dc42be32afa34b4151d609e6  views/settings/_plano_resumo.php
+ba49bcf37f56304337c98c34826c841ba4b19f62af71da878966bdd921167bc7  views/settings/_plano_trocar.php
+291d0ee50f9dafa47a1778f787c9ffe31288b52a6ec06bb64577961387a9f9bf  views/settings/profile.php
+50ea6dbd75fa23906fc3f003ab51d2085bdf246da1653ba341fa67862d1e0cc0  views/settings/subscription.php

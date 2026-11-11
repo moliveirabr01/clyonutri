@@ -30,12 +30,15 @@ class PatientRepository
         try {
         $this->lockClinic();
         $this->assertUniqueContact($data);
+        // NI2-585: alergia do cadastro (migração 75). Sem as colunas, cadastra como na v53 em vez de quebrar.
+        $allergy = self::normalizeAllergy($data['allergies'] ?? null, $data['allergy_assessment'] ?? null);
+        $withAllergy = $this->hasAllergyColumns();
         $stmt = $this->db->prepare("
-            INSERT INTO patients (clinic_id, uuid, name, email, phone, birth_date, gender, status, notes)
-            VALUES (:clinic_id, :uuid, :name, :email, :phone, :birth_date, :gender, :status, :notes)
+            INSERT INTO patients (clinic_id, uuid, name, email, phone, birth_date, gender, status, notes" . ($withAllergy ? ", allergies, allergy_assessment" : "") . ")
+            VALUES (:clinic_id, :uuid, :name, :email, :phone, :birth_date, :gender, :status, :notes" . ($withAllergy ? ", :allergies, :allergy_assessment" : "") . ")
         ");
 
-        $stmt->execute([
+        $params = [
             'clinic_id' => $clinicId,
             'uuid' => $uuid,
             'name' => trim($data['name']),
@@ -45,7 +48,11 @@ class PatientRepository
             'gender' => $data['gender'] ?? null,
             'status' => $data['status'] ?? 'active',
             'notes' => $data['notes'] ?? null,
-        ]);
+        ];
+        if ($withAllergy) {
+            $params += $allergy;
+        }
+        $stmt->execute($params);
 
         $id = (int)$this->db->lastInsertId();
 
@@ -63,7 +70,7 @@ class PatientRepository
                 ->execute([$clinicId, TenantContext::getUserId(), (string)$this->db->lastInsertId(), json_encode(['term_id'=>(int)$data['consent_term_id'], 'channel'=>'professional_attestation'])]);
         }
 
-        $this->audit('PATIENT_CREATED', $id, ['fields' => ['name','email','phone','birth_date','gender','notes']]);
+        $this->audit('PATIENT_CREATED', $id, ['fields' => ['name','email','phone','birth_date','gender','notes','allergies','allergy_assessment']]);
         $patient = $this->findById($id);
         if ($ownsTransaction) $this->db->commit();
         return $patient;
@@ -85,12 +92,27 @@ class PatientRepository
             if (mb_strtolower(trim((string)($data['email'] ?? ''))) === mb_strtolower(trim((string)($patient['email'] ?? '')))) $contacts['email'] = null;
             if (preg_replace('/\D/', '', (string)($data['phone'] ?? '')) === preg_replace('/\D/', '', (string)($patient['phone'] ?? ''))) $contacts['phone'] = null;
             $this->assertUniqueContact($contacts, $id);
+            $withAllergy = $this->hasAllergyColumns();
             $stmt = $this->db->prepare("UPDATE patients SET name = :name, email = :email,
-                phone = :phone, birth_date = :birth_date, gender = :gender, notes = :notes,
+                phone = :phone, birth_date = :birth_date, gender = :gender, notes = :notes,"
+                . ($withAllergy ? " allergies = :allergies, allergy_assessment = :allergy_assessment," : "") . "
                 updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :clinic_id");
-            $fields = array_intersect_key($data, array_flip(['name','email','phone','birth_date','gender','notes']));
+            $fields = [
+                'name' => array_key_exists('name', $data) ? $data['name'] : $patient['name'],
+                'email' => array_key_exists('email', $data) ? $data['email'] : $patient['email'],
+                'phone' => array_key_exists('phone', $data) ? $data['phone'] : $patient['phone'],
+                'birth_date' => array_key_exists('birth_date', $data) ? $data['birth_date'] : $patient['birth_date'],
+                'gender' => array_key_exists('gender', $data) ? $data['gender'] : $patient['gender'],
+                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $patient['notes'],
+            ];
+            if ($withAllergy) {
+                $fields += self::normalizeAllergy(
+                    array_key_exists('allergies', $data) ? $data['allergies'] : ($patient['allergies'] ?? null),
+                    array_key_exists('allergy_assessment', $data) ? $data['allergy_assessment'] : ($patient['allergy_assessment'] ?? null)
+                );
+            }
             $stmt->execute($fields + ['id' => $id, 'clinic_id' => TenantContext::getClinicId()]);
-            $changed = array_keys(array_filter($fields, static fn($v, $k) => $v !== $patient[$k], ARRAY_FILTER_USE_BOTH));
+            $changed = array_keys(array_filter($fields, static fn($v, $k) => $v !== ($patient[$k] ?? null), ARRAY_FILTER_USE_BOTH));
             $this->audit('PATIENT_UPDATED', $id, ['fields' => $changed]);
             if ($ownsTx) $this->db->commit();
             return true;
@@ -321,4 +343,28 @@ class PatientRepository
         return $stmt->fetchAll();
     }
 
+
+    private function hasAllergyColumns(): bool
+    {
+        return \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'patients', 'allergies')
+            && \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'patients', 'allergy_assessment');
+    }
+
+    /**
+     * "Nega alergias" e texto de alergia não convivem: negado limpa o texto; texto sem avaliação vira "recorded".
+     * @return array{allergies: ?string, allergy_assessment: ?string}
+     */
+    public static function normalizeAllergy(mixed $allergies, mixed $assessment): array
+    {
+        $text = is_string($allergies) ? trim($allergies) : '';
+        $text = $text === '' ? null : mb_substr($text, 0, 500);
+        $assessment = is_string($assessment) ? trim($assessment) : '';
+        if ($assessment === 'denied') {
+            return ['allergies' => null, 'allergy_assessment' => 'denied'];
+        }
+        if ($text !== null) {
+            return ['allergies' => $text, 'allergy_assessment' => 'recorded'];
+        }
+        return ['allergies' => null, 'allergy_assessment' => null];
+    }
 }

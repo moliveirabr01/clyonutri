@@ -18,6 +18,8 @@ class LgpdService
         'nutrition_records' => [],
         'meal_plans' => [],
         'meal_plan_versions' => [],
+        'dietary_confirmations' => ['request_key'],
+        'meal_plan_energy_targets' => [],
         'appointments' => [],
         'checkins' => [],
         'receivables' => [],
@@ -26,7 +28,7 @@ class LgpdService
         'skinfold_measurements' => [],
         'patient_self_metrics' => [],
         'health_sync_data' => [],
-        'preconsultation_questionnaires' => ['token_hash', 'token_generation', 'token_expires_at', 'failed_attempts', 'locked_until'],
+        'preconsultation_questionnaires' => ['access_hash', 'token_hash', 'token_generation', 'token_expires_at', 'failed_attempts', 'locked_until'],
         'recipe_prescriptions' => [],
         'chat_conversations' => [],
         'patient_documents' => ['file_path', 'access_token'],
@@ -38,6 +40,11 @@ class LgpdService
         'patient_self_metric_permissions' => [],
         'appointment_change_requests' => [],
         'patient_professional_links' => [],
+        // NI2-635/655: condições clínicas com origem e respostas dos protocolos (dados de saúde, art. 11)
+        'patient_conditions' => [],
+        'protocol_responses' => [],
+        // v54.21: materiais educativos recebidos (envios; o título vai em educational_materials_received)
+        'educational_material_shares' => [],
     ];
 
     /** Tabelas com patient_id que NÃO entram no pacote, e por quê (revisar com o jurídico). */
@@ -53,6 +60,7 @@ class LgpdService
         'booking_holds' => 'operacional: reservas temporárias de horário (dados pessoais são apagados na anonimização)',
         'onboarding_progress' => 'dados do profissional (first_patient_id é só referência)',
         'personal_access_tokens' => 'segredo de autenticação',
+        'patient_import_rows' => 'operacional: relatório por linha da importação por CSV (os dados brutos são apagados ao confirmar ou descartar)',
     ];
 
     private PDO $db;
@@ -82,6 +90,7 @@ class LgpdService
         // Anamneses
         $aStmt = $this->db->prepare("SELECT * FROM anamneses WHERE patient_id = :id AND clinic_id = :clinic_id");
         $aStmt->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+        // NI2-716: exportação LGPD entrega texto claro ao titular (decrypt transparente).
         $anamneses = ClinicalEncryptionService::decryptAnamnesisRows($aStmt->fetchAll());
 
         // Antropometrias
@@ -125,6 +134,22 @@ class LgpdService
             $related['notification_preferences'] = (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->preferences((int)$clinicId, 'patient', $patientId);
             // Aparelhos cadastrados para o aviso no celular: plataforma e datas (o token em si não sai na exportação).
             $related['push_devices'] = (new \ClyoNutri\Domain\Notification\PushTokenService($this->db))->devicesForExport((int)$clinicId, 'patient', $patientId);
+        }
+        // NI2-655: histórico das condições (a tabela de eventos não tem patient_id; o vínculo vem da condição)
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'patient_condition_events')) {
+            $ev = $this->db->prepare('SELECT e.id, e.condition_id, e.from_status, e.to_status, e.provenance, e.note, e.created_at
+                FROM patient_condition_events e JOIN patient_conditions c ON c.id = e.condition_id AND c.clinic_id = e.clinic_id
+                WHERE c.clinic_id = ? AND c.patient_id = ? ORDER BY e.id');
+            $ev->execute([$clinicId, $patientId]);
+            $related['patient_condition_events'] = $ev->fetchAll(PDO::FETCH_ASSOC);
+        }
+        // v54.21: materiais recebidos, com título e categoria (o arquivo em si é material da clínica, não dado do titular)
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'educational_material_shares')) {
+            $mat = $this->db->prepare('SELECT s.id AS share_id, m.title, m.category, s.note, s.shared_at, s.first_opened_at, s.revoked_at
+                FROM educational_material_shares s JOIN educational_materials m ON m.id = s.material_id AND m.clinic_id = s.clinic_id
+                WHERE s.clinic_id = ? AND s.patient_id = ? ORDER BY s.id');
+            $mat->execute([$clinicId, $patientId]);
+            $related['educational_materials_received'] = $mat->fetchAll(PDO::FETCH_ASSOC);
         }
         // Registrar auditoria de exportação
         $this->auditLogger->log('LGPD_DATA_EXPORT', 'patients', (string)$patientId, ['patient_id' => $patientId, 'tables' => array_keys($related)]);
@@ -177,7 +202,7 @@ class LgpdService
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
             $this->db->prepare("UPDATE booking_holds SET patient_name = NULL, patient_email = NULL, patient_phone = NULL, patient_cpf = NULL, patient_notes = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
-            $this->db->prepare("UPDATE preconsultation_questionnaires SET revoked_at = CURRENT_TIMESTAMP WHERE patient_id = :id AND clinic_id = :clinic_id AND submitted_at IS NULL AND revoked_at IS NULL")
+            $this->db->prepare("UPDATE preconsultation_questionnaires SET revoked_at = CURRENT_TIMESTAMP, status = 'revoked', token_hash = NULL, access_hash = NULL WHERE patient_id = :id AND clinic_id = :clinic_id AND submitted_at IS NULL AND revoked_at IS NULL")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
 
             // NI2-138: o chat fica só para leitura sob guarda legal (vínculos encerrados, conversas arquivadas);
@@ -216,11 +241,24 @@ class LgpdService
                 }
             }
 
+            // v54.21: materiais deixam de aparecer para o titular; o recado (texto livre) é apagado.
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'educational_material_shares')) {
+                $this->db->prepare("UPDATE educational_material_shares SET note = NULL, revoked_at = COALESCE(revoked_at, :now) WHERE patient_id = :id AND clinic_id = :clinic_id")
+                    ->execute(['now' => date('Y-m-d H:i:s'), 'id' => $patientId, 'clinic_id' => $clinicId]);
+            }
+
             // NI2-132: o texto livre do diário (descrição, sintomas, feedback do profissional e caminho de foto) é dado
             // de saúde que pode identificar a pessoa: é apagado. Ficam nome da refeição, horário, fome e saciedade
             // (uso estatístico, sem vínculo identificável porque o cadastro já foi anonimizado).
             $this->db->prepare("UPDATE food_diary_entries SET description = NULL, symptoms = NULL, feedback_from_professional = NULL, photo_path = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
                 ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+            // NI2-655: texto livre das condições pode citar dados pessoais; status e datas ficam (descaracterizados)
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'patient_conditions')) {
+                $this->db->prepare("UPDATE patient_condition_events SET note = NULL WHERE clinic_id = :clinic_id AND condition_id IN (SELECT id FROM patient_conditions WHERE patient_id = :id AND clinic_id = :clinic_id2)")
+                    ->execute(['id' => $patientId, 'clinic_id' => $clinicId, 'clinic_id2' => $clinicId]);
+                $this->db->prepare("UPDATE patient_conditions SET evidence_text = NULL WHERE patient_id = :id AND clinic_id = :clinic_id")
+                    ->execute(['id' => $patientId, 'clinic_id' => $clinicId]);
+            }
 
             // Registrar revogação de consentimentos
             $revStmt = $this->db->prepare("

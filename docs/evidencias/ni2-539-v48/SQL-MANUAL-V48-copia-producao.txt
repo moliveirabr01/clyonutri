@@ -1,0 +1,50 @@
+SQL manual v48 (migração 67) ensaiado numa cópia do banco de produção (dump de 29/10/2026 12:03, com a v47 aplicada como na produção),
+com o banco ATIVO = information_schema (como o phpMyAdmin deixa). MariaDB 10.11.14-MariaDB-0ubuntu0.24.04.1. A cópia foi apagada depois.
+
+==== atualizacao-v48-preflight.sql
++---------------------+----------------------------------------+------------------------+-------------+-------------+-----------------------+
+| banco               | situacao                               | tabelas_de_laudos_de_2 | migracao_66 | migracao_67 | solicitacoes_emitidas |
++---------------------+----------------------------------------+------------------------+-------------+-------------+-----------------------+
+| maic6824_Clyonutri2 | OK: PRONTO PARA MIGRAR (migração 67) |                      0 |           1 |           0 |                     1 |
++---------------------+----------------------------------------+------------------------+-------------+-------------+-----------------------+
+==== atualizacao-v48-completa.sql
++---------------------+------------------------+----------------------+--------------+------------------------+
+| banco               | tabelas_de_laudos_de_2 | colunas_laudos_de_26 | indices_de_5 | migracao_67_registrada |
++---------------------+------------------------+----------------------+--------------+------------------------+
+| maic6824_Clyonutri2 |                      2 |                   26 |            5 |                      1 |
++---------------------+------------------------+----------------------+--------------+------------------------+
+==== atualizacao-v48-completa.sql
++---------------------+------------------------+----------------------+--------------+------------------------+
+| banco               | tabelas_de_laudos_de_2 | colunas_laudos_de_26 | indices_de_5 | migracao_67_registrada |
++---------------------+------------------------+----------------------+--------------+------------------------+
+| maic6824_Clyonutri2 |                      2 |                   26 |            5 |                      1 |
++---------------------+------------------------+----------------------+--------------+------------------------+
+==== atualizacao-v48-verificacao.sql
++--------------------------------------------------+---------------------+
+| item                                             | resultado           |
++--------------------------------------------------+---------------------+
+| banco                                            | maic6824_Clyonutri2 |
+| tabelas de laudos (2)                            | OK                  |
+| colunas de exam_result_documents (26)            | OK                  |
+| colunas de exam_result_document_items (4)        | OK                  |
+| índices (5)                                     | OK                  |
+| exame coberto uma vez por laudo (índice único) | OK                  |
+| ids em BIGINT(20)                                | OK                  |
+| migração 67 registrada uma vez                 | OK                  |
+| sem chave estrangeira nas tabelas de laudos      | OK                  |
++--------------------------------------------------+---------------------+
+==== atualizacao-v48-preflight.sql
++---------------------+----------------------------------------------------------------+------------------------+-------------+-------------+-----------------------+
+| banco               | situacao                                                       | tabelas_de_laudos_de_2 | migracao_66 | migracao_67 | solicitacoes_emitidas |
++---------------------+----------------------------------------------------------------+------------------------+-------------+-------------+-----------------------+
+| maic6824_Clyonutri2 | OK: v48 já aplicada (rodar a completa de novo não muda nada) |                      2 |           1 |           1 |                     1 |
++---------------------+----------------------------------------------------------------+------------------------+-------------+-------------+-----------------------+
+==== diferença na quantidade de linhas por tabela (antes x depois)
+38a39,40
+> exam_result_documents 0
+> exam_result_document_items 0
+65c67
+< migrations 66
+---
+> migrations 67
+migrações pendentes para o php bin/migrate.php: 0

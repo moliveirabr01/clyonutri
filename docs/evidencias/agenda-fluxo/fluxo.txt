@@ -1,0 +1,32 @@
+PASS: partial holiday blocks only the configured hours
+PASS: blocked appointment error identifies holiday and period
+PASS: internal appointment is allowed after the partial holiday
+PASS: editing moves the rule without replacing its identity
+PASS: edited holiday updates availability on both old and new dates
+PASS: switching to full day clears stale hour values
+PASS: agenda range includes saved rule hours and scope
+PASS: calendar markers are isolated by clinic
+PASS: cross-clinic editing rejected
+PASS: professional cannot edit a clinic-wide rule
+PASS: professional can edit own rule hours
+PASS: invalid edit leaves persisted hours unchanged
+PASS: partial holiday requires start and end
+PASS: separate date and time preserve minute-level input
+PASS: legacy scheduled_at requests remain supported
+PASS: midnight is accepted as a valid explicit time
+PASS: malformed or incomplete date/time rejected
+PASS: malformed or incomplete date/time rejected
+PASS: malformed or incomplete date/time rejected
+PASS: invalid time keeps the selected date for recovery
+PASS: saved holiday is rendered by actual day controller view
+PASS: separate date/time controls in day view
+PASS: existing appointment remains visible on holiday
+PASS: saved holiday is rendered by actual week controller view
+PASS: separate date/time controls in week view
+PASS: blocked dates are not labelled free in week view
+PASS: saved holiday is rendered by actual month controller view
+PASS: separate date/time controls in month view
+PASS: blocked dates are not labelled free in month view
+PASS: rescheduling also provides explicit date and time fields
+PASS: failed appointment recovery keeps both controls filled
+All calendar flow checks passed.

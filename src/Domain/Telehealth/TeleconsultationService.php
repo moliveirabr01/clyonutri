@@ -291,7 +291,7 @@ class TeleconsultationService
             return null;
         }
         $session = $this->applyExpiry($session);
-        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+        if (!empty($session['invite_revoked_at_utc']) || in_array($session['status'], self::TERMINAL_STATUSES, true)) {
             return null;
         }
         $key = self::ticketKey();
@@ -384,7 +384,7 @@ class TeleconsultationService
     private function assertPatientSessionUsable(array $session): array
     {
         $session = $this->applyExpiry($session);
-        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
+        if (!empty($session['invite_revoked_at_utc']) || in_array($session['status'], self::TERMINAL_STATUSES, true)) {
             throw new TeleconsultationStateException('Esta teleconsulta não está mais disponível. Fale com seu nutricionista.');
         }
         return $session;
@@ -442,11 +442,7 @@ class TeleconsultationService
                 throw new TenantSecurityException('Convite de teleconsulta inválido, substituído ou revogado.');
             }
         }
-        $session = $this->applyExpiry($session);
-        if (in_array($session['status'], self::TERMINAL_STATUSES, true)) {
-            throw new TeleconsultationStateException('Esta teleconsulta não está mais disponível. Fale com seu nutricionista.');
-        }
-        return $session;
+        return $this->assertPatientSessionUsable($session);
     }
 
     public function submitDeviceCheck(string $rawToken, array $metrics): array
@@ -551,14 +547,18 @@ class TeleconsultationService
     public function enterWaitingRoom(string $rawToken): array
     {
         $session = $this->getSessionByPatientToken($rawToken);
-        if ((int)$session['device_check_passed'] !== 1) {
+        // v20: 1 = câmera+microfone, 2 = somente áudio, 3 = continuar com aviso (sem dispositivos).
+        if (!in_array((int)$session['device_check_passed'], [1, 2, 3], true)) {
             throw new TeleconsultationStateException('Conclua o teste de câmera e microfone antes de entrar na sala de espera.');
         }
         if (empty($session['consent_accepted_at'])) {
             throw new TeleconsultationStateException('Aceite o termo da teleconsulta antes de entrar na sala de espera.');
         }
-        if ($this->now() < $this->utc((string)$session['join_opens_at_utc'])) {
-            throw new TeleconsultationStateException('A sala de espera ainda não abriu. Ela abre pouco antes do horário da consulta.');
+        $opensAt = $this->effectiveJoinOpensAt($session);
+        if ($this->now() < $opensAt) {
+            // v54.27: horário exato no fuso da clínica, para o paciente saber quando voltar
+            $local = $opensAt->setTimezone(new DateTimeZone(date_default_timezone_get()));
+            throw new TeleconsultationStateException('A sala de espera abre às ' . $local->format('H:i') . ' (horário de Brasília). Volte a tocar em "Entrar" nesse horário.');
         }
         if ($session['status'] === self::STATUS_WAITING_ROOM) {
             return ['session_id' => (int)$session['id'], 'status' => self::STATUS_WAITING_ROOM];
@@ -582,7 +582,63 @@ class TeleconsultationService
         return [
             'status' => $session['status'],
             'is_admitted' => $this->isAdmitted($session),
+        ] + $this->waitingRoomClock($session);
+    }
+
+    /**
+     * v54.27: relógio da sala de espera (abertura efetiva + hora do servidor), para a contagem regressiva.
+     * @return array{join_opens_at_utc: string, server_now_utc: string, opens_label: string, is_open: bool}
+     */
+    public function waitingRoomClock(array $session): array
+    {
+        $opens = $this->effectiveJoinOpensAt($session);
+        $now = $this->now()->setTimezone(new DateTimeZone('UTC'));
+        return [
+            'join_opens_at_utc' => $opens->format('Y-m-d\TH:i:s\Z'),
+            'server_now_utc' => $now->format('Y-m-d\TH:i:s\Z'),
+            'opens_label' => $opens->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('H:i'),
+            'is_open' => $now >= $opens,
         ];
+    }
+
+    /**
+     * v54.27: abertura efetiva da sala de espera. A janela gravada na sessão foi calculada com o
+     * TELECONSULT_JOIN_EARLY_MINUTES da época do convite; se a configuração atual abre mais cedo, vale a atual,
+     * sem precisar reenviar convite. Nunca abre depois do que está gravado nem depois do fechamento gravado
+     * (o fechamento continua o da sessão: credencial, cookie e bilhetes expiram como antes).
+     */
+    public function effectiveJoinOpensAt(array $session): DateTimeImmutable
+    {
+        $stored = !empty($session['join_opens_at_utc']) ? $this->utc((string)$session['join_opens_at_utc']) : null;
+        $current = null;
+        if (!empty($session['scheduled_at'])) {
+            $current = self::currentJoinOpensAt((string)$session['scheduled_at']);
+        }
+        $opens = match (true) {
+            $stored === null && $current === null => $this->now(),
+            $stored === null => $current,
+            $current === null => $stored,
+            default => min($stored, $current),
+        };
+        if (!empty($session['join_closes_at_utc'])) {
+            $closes = $this->utc((string)$session['join_closes_at_utc']);
+            if ($opens > $closes) {
+                $opens = $stored ?? $closes;
+            }
+        }
+        return $opens;
+    }
+
+    /** Abertura pela configuração atual: horário agendado (fuso da aplicação) menos TELECONSULT_JOIN_EARLY_MINUTES, em UTC. */
+    public static function currentJoinOpensAt(string $scheduledAtLocal): DateTimeImmutable
+    {
+        $start = (new DateTimeImmutable($scheduledAtLocal, new DateTimeZone(date_default_timezone_get())))->setTimezone(new DateTimeZone('UTC'));
+        return $start->modify('-' . self::joinEarlyMinutes() . ' minutes');
+    }
+
+    public static function joinEarlyMinutes(): int
+    {
+        return self::intEnv('TELECONSULT_JOIN_EARLY_MINUTES', 15, 0, 120);
     }
 
     /** Credencial de mídia do paciente — somente após admissão e com sala pronta. */
@@ -610,7 +666,7 @@ class TeleconsultationService
             throw new TeleconsultationStateException('Teleconsulta encerrada.');
         }
         $session = $this->ensureRoom($session, $professionalId);
-        return $this->issueCredential($session, 'professional', (string)$session['professional_name'], 'professional-' . $professionalId, $professionalId);
+        return $this->issueCredential($session, 'professional', (string)$session['professional_name'], $this->professionalMediaRef($session), $professionalId);
     }
 
     /**
@@ -635,9 +691,14 @@ class TeleconsultationService
         }
         $session = $this->applyExpiry($session);
 
+        $active = $this->db->prepare("SELECT 1 FROM users u JOIN professionals pr ON pr.user_id = u.id JOIN clinic_members cm ON cm.user_id = u.id AND cm.clinic_id = :clinic JOIN clinics c ON c.id = cm.clinic_id JOIN patients p ON p.id = :patient AND p.clinic_id = c.id WHERE pr.id = :professional AND u.status = 'active' AND u.role IN ('nutritionist','admin','owner') AND c.status = 'active' AND p.status = 'active' AND cm.status = 'active' AND cm.role IN ('owner','admin','nutritionist')");
+        $active->execute(['clinic' => (int)$session['clinic_id'], 'patient' => (int)$session['patient_id'], 'professional' => (int)$session['professional_id']]);
+        if (!$active->fetchColumn()) {
+            throw new TenantSecurityException('Participante ou clínica sem acesso ativo à teleconsulta.');
+        }
         $role = $claims['role'];
         $allowed = $role === 'professional'
-            ? !in_array($session['status'], self::TERMINAL_STATUSES, true) && $claims['ref'] === 'professional-' . (int)$session['professional_id']
+            ? !in_array($session['status'], self::TERMINAL_STATUSES, true) && $claims['ref'] === $this->professionalMediaRef($session)
             : $this->isAdmitted($session) && $claims['ref'] === 'patient-' . (int)$session['patient_id'];
         if (!$allowed) {
             throw new TenantSecurityException('Acesso à sala de teleconsulta não autorizado neste momento.');
@@ -785,6 +846,8 @@ class TeleconsultationService
 
         $this->transaction(function () use ($session, $clinicId, $opensAt, $closesAt): void {
         $this->releaseRoom($session, $clinicId);
+        $this->db->prepare('UPDATE teleconsultation_sessions SET invite_generation = invite_generation + 1 WHERE id = ? AND clinic_id = ?')->execute([(int)$session['id'], $clinicId]);
+        $this->db->prepare('DELETE FROM teleconsultation_ticket_redemptions WHERE session_id = ?')->execute([(int)$session['id']]);
         $this->guardedUpdate((int)$session['id'], $clinicId, $session['status'], [
             'status' => self::STATUS_SCHEDULED,
             'invite_revoked_at_utc' => $this->nowSql(),
@@ -823,7 +886,7 @@ class TeleconsultationService
 
     private const SESSION_SELECT = "
         SELECT s.*, p.name AS patient_name, u.name AS professional_name, pr.crn AS council_number,
-               a.scheduled_at, a.duration_minutes, a.status AS appointment_status, c.name AS clinic_name
+               a.scheduled_at, a.duration_minutes, a.status AS appointment_status, c.name AS clinic_name, u.auth_version AS professional_auth_version
         FROM teleconsultation_sessions s
         INNER JOIN patients p ON p.id = s.patient_id AND p.clinic_id = s.clinic_id
         INNER JOIN professionals pr ON pr.id = s.professional_id
@@ -864,9 +927,17 @@ class TeleconsultationService
         $appTz = new DateTimeZone(date_default_timezone_get());
         $start = (new DateTimeImmutable((string)$appointment['scheduled_at'], $appTz))->setTimezone(new DateTimeZone('UTC'));
         $duration = max(15, (int)($appointment['duration_minutes'] ?? 60));
-        $early = self::intEnv('TELECONSULT_JOIN_EARLY_MINUTES', 15, 0, 120);
+        $early = self::joinEarlyMinutes();
         $grace = self::intEnv('TELECONSULT_JOIN_GRACE_MINUTES', 30, 0, 240);
         return [$start->modify("-{$early} minutes"), $start->modify('+' . ($duration + $grace) . ' minutes')];
+    }
+
+    private function professionalMediaRef(array $session): string
+    {
+        if (!$this->videoProvider instanceof Contracts\VerifiableCredentialProviderInterface) {
+            return 'professional-' . (int)$session['professional_id'];
+        }
+        return 'professional-' . (int)$session['professional_id'] . '-v' . (int)$session['professional_auth_version'] . '-g' . (int)$session['invite_generation'];
     }
 
     private function credentialExpiry(array $session): int

@@ -1,0 +1,76 @@
+COMPARAÇÃO v45 x v46 (por conteúdo: sha256 e permissão de execução de cada arquivo)
+
+v45: clyonutri-v45.zip (sha256 1eadeca62cb2b63c7d626644e832e591f760c1969d885fdbc730836194a96331)  1236 itens (arquivos e pastas vazias)
+v46: clyonutri-v46.zip  1237 itens (inclui este arquivo)
+
+Iguais: 1217 (vendor/ inteiro, migrações 1 a 63, ExamRequestPdfService, ExamCatalogService, ExamText, ProfessionalEligibilityValidator, exam_print.php, exame-documento.css, exames.css, exames-solicitacao.js, public/index.php, routes/web.php, COMPARACAO anteriores e o restante)
+Adicionados: 7 (6 + esta COMPARACAO)
+Removidos: 6
+Alterados: 13
+Mudança só de permissão de execução: nenhuma
+
+Regressões: nenhuma. Nenhum arquivo de rota, login, isolamento por clínica, PDF (ExamRequestPdfService), impressão (exam_print.php, prontuario-impressao.js) ou JS mudou. O que saiu é só a trava de liberação.
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v46.md  -> novo: o que muda da v45, fluxo da nutricionista sem trava, SQL só da 65 sobre a produção, ordem de instalação, conferência e como voltar
+  database/manual/atualizacao-v46-completa.sql  -> novo: idempotente, sem FK, sem DROP/DELETE/UPDATE; aplica a 65 onde a 64 já está (ou a 64 e a 65 em banco sem exames); não mexe na política; testado em MySQL 5.7.44
+  database/manual/atualizacao-v46-preflight.sql  -> novo: só lê; mostra tabelas, colunas da 65, migrações 63/64/65 e a política com a observação "não usado pela v46"
+  database/manual/atualizacao-v46-verificacao.sql  -> novo: só lê; dez conferências (tabelas, colunas, BIGINT, padrão da ciência, índice, política, catálogo, 64 e 65 registradas uma vez, sem FK)
+  database/migrations/2026_10_29_000065_exam_requests_pdf_and_review.php  -> novo nome da 65 (classe ExamRequestsPdfAndReview): revisão, emissor e PDF no pedido, padrão 0 na ciência, índice idx_exam_audit_entity; não toca na política e não fecha nada
+  docs/evidencias/ni2-529-v46/SMOKE-V46-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (SQL v46 sobre banco como a produção, HTTP 77/77 e navegador)
+  COMPARACAO-V45-V46.txt  -> este arquivo
+
+== REMOVIDOS ==
+  bin/exam_gate.php  -> removido: comando de liberação da emissão; na v46 não há liberação
+  database/manual/atualizacao-v45-completa.sql  -> removido: SQL da v45 fechava a política; substituído pelo trio v46
+  database/manual/atualizacao-v45-preflight.sql  -> removido: substituído por atualizacao-v46-preflight.sql
+  database/manual/atualizacao-v45-verificacao.sql  -> removido: substituído por atualizacao-v46-verificacao.sql
+  database/migrations/2026_10_29_000065_exam_requests_pdf_review_and_closed_gate.php  -> removido: a 65 da v45 (colunas de aprovação e fechamento da política); renomeada e reescrita como 2026_10_29_000065_exam_requests_pdf_and_review.php. Nunca rodou em produção
+  src/Domain/LaboratoryExam/ExamReleaseGate.php  -> removido: classe da liberação; nada mais a chama
+
+== ALTERADOS ==
+  LEIA-ME-HOSTGATOR-v45.md  -> só ganhou no topo a nota "substituído pela v46; não instalar; exam_gate não existe mais"
+  RELEASE_INFO.json  -> v46 no topo; os campos de topo da v45 viram previous_*_v45; histórico mantido
+  database/instalacao_mysql8.sql  -> instalação limpa: política sem colunas de aprovação, padrões e seed 1,1 como na u3, migração 65 com o nome novo
+  database/manual/atualizacao-exames-ni2-529-completa.sql  -> SQL avulso da u3: só o comentário passa a apontar para o trio v46 (histórico)
+  database/manual/atualizacao-exames-ni2-529-preflight.sql  -> SQL avulso da u3: só o comentário passa a apontar para o trio v46 (histórico)
+  database/manual/atualizacao-exames-ni2-529-verificacao.sql  -> SQL avulso da u3: só o comentário passa a apontar para o trio v46 (histórico)
+  database/migrations/2026_10_29_000064_create_laboratory_exam_requests_and_catalog.php  -> padrões e seed da política voltam a 1,1, como na u3 em produção (nada muda onde a 64 já rodou)
+  src/Application/Controllers/ExamRequestController.php  -> tira gateOpen/gateMessage das telas de lista, novo pedido e pedido; rotas, login, clínica, /imprimir e /pdf iguais
+  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php  -> remove GATE_CLOSED_MESSAGE, isReleaseGateOpen e assertReleaseGateApproved; a política segue carregada para base legal e aviso de cobertura
+  src/Domain/LaboratoryExam/ExamRequestService.php  -> emissão sem a checagem de liberação; continuam CRN com região, autor do pedido, ciência do aviso, PDF gravado antes do status, SHA-256 dos bytes e auditoria
+  views/patients/exam_new.php  -> sai o aviso de liberação pendente
+  views/patients/exam_show.php  -> sai o aviso de liberação; o formulário "Emitir e gerar PDF" aparece sempre na revisão; pedido antigo sem PDF diz "antes da versão 46"
+  views/patients/exams.php  -> sai o aviso de liberação pendente
+
+== FORA DO ZIP (testes e imagens, no repositório) ==
+  tests/ni2_529_exam_requests_test.php  -> 113 verificações; trocadas as da liberação por emissão livre com política 1,1 e 0,0
+  tests/ni2_529_v46_sql_manual_test.php  -> 41 verificações do trio v46 (renomeado de ni2_529_v45_sql_manual_test.php)
+  tests/assinaturas_faltantes_sql_test.php  -> só o nome do arquivo SQL da v46 na lista de SQL manuais
+  docs/evidencias/ni2-529-v46/*.png  -> telas do teste no navegador (rascunho, revisão, emitido, impressão)
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS (no zip) ==
+abea1b085b642b15d760169c34f0333e197359ccea016d09e6fda579bcb75cc1  LEIA-ME-HOSTGATOR-v46.md
+1072b76d1a4bbc4fe7342e60ac883fa207637d677bd87ad9368b74aaea51e9a2  database/manual/atualizacao-v46-completa.sql
+b34d58880165f927996a2d804fe40bdf23ea55f699b63963da10cb90e6964d45  database/manual/atualizacao-v46-preflight.sql
+7417ea45a0a669b8e8e555eaa29f5572dfcba9f6096b72654b39467bc08582bb  database/manual/atualizacao-v46-verificacao.sql
+5e87461098f2eed7d77657b2181e57ca196eaad6bb4cb8592c8ebca7ef1546cd  database/migrations/2026_10_29_000065_exam_requests_pdf_and_review.php
+158711ff25bdb7f79b444bd802e99fbe6c911f032bec441c209256215b685583  docs/evidencias/ni2-529-v46/SMOKE-V46-mysql57.txt
+0af1c0a639385afcea70bb157f164e8267055e092f1938fb8a6626497ead0f74  LEIA-ME-HOSTGATOR-v45.md
+1748929ccebef91f47e004c29089e0bfa1cfeb03d68572eb56c9b3be863975ce  RELEASE_INFO.json
+6665e631c923cccc1e9620413d09785ca97c8021d5ab057784fc88c63232d62d  database/instalacao_mysql8.sql
+80577d3a9a2810cfa9081a31e5348f6967b44a132c44018751ba5f3b30946c95  database/manual/atualizacao-exames-ni2-529-completa.sql
+4bed667341a91a2d8644e56fd2f860d7ce751d8115bed521609dbd9bfbcc86f5  database/manual/atualizacao-exames-ni2-529-preflight.sql
+db74a09f2180beba69dbac699732c3d81c0aad564fb8ad619056e6757a89c5e1  database/manual/atualizacao-exames-ni2-529-verificacao.sql
+d83ba5658e4be2614c61594481103e15274b7777f4a191520b7a4278e836f3a6  database/migrations/2026_10_29_000064_create_laboratory_exam_requests_and_catalog.php
+bb6281b186a29e095b520b03040811f4bae6107bd7de1c17b8e455da8c92d355  src/Application/Controllers/ExamRequestController.php
+cb3bb2889ae4c1dd060616d96ebf3efc55620e288e631226d065a8734195ebb5  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php
+4062a00331c86059c051023b537289a48dbdde90c426b28dc98d8e5037f7ed29  src/Domain/LaboratoryExam/ExamRequestService.php
+74971bd9403e5f50eb094d8ced3756ebb0d18e24f0a4fee47c70e2ad25eb500c  views/patients/exam_new.php
+c4acc8033309d0c6902a06a0326082c0efb2f3c93333ac6aab5a807512a677dc  views/patients/exam_show.php
+1d655509103d03770abcadfdd10a2cbb9af899443626b131ff219799e3701e97  views/patients/exams.php
+
+== SHA256 DOS TESTES FORA DO ZIP ==
+ce48cbb5aa858f8d87e66443f5b7cb312f57a3b25bae5f3668c710393faad86a  tests/ni2_529_exam_requests_test.php
+c93fe770c0a7b4724b8c9aa83aa24efcfd78bb46d7557da64f23ed1090c8690e  tests/ni2_529_v46_sql_manual_test.php
+0715fc211fe721d1c48dc43887bab570dd1a0bba9ef0ea90cc72d07bf0251be0  tests/assinaturas_faltantes_sql_test.php

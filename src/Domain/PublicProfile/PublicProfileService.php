@@ -60,7 +60,7 @@ class PublicProfileService
         return [
             'id' => $id,
             'slug' => $slug,
-            'public_url' => "https://clyonutri.com.br/nutricionista/{$slug}",
+            'public_url' => \ClyoNutri\Core\Security\ContactInfo::url('/nutricionista/' . rawurlencode((string)$slug)),
         ];
     }
 

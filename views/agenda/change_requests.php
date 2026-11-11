@@ -4,7 +4,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $fmt = function ($d) { $t = $d ? strtotime((string)$d) : false; return $t ? date('d/m/Y', $t) . ' às ' . date('H:i', $t) : '—'; };
 $statusLabels = ['accepted' => 'Aceito', 'declined' => 'Recusado', 'cancelled' => 'Encerrado', 'expired' => 'Expirado'];
 ?>
-<div style="font-size: 0.85rem; margin-bottom: 4px;"><a href="/agenda" style="color: var(--brand-copper-600);">← Voltar para a agenda</a></div>
+<div class="u-text-compact u-mb-1"><a href="/agenda" class="u-color-botanical-copper-600">← Voltar para a agenda</a></div>
 <h1>Pedidos de remarcação</h1>
 <p>Pedidos feitos pela paciente no app. A paciente escolheu um horário livre da sua disponibilidade; a consulta só muda quando você aceita.</p>
 <?php if ($flash): ?><p role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" data-testid="change-request-flash"><?= $e($flash['message']) ?></p><?php endif; ?>
@@ -23,7 +23,7 @@ $statusLabels = ['accepted' => 'Aceito', 'declined' => 'Recusado', 'cancelled' =
       <td><strong><?= $e($fmt($r['requested_scheduled_at'])) ?></strong><br><small><?= (int)$r['duration_minutes'] ?> minutos · pedido em <?= $e($fmt($r['created_at'])) ?></small></td>
       <td><?= $r['reason'] !== null && $r['reason'] !== '' ? $e($r['reason']) : '<small>Não informado</small>' ?></td>
       <td>
-        <form method="post" action="/agenda/pedidos-remarcacao/<?= (int)$r['id'] ?>/aceitar" style="margin-bottom: 8px;">
+        <form method="post" action="/agenda/pedidos-remarcacao/<?= (int)$r['id'] ?>/aceitar" class="u-mb-2">
           <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
           <button type="submit" class="btn btn-primary" data-testid="approve-request">Aceitar novo horário</button>
         </form>
@@ -31,7 +31,7 @@ $statusLabels = ['accepted' => 'Aceito', 'declined' => 'Recusado', 'cancelled' =
           <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
           <label for="decline-note-<?= (int)$r['id'] ?>"><small>Resposta para a paciente (opcional)</small></label>
           <input class="form-control" type="text" id="decline-note-<?= (int)$r['id'] ?>" name="decision_note" maxlength="300" placeholder="Ex.: esse horário não dá; me chame no chat">
-          <button type="submit" class="btn btn-secondary" style="margin-top: 6px;" data-testid="decline-request">Recusar</button>
+          <button type="submit" class="btn btn-secondary u-mt-1" data-testid="decline-request">Recusar</button>
         </form>
       </td>
     </tr>
@@ -41,7 +41,7 @@ $statusLabels = ['accepted' => 'Aceito', 'declined' => 'Recusado', 'cancelled' =
 </div>
 <?php endif; ?>
 <?php if ($recent): ?>
-<h2 style="margin-top: 24px;">Respondidos nos últimos 14 dias</h2>
+<h2 class="u-mt-6">Respondidos nos últimos 14 dias</h2>
 <div class="table-responsive card">
 <table class="table" data-testid="change-requests-recent">
   <caption class="sr-only">Pedidos de remarcação respondidos ou encerrados</caption>

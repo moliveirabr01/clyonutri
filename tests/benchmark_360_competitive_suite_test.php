@@ -192,7 +192,7 @@ try {
     assertBenchmark($sub > 0, "Substituição de alimento vinculada deve ser registrada");
 
     // Publicar Plano Atômico com Snapshot Imutável
-    $publishedPlan = $mealPlanService->publishPlan($planId, false, true);
+    $publishedPlan = $mealPlanService->publishPlan($planId, false, true, null, true, 'Autorizado clinicamente para teste benchmark 360');
     assertBenchmark(is_array($publishedPlan) && $publishedPlan['status'] === 'published', "Status do plano deve ser published");
     assertBenchmark((int)$publishedPlan['version'] === 1, "Versão publicada deve ser 1");
     logBenchmarkPass('MEAL_PLAN', 'Plano alimentar elaborado com TACO, substituições e publicado como v1 imutável');

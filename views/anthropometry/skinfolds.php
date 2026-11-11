@@ -19,6 +19,7 @@ $formAction = $correcting
     ? "/pacientes/{$patientId}/antropometria/dobras/{$correcting['id']}/corrigir"
     : "/pacientes/{$patientId}/antropometria/dobras";
 ?>
+<?= \ClyoNutri\Application\View\PatientHeader::render(\ClyoNutri\Core\Database\Connection::getInstance(),(int)$patientId,'avaliacoes') ?>
 <nav aria-label="Navegação" style="margin-bottom: var(--space-3); font-size: 0.9rem;">
   <a href="/pacientes/<?= $patientId ?>/antropometria">← Avaliação antropométrica</a>
 </nav>
@@ -28,7 +29,7 @@ $formAction = $correcting
 </p>
 
 <?php if ($flash): ?>
-  <div role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= $flash['type'] === 'error' ? '#C62828' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);">
+  <div role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" style="border-left: 4px solid <?= $flash['type'] === 'error' ? 'var(--semantic-error, #B42318)' : 'var(--semantic-success)' ?>; margin-bottom: var(--space-4);">
     <strong><?= $e($flash['message']) ?></strong>
     <?php if (!empty($flash['warnings'])): ?>
       <ul style="margin: 8px 0 0; padding-left: 20px;" data-testid="skinfold-warnings">
@@ -38,7 +39,7 @@ $formAction = $correcting
   </div>
 <?php endif; ?>
 
-<div class="card" style="margin-bottom: var(--space-4); font-size: 0.9rem; color: #334155;">
+<div class="card" style="margin-bottom: var(--space-4); font-size: 0.9rem; color: var(--neutral-gray-700, #344054);">
   Equações de dobras estimam a gordura corporal com erro típico de cerca de 3 a 4 pontos percentuais. Compare apenas medições do mesmo protocolo, feitas com a mesma técnica. O sistema não estima composição corporal por foto.
 </div>
 
@@ -77,9 +78,9 @@ $formAction = $correcting
   <?php endif; ?>
 
   <?php if (!$p || !$eligibleNow): ?>
-    <p role="status" style="color: #8F3D14;">Nenhum protocolo elegível com os dados atuais. <?= $p ? $e(Catalog::ineligibilityReason($protocol, $sex, $age)) : '' ?></p>
+    <p class="op-message op-message--info" role="status" style="color: var(--botanical-copper-700, #8F3D14);">Nenhum protocolo elegível com os dados atuais. <?= $p ? $e(Catalog::ineligibilityReason($protocol, $sex, $age)) : '' ?></p>
   <?php else: ?>
-  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.85rem; margin-bottom: 16px;" data-testid="protocol-provenance">
+  <div style="background: var(--neutral-gray-50, #F9FAFB); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 8px; padding: 12px; font-size: 0.85rem; margin-bottom: 16px;" data-testid="protocol-provenance">
     <strong><?= $e($p['name']) ?></strong><br>
     Equação: <?= $e($p['equation_text']) ?> · Conversão: <?= $e(Catalog::CONVERSIONS[$p['conversion']]['equation_text']) ?><br>
     População: <?= $e($p['population']) ?><br>
@@ -113,14 +114,14 @@ $formAction = $correcting
       </div>
     </div>
 
-    <fieldset style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+    <fieldset style="border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
       <legend style="padding: 0 6px; font-weight: 600;">Dobras (mm) — até 3 leituras por ponto</legend>
-      <p style="margin: 0 0 10px; font-size: 0.85rem; color: #475569;">Lado direito, pinçando pele e tecido subcutâneo. Com 3 leituras, o sistema usa a mediana; com 2, a média. Leituras que diferem mais de 5% geram alerta para repetir.</p>
+      <p style="margin: 0 0 10px; font-size: 0.85rem; color: var(--neutral-gray-600, #475467);">Lado direito, pinçando pele e tecido subcutâneo. Com 3 leituras, o sistema usa a mediana; com 2, a média. Leituras que diferem mais de 5% geram alerta para repetir.</p>
       <?php foreach ($p['sites'] as $site): $s = Catalog::SITES[$site]; ?>
-        <div style="display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(3, minmax(70px, 0.5fr)); gap: 8px; align-items: start; padding: 8px 0; border-top: 1px solid #f1f5f9;">
+        <div style="display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(3, minmax(70px, 0.5fr)); gap: 8px; align-items: start; padding: 8px 0; border-top: 1px solid var(--neutral-gray-100, #F4F5F6);">
           <div>
             <label class="form-label" for="skf-<?= $e($site) ?>-0" style="margin: 0;"><?= $e($s['label']) ?></label>
-            <small style="display: block; color: #64748b;"><?= $e($s['location']) ?></small>
+            <small style="display: block; color: var(--neutral-gray-500, #667085);"><?= $e($s['location']) ?></small>
           </div>
           <?php for ($i = 0; $i < 3; $i++): ?>
             <input class="form-control tabular-nums" type="text" inputmode="decimal" id="skf-<?= $e($site) ?>-<?= $i ?>" name="readings[<?= $e($site) ?>][]" value="<?= $e($prefill($site, $i)) ?>" aria-label="<?= $e($s['label']) ?>, leitura <?= $i + 1 ?> (mm)" <?= $i === 0 ? 'required' : '' ?> placeholder="<?= $i === 0 ? 'mm' : 'opcional' ?>">
@@ -156,7 +157,7 @@ $formAction = $correcting
     <?php foreach ($history as $h): ?>
       <li style="margin-bottom: 8px;">
         <strong>Versão <?= (int)$h['version'] ?></strong> (<?= $h['status'] === 'active' ? 'vigente' : 'substituída' ?>) · <?= $num($h['body_fat_pct']) ?>% · soma <?= $num($h['sum_mm']) ?> mm · por <?= $e($h['professional_name']) ?> em <?= $e(date('d/m/Y H:i', strtotime((string)$h['created_at']))) ?>
-        <?php if ($h['correction_reason']): ?><br><span style="color: #475569;">Motivo: <?= $e($h['correction_reason']) ?></span><?php endif; ?>
+        <?php if ($h['correction_reason']): ?><br><span style="color: var(--neutral-gray-600, #475467);">Motivo: <?= $e($h['correction_reason']) ?></span><?php endif; ?>
       </li>
     <?php endforeach; ?>
   </ol>
@@ -174,7 +175,7 @@ $formAction = $correcting
       <?php endforeach; ?>
     </p>
   <?php endif; ?>
-  <p style="margin: 0 0 8px; color: #475569;" data-testid="skinfold-summary"><?= $e($evolution['accessible_summary']) ?></p>
+  <p style="margin: 0 0 8px; color: var(--neutral-gray-600, #475467);" data-testid="skinfold-summary"><?= $e($evolution['accessible_summary']) ?></p>
   <?php $pts = $evolution['points']; ?>
   <?php if (count($pts) >= 2):
       $w = 640; $h = 220; $padL = 44; $padR = 36; $padT = 16; $padB = 32;
@@ -189,13 +190,13 @@ $formAction = $correcting
       <title id="skf-svg-title">% de gordura — <?= $e($evolution['protocol_name']) ?></title>
       <desc id="skf-svg-desc"><?= $e($evolution['accessible_summary']) ?></desc>
       <?php for ($t = 0; $t <= 4; $t++): $v = $min + ($max - $min) * $t / 4; ?>
-        <line x1="<?= $padL ?>" x2="<?= $w - $padR ?>" y1="<?= round($y($v), 1) ?>" y2="<?= round($y($v), 1) ?>" stroke="#e2e8f0" />
-        <text x="<?= $padL - 6 ?>" y="<?= round($y($v), 1) + 4 ?>" font-size="11" text-anchor="end" fill="#64748b"><?= $num($v, 0) ?>%</text>
+        <line x1="<?= $padL ?>" x2="<?= $w - $padR ?>" y1="<?= round($y($v), 1) ?>" y2="<?= round($y($v), 1) ?>" stroke="#E5E7EB" />
+        <text x="<?= $padL - 6 ?>" y="<?= round($y($v), 1) + 4 ?>" font-size="11" text-anchor="end" fill="#667085"><?= $num($v, 0) ?>%</text>
       <?php endfor; ?>
       <path d="<?= $path ?>" fill="none" stroke="#B04A1B" stroke-width="2" />
       <?php foreach ($pts as $i => $pt): ?>
         <circle cx="<?= round($x($i), 1) ?>" cy="<?= round($y($pt['body_fat_pct']), 1) ?>" r="4" fill="#B04A1B"><title><?= $e(date('d/m/Y', strtotime($pt['date']))) ?>: <?= $num($pt['body_fat_pct']) ?>% (soma <?= $num($pt['sum_mm']) ?> mm, versão <?= (int)$pt['version'] ?>, catálogo <?= $e($pt['catalog_version']) ?>)</title></circle>
-        <text x="<?= round($x($i), 1) ?>" y="<?= $h - 10 ?>" font-size="11" text-anchor="<?= $i === $n - 1 ? 'end' : ($i === 0 ? 'start' : 'middle') ?>" fill="#64748b"><?= $e(date('d/m/y', strtotime($pt['date']))) ?></text>
+        <text x="<?= round($x($i), 1) ?>" y="<?= $h - 10 ?>" font-size="11" text-anchor="<?= $i === $n - 1 ? 'end' : ($i === 0 ? 'start' : 'middle') ?>" fill="#667085"><?= $e(date('d/m/y', strtotime($pt['date']))) ?></text>
       <?php endforeach; ?>
     </svg>
   <?php endif; ?>
@@ -212,7 +213,7 @@ $formAction = $correcting
     </table>
   </div>
   <?php endif; ?>
-  <p style="font-size: 0.8rem; color: #64748b; margin: 8px 0 0;" data-testid="chart-provenance">Fonte dos valores: <?= $e($evolution['provenance']['equation']) ?>; <?= $e($evolution['provenance']['conversion']) ?>. <?= $e($evolution['provenance']['reference']) ?></p>
+  <p style="font-size: 0.8rem; color: var(--neutral-gray-500, #667085); margin: 8px 0 0;" data-testid="chart-provenance">Fonte dos valores: <?= $e($evolution['provenance']['equation']) ?>; <?= $e($evolution['provenance']['conversion']) ?>. <?= $e($evolution['provenance']['reference']) ?></p>
 </section>
 <?php endif; ?>
 
@@ -222,15 +223,15 @@ $formAction = $correcting
     <p style="color: var(--neutral-gray-500);">Nenhuma medição de dobras registrada.</p>
   <?php else: ?>
     <?php foreach ($measurements as $m): $mp = Catalog::PROTOCOLS[$m['protocol_code']] ?? null; ?>
-      <article style="border-top: 1px solid #f1f5f9; padding: 12px 0;" data-testid="skinfold-row-<?= (int)$m['id'] ?>">
+      <article style="border-top: 1px solid var(--neutral-gray-100, #F4F5F6); padding: 12px 0;" data-testid="skinfold-row-<?= (int)$m['id'] ?>">
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px;">
           <div>
             <strong><?= $e(date('d/m/Y', strtotime((string)$m['assessed_at']))) ?> · <?= $num($m['body_fat_pct']) ?>% de gordura</strong>
-            <span style="color: #475569;"> · <?= $e($mp['name'] ?? $m['protocol_code']) ?> · soma <?= $num($m['sum_mm']) ?> mm · densidade <?= $num($m['body_density'], 4) ?> g/mL</span>
-            <?php if ($m['fat_mass_kg'] !== null): ?><span style="color: #475569;"> · massa gorda <?= $num($m['fat_mass_kg']) ?> kg · massa magra <?= $num($m['lean_mass_kg']) ?> kg</span><?php endif; ?>
-            <br><small style="color: #64748b;">Por <?= $e($m['professional_name']) ?> · <?= $e($sexLabel[$m['equation_sex']] ?? $m['equation_sex']) ?>, <?= (int)$m['age_years'] ?> anos na equação · versão <?= (int)$m['version'] ?></small>
+            <span style="color: var(--neutral-gray-600, #475467);"> · <?= $e($mp['name'] ?? $m['protocol_code']) ?> · soma <?= $num($m['sum_mm']) ?> mm · densidade <?= $num($m['body_density'], 4) ?> g/mL</span>
+            <?php if ($m['fat_mass_kg'] !== null): ?><span style="color: var(--neutral-gray-600, #475467);"> · massa gorda <?= $num($m['fat_mass_kg']) ?> kg · massa magra <?= $num($m['lean_mass_kg']) ?> kg</span><?php endif; ?>
+            <br><small style="color: var(--neutral-gray-500, #667085);">Por <?= $e($m['professional_name']) ?> · <?= $e($sexLabel[$m['equation_sex']] ?? $m['equation_sex']) ?>, <?= (int)$m['age_years'] ?> anos na equação · versão <?= (int)$m['version'] ?></small>
             <?php if ($m['warnings']): ?>
-              <ul style="margin: 6px 0 0; padding-left: 20px; color: #8F3D14; font-size: 0.85rem;">
+              <ul style="margin: 6px 0 0; padding-left: 20px; color: var(--botanical-copper-700, #8F3D14); font-size: 0.85rem;">
                 <?php foreach ($m['warnings'] as $w): ?><li><?= $e($w['message']) ?></li><?php endforeach; ?>
               </ul>
             <?php endif; ?>
@@ -247,7 +248,7 @@ $formAction = $correcting
               <li><?= $e(Catalog::SITES[$site]['label'] ?? $site) ?>: <?= $num($s['value_mm']) ?> mm<?= count($s['readings']) > 1 ? ' (leituras: ' . $e(implode(' / ', array_map(fn($r) => $num($r), $s['readings']))) . ')' : '' ?></li>
             <?php endforeach; ?>
           </ul>
-          <p style="margin: 0; color: #475569;">
+          <p style="margin: 0; color: var(--neutral-gray-600, #475467);">
             <?= $e($m['provenance']['equation'] ?? '') ?> · <?= $e($m['provenance']['conversion'] ?? '') ?> · catálogo <?= $e($m['catalog_version']) ?><br>
             Coeficientes usados: <?= $e(json_encode($m['provenance']['coefficients_used'] ?? [], JSON_UNESCAPED_UNICODE)) ?><br>
             <?= $e($m['provenance']['reference'] ?? '') ?>

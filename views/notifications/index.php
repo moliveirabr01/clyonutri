@@ -14,7 +14,7 @@ $fmt = static function (string $dt): string {
 <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
   <div>
     <h1>Avisos</h1>
-    <p>Mensagens novas de pacientes e outros avisos do consultório. Para escolher o que também chega por e-mail, vá em <a href="/configuracoes#notification-settings">Configurações</a>.</p>
+    <p>Mensagens novas de pacientes e outros avisos do consultório. Para escolher o que também chega por e-mail, vá em <a href="/configuracoes?tab=paciente-app#notification-settings">Configurações</a>.</p>
   </div>
   <?php if (($inbox['unread_count'] ?? 0) > 0): ?>
   <form method="POST" action="/avisos/lidas">
@@ -25,7 +25,7 @@ $fmt = static function (string $dt): string {
 </div>
 
 <?php if (!empty($flash)): ?>
-<div class="alert alert-info" role="status"><?= $e($flash) ?></div>
+<div class="op-message op-message--info alert alert-info" role="status"><?= $e($flash) ?></div>
 <?php endif; ?>
 
 <div class="card" data-testid="notices-inbox">

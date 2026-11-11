@@ -123,6 +123,11 @@ class ClinicalRecordService
      * O registro original NUNCA é deletado ou alterado em seu conteúdo clínico,
      * apenas marcado como superado (is_retracted = 1) com justificativa formal registrada.
      */
+    /** Campos estruturados mantidos de uma versão para a retificação seguinte (NI2-220). */
+    private const REVISION_CARRIED_FIELDS = ['appointment_id', 'scheduled_at', 'concluded_at', 'weight_kg', 'waist_cm', 'category', 'scheduled_professional_id',
+        // v54.27: origem da evolução gravada na sala de teleconsulta
+        'source', 'teleconsultation_session_id', 'recorded_during_telehealth'];
+
     public function reviseRecord(int $targetRecordId, int $patientId, int $professionalId, string $reason, array $newContent): array
     {
         $clinicId = TenantContext::getClinicId();
@@ -144,7 +149,7 @@ class ClinicalRecordService
             $this->lockPatient($patientId, $clinicId);
             // Verificar registro alvo a ser retificado
             $targetStmt = $this->db->prepare("
-                SELECT id, title, version, is_retracted 
+                SELECT id, title, version, is_retracted, content_json
                 FROM clinical_records 
                 WHERE id = :id AND clinic_id = :clinic_id AND patient_id = :patient_id
             ");
@@ -157,6 +162,27 @@ class ClinicalRecordService
 
             if (!$target) {
                 throw new InvalidArgumentException("Registro clínico ID {$targetRecordId} não encontrado no histórico deste paciente.");
+            }
+            // NI2-233: só a versão vigente pode ser retificada. Formulário antigo ou duas abas retificando a mesma
+            // versão bifurcavam o histórico (duas versões vigentes superando o mesmo registro). O paciente já está
+            // travado acima, então a segunda tentativa concorrente enxerga is_retracted = 1 e para aqui.
+            if ((int)$target['is_retracted'] === 1) {
+                throw new InvalidArgumentException('Este registro já foi retificado. Recarregue o prontuário e retifique a versão vigente.');
+            }
+
+            // NI2-220: a retificação troca o texto, não apaga os dados estruturados da versão anterior
+            // (consulta de origem, data, peso e cintura aferidos, categoria). Valores novos têm prioridade.
+            $previousContent = json_decode((string)($target['content_json'] ?? ''), true);
+            if (is_array($previousContent)) {
+                // v54.27: registro em anotações/metas (sala de teleconsulta) continua nesse formato depois da retificação.
+                if (ClinicalRecordContent::present($previousContent)['structured'] && !array_key_exists('notes', $newContent) && array_key_exists('text', $newContent)) {
+                    $newContent['notes'] = $newContent['text'];
+                    unset($newContent['text']);
+                    if (!array_key_exists('goals', $newContent) && is_string($previousContent['goals'] ?? null)) {
+                        $newContent['goals'] = $previousContent['goals'];
+                    }
+                }
+                $newContent += array_intersect_key($previousContent, array_flip(self::REVISION_CARRIED_FIELDS));
             }
 
             // Marcar o anterior como superado (retração administrativa, sem alterar conteúdo histórico)
@@ -341,6 +367,11 @@ class ClinicalRecordService
     /**
      * Recupera o histórico completo cronológico de registros do paciente
      */
+    /**
+     * NI2-233: inclui previous_hash (elo da cadeia) e o CRN do autor. Sem o elo, a tela de
+     * autenticidade mostrava "Registro inicial" em todas as versões e a exportação não permitia
+     * conferir a cadeia fora do sistema.
+     */
     public function getPatientTimeline(int $patientId): array
     {
         $clinicId = TenantContext::getClinicId();
@@ -348,7 +379,8 @@ class ClinicalRecordService
 
         $stmt = $this->db->prepare("
             SELECT r.id, r.version, r.supersedes_id, r.revision_reason, r.title,
-                   r.content_json, r.record_hash, r.is_retracted, r.created_at,
+                   r.content_json, r.record_hash, r.previous_hash, r.is_retracted, r.created_at,
+                   r.professional_id, p.crn AS professional_crn, p.crn_region AS professional_crn_region,
                    u.name as professional_name
             FROM clinical_records r
             JOIN professionals p ON p.id = r.professional_id
@@ -362,7 +394,12 @@ class ClinicalRecordService
         ]);
 
         return array_map(function ($row) {
-            $row['content'] = json_decode($row['content_json'], true);
+            $decoded = json_decode((string)$row['content_json'], true);
+            $row['content'] = is_array($decoded) ? $decoded : null;
+            // v54.27: conteúdo que não é JSON válido segue como texto bruto, para a tela mostrar como texto simples.
+            if (!is_array($decoded) && trim((string)$row['content_json']) !== '') {
+                $row['content_unparsed'] = (string)$row['content_json'];
+            }
             unset($row['content_json']);
             return $row;
         }, $stmt->fetchAll());
@@ -434,8 +471,13 @@ class ClinicalRecordService
 
     private function validateRevisionContent(array $content): void
     {
-        if (array_key_exists('text', $content) && (!is_string($content['text']) || trim($content['text']) === '')) {
-            throw new InvalidArgumentException('O texto retificado é obrigatório.');
+        foreach (['text', 'notes'] as $k) {
+            if (array_key_exists($k, $content) && (!is_string($content[$k]) || trim($content[$k]) === '')) {
+                throw new InvalidArgumentException('O texto retificado é obrigatório.');
+            }
+        }
+        if (array_key_exists('goals', $content) && !is_string($content['goals'])) {
+            throw new InvalidArgumentException('As metas precisam ser texto.');
         }
         $hasContent = false;
         array_walk_recursive($content, static function ($value, $key) use (&$hasContent): void {
@@ -490,11 +532,14 @@ class ClinicalRecordService
     private function logClinicalAudit(int $clinicId, int $patientId, string $action, string $resourceId, array $meta): void
     {
         $stmt = $this->db->prepare("
-            INSERT INTO audit_logs (clinic_id, action, resource, resource_id, details)
-            VALUES (:clinic_id, :action, 'clinical_records', :res_id, :details)
+            INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details)
+            VALUES (:clinic_id, :user_id, :action, 'clinical_records', :res_id, :details)
         ");
+        // NI2-220 (I7): a trilha clínica guarda quem agiu (usuário da sessão), não só o profissional autor.
+        $userId = TenantContext::getUserId();
         $stmt->execute([
             'clinic_id' => $clinicId,
+            'user_id' => $userId ? (int)$userId : null,
             'action' => $action,
             'res_id' => $resourceId,
             'details' => json_encode(array_merge([

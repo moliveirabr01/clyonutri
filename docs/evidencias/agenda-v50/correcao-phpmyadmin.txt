@@ -1,0 +1,3 @@
+Correção: nomes de banco explícitos em DDL, migrations e filtros de information_schema.
+Verificação estática: todos os acessos às tabelas da aplicação nos três scripts estão qualificados.
+Testes MySQL anteriores referem-se à revisão anterior dos scripts.

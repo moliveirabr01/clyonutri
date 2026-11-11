@@ -31,6 +31,16 @@ DirectoryIndex index.php index.html
     RewriteCond %{HTTP_HOST} ^((www\.|staging\.)?clyonutri\.com(\.br)?)(:80)?$ [NC]
     RewriteRule ^ - [F,L]
 
+    # NI2-808 / ZAP-40025: Bloqueio de métodos de diagnóstico e proxy (TRACE, TRACK, CONNECT)
+    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK|CONNECT) [NC]
+    RewriteRule .* - [F,L]
+
+    # NI2-811: Detecção unificada de Rollback de HSTS (de ponta a ponta)
+    # Se o flag de rollback existir em storage/, ativa a variável HSTS_ROLLBACK para todo o servidor web
+    RewriteCond %{DOCUMENT_ROOT}/../storage/hsts_rollback -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/storage/hsts_rollback -f
+    RewriteRule ^ - [E=HSTS_ROLLBACK:1]
+
     # Repassa o cabeçalho Authorization (tokens da API) no Apache/HostGator
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -68,17 +78,29 @@ DirectoryIndex index.php index.html
     </IfModule>
 </FilesMatch>
 
-# NI2-429: cabeçalhos para o que o Apache serve direto (CSS, JS, imagens, SVG).
-# O PHP é a fonte única das páginas e da API (CSP com nonce, X-Frame-Options, HSTS configurável).
-# Correção v8: com PHP via FPM/CGI (HostGator), "Header setifempty" NÃO enxerga os cabeçalhos do PHP
-# e acrescentava uma 2ª CSP (form-action 'none') nas páginas, bloqueando o envio do login. Por isso
-# X-Frame-Options e a CSP estática ficam restritas aos arquivos estáticos (FilesMatch abaixo).
-# HSTS não é enviado aqui de propósito: o valor do rollout fica só no .env (HSTS_MAX_AGE).
+# O PHP define as políticas das páginas/API, inclusive no-referrer nos links sensíveis.
+# Apache só completa nosniff/referrer quando ausentes nas DUAS tabelas de resposta:
+# setifempty sozinho consulta apenas uma tabela e duplica os valores do PHP/FPM.
+# resp() consulta headers_out e err_headers_out, preservando também overrides do mod_php.
+# always mantém o fallback nos arquivos estáticos, redirects e erros nativos do Apache.
+# CSP e X-Frame-Options estáticos continuam restritos a arquivos estáticos.
+# HSTS é aplicado a assets estáticos servidos diretamente pelo Apache sob HTTPS (NI2-794 / ZAP 10035).
 <IfModule mod_headers.c>
-    Header setifempty X-Content-Type-Options "nosniff"
-    Header setifempty Referrer-Policy "strict-origin-when-cross-origin"
+    Header always setifempty X-Content-Type-Options "nosniff" "expr=-z resp('X-Content-Type-Options')"
+    Header always setifempty Referrer-Policy "strict-origin-when-cross-origin" "expr=-z resp('Referrer-Policy')"
+    # NI2-811: Se o rollback estiver ativo (storage/hsts_rollback), força max-age=0 em absolutamente TODAS as respostas (inclusive assets estáticos, redirecionamentos e erros 403/404)
+    Header always set Strict-Transport-Security "max-age=0" "expr=-f '%{DOCUMENT_ROOT}/../storage/hsts_rollback' || -f '%{DOCUMENT_ROOT}/storage/hsts_rollback' || -n reqenv('HSTS_ROLLBACK')"
+    # Se o rollback NÃO estiver ativo, aplica o baseline seguro de 86400 apenas quando o PHP não tiver emitido e o rollback não estiver ativo
+    Header always setifempty Strict-Transport-Security "max-age=86400" "expr=%{HTTPS} == 'on' && -z resp('Strict-Transport-Security') && ! -f '%{DOCUMENT_ROOT}/../storage/hsts_rollback' && ! -f '%{DOCUMENT_ROOT}/storage/hsts_rollback' && -z reqenv('HSTS_ROLLBACK')"
+    # NI2-809 / ZAP-10038: Garante baseline CSP em todas as respostas nativas do Apache (erros 406, 403, 404, 500)
+    Header always setifempty Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" "expr=-z resp('Content-Security-Policy')"
+    # NI2-812 / ZAP-10063: Garante baseline Permissions-Policy em respostas nativas do Apache
+    Header always setifempty Permissions-Policy "camera=(), microphone=(), display-capture=(), geolocation=(), payment=()" "expr=-z resp('Permissions-Policy')"
     <FilesMatch "\.(css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf|txt|webmanifest)$">
         Header set X-Frame-Options "DENY"
         Header set Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+        Header set Permissions-Policy "camera=(), microphone=(), display-capture=(), geolocation=(), payment=()"
+        Header set Cross-Origin-Resource-Policy "same-origin"
+        Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
     </FilesMatch>
 </IfModule>

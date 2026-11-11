@@ -1,6 +1,6 @@
 <div style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
   <div>
-    <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--admin-navy-900);">Trilha Imutável de Auditoria</h2>
+    <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--admin-navy-900);">Trilha imutável de auditoria</h2>
     <p style="font-size: 0.88rem; color: var(--admin-gray-500);">Registro criptográfico e sequencial de todas as operações administrativas e eventos de segurança.</p>
   </div>
 </div>
@@ -8,14 +8,17 @@
 <div class="admin-card">
   <div class="admin-card__header">
     <form action="/admin/auditoria" method="GET" style="display: flex; gap: 0.75rem; flex-wrap: wrap; width: 100%; max-width: 650px;">
-      <input type="text" name="action" value="<?= htmlspecialchars($_GET['action'] ?? '') ?>" placeholder="Filtrar por ação (ex: SECURITY, LOGIN, ADMIN)..." style="flex: 1; padding: 0.45rem 0.75rem; border: 1px solid var(--admin-gray-300); border-radius: 6px; font-size: 0.85rem;">
+      <input type="text" name="action" value="<?= htmlspecialchars($_GET['action'] ?? '') ?>" placeholder="Filtrar por ação (ex: SECURITY, LOGIN, ADMIN)..." style="flex: 1; padding: 0.45rem 0.75rem; border: 1px solid var(--border-input, #828B9B); border-radius: 6px; font-size: 0.85rem;">
+      <?php if (($pagination['per_page'] ?? 0) !== ($pagination['default_per_page'] ?? 0)): ?>
+        <input type="hidden" name="per_page" value="<?= (int)$pagination['per_page'] ?>">
+      <?php endif; ?>
       <button type="submit" class="btn btn--secondary btn--sm">Filtrar</button>
       <?php if (!empty($_GET['action'])): ?>
         <a href="/admin/auditoria" class="btn btn--secondary btn--sm">Limpar</a>
       <?php endif; ?>
     </form>
     <div style="font-size: 0.85rem; color: var(--admin-gray-500);">
-      Exibindo últimos <strong><?= count($auditLogs) ?></strong> registros
+      Total: <strong><?= (int)$pagination['total_records'] ?></strong> <?= (int)$pagination['total_records'] === 1 ? 'registro' : 'registros' ?>
     </div>
   </div>
 
@@ -24,14 +27,14 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Data / Hora</th>
-          <th>Ação / Evento</th>
+          <th>Data / hora</th>
+          <th>Ação / evento</th>
           <th>Recurso</th>
-          <th>ID Recurso</th>
-          <th>Usuário Responsável</th>
+          <th>ID recurso</th>
+          <th>Usuário responsável</th>
           <th>Clínica ID</th>
-          <th>IP Origem</th>
-          <th>Detalhes / Payload</th>
+          <th>IP origem</th>
+          <th>Detalhes / payload</th>
         </tr>
       </thead>
       <tbody>
@@ -59,4 +62,5 @@
       </tbody>
     </table>
   </div>
+  <?php require __DIR__ . '/_pagination.php'; ?>
 </div>

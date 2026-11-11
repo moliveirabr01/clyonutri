@@ -45,6 +45,51 @@ final class SubscriptionService
         return in_array($role, ['owner', 'admin'], true);
     }
 
+    public function getOnboardingPlans(): array
+    {
+        return $this->db->query("SELECT * FROM saas_plans WHERE is_active = 1 ORDER BY price_cents, id")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function canChooseOnboardingPlan(int $clinicId, int $userId): bool
+    {
+        if (!$this->canManageSubscription($clinicId, $userId)) {
+            return false;
+        }
+        $stmt = $this->db->prepare("SELECT status FROM clinic_subscriptions WHERE clinic_id = ?");
+        $stmt->execute([$clinicId]);
+        $status = $stmt->fetchColumn();
+        return $status === false || $status === 'trialing';
+    }
+
+    /** Called inside the onboarding transaction; never renews the trial or creates invoices. */
+    public function chooseOnboardingPlan(int $clinicId, int $userId, string $code): void
+    {
+        if (!$this->canChooseOnboardingPlan($clinicId, $userId)) {
+            throw new \DomainException('A seleção de plano exige um titular ou administrador em período de teste.');
+        }
+        $stmt = $this->db->prepare("SELECT * FROM saas_plans WHERE code = ? AND is_active = 1");
+        $stmt->execute([$code]);
+        $plan = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$plan) {
+            throw new \InvalidArgumentException('Selecione um plano disponível da Clyo Nutri.');
+        }
+        $stmt = $this->db->prepare("SELECT id FROM clinic_subscriptions WHERE clinic_id = ?");
+        $stmt->execute([$clinicId]);
+        if (!$stmt->fetchColumn()) {
+            $this->initializeDefaultSubscription($clinicId, $code);
+            return;
+        }
+        $stmt = $this->db->prepare("UPDATE clinic_subscriptions SET plan_id = ?, billing_cycle = ?, price_cents = ?, updated_at = CURRENT_TIMESTAMP WHERE clinic_id = ? AND status = 'trialing'");
+        $stmt->execute([$plan['id'], $plan['billing_cycle'], $plan['price_cents'], $clinicId]);
+        if ($stmt->rowCount() === 0) {
+            $check = $this->db->prepare("SELECT plan_id FROM clinic_subscriptions WHERE clinic_id = ? AND status = 'trialing'");
+            $check->execute([$clinicId]);
+            if ((int)$check->fetchColumn() !== (int)$plan['id']) {
+                throw new \DomainException('A assinatura mudou. Recarregue a página antes de selecionar o plano.');
+            }
+        }
+    }
+
     /**
      * Retorna a assinatura da clínica com plano, limites e consumo real.
      */
@@ -62,6 +107,10 @@ final class SubscriptionService
 
         if (!$sub) {
             $sub = $this->initializeDefaultSubscription($clinicId);
+            // v34: teste criado sob demanda (fora do cadastro) avisa o backoffice. Nunca lança.
+            if (!$this->db->inTransaction()) {
+                (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyTrialStarted($clinicId);
+            }
         }
 
         // Informações e cálculo do período de teste (trial)
@@ -308,17 +357,77 @@ final class SubscriptionService
      */
     public function getInvoices(int $clinicId, int $subscriptionId): array
     {
-        $stmt = $this->db->prepare("
-            SELECT * FROM subscription_invoices 
-            WHERE clinic_id = :clinic_id AND subscription_id = :sub_id 
-            ORDER BY due_date DESC, id DESC
-        ");
-        $stmt->execute([
-            'clinic_id' => $clinicId,
-            'sub_id' => $subscriptionId
-        ]);
+        // v54.51: junta o recibo do Asaas (mesma clínica) para expor receipt_url à view.
+        try {
+            $stmt = $this->db->prepare("
+                SELECT i.*, r.asaas_payment_id, r.receipt_url
+                FROM subscription_invoices i
+                LEFT JOIN asaas_payment_receipts r ON r.invoice_id = i.id AND r.clinic_id = i.clinic_id
+                WHERE i.clinic_id = :clinic_id AND i.subscription_id = :sub_id
+                ORDER BY i.due_date DESC, i.id DESC
+            ");
+            $stmt->execute(['clinic_id' => $clinicId, 'sub_id' => $subscriptionId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            // Banco sem a migração 89/90: lista as faturas sem link (não quebra a página).
+            $stmt = $this->db->prepare("
+                SELECT * FROM subscription_invoices
+                WHERE clinic_id = :clinic_id AND subscription_id = :sub_id
+                ORDER BY due_date DESC, id DESC
+            ");
+            $stmt->execute(['clinic_id' => $clinicId, 'sub_id' => $subscriptionId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $lookups = 0;
+        foreach ($rows as &$row) {
+            $url = isset($row['receipt_url']) ? (string)$row['receipt_url'] : '';
+            $pid = isset($row['asaas_payment_id']) ? (string)$row['asaas_payment_id'] : '';
+            if ($url === '' && $pid !== '' && $lookups < 3) {
+                $lookups++;
+                $url = (string)($this->resolveReceiptUrl($clinicId, $pid) ?? '');
+            }
+            $row['receipt_url'] = \ClyoNutri\Domain\Billing\AsaasReceiptUrl::isSafe($url) ? $url : null;
+            unset($row['asaas_payment_id']);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /** @var (callable(string):array)|null */
+    private $paymentFetcher = null;
+
+    /** Permite injetar a consulta GET /payments/{id} (testes). Padrão: AsaasClient com a chave do ambiente. */
+    public function setPaymentFetcher(?callable $fetcher): void
+    {
+        $this->paymentFetcher = $fetcher;
+    }
+
+    /** Fallback: consulta o Asaas e grava a URL se o gateway devolver uma válida. Falha = sem link. */
+    private function resolveReceiptUrl(int $clinicId, string $paymentId): ?string
+    {
+        if (preg_match('/^pay_[A-Za-z0-9]+$/', $paymentId) !== 1) {
+            return null; // ids locais/de teste (ex.: pay_test_3) não existem no gateway
+        }
+        try {
+            $fetch = $this->paymentFetcher;
+            if ($fetch === null) {
+                $cfg = \ClyoNutri\Domain\Billing\AsaasConfig::fromEnv();
+                if (!$cfg->hasApiKey()) {
+                    return null;
+                }
+                $client = new \ClyoNutri\Domain\Billing\AsaasClient($cfg);
+                $fetch = static fn(string $id): array => $client->getPayment($id);
+            }
+            $url = \ClyoNutri\Domain\Billing\AsaasReceiptUrl::pick((array)$fetch($paymentId));
+            if ($url !== null) {
+                $u = $this->db->prepare('UPDATE asaas_payment_receipts SET receipt_url = ? WHERE asaas_payment_id = ? AND clinic_id = ?');
+                $u->execute([$url, $paymentId, $clinicId]);
+            }
+            return $url;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
@@ -444,6 +553,10 @@ final class SubscriptionService
             throw $e;
         }
 
+        // v34: aviso ao backoffice depois do commit (nunca lança; o cancelamento já está gravado)
+        (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))
+            ->notifySubscriptionCanceled($clinicId, $protocol, (string)$subscription['current_period_end']);
+
         $effectiveUntilFormatted = (new \DateTimeImmutable($subscription['current_period_end']))->format('d/m/Y');
 
         return [
@@ -453,7 +566,7 @@ final class SubscriptionService
             'status' => 'canceled',
             'canceled_at' => $canceledAt,
             'effective_until' => $subscription['current_period_end'],
-            'message' => 'Assinatura cancelada com sucesso. Seu acesso continuará liberado até ' . $effectiveUntilFormatted . ', fim do ciclo faturado.'
+            'message' => 'Assinatura cancelada. Seu acesso continuará liberado até ' . $effectiveUntilFormatted . ', fim do ciclo faturado.'
         ];
     }
 

@@ -4,386 +4,334 @@ declare(strict_types=1);
 
 namespace ClyoNutri\Domain\Academy;
 
+use DomainException;
+use InvalidArgumentException;
 use PDO;
 
+/**
+ * NI2-663 · Acervo da Clyo Academy. Só metadados com proveniência (DOI/PMID, fonte, URL oficial, data de obtenção).
+ *
+ * Revisão de 03/11/2026 (code review do commit fae6581):
+ *  - sem semente: nenhum artigo nasce do código; o acervo entra pelo console editorial (e, depois, pelos conectores NI2-667);
+ *  - duplicata por DOI/PMID é recusada (não sobrescreve em silêncio);
+ *  - o texto do resumo só é guardado e exibido com licença declarada que permita (metadados ≠ direito de reproduzir);
+ *  - SQL portátil (SQLite e MySQL): upsert por SELECT seguido de UPDATE ou INSERT.
+ *
+ * v54.22: a biblioteca é só de leitura para as clínicas. O artigo nasce como rascunho no console da equipe da Clyo Nutri e
+ * só aparece para as clínicas depois de publicado; a equipe pode editar os metadados, arquivar e publicar de novo.
+ * Tudo o que a clínica enxerga passa por publishedOnly (busca, detalhe, vínculos com protocolos e favoritos).
+ */
 final class AcademyArticleService
 {
-    private PDO $db;
+    public const DESIGNS = [
+        'systematic_review' => 'Revisão sistemática', 'meta_analysis' => 'Metanálise', 'rct' => 'Ensaio clínico randomizado',
+        'clinical_guideline' => 'Diretriz clínica', 'cohort' => 'Coorte', 'case_control' => 'Caso-controle',
+        'cross_sectional' => 'Estudo transversal', 'case_report' => 'Relato de caso', 'narrative_review' => 'Revisão narrativa',
+        'preprint' => 'Preprint (não revisado por pares)', 'editorial' => 'Editorial ou opinião',
+    ];
+    public const ACCESS = ['open_access' => 'Acesso aberto', 'publisher_link' => 'No site do periódico', 'subscription' => 'Assinatura do periódico'];
+    public const SOURCES = ['pubmed' => 'PubMed', 'crossref' => 'Crossref', 'publisher' => 'Site do periódico', 'pmc' => 'PubMed Central'];
+    public const STATUS = ['draft' => 'Rascunho', 'published' => 'Publicado', 'archived' => 'Arquivado'];
+    public const RETRACTION = ['none' => 'Sem sinalização', 'corrected' => 'Correção publicada', 'expression_of_concern' => 'Manifestação de preocupação', 'retracted' => 'Retratado'];
 
-    public function __construct(PDO $db)
+    /** @var array<string, bool> */
+    private static array $ready = [];
+
+    public function __construct(private PDO $db)
     {
-        $this->db = $db;
     }
 
-    /**
-     * Busca artigos com filtros multifacetados.
-     *
-     * @param array{
-     *   q?: string,
-     *   study_design?: string,
-     *   access_type?: string,
-     *   condition_tag?: string,
-     *   year_min?: int,
-     *   year_max?: int,
-     *   has_evidence_sheet?: bool,
-     *   limit?: int,
-     *   offset?: int
-     * } $filters
-     * @return array{total: int, items: array<int, array<string, mixed>>}
-     */
+    /** A coluna de situação (migração 84) existe? Sem ela a Academy não abre para as clínicas. */
+    public static function ready(PDO $db): bool
+    {
+        $k = spl_object_hash($db);
+        if (!isset(self::$ready[$k])) {
+            try {
+                $db->query('SELECT status FROM academy_articles WHERE 1 = 0');
+                self::$ready[$k] = true;
+            } catch (\Throwable $e) {
+                self::$ready[$k] = false;
+            }
+        }
+        return self::$ready[$k];
+    }
+
+    /** @return array{total: int, items: list<array<string, mixed>>} */
     public function search(array $filters = []): array
     {
         $where = ['1=1'];
         $params = [];
-
+        if (empty($filters['include_unpublished'])) { // a clínica só enxerga o que a equipe publicou
+            $where[] = "status = 'published'";
+        }
         $q = trim((string)($filters['q'] ?? ''));
         if ($q !== '') {
-            $where[] = '(title LIKE ? OR authors LIKE ? OR journal LIKE ? OR abstract LIKE ? OR doi LIKE ? OR pmid LIKE ?)';
-            $like = '%' . $q . '%';
-            $params = array_merge($params, [$like, $like, $like, $like, $like, $like]);
+            $like = '%' . self::escapeLike(mb_substr($q, 0, 200, 'UTF-8')) . '%';
+            $where[] = "(title LIKE ? ESCAPE '!' OR authors LIKE ? ESCAPE '!' OR journal LIKE ? ESCAPE '!' OR doi LIKE ? ESCAPE '!' OR pmid LIKE ? ESCAPE '!')";
+            array_push($params, $like, $like, $like, $like, $like);
         }
-
-        $studyDesign = trim((string)($filters['study_design'] ?? ''));
-        if ($studyDesign !== '' && $studyDesign !== 'all') {
+        $design = (string)($filters['study_design'] ?? '');
+        if (isset(self::DESIGNS[$design])) {
             $where[] = 'study_design = ?';
-            $params[] = $studyDesign;
+            $params[] = $design;
         }
-
-        $accessType = trim((string)($filters['access_type'] ?? ''));
-        if ($accessType !== '' && $accessType !== 'all') {
+        $access = (string)($filters['access_type'] ?? '');
+        if (isset(self::ACCESS[$access])) {
             $where[] = 'access_type = ?';
-            $params[] = $accessType;
+            $params[] = $access;
         }
-
-        $conditionTag = trim((string)($filters['condition_tag'] ?? ''));
-        if ($conditionTag !== '' && $conditionTag !== 'all') {
-            $where[] = 'condition_tags LIKE ?';
-            $params[] = '%' . $conditionTag . '%';
+        $tag = self::normalizeTag((string)($filters['condition_tag'] ?? ''));
+        if ($tag !== '' && $tag !== 'all') { // etiqueta inteira, não pedaço de palavra
+            $where[] = $this->concat("','", 'condition_tags', "','") . " LIKE ? ESCAPE '!'";
+            $params[] = '%,' . self::escapeLike($tag) . ',%';
         }
-
-        if (!empty($filters['year_min']) && is_numeric($filters['year_min'])) {
-            $where[] = 'publication_year >= ?';
-            $params[] = (int)$filters['year_min'];
+        foreach (['year_min' => '>=', 'year_max' => '<='] as $k => $op) {
+            if (!empty($filters[$k]) && is_numeric($filters[$k])) {
+                $where[] = "publication_year $op ?";
+                $params[] = (int)$filters[$k];
+            }
         }
-
-        if (!empty($filters['year_max']) && is_numeric($filters['year_max'])) {
-            $where[] = 'publication_year <= ?';
-            $params[] = (int)$filters['year_max'];
-        }
-
         if (!empty($filters['has_evidence_sheet'])) {
             $where[] = 'has_evidence_sheet = 1';
         }
-
         $sqlWhere = implode(' AND ', $where);
-
-        // Contagem total
-        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM academy_articles WHERE $sqlWhere");
-        $countStmt->execute($params);
-        $total = (int)$countStmt->fetchColumn();
-
-        // Paginação
+        $c = $this->db->prepare("SELECT COUNT(*) FROM academy_articles WHERE $sqlWhere");
+        $c->execute($params);
         $limit = max(1, min(100, (int)($filters['limit'] ?? 20)));
         $offset = max(0, (int)($filters['offset'] ?? 0));
-
-        $selectStmt = $this->db->prepare(
-            "SELECT * FROM academy_articles WHERE $sqlWhere ORDER BY publication_year DESC, id DESC LIMIT $limit OFFSET $offset"
-        );
-        $selectStmt->execute($params);
-        $items = $selectStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-        return [
-            'total' => $total,
-            'items' => $items,
-        ];
+        $s = $this->db->prepare("SELECT * FROM academy_articles WHERE $sqlWhere ORDER BY publication_year DESC, id DESC LIMIT $limit OFFSET $offset");
+        $s->execute($params);
+        return ['total' => (int)$c->fetchColumn(), 'items' => $s->fetchAll(PDO::FETCH_ASSOC) ?: []];
     }
 
-    /**
-     * Obtém um artigo pelo ID.
-     */
     public function getById(int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM academy_articles WHERE id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: null;
+        $s = $this->db->prepare('SELECT * FROM academy_articles WHERE id = ?');
+        $s->execute([$id]);
+        return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Leitura do lado da clínica: só artigo publicado. */
+    public function getPublishedById(int $id): ?array
+    {
+        $s = $this->db->prepare("SELECT * FROM academy_articles WHERE id = ? AND status = 'published'");
+        $s->execute([$id]);
+        return $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** @return list<array<string, mixed>> Lista do console (todas as situações). */
+    public function listForConsole(int $limit = 200): array
+    {
+        $limit = max(1, min(500, $limit));
+        return $this->db->query("SELECT id, title, journal, publication_year, doi, pmid, study_design, retraction_status, has_evidence_sheet, retrieved_at, status
+            FROM academy_articles ORDER BY id DESC LIMIT $limit")->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
-     * Cadastra ou atualiza um artigo no acervo da Academy.
+     * Cadastro pelo console editorial. Exige proveniência mínima: DOI ou PMID, URL oficial https, fonte e data de obtenção.
      */
-    public function upsert(array $data): int
+    public function register(array $d, int $userId): int
     {
-        $title = trim((string)($data['title'] ?? ''));
-        if ($title === '') {
-            throw new \InvalidArgumentException('Título do artigo é obrigatório.');
-        }
-
-        $authors = trim((string)($data['authors'] ?? ''));
-        $journal = trim((string)($data['journal'] ?? ''));
-        $year = (int)($data['publication_year'] ?? date('Y'));
-        $studyDesign = trim((string)($data['study_design'] ?? 'rct'));
-        $accessType = trim((string)($data['access_type'] ?? 'publisher_link'));
-        $abstract = isset($data['abstract']) ? trim((string)$data['abstract']) : null;
-        $url = trim((string)($data['url'] ?? ''));
-        $pmid = !empty($data['pmid']) ? trim((string)$data['pmid']) : null;
-        $doi = !empty($data['doi']) ? trim((string)$data['doi']) : null;
-        $source = trim((string)($data['source'] ?? 'pubmed'));
-        $conditionTags = !empty($data['condition_tags']) ? trim((string)$data['condition_tags']) : null;
-        $hasEvidenceSheet = !empty($data['has_evidence_sheet']) ? 1 : 0;
-        $retractionStatus = trim((string)($data['retraction_status'] ?? 'none'));
+        $v = $this->validate($d);
+        $this->assertUnique($v, null);
         $now = date('Y-m-d H:i:s');
-
-        // Se já existe por DOI ou PMID, atualiza
-        $existingId = null;
-        if ($doi !== null) {
-            $stmt = $this->db->prepare('SELECT id FROM academy_articles WHERE doi = ?');
-            $stmt->execute([$doi]);
-            $existingId = $stmt->fetchColumn() ?: null;
-        }
-        if (!$existingId && $pmid !== null) {
-            $stmt = $this->db->prepare('SELECT id FROM academy_articles WHERE pmid = ?');
-            $stmt->execute([$pmid]);
-            $existingId = $stmt->fetchColumn() ?: null;
-        }
-
-        if ($existingId) {
-            $update = $this->db->prepare("
-                UPDATE academy_articles SET
-                    title = ?, authors = ?, journal = ?, publication_year = ?,
-                    study_design = ?, access_type = ?, abstract = ?, url = ?,
-                    source = ?, condition_tags = ?, has_evidence_sheet = ?,
-                    retraction_status = ?, updated_at = ?
-                WHERE id = ?
-            ");
-            $update->execute([
-                $title, $authors, $journal, $year, $studyDesign, $accessType,
-                $abstract, $url, $source, $conditionTags, $hasEvidenceSheet,
-                $retractionStatus, $now, (int)$existingId
-            ]);
-            return (int)$existingId;
-        }
-
-        $insert = $this->db->prepare("
-            INSERT INTO academy_articles (
-                pmid, doi, title, authors, journal, publication_year,
-                study_design, access_type, abstract, url, source,
-                condition_tags, has_evidence_sheet, retraction_status,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $insert->execute([
-            $pmid, $doi, $title, $authors, $journal, $year,
-            $studyDesign, $accessType, $abstract, $url, $source,
-            $conditionTags, $hasEvidenceSheet, $retractionStatus,
-            $now, $now
-        ]);
-
+        $this->db->prepare("INSERT INTO academy_articles (pmid, doi, title, authors, journal, publication_year, study_design, access_type, abstract, url, source,
+            condition_tags, has_evidence_sheet, retraction_status, license, retrieved_at, created_by_user_id, created_at, updated_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'draft')")
+            ->execute([$v['pmid'], $v['doi'], $v['title'], $v['authors'], $v['journal'], $v['year'], $v['design'], $v['access'], $v['abstract'], $v['url'],
+                $v['source'], $v['tags'], $v['retraction'], $v['license'], $v['retrieved_at'], $userId, $now, $now]);
         return (int)$this->db->lastInsertId();
     }
 
-    /**
-     * Vincula um artigo a um protocolo clínico (NI2-635).
-     */
-    public function linkToProtocol(string $protocolCode, int $articleId, ?string $relevanceNote = null): bool
+    /** Edição dos metadados pela equipe (mesmas regras do cadastro; a situação e a sinalização não mudam aqui). */
+    public function update(int $id, array $d): void
     {
-        $stmt = $this->db->prepare("
-            INSERT OR REPLACE INTO academy_protocol_links (protocol_code, article_id, relevance_note, created_at)
-            VALUES (?, ?, ?, ?)
-        ");
-        return $stmt->execute([
-            $protocolCode,
-            $articleId,
-            $relevanceNote,
-            date('Y-m-d H:i:s')
-        ]);
+        $cur = $this->getById($id);
+        if (!$cur) {
+            throw new DomainException('Artigo não encontrado.');
+        }
+        $v = $this->validate($d + ['retraction_status' => $cur['retraction_status']]);
+        $this->assertUnique($v, $id);
+        $this->db->prepare('UPDATE academy_articles SET pmid = ?, doi = ?, title = ?, authors = ?, journal = ?, publication_year = ?, study_design = ?, access_type = ?,
+            abstract = ?, url = ?, source = ?, condition_tags = ?, license = ?, retrieved_at = ?, updated_at = ? WHERE id = ?')
+            ->execute([$v['pmid'], $v['doi'], $v['title'], $v['authors'], $v['journal'], $v['year'], $v['design'], $v['access'], $v['abstract'], $v['url'],
+                $v['source'], $v['tags'], $v['license'], $v['retrieved_at'], date('Y-m-d H:i:s'), $id]);
     }
 
-    /**
-     * Retorna os artigos vinculados a um protocolo clínico específico.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public function getArticlesForProtocol(string $protocolCode): array
+    /** Publicar (rascunho ou arquivado → publicado) ou arquivar (publicado ou rascunho → arquivado). Devolve a situação anterior. */
+    public function setStatus(int $id, string $status): string
     {
-        $stmt = $this->db->prepare("
-            SELECT a.*, l.relevance_note, l.created_at as linked_at
-            FROM academy_protocol_links l
-            JOIN academy_articles a ON a.id = l.article_id
-            WHERE l.protocol_code = ?
-            ORDER BY a.publication_year DESC, a.id DESC
-        ");
-        $stmt->execute([$protocolCode]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!in_array($status, ['published', 'archived'], true)) {
+            throw new InvalidArgumentException('Situação inválida.');
+        }
+        $cur = $this->getById($id);
+        if (!$cur) {
+            throw new DomainException('Artigo não encontrado.');
+        }
+        if ($cur['status'] === $status) {
+            throw new DomainException($status === 'published' ? 'O artigo já está publicado.' : 'O artigo já está arquivado.');
+        }
+        $this->db->prepare('UPDATE academy_articles SET status = ?, updated_at = ? WHERE id = ?')->execute([$status, date('Y-m-d H:i:s'), $id]);
+        return (string)$cur['status'];
     }
 
-    /**
-     * Gera citação do artigo em formatos acadêmicos padronizados (ABNT, Vancouver, BibTeX).
-     *
-     * @return array{abnt: string, vancouver: string, bibtex: string}
-     */
+    private function assertUnique(array $v, ?int $selfId): void
+    {
+        foreach (['doi' => $v['doi'], 'pmid' => $v['pmid']] as $col => $val) {
+            if ($val !== null) {
+                $s = $this->db->prepare("SELECT id FROM academy_articles WHERE $col = ? AND id <> ?");
+                $s->execute([$val, $selfId ?? 0]);
+                if ($dup = $s->fetchColumn()) {
+                    throw new DomainException(strtoupper($col) . ' já está no acervo (artigo #' . (int)$dup . '). Atualize o registro existente.');
+                }
+            }
+        }
+    }
+
+    /** Sinalização de correção/retratação (informada pela fonte). */
+    public function setRetraction(int $id, string $status): void
+    {
+        if (!isset(self::RETRACTION[$status])) {
+            throw new InvalidArgumentException('Sinalização inválida.');
+        }
+        if (!$this->getById($id)) {
+            throw new DomainException('Artigo não encontrado.');
+        }
+        $this->db->prepare('UPDATE academy_articles SET retraction_status = ?, updated_at = ? WHERE id = ?')->execute([$status, date('Y-m-d H:i:s'), $id]);
+    }
+
+    /** Vínculo a um protocolo da NI2-635 (código existente no catálogo). Portátil: confere e atualiza ou insere. */
+    public function linkToProtocol(string $protocolCode, int $articleId, ?string $note, ?int $userId = null): void
+    {
+        $protocolCode = trim($protocolCode);
+        if (!preg_match('/^[a-z][a-z0-9_]{2,59}$/', $protocolCode)) {
+            throw new InvalidArgumentException('Código de protocolo inválido.');
+        }
+        $p = $this->db->prepare('SELECT 1 FROM clinical_protocols WHERE code = ?');
+        $p->execute([$protocolCode]);
+        if (!$p->fetchColumn()) {
+            throw new DomainException('Protocolo não encontrado no catálogo.');
+        }
+        if (!$this->getById($articleId)) {
+            throw new DomainException('Artigo não encontrado.');
+        }
+        $note = $note !== null ? mb_substr(trim($note), 0, 255, 'UTF-8') : null;
+        $s = $this->db->prepare('SELECT id FROM academy_protocol_links WHERE protocol_code = ? AND article_id = ?');
+        $s->execute([$protocolCode, $articleId]);
+        if ($id = $s->fetchColumn()) {
+            $this->db->prepare('UPDATE academy_protocol_links SET relevance_note = ? WHERE id = ?')->execute([$note, $id]);
+            return;
+        }
+        $this->db->prepare('INSERT INTO academy_protocol_links (protocol_code, article_id, relevance_note, created_by_user_id, created_at) VALUES (?, ?, ?, ?, ?)')
+            ->execute([$protocolCode, $articleId, $note, $userId, date('Y-m-d H:i:s')]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function getArticlesForProtocol(string $protocolCode, bool $publishedOnly = true): array
+    {
+        $s = $this->db->prepare('SELECT a.id, a.title, a.authors, a.journal, a.publication_year, a.study_design, a.doi, a.pmid, a.url, a.retraction_status,
+            l.relevance_note, l.created_at AS linked_at FROM academy_protocol_links l JOIN academy_articles a ON a.id = l.article_id
+            WHERE l.protocol_code = ?' . ($publishedOnly ? " AND a.status = 'published'" : '') . ' ORDER BY a.publication_year DESC, a.id DESC');
+        $s->execute([$protocolCode]);
+        return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** O resumo só aparece quando a licença declarada permite reprodução. */
+    public static function abstractVisible(array $a): bool
+    {
+        return trim((string)($a['abstract'] ?? '')) !== '' && trim((string)($a['license'] ?? '')) !== '';
+    }
+
+    /** @return array{abnt: string, vancouver: string, bibtex: string} */
     public function formatCitations(array $article): array
     {
-        $authors = (string)($article['authors'] ?? 'Autor Desconhecido');
+        $authorsRaw = trim((string)($article['authors'] ?? ''));
+        $list = array_values(array_filter(array_map('trim', explode(';', $authorsRaw)), static fn($x) => $x !== ''));
+        $first = $list[0] ?? 'Autoria não informada';
         $title = rtrim((string)($article['title'] ?? ''), '.');
         $journal = (string)($article['journal'] ?? '');
         $year = (string)($article['publication_year'] ?? '');
         $doi = (string)($article['doi'] ?? '');
         $url = (string)($article['url'] ?? '');
-
-        // Formatação ABNT
-        $firstAuthor = explode(',', $authors)[0] ?? $authors;
-        $abntAuthors = mb_strtoupper(trim($firstAuthor));
-        if (str_contains($authors, ';') || str_contains($authors, ',')) {
-            $abntAuthors .= ' et al.';
-        }
-        $abntDoi = $doi !== '' ? " Disponível em: <https://doi.org/$doi>." : ($url !== '' ? " Disponível em: <$url>." : '');
-        $abnt = "{$abntAuthors} {$title}. {$journal}, {$year}.{$abntDoi}";
-
-        // Formatação Vancouver
-        $vancouverDoi = $doi !== '' ? " doi: $doi." : '';
-        $vancouver = "{$authors}. {$title}. {$journal}. {$year};{$vancouverDoi}";
-
-        // BibTeX
-        $cleanKey = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(explode(' ', $firstAuthor)[0] ?? 'artigo')) . $year;
-        $bibtex = "@article{{$cleanKey},\n" .
-            "  title = {{$title}},\n" .
-            "  author = {{$authors}},\n" .
-            "  journal = {{$journal}},\n" .
-            "  year = {{$year}}" .
-            ($doi !== '' ? ",\n  doi = {{$doi}}" : "") .
-            ($url !== '' ? ",\n  url = {{$url}}" : "") .
-            "\n}";
-
-        return [
-            'abnt' => $abnt,
-            'vancouver' => $vancouver,
-            'bibtex' => $bibtex,
-        ];
+        $abntAuthors = mb_strtoupper($first, 'UTF-8') . (count($list) > 3 ? ' et al.' : (count($list) > 1 ? '; ' . mb_strtoupper(implode('; ', array_slice($list, 1)), 'UTF-8') : ''));
+        $where = $doi !== '' ? " DOI: https://doi.org/$doi." : ($url !== '' ? " Disponível em: $url." : '');
+        $vanc = count($list) > 6 ? implode(', ', array_slice($list, 0, 6)) . ', et al' : implode(', ', $list);
+        $key = (preg_replace('/[^a-z0-9]/', '', strtolower(explode(',', $first)[0])) ?: 'artigo') . $year;
+        $bib = "@article{{$key},\n  title = {{$title}},\n  author = {" . implode(' and ', $list) . "},\n  journal = {{$journal}},\n  year = {{$year}}"
+            . ($doi !== '' ? ",\n  doi = {{$doi}}" : '') . ($url !== '' ? ",\n  url = {{$url}}" : '') . "\n}";
+        return ['abnt' => "$abntAuthors. $title. $journal, $year.$where", 'vancouver' => "$vanc. $title. $journal. $year;" . ($doi !== '' ? " doi:$doi" : ''), 'bibtex' => $bib];
     }
 
-    /**
-     * Rótulo em português para cada desenho de estudo.
-     */
     public static function studyDesignLabel(string $design): string
     {
-        return match ($design) {
-            'systematic_review' => 'Revisão Sistemática',
-            'meta_analysis' => 'Metanálise',
-            'rct' => 'Ensaio Clínico Randomizado (ECR)',
-            'clinical_guideline' => 'Diretriz Clínica Baseada em Evidências',
-            'cohort' => 'Estudo de Coorte Observacional',
-            'case_control' => 'Caso-Controle',
-            'cross_sectional' => 'Transversal',
-            'preprint' => 'Preprint (Não Revisado por Pares)',
-            'editorial' => 'Comentário Editorial / Opinião',
-            default => 'Estudo Científico'
-        };
+        return self::DESIGNS[$design] ?? 'Estudo';
     }
 
-    /**
-     * Semente de artigos essenciais para a Academy se o banco estiver vazio.
-     */
-    public function seedIfEmpty(): void
+    private function validate(array $d): array
     {
-        $count = (int)$this->db->query("SELECT COUNT(*) FROM academy_articles")->fetchColumn();
-        if ($count > 0) {
-            return;
+        $s = static fn(string $k): string => trim((string)($d[$k] ?? ''));
+        $title = $s('title');
+        $authors = $s('authors');
+        $journal = $s('journal');
+        if ($title === '' || $authors === '' || $journal === '') {
+            throw new InvalidArgumentException('Título, autores (separados por ";") e periódico são obrigatórios.');
         }
-
-        $seeds = [
-            [
-                'pmid' => '30487102',
-                'doi' => '10.1016/S0140-6736(18)31808-7',
-                'title' => 'Carbohydrate quality and human health: a series of systematic reviews and meta-analyses',
-                'authors' => 'Reynolds, Andrew; Mann, Jim; Cummings, John; Winter, Nicola; Mete, Evelyn; Te Morenga, Lisa',
-                'journal' => 'The Lancet',
-                'publication_year' => 2019,
-                'study_design' => 'meta_analysis',
-                'access_type' => 'open_access',
-                'abstract' => 'Evidências de estudos prospectivos e ensaios clínicos demonstraram que a ingestão elevada de fibras alimentares (25-29 g/dia) está associada a reduções significativas na mortalidade por todas as causas e risco de diabetes tipo 2, doenças cardiovasculares e câncer colorretal.',
-                'url' => 'https://doi.org/10.1016/S0140-6736(18)31808-7',
-                'source' => 'pubmed',
-                'condition_tags' => 'diabetes,cardiovascular,obesidade',
-                'has_evidence_sheet' => 1,
-            ],
-            [
-                'pmid' => '29801004',
-                'doi' => '10.1056/NEJMoa1800389',
-                'title' => 'Primary Prevention of Cardiovascular Disease with a Mediterranean Diet Supplemented with Extra-Virgin Olive Oil or Nuts',
-                'authors' => 'Estruch, Ramón; Ros, Emilio; Salas-Salvadó, Jordi; Covas, Maria-Isabel; Corella, Dolores; Arós, Fernando; Gómez-Gracia, Enrique; Ruiz-Gutiérrez, Valentina; Fiol, Miquel; Lapetra, José; et al.',
-                'journal' => 'New England Journal of Medicine (NEJM)',
-                'publication_year' => 2018,
-                'study_design' => 'rct',
-                'access_type' => 'open_access',
-                'abstract' => 'Ensaio clínico randomizado multicêntrico avaliando a dieta mediterrânea suplementada com azeite de oliva extravirgem ou castanhas na prevenção primária de eventos cardiovasculares maiores em participantes com alto risco cardiovascular.',
-                'url' => 'https://doi.org/10.1056/NEJMoa1800389',
-                'source' => 'pubmed',
-                'condition_tags' => 'hipertensao,cardiovascular,dislipidemia',
-                'has_evidence_sheet' => 1,
-            ],
-            [
-                'pmid' => '33358055',
-                'doi' => '10.1111/jhn.12845',
-                'title' => 'Celiac disease and gluten-free diet: Nutritional adequacy, gut microbiota and long-term implications',
-                'authors' => 'Staudacher, Heidi M.; Gibson, Peter R.; Whelan, Kevin',
-                'journal' => 'Journal of Human Nutrition and Dietetics',
-                'publication_year' => 2021,
-                'study_design' => 'systematic_review',
-                'access_type' => 'publisher_link',
-                'abstract' => 'Revisão sistemática sobre o impacto nutricional e na microbiota intestinal da dieta isenta de glúten em pacientes com doença celíaca confirmada, com ênfase na ingestão de micronutrientes (ferro, folato, zinco, cálcio) e fibras.',
-                'url' => 'https://doi.org/10.1111/jhn.12845',
-                'source' => 'pubmed',
-                'condition_tags' => 'celiaca,gastroenterologia',
-                'has_evidence_sheet' => 1,
-            ],
-            [
-                'pmid' => '32732152',
-                'doi' => '10.1053/j.ajkd.2020.05.006',
-                'title' => 'KDOQI Clinical Practice Guideline for Nutrition in CKD: 2020 Update',
-                'authors' => 'Ikizler, T. Alp; Burrowes, Jerrilynn D.; Byham-Gray, Laura D.; Campbell, Katrina L.; Carrero, Juan-Jesus; Chan, Wai; Fouque, Denis; Friedman, Allon N.; Ghaddar, Sahar; Goldstein-Fuchs, Debra J.; et al.',
-                'journal' => 'American Journal of Kidney Diseases (AJKD)',
-                'publication_year' => 2020,
-                'study_design' => 'clinical_guideline',
-                'access_type' => 'open_access',
-                'abstract' => 'Diretrizes clínicas baseadas em evidências para terapia nutricional na Doença Renal Crônica (DRC estágios 1 a 5), incluindo recomendações de aporte proteico, calórico, fósforo, potássio e sódio.',
-                'url' => 'https://doi.org/10.1053/j.ajkd.2020.05.006',
-                'source' => 'pubmed',
-                'condition_tags' => 'renal,hipertensao',
-                'has_evidence_sheet' => 1,
-            ],
-            [
-                'pmid' => '31974140',
-                'doi' => '10.2337/dc20-S005',
-                'title' => 'Facilitating Behavior Change and Well-being to Improve Health Outcomes: Standards of Medical Care in Diabetes—2020',
-                'authors' => 'American Diabetes Association (ADA)',
-                'journal' => 'Diabetes Care',
-                'publication_year' => 2020,
-                'study_design' => 'clinical_guideline',
-                'access_type' => 'open_access',
-                'abstract' => 'Padrões de cuidados médicos e conduta nutricional individualizada para pacientes com diabetes mellitus tipo 1 e tipo 2, contagem de carboidratos, metas glicêmicas e prevenção de hipoglicemia.',
-                'url' => 'https://doi.org/10.2337/dc20-S005',
-                'source' => 'pubmed',
-                'condition_tags' => 'diabetes,obesidade',
-                'has_evidence_sheet' => 1,
-            ],
-        ];
-
-        foreach ($seeds as $seed) {
-            $id = $this->upsert($seed);
-            // Vincular às condições dos protocolos clínicos
-            if (str_contains($seed['condition_tags'], 'diabetes')) {
-                $this->linkToProtocol('diabetes', $id, 'Evidência de referência para manejo glicêmico e qualidade de carboidratos.');
-            }
-            if (str_contains($seed['condition_tags'], 'hipertensao')) {
-                $this->linkToProtocol('hipertensao', $id, 'Evidência classe A para prevenção cardiovascular e controle pressórico.');
-            }
-            if (str_contains($seed['condition_tags'], 'celiaca')) {
-                $this->linkToProtocol('celiaca', $id, 'Diretriz de adequação nutricional na dieta sem glúten estrita.');
-            }
-            if (str_contains($seed['condition_tags'], 'renal')) {
-                $this->linkToProtocol('renal', $id, 'KDOQI guideline: padrão-ouro de prescrição proteica na DRC.');
-            }
+        $year = (int)$s('publication_year');
+        if ($year < 1800 || $year > (int)date('Y') + 1) {
+            throw new InvalidArgumentException('Ano de publicação inválido.');
         }
+        $doi = $s('doi') !== '' ? preg_replace('#^https?://(dx\.)?doi\.org/#i', '', $s('doi')) : null;
+        if ($doi !== null && !preg_match('#^10\.\d{4,9}/\S{1,110}$#', $doi)) {
+            throw new InvalidArgumentException('DOI inválido (ex.: 10.1016/S0140-6736(18)31809-9).');
+        }
+        $pmid = $s('pmid') !== '' ? $s('pmid') : null;
+        if ($pmid !== null && !preg_match('/^\d{1,9}$/', $pmid)) {
+            throw new InvalidArgumentException('PMID deve ter só números.');
+        }
+        if ($doi === null && $pmid === null) {
+            throw new InvalidArgumentException('Informe DOI ou PMID: sem identificador não há como conferir a referência.');
+        }
+        $url = $s('url');
+        if (!preg_match('#^https://[^\s"<>]{4,490}$#', $url)) {
+            throw new InvalidArgumentException('URL oficial deve começar com https://.');
+        }
+        $design = $s('study_design');
+        $access = $s('access_type') ?: 'publisher_link';
+        $source = $s('source');
+        if (!isset(self::DESIGNS[$design]) || !isset(self::ACCESS[$access]) || !isset(self::SOURCES[$source])) {
+            throw new InvalidArgumentException('Escolha desenho do estudo, tipo de acesso e fonte da lista.');
+        }
+        $retrieved = $s('retrieved_at');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $retrieved) || strtotime($retrieved) === false || $retrieved > date('Y-m-d')) {
+            throw new InvalidArgumentException('Informe a data em que os metadados foram conferidos na fonte.');
+        }
+        $license = $s('license') !== '' ? mb_substr($s('license'), 0, 60, 'UTF-8') : null;
+        $abstract = $s('abstract') !== '' ? $s('abstract') : null;
+        if ($abstract !== null && $license === null) {
+            throw new InvalidArgumentException('O resumo só pode ser guardado com a licença que permite reproduzi-lo (ex.: CC BY 4.0). Sem licença, deixe só o link.');
+        }
+        $retraction = $s('retraction_status') ?: 'none';
+        if (!isset(self::RETRACTION[$retraction])) {
+            throw new InvalidArgumentException('Sinalização inválida.');
+        }
+        $tags = array_values(array_unique(array_filter(array_map([self::class, 'normalizeTag'], explode(',', $s('condition_tags'))))));
+        return ['title' => mb_substr($title, 0, 500, 'UTF-8'), 'authors' => $authors, 'journal' => mb_substr($journal, 0, 255, 'UTF-8'), 'year' => $year,
+            'doi' => $doi, 'pmid' => $pmid, 'url' => $url, 'design' => $design, 'access' => $access, 'source' => $source, 'retrieved_at' => $retrieved,
+            'license' => $license, 'abstract' => $abstract, 'retraction' => $retraction, 'tags' => $tags ? mb_substr(implode(',', $tags), 0, 255, 'UTF-8') : null];
+    }
+
+    private static function normalizeTag(string $t): string
+    {
+        return trim((string)preg_replace('/[^a-z0-9_]+/', '_', strtolower(trim($t))), '_');
+    }
+
+    private static function escapeLike(string $s): string
+    {
+        return strtr($s, ['!' => '!!', '%' => '!%', '_' => '!_']);
+    }
+
+    private function concat(string ...$parts): string
+    {
+        return $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? 'CONCAT(' . implode(', ', $parts) . ')' : implode(' || ', $parts);
     }
 }

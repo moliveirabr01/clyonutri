@@ -1,0 +1,28 @@
+PASS: team creation queues without SMTP
+PASS: pending wording and explicit timezone
+PASS: worker sends to authenticated portal
+PASS: repeated drain does not send again
+PASS: confirmation transition publishes canonical event
+PASS: repeated confirmation is idempotent
+PASS: manual action reuses automatic event
+PASS: confirmed template is distinct
+PASS: outer transaction includes queued event
+PASS: rollback removes both appointment and event
+PASS: conflict does not publish
+PASS: cancellation before dispatch suppresses message
+PASS: reschedule before dispatch suppresses old message
+PASS: mail failure is observable and retryable
+PASS: retry succeeds without undoing appointment
+PASS: public booking publishes in its transaction
+PASS: converted hold retry is idempotent
+PASS: expired hold does not publish
+PASS: wrong recipient cannot receive confirmation
+PASS: rejected public request does not publish
+PASS: concurrent worker completed
+PASS: concurrent worker completed
+PASS: concurrent cron workers send queued booking once
+PASS: cross-clinic publication rejected
+PASS: retries are bounded and terminate in failed
+PASS: preview matches template, modality included, clinical notes excluded
+PASS: outbox unavailable rolls back appointment
+All ET06 integration checks passed.

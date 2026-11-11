@@ -8,7 +8,11 @@ final class ProfessionalProfile
     public function __construct(private PDO $db) {}
     public function read(bool $lock = false): array
     {
-        $query = "SELECT u.name, u.email, u.phone, COALESCE(op.practice_preferences, '{}') AS practice_preferences, p.specialty, p.bio, p.crn, p.crn_region, c.name AS clinic_name, cm.role AS member_role
+        $query = "SELECT u.name, u.email, u.phone, COALESCE(op.practice_preferences, '{}') AS practice_preferences, p.specialty, p.bio, p.crn, p.crn_region, c.name AS clinic_name, c.email AS clinic_email, c.document AS clinic_document, c.phone AS clinic_phone,
+            c.address_street AS clinic_address_street, c.address_number AS clinic_address_number,
+            c.address_complement AS clinic_address_complement, c.address_neighborhood AS clinic_address_neighborhood,
+            c.address_city AS clinic_address_city, c.address_state AS clinic_address_state, c.address_zip AS clinic_address_zip,
+            cm.role AS member_role
             FROM users u JOIN professionals p ON p.user_id=u.id
             JOIN clinic_members cm ON cm.user_id=u.id JOIN clinics c ON c.id=cm.clinic_id
             LEFT JOIN onboarding_progress op ON op.user_id=u.id AND op.clinic_id=cm.clinic_id
@@ -26,16 +30,37 @@ final class ProfessionalProfile
         try {
             $current=$this->read(true);
             if (!is_string($input['revision']??null)||!hash_equals(self::revision($current),$input['revision'])) throw new \DomainException('O perfil mudou em outra aba. Recarregue e confira os valores atuais.');
-            $data=[];foreach(['name'=>120,'specialty'=>100,'bio'=>2000,'clinic_name'=>150] as $field=>$max){
-                if(!is_string($input[$field]??null)) throw new \InvalidArgumentException('Confira os campos do perfil.');
-                $data[$field]=trim($input[$field]);if(mb_strlen($data[$field])>$max) throw new \InvalidArgumentException('O campo '.$field.' excede o limite permitido.');
+            $data=[];foreach(['name'=>120,'specialty'=>100,'bio'=>2000,'clinic_name'=>150,'clinic_document'=>20] as $field=>$max){
+                $value=$input[$field]??($current[$field]??null);
+                if($value===null&&$field==='clinic_document')$value='';
+                if(!is_scalar($value)) throw new \InvalidArgumentException('Confira os campos do perfil.');
+                $data[$field]=trim((string)$value);if(mb_strlen($data[$field])>$max) throw new \InvalidArgumentException('O campo '.$field.' excede o limite permitido.');
             }
             if($data['name']===''||$data['clinic_name']==='') throw new \InvalidArgumentException('Informe nome e nome do consultório.');
-            if($data['clinic_name']!==$current['clinic_name']&&!in_array($current['member_role'],['owner','admin'],true)) throw new \InvalidArgumentException('Somente a gestão pode alterar o nome do consultório.');
+            $canManageClinic=in_array($current['member_role'],['owner','admin'],true);
+            if(!in_array(strlen(preg_replace('/\D/','',$data['clinic_document'])),[11,14],true))throw new \DomainException('Informe o CPF (11 dígitos) ou CNPJ (14 dígitos) em Configurações → Perfil → Dados do consultório para cobrança. Ele é necessário para a assinatura e a nota fiscal.');
+            if($data['clinic_name']!==$current['clinic_name']&&!$canManageClinic) throw new \InvalidArgumentException('Somente a gestão pode alterar o nome do consultório.');
+            $clinicFields=['clinic_email'=>255,'clinic_document'=>20,'clinic_phone'=>30,'clinic_address_street'=>255,'clinic_address_number'=>30,'clinic_address_complement'=>100,'clinic_address_neighborhood'=>100,'clinic_address_city'=>100,'clinic_address_state'=>2,'clinic_address_zip'=>20];
+            foreach($clinicFields as $field=>$max){
+                $value=$input[$field]??$current[$field]??'';
+                if(!is_scalar($value)||mb_strlen(trim((string)$value))>$max)throw new \InvalidArgumentException('Confira os dados do consultório para cobrança.');
+                $data[$field]=trim((string)$value);
+                if($data[$field]!==(string)($current[$field]??'')&&!$canManageClinic)throw new \DomainException('Somente a gestão do consultório pode alterar os dados de cobrança.');
+            }
+            if($data['clinic_email']!==''&&!filter_var($data['clinic_email'],FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Informe um e-mail válido para o consultório.');
+            $document=preg_replace('/\D/','',$data['clinic_document']);
+            if(!in_array(strlen($document),[11,14],true))throw new \DomainException('Informe o CPF (11 dígitos) ou CNPJ (14 dígitos) em Configurações → Perfil → Dados do consultório para cobrança. Ele é necessário para a assinatura e a nota fiscal.');
+            $data['clinic_document']=$document;
+            if($data['clinic_phone']!==''&&(strlen(preg_replace('/\D/','',$data['clinic_phone']))<10||strlen(preg_replace('/\D/','',$data['clinic_phone']))>15||!preg_match('/^[0-9+(). \-]{10,30}$/D',$data['clinic_phone'])))throw new \InvalidArgumentException('Informe um telefone válido para o consultório, com DDD.');
+            $zip=preg_replace('/\D/','',$data['clinic_address_zip']);
+            if($zip!==''&&strlen($zip)!==8)throw new \InvalidArgumentException('Informe um CEP válido, com 8 dígitos.');
+            $data['clinic_address_zip']=$zip;
+            $data['clinic_address_state']=strtoupper($data['clinic_address_state']);
+            if($data['clinic_address_state']!==''&&!preg_match('/^[A-Z]{2}$/D',$data['clinic_address_state']))throw new \InvalidArgumentException('Informe a UF do consultório com duas letras.');
             foreach(['email'=>255,'phone'=>30,'crn'=>20,'crn_region'=>10] as $field=>$max){
                 $value=$input[$field]??$current[$field]??'';
-                if(!is_string($value)||mb_strlen($value)>$max)throw new \InvalidArgumentException('Confira e-mail, celular e identificação profissional.');
-                $data[$field]=trim($value);
+                if(!is_scalar($value)||mb_strlen((string)$value)>$max)throw new \InvalidArgumentException('Confira e-mail, celular e identificação profissional.');
+                $data[$field]=trim((string)$value);
             }
             $data['email']=strtolower($data['email']);
             if(!filter_var($data['email'],FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Informe um e-mail válido.');
@@ -50,7 +75,7 @@ final class ProfessionalProfile
             $changedIdentity=$data['email']!==strtolower($current['email'])||$data['crn']!==$current['crn']||$data['crn_region']!==$current['crn_region'];
             $this->db->prepare('UPDATE users SET name=?,email=?,phone=?,is_verified=CASE WHEN ?=1 THEN 0 ELSE is_verified END,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['name'],$data['email'],$data['phone'],(int)$changedIdentity,TenantContext::getUserId()]);
             $this->db->prepare('UPDATE professionals SET specialty=?,bio=?,crn=?,crn_region=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?')->execute([$data['specialty'],$data['bio'],$data['crn'],$data['crn_region'],TenantContext::getUserId()]);
-            if($data['clinic_name']!==$current['clinic_name']) $this->db->prepare('UPDATE clinics SET name=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['clinic_name'],TenantContext::getClinicId()]);
+            $this->db->prepare('UPDATE clinics SET name=?,email=?,document=?,phone=?,address_street=?,address_number=?,address_complement=?,address_neighborhood=?,address_city=?,address_state=?,address_zip=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['clinic_name'],$data['clinic_email'],$data['clinic_document'],$data['clinic_phone']!==''?$data['clinic_phone']:($canManageClinic?$data['phone']:''),$data['clinic_address_street'],$data['clinic_address_number'],$data['clinic_address_complement'],$data['clinic_address_neighborhood'],$data['clinic_address_city'],$data['clinic_address_state'],$data['clinic_address_zip'],TenantContext::getClinicId()]);
             $this->db->prepare("INSERT INTO audit_logs(clinic_id,user_id,action,resource,resource_id,details) VALUES(?,?,'PROFESSIONAL_PROFILE_UPDATED','users',?,'{}')")->execute([TenantContext::getClinicId(),TenantContext::getUserId(),(string)TenantContext::getUserId()]);
             $this->db->commit();$_SESSION['user_email']=$data['email'];$_SESSION['user_name']=$data['name'];$_SESSION['clinic_name']=$data['clinic_name'];
         }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
@@ -83,20 +108,29 @@ final class ProfessionalProfile
             $this->db->commit();
         }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
     }
+    /** @var list<string> dias cuja pausa ficou fora do expediente e foi descartada no último saveAvailability */
+    public array $droppedBreaks=[];
     public function saveAvailability(array $input): void
     {
+        $this->droppedBreaks=[];
         $this->db->beginTransaction();
         try{
             $current=$this->read(true);
             if(!is_string($input['revision']??null)||!hash_equals(self::revision($current),$input['revision']))throw new \DomainException('As configurações mudaram em outra aba. Recarregue e confira os valores atuais.');
-            $weekly=[];
-            foreach(['seg','ter','qua','qui','sex','sab','dom'] as $day){
+            $weekly=[];$names=['seg'=>'segunda-feira','ter'=>'terça-feira','qua'=>'quarta-feira','qui'=>'quinta-feira','sex'=>'sexta-feira','sab'=>'sábado','dom'=>'domingo'];
+            foreach(['seg','ter','qua','qui','sex','sab','dom'] as $day){$dayName=$names[$day];
                 $row=$input['weekly'][$day]??[];if(!is_array($row))throw new \InvalidArgumentException('Confira os horários da semana.');
                 $enabled=($row['enabled']??'')==='1';$weekly[$day]=['enabled'=>$enabled,'start'=>'','end'=>'','break_start'=>'','break_end'=>''];
                 if(!$enabled)continue;
-                foreach(['start','end','break_start','break_end'] as $field){$value=$row[$field]??'';if(!is_string($value)||($value!==''&&!preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D',$value)))throw new \InvalidArgumentException('Informe horários válidos para '.$day.'.');$weekly[$day][$field]=$value;}
-                $r=$weekly[$day];if($r['start']===''||$r['end']===''||$r['start']>=$r['end'])throw new \InvalidArgumentException('O início deve ser anterior ao fim em '.$day.'.');
-                if(($r['break_start']!==''||$r['break_end']!=='')&& !($r['start']<$r['break_start']&&$r['break_start']<$r['break_end']&&$r['break_end']<$r['end']))throw new \InvalidArgumentException('O intervalo deve ficar dentro do horário de atendimento em '.$day.'.');
+                foreach(['start','end','break_start','break_end'] as $field){$value=$row[$field]??'';if(!is_string($value)||($value!==''&&!preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D',$value)))throw new \InvalidArgumentException('Informe horários válidos na '.$dayName.'.');$weekly[$day][$field]=$value;}
+                $r=$weekly[$day];if($r['start']===''||$r['end']==='')throw new \InvalidArgumentException('Informe o início e o fim do atendimento na '.$dayName.'.');
+                if($r['start']>=$r['end'])throw new \InvalidArgumentException('Na '.$dayName.', o início ('.$r['start'].') deve ser anterior ao fim ('.$r['end'].').');
+                if(($r['break_start']==='')!==($r['break_end']===''))throw new \InvalidArgumentException('Na '.$dayName.', preencha o início e o fim da pausa, ou deixe os dois vazios.');
+                // v54.39: pausa que fica toda fora do expediente (ex.: atende 14:00–18:00 e a pausa
+                // ficou 12:00–13:00 de uma sugestão antiga) não se aplica ao dia: é descartada em vez
+                // de bloquear o salvamento de TODA a semana.
+                if($r['break_start']!==''&&($r['break_end']<=$r['start']||$r['break_start']>=$r['end'])){$weekly[$day]['break_start']='';$weekly[$day]['break_end']='';$this->droppedBreaks[]=$dayName;continue;}
+                if($r['break_start']!==''&& !($r['start']<$r['break_start']&&$r['break_start']<$r['break_end']&&$r['break_end']<$r['end']))throw new \InvalidArgumentException('Na '.$dayName.', a pausa ('.$r['break_start'].'–'.$r['break_end'].') precisa ficar dentro do atendimento ('.$r['start'].'–'.$r['end'].').');
             }
             $duration=$input['default_duration_minutes']??'';
             if(!is_string($duration)||!ctype_digit($duration)||(int)$duration<15||(int)$duration>240)throw new \InvalidArgumentException('A duração deve estar entre 15 e 240 minutos.');

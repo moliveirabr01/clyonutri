@@ -1,0 +1,33 @@
+COMPARAÇÃO v39 x v40 (por conteúdo, sha256 de cada arquivo)
+
+v39: clyonutri-v39.zip (sha256 f4c5e4607b64b4e99e5d2de4e65e46c5dc1821b9c5a059d9ddfeb8a63f589027)  687 itens (arquivos e pastas vazias)
+v40: clyonutri-v40.zip  689 itens (esta lista inclui o próprio COMPARACAO-V39-V40.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 681 (vendor/ inteiro, as migrações e todo o SQL manual, as rotas, o app e o restante de src/ e views/; os Termos, a Política e os textos legais são os mesmos byte a byte)
+Adicionados: 2 (1 + este arquivo)
+Removidos: 0
+Alterados: 6
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v40.md  -> novo: o que saiu das telas, o que ficou e por quê, e que NÃO há SQL novo
+  COMPARACAO-V39-V40.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  views/settings/_conta_exclusao.php  -> alterado: saíram o rótulo "RASCUNHO PARA REVISÃO DE UM ADVOGADO" e a nota "Texto provisório, ainda sem validação jurídica (versão …)"; os parágrafos do aviso ficam
+  src/Domain/Privacy/AccountDeletionRequestService.php  -> alterado: removida a constante LEGAL_DRAFT_LABEL (só servia ao rótulo); o texto do aviso e LEGAL_NOTICE_VERSION não mudam
+  views/teleconsultation/patient_waiting.php  -> alterado: "— texto sujeito a revisão jurídica e regulatória (NI2-253)" saiu; fica "Versão X"
+  views/admin/_comercial_trocas_pedidos.php  -> alterado: ", ponto a validar com advogado" saiu da orientação à equipe
+  LEIA-ME-HOSTGATOR-v39.md  -> alterado: nota no topo dizendo que a v40 não muda o SQL da v39
+  RELEASE_INFO.json  -> alterado: versão v40, base clyonutri-v39.zip (sha256 f4c5e460…), arquivos alterados e hashes, o que ficou e por quê
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+466a9e2ae1c12f8ba0029a7f8a681d8db4f5eb49eab18d2b4df9f479e03b6914  LEIA-ME-HOSTGATOR-v40.md
+517136af2a78126e8d2701307745c4d3c0c39496209e8ce26adc9a30974be114  views/settings/_conta_exclusao.php
+1bec7f1ffbd2da5567e769bc1d6566616640d206d7e34d357694ebbc201b7def  src/Domain/Privacy/AccountDeletionRequestService.php
+5c5e3757d0846238209ec249b861be54f2208a747af8e57f59888a5645eafc94  views/teleconsultation/patient_waiting.php
+51be7713a96919eec42ef6bf4a0d751070ef7996235526866083d05ff25adc71  views/admin/_comercial_trocas_pedidos.php
+54761ceb777b6a0a1f2c738809dbcd9ba56312d390d9b2a104a00e887d3c4951  LEIA-ME-HOSTGATOR-v39.md
+4fe717ed4a9bbe9bfa6041ed8e354f699dd4a9233d33257de095f5ed523ee9d9  RELEASE_INFO.json

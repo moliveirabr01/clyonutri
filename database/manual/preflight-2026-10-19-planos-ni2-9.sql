@@ -6,6 +6,7 @@
 -- (o que impediria o índice único uq_meal_plan_versions_number).
 -- ============================================================================
 SET NAMES utf8mb4;
+SET SESSION group_concat_max_len = 1048576; -- MySQL 5.7 corta GROUP_CONCAT em 1024 caracteres por padrão
 SET @db = DATABASE();
 
 SET @has_plans = (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'meal_plans');

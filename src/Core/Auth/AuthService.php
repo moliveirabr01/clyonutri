@@ -16,8 +16,18 @@ class AuthService
         $this->db = $db ?? Connection::getInstance();
     }
 
+    public function getDb(): PDO
+    {
+        return $this->db;
+    }
+
     /**
-     * Registra novo nutricionista e sua clínica (Tenant)
+     * Registra novo nutricionista e sua clínica (Tenant).
+     *
+     * NI2-449: grava, na mesma transação, o aceite dos Termos de Uso e da Política de Privacidade
+     * (user_legal_acceptances). Se a gravação falhar, o cadastro inteiro é desfeito.
+     * $legalAcceptance: ['source' => ..., 'ip' => ..., 'user_agent' => ..., 'versions' => [documento => versão vista]].
+     * O cadastro pela tela (/cadastro) informa tudo; chamadas internas (seed local, testes) gravam origem 'internal'.
      */
     public function registerNutritionist(
         string $name,
@@ -25,7 +35,9 @@ class AuthService
         string $password,
         string $clinicName,
         string $crn,
-        string $crnRegion
+        string $crnRegion,
+        ?array $legalAcceptance = null,
+        ?string $planCode = null
     ): array {
         $email = strtolower(trim($email));
 
@@ -76,7 +88,31 @@ class AuthService
                 'region' => trim($crnRegion),
             ]);
 
-            // 5. Auditoria de Criação
+            // 5. Aceite versionado dos Termos e da Política (NI2-449)
+            (new \ClyoNutri\Domain\Legal\LegalAcceptanceService($this->db))->recordUserAcceptance(
+                $userId,
+                $clinicId,
+                (string)($legalAcceptance['source'] ?? 'internal'),
+                isset($legalAcceptance['ip']) ? (string)$legalAcceptance['ip'] : null,
+                isset($legalAcceptance['user_agent']) ? (string)$legalAcceptance['user_agent'] : null,
+                isset($legalAcceptance['versions']) && is_array($legalAcceptance['versions']) ? $legalAcceptance['versions'] : null
+            );
+
+            // 6. Período de teste de 14 dias contado da criação da conta (NI2-450), como dizem os Termos.
+            // Valida estritamente o plano informado contra o catálogo oficial (NI2-804)
+            $effectivePlan = ($planCode !== null && in_array(strtoupper(trim($planCode)), \ClyoNutri\Application\Controllers\AuthController::ALLOWED_REGISTER_PLANS, true))
+                ? strtoupper(trim($planCode))
+                : \ClyoNutri\Domain\Subscription\SubscriptionService::DEFAULT_TRIAL_PLAN;
+
+            $trialPlan = $this->db->prepare('SELECT 1 FROM saas_plans WHERE code = ?');
+            $trialPlan->execute([$effectivePlan]);
+            $hasTrialPlan = $trialPlan->fetchColumn() !== false;
+            $trialPlan = null;
+            if ($hasTrialPlan) {
+                (new \ClyoNutri\Domain\Subscription\SubscriptionService($this->db))->initializeDefaultSubscription($clinicId, $effectivePlan);
+            }
+
+            // 7. Auditoria de Criação
             $insAudit = $this->db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details) VALUES (:clinic_id, :user_id, 'USER_REGISTER', 'users', :res_id, :details)");
             $insAudit->execute([
                 'clinic_id' => $clinicId,
@@ -87,6 +123,11 @@ class AuthService
 
             $this->db->commit();
 
+            // v34: aviso ao backoffice DEPOIS do commit. Nunca lança; se falhar, o cadastro segue e a varredura recupera.
+            if (!$this->db->inTransaction()) {
+                (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyClinicSignup($clinicId);
+            }
+
             return [
                 'user_id' => $userId,
                 'user_uuid' => $userUuid,
@@ -95,7 +136,9 @@ class AuthService
                 'name' => $name,
             ];
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
         }
     }
@@ -110,15 +153,60 @@ class AuthService
         $limiter ??= new \ClyoNutri\Core\Security\LoginRateLimiter($this->db);
         $gate = $limiter->attempt('staff', $email, $ip);
         if (!$gate['allowed']) {
+            // v34: conta da EQUIPE travada avisa os superadmins (no máximo 1 aviso por conta a cada 30 min; nunca lança)
+            (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyLoginLocked($email);
             return ['status' => 'locked', 'user' => null, 'retry_after' => (int)$gate['retry_after']];
         }
         $user = $this->attempt($email, $password);
         if ($user === null) {
             $limiter->failure('staff', $email, $ip);
+            // v33: conta suspensa ou bloqueada. A mensagem diferente só aparece quando a senha confere,
+            // para não revelar a ninguém que um e-mail existe (sem enumeração de contas).
+            if ($this->inactiveAccountMatches($email, $password)) {
+                return ['status' => 'inactive', 'user' => null, 'retry_after' => 0];
+            }
             return ['status' => 'invalid', 'user' => null, 'retry_after' => 0];
         }
         $limiter->success('staff', $email, $ip);
+        $this->recordLogin((int)$user['id']);
         return ['status' => 'ok', 'user' => $user, 'retry_after' => 0];
+    }
+
+    /** True se o e-mail é de uma conta suspensa/bloqueada E a senha confere. Nunca registra a senha. */
+    private function inactiveAccountMatches(string $email, string $password): bool
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT id, password_hash, status FROM users WHERE email = :email AND status IN ('suspended', 'blocked') LIMIT 1");
+            $stmt->execute(['email' => strtolower(trim($email))]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$row || !password_verify($password, (string)$row['password_hash'])) {
+                return false;
+            }
+            try {
+                $this->db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at) VALUES (NULL, :uid, 'AUTH_LOGIN_DENIED_INACTIVE_ACCOUNT', 'users', :rid, :ip, :ua, :details, :created_at)")->execute([
+                    'uid' => (int)$row['id'],
+                    'rid' => (string)$row['id'],
+                    'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+                    'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+                    'details' => json_encode(['account_status' => (string)$row['status']]),
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+            } catch (\Throwable) {
+                // auditoria indisponível não muda a resposta ao usuário
+            }
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Registra o último login bem-sucedido (backoffice: "Último login"). Só profissional/equipe; paciente fica de fora.
+     * Melhor esforço: se a coluna ainda não existe ou o banco falha, o login segue normalmente.
+     */
+    public function recordLogin(int $userId): void
+    {
+        (new LastLoginService($this->db))->record($userId);
     }
 
     /**
@@ -178,6 +266,24 @@ class AuthService
         $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // version 4
         $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // variant RFC 4122
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
+    /**
+     * Incrementa o auth_version do usuário para invalidar imediatamente outras sessões ativas (SEC-F005).
+     * Retorna a nova versão para persistência na sessão atual recém-iniciada.
+     */
+    public function bumpAuthVersion(int $userId): int
+    {
+        $this->db->prepare("UPDATE users SET auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = :id")
+            ->execute(['id' => $userId]);
+
+        try {
+            $this->db->prepare("DELETE FROM sessions WHERE user_id = :id")->execute(['id' => $userId]);
+        } catch (\Throwable) {}
+
+        $stmt = $this->db->prepare("SELECT auth_version FROM users WHERE id = :id");
+        $stmt->execute(['id' => $userId]);
+        return (int)$stmt->fetchColumn();
     }
 
     /**

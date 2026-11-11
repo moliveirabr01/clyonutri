@@ -1,0 +1,4 @@
+PASS: manual SQL runs twice with one migration record
+PASS: manual SQL does not create policies or patient requests
+PASS: PHP migration tolerates prior manual SQL
+MySQL version: 8.0.46

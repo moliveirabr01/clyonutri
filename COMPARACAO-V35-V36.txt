@@ -1,0 +1,196 @@
+Base: clyonutri-v35.zip
+Alterados:
+RELEASE_INFO.json
+docs/validation/example-recipe-catalog/README.md
+src/Application/Controllers/OnboardingController.php
+src/Application/Controllers/RecipeController.php
+src/Core/Database/ExampleRecipeCatalogSeeder.php
+src/Domain/Onboarding/OnboardingService.php
+src/Domain/Recipe/RecipeService.php
+
+Adicionados:
+LEIA-ME-HOSTGATOR-v36.md
+
+Removidos: nenhum.
+Originais idênticos: 652
+
+--- v35/src/Application/Controllers/OnboardingController.php
++++ v36/src/Application/Controllers/OnboardingController.php
+@@ -218,27 +218,6 @@
+                   </div>
+                 </div>
+ 
+-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
+-                  <div>
+-                    <label for="ob1-monthly_patients_goal" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Meta de pacientes ativos / mês</label>
+-                    <select id="ob1-monthly_patients_goal" name="monthly_patients_goal" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+-                      <option value="15" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 15) ? 'selected' : '' ?>>Até 15 pacientes/mês</option>
+-                      <option value="30" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 30) ? 'selected' : '' ?>>15 a 30 pacientes/mês</option>
+-                      <option value="60" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 60) ? 'selected' : '' ?>>30 a 60 pacientes/mês</option>
+-                      <option value="100" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 100) ? 'selected' : '' ?>>Mais de 60 pacientes/mês</option>
+-                    </select>
+-                  </div>
+-                  <div>
+-                    <label for="ob2-clinical_experience_years" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de atuação clínica</label>
+-                    <select id="ob2-clinical_experience_years" name="clinical_experience_years" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+-                      <option value="0">Recém-formado / Iniciando consultório</option>
+-                      <option value="2">1 a 3 anos de experiência</option>
+-                      <option value="5">3 a 7 anos de experiência</option>
+-                      <option value="10">Mais de 7 anos de experiência</option>
+-                    </select>
+-                  </div>
+-                </div>
+-
+               <?php elseif ($step === 2): ?>
+                 <!-- PASSO 2: Dados Profissionais Reais -->
+                 <?php
+
+--- v35/src/Application/Controllers/RecipeController.php
++++ v36/src/Application/Controllers/RecipeController.php
+@@ -6,6 +6,7 @@
+ 
+ use ClyoNutri\Core\Auth\TenantContext;
+ use ClyoNutri\Core\Database\Connection;
++use ClyoNutri\Core\Database\ExampleRecipeCatalogSeeder;
+ use ClyoNutri\Core\Security\Csrf;
+ use ClyoNutri\Domain\Recipe\RecipeService;
+ use PDO;
+@@ -69,6 +70,14 @@
+     {
+         $auth = $this->getAuthInfo();
+ 
++        $catalogUnavailable = false;
++        try {
++            (new ExampleRecipeCatalogSeeder($this->db))->run();
++        } catch (\Throwable $e) {
++            $catalogUnavailable = true;
++            error_log('ClyoNutri: falha ao preparar catálogo de receitas (' . get_class($e) . ').');
++        }
++
+         $search = trim((string)($_GET['q'] ?? ''));
+         $mealType = trim((string)($_GET['meal_type'] ?? ''));
+         $difficulty = trim((string)($_GET['difficulty'] ?? ''));
+@@ -76,7 +85,7 @@
+ 
+         $filters = [];
+         if ($search !== '') {
+-            $filters['search'] = $search;
++            $filters['query'] = $search;
+         }
+         if ($mealType !== '') {
+             $filters['meal_type'] = $mealType;
+@@ -85,7 +94,7 @@
+             $filters['difficulty'] = $difficulty;
+         }
+         if ($maxKcal !== null) {
+-            $filters['max_kcal'] = $maxKcal;
++            $filters['max_calories'] = $maxKcal;
+         }
+ 
+         $recipes = $this->recipeService->searchRecipes($filters, $auth['clinicId']);
+@@ -99,6 +108,9 @@
+ 
+         ob_start();
+         ?>
++        <?php if ($catalogUnavailable): ?>
++          <div class="card" role="alert">Não foi possível preparar as receitas de exemplo. Tente novamente ou entre em contato com o suporte. Suas receitas cadastradas continuam disponíveis abaixo.</div>
++        <?php endif; ?>
+         <!-- Alertas de Feedback -->
+         <?php if (!empty($_GET['prescrito'])): ?>
+           <div style="background: var(--semantic-success-light); border-left: 4px solid var(--semantic-success); padding: 12px 16px; border-radius: var(--radius-input); margin-bottom: var(--space-4); color: var(--semantic-success); font-weight: 500;">
+@@ -166,9 +178,10 @@
+             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-copper-500); margin: 0 auto var(--space-3);"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg>
+             <h3 style="color: var(--brand-navy-900); margin-bottom: var(--space-2);">Nenhuma receita encontrada</h3>
+             <p style="color: var(--neutral-gray-500); margin-bottom: var(--space-4); max-width: 480px; margin-left: auto; margin-right: auto;">
+-              Crie receitas culinárias personalizadas com cálculo automatizado de macronutrientes da Tabela TACO e medidas caseiras.
++              Nenhuma receita corresponde aos filtros escolhidos. Limpe os filtros para consultar a biblioteca completa.
+             </p>
+-            <a href="/receitas/nova" class="btn btn-accent">Criar primeira receita</a>
++            <a href="/receitas" class="btn btn-secondary">Limpar filtros</a>
++            <a href="/receitas/nova" class="btn btn-accent">Criar receita</a>
+           </div>
+         <?php else: ?>
+           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-6);">
+
+--- v35/src/Core/Database/ExampleRecipeCatalogSeeder.php
++++ v36/src/Core/Database/ExampleRecipeCatalogSeeder.php
+@@ -6,6 +6,7 @@
+ 
+ use ClyoNutri\Core\Auth\TenantContext;
+ use ClyoNutri\Domain\Recipe\RecipeService;
++use ClyoNutri\Domain\Food\FoodCatalogService;
+ use PDO;
+ 
+ /** Installs only the curated examples; never republishes a clinic's recipes. */
+@@ -19,7 +20,13 @@
+         $user = TenantContext::getUser();
+         TenantContext::clear();
+         $created = 0;
++        $locked = false;
+         try {
++            // MySQL serializes first requests from different clinics during installation.
++            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
++                $locked = (int)$this->db->query("SELECT GET_LOCK('clyonutri_example_recipes', 15)")->fetchColumn() === 1;
++                if (!$locked) { throw new \RuntimeException('Catálogo em preparação. Tente novamente.'); }
++            }
+             $service = new RecipeService($this->db);
+             foreach (require __DIR__ . '/../../../database/seeds/fit_example_recipes.php' as $sample) {
+                 $exists = $this->db->prepare("SELECT id FROM recipes WHERE clinic_id IS NULL AND is_custom = 0 AND title = ? AND visibility = 'public' AND status = 'published'");
+@@ -30,7 +37,12 @@
+                     $food = $this->db->prepare('SELECT id FROM foods WHERE name = ? AND clinic_id IS NULL ORDER BY id LIMIT 1');
+                     $food->execute([$name]);
+                     $id = $food->fetchColumn();
+-                    if (!$id) { throw new \RuntimeException('Ingrediente de catálogo ausente: ' . $name); }
++                    if (!$id) {
++                        (new FoodCatalogService($this->db))->seedTacoReference();
++                        $food->execute([$name]);
++                        $id = $food->fetchColumn();
++                        if (!$id) { throw new \RuntimeException('Ingrediente de catálogo ausente: ' . $name); }
++                    }
+                     $ingredients[] = ['food_id' => (int)$id, 'amount' => $amount, 'measure_unit' => 'g'];
+                 }
+                 $service->createRecipe([
+@@ -47,6 +59,7 @@
+             }
+             return $created;
+         } finally {
++            if ($locked) { $this->db->query("SELECT RELEASE_LOCK('clyonutri_example_recipes')"); }
+             TenantContext::clear();
+             if ($clinicId !== null) { TenantContext::set($clinicId, $user ?? []); }
+             elseif ($user !== null && isset($user['id'])) { TenantContext::setUserId((int)$user['id']); }
+
+--- v35/src/Domain/Onboarding/OnboardingService.php
++++ v36/src/Domain/Onboarding/OnboardingService.php
+@@ -91,8 +91,6 @@
+ 
+                     $focusPayload = [
+                         'focus_objectives' => !empty($focusList) ? $focusList : ['Nutrição Clínica'],
+-                        'monthly_patients_goal' => (int)($data['monthly_patients_goal'] ?? 20),
+-                        'clinical_experience_years' => (int)($data['clinical_experience_years'] ?? 1),
+                         'plan_code' => $planCode,
+                         'answered_at' => date('c'),
+                     ];
+
+--- v35/src/Domain/Recipe/RecipeService.php
++++ v36/src/Domain/Recipe/RecipeService.php
+@@ -691,7 +691,7 @@
+         // Filtro por termo de busca
+         if (!empty($filters['query'])) {
+             $term = '%' . trim($filters['query']) . '%';
+-            $sql .= " AND (r.title LIKE :term OR r.summary LIKE :term OR r.instructions LIKE :term)";
++            $sql .= " AND (r.title LIKE :term OR r.summary LIKE :term OR r.instructions LIKE :term OR EXISTS (SELECT 1 FROM recipe_ingredients ri JOIN foods f ON f.id = ri.food_id WHERE ri.recipe_id = r.id AND f.name LIKE :term))";
+             $params['term'] = $term;
+         }
+ 
+@@ -699,6 +699,11 @@
+         if (!empty($filters['category'])) {
+             $sql .= " AND r.category = :category";
+             $params['category'] = trim($filters['category']);
++        }
++
++        if (!empty($filters['meal_type'])) {
++            $sql .= " AND LOWER(r.meal_type) = LOWER(:meal_type)";
++            $params['meal_type'] = trim($filters['meal_type']);
+         }
+ 
+         // Filtro por dificuldade

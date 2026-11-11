@@ -9,6 +9,7 @@ use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Core\Security\TenantSecurityException;
 use ClyoNutri\Domain\Patient\PatientRepository;
+use ClyoNutri\Domain\Subscription\SubscriptionService;
 use InvalidArgumentException;
 use PDO;
 
@@ -78,15 +79,19 @@ class OnboardingService
         try {
             switch ($step) {
                 case 1:
-                    // Passo 1: Boas-vindas & Objetivos do Consultório
+                    // Passo 1: Boas-vindas, plano SaaS e objetivos do consultório.
+                    $subscriptions = new SubscriptionService($this->db);
+                    $planCode = trim((string)($data['plan_code'] ?? ''));
+                    if ($planCode !== '' || $subscriptions->canChooseOnboardingPlan($clinicId, $userId)) {
+                        $subscriptions->chooseOnboardingPlan($clinicId, $userId, $planCode);
+                    }
                     $focusList = is_array($data['focus_objectives'] ?? null)
                         ? $data['focus_objectives']
                         : array_filter(array_map('trim', explode(',', (string)($data['focus_objectives'] ?? 'Nutrição Clínica'))));
 
                     $focusPayload = [
                         'focus_objectives' => !empty($focusList) ? $focusList : ['Nutrição Clínica'],
-                        'monthly_patients_goal' => (int)($data['monthly_patients_goal'] ?? 20),
-                        'clinical_experience_years' => (int)($data['clinical_experience_years'] ?? 1),
+                        'plan_code' => $planCode,
                         'answered_at' => date('c'),
                     ];
 
@@ -218,10 +223,14 @@ class OnboardingService
                     break;
 
                 case 4:
-                    // Passo 4: Criação do Primeiro Paciente Real de Ativação
+                    // Adiar é uma escolha explícita: avança sem criar ou alterar pacientes.
+                    if (($data['skip_patient'] ?? '') === '1') {
+                        break;
+                    }
+                    // Passo 4: Criação opcional do primeiro paciente.
                     $patientName = trim((string)($data['name'] ?? ''));
                     if ($patientName === '') {
-                        throw new InvalidArgumentException("O nome do primeiro paciente é obrigatório para ativação da rotina clínica.");
+                        throw new InvalidArgumentException("Informe o nome para cadastrar o paciente ou escolha cadastrar depois.");
                     }
 
                     // Garantir TenantContext para criar paciente com isolamento

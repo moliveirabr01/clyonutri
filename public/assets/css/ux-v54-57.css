@@ -1,0 +1,44 @@
+/* v54.57 (UX-104/UX-111/R55-01): página de erro única (com ou sem o layout do consultório). Só tokens do DS. */
+.error-page{max-width:40rem;margin-block:var(--space-6,2rem)}
+.error-page h1{font-size:var(--font-size-xl,1.35rem);margin:0 0 var(--space-2,.5rem)}
+.error-page__actions{display:flex;flex-wrap:wrap;gap:var(--space-2,.5rem);margin-top:var(--space-4,1rem)}
+.error-page__actions .btn{min-height:44px;display:inline-flex;align-items:center}
+.error-standalone{margin:0;background:var(--botanical-cream-50,#FAF9F4);color:var(--botanical-forest-900,#0F3E17);font-family:Inter,system-ui,sans-serif}
+.error-standalone__header{padding:var(--space-4,1rem) var(--space-6,1.5rem);background:#fff;border-bottom:1px solid var(--neutral-gray-200,#E5E7EB)}
+.error-standalone__main{padding:var(--space-4,1rem);display:flex;justify-content:center}
+/* v54.57 (UX-119/UX-105): faixa do atendimento com data/hora e etapas navegáveis */
+.attendance-bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2,.5rem) var(--space-4,1rem)}
+.attendance-bar__label{margin:0}
+.attendance-steps ol{display:flex;flex-wrap:wrap;gap:var(--space-2,.5rem);list-style:none;margin:0;padding:0}
+.attendance-steps__step{display:inline-flex;align-items:center;min-height:32px;padding:.25rem .75rem;border-radius:999px;border:1px solid var(--neutral-gray-300);text-decoration:none;color:inherit;font-size:.875rem}
+.attendance-steps__step--done{border-color:var(--semantic-success)}
+.attendance-steps__step[aria-current="step"]{font-weight:700;border-width:2px}
+.attendance-bar__hub{margin-left:auto}
+/* v54.57 (UX-110): busca de paciente e "Nova consulta" no topo do painel */
+.dash-greeting{flex-wrap:wrap}
+.dash-greeting__actions{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.dash-search{display:flex;gap:var(--space-2);align-items:center}
+.dash-search__input{min-width:14rem;min-height:44px}
+.dash .dash-greeting__actions .btn{min-height:44px;display:inline-flex;align-items:center}
+/* v54.57 (UX-109): preferências opcionais em uma linha discreta quando a prontidão está completa */
+.dash-optional{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-3);font-size:.8125rem;color:var(--neutral-gray-600)}
+.dash-optional__link{font-weight:600;color:var(--botanical-copper-600);display:inline-flex;align-items:center;min-height:24px}
+@media (max-width: 640px){
+  /* 390 px: mantém a ordem do v54.56 (saudação → indicadores → agenda → lista);
+     só compacta a saudação para que busca e "+ Nova consulta" fiquem na 1ª dobra */
+  .dash .dash-greeting__icon{display:none}
+  .dash-greeting__actions{margin-left:0;width:100%}
+  .dash-search{flex:1 1 100%}
+  .dash-search__input{min-width:0;flex:1}
+  .dash-new-appointment{flex:1 1 100%;justify-content:center}
+}
+
+/* v54.57 (UX-121): links isolados que viram bloco (itens de flex, breadcrumb, estado do rascunho) com alvo ≥ 24 px — WCAG 2.5.8 */
+.card__header > a,.op-breadcrumb > a,a[data-resume],.u-flex > a.u-text-compact{min-height:24px;line-height:1.5rem}
+/* v54.57 (UX-122): indicador de foco visível em campos de data e hora (Chromium não mostrava contorno) */
+input[type="date"]:focus-visible,input[type="time"]:focus-visible,input[type="datetime-local"]:focus-visible,
+input[type="date"]:focus-within,input[type="time"]:focus-within,input[type="datetime-local"]:focus-within{outline:2px solid var(--botanical-green-600,#39734A);outline-offset:2px}
+/* (no Chromium, o botão do calendário fica no shadow DOM: o campo só casa :focus-within) */
+/* v54.57 (UX-120): estado vazio do KPI em texto menor e neutro; nomes da agenda em até 2 linhas (nome completo no title) */
+.dash .dash-kpi__value.dash-kpi__value--empty{font-size:1rem;font-weight:600;color:var(--neutral-gray-600)}
+.dash .dash-appt__name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}

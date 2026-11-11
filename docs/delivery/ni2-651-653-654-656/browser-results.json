@@ -1,0 +1,128 @@
+{
+  "build": "v54.17",
+  "passed": 30,
+  "failed": 0,
+  "tests": [
+    {
+      "test": "login profissional A",
+      "pass": true
+    },
+    {
+      "test": "editor autenticado",
+      "pass": true
+    },
+    {
+      "test": "prévia usa validação do servidor",
+      "pass": true
+    },
+    {
+      "test": "prévia rejeita limite inválido",
+      "pass": true
+    },
+    {
+      "test": "rascunho salvo pela interface",
+      "pass": true
+    },
+    {
+      "test": "editor sem rolagem horizontal em 375px",
+      "pass": true
+    },
+    {
+      "test": "login profissional B",
+      "pass": true
+    },
+    {
+      "test": "B não lê modelo privado A",
+      "pass": true
+    },
+    {
+      "test": "B não lê respostas clínicas A",
+      "pass": true
+    },
+    {
+      "test": "mutações exigem CSRF",
+      "pass": true
+    },
+    {
+      "test": "convite criado sem enviar mensagem",
+      "pass": true
+    },
+    {
+      "test": "paciente confirma identidade",
+      "pass": true
+    },
+    {
+      "test": "perguntas exclusivas do profissional ausentes",
+      "pass": true
+    },
+    {
+      "test": "etapas acessíveis",
+      "pass": true
+    },
+    {
+      "test": "questionário sem rolagem horizontal em 375px",
+      "pass": true
+    },
+    {
+      "test": "rascunho salvo e retomado",
+      "pass": true
+    },
+    {
+      "test": "mesmo convite não abre em outro navegador",
+      "pass": true
+    },
+    {
+      "test": "mesmo navegador retoma pelo convite",
+      "pass": true
+    },
+    {
+      "test": "retomada continua autenticada",
+      "pass": true
+    },
+    {
+      "test": "envio final pelo paciente",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado à anamnese",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado perfil",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado /prontuario",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado /exames",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado /planos/:id",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado /planos/:id/lista-compras",
+      "pass": true
+    },
+    {
+      "test": "resumo integrado /consulta/:id",
+      "pass": true
+    },
+    {
+      "test": "editor a 200% sem rolagem horizontal",
+      "pass": true
+    },
+    {
+      "test": "navegação por teclado tem foco",
+      "pass": true
+    },
+    {
+      "test": "sem erros JS ou violações CSP",
+      "pass": true
+    }
+  ],
+  "errors": []
+}

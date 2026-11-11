@@ -9,65 +9,83 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 $patientName = $patient['name'] ?? 'Paciente';
 $code = $invitation['invitation_code'] ?? '';
 
+// v21: texto neutro em gênero, assinado por quem envia (sem "seu nutricionista").
+$patientFirst = trim(explode(' ', trim((string)$patientName))[0] ?? '');
+$senderName = trim((string)($userName ?? ''));
 $whatsappMsg = urlencode(
-    "Olá, {$patientName}! Seu nutricionista preparou seu acesso exclusivo ao ClyoNutri. " .
-    "Acesse o link a seguir para ativar seu primeiro acesso e criar sua senha:\n\n" .
-    "{$directLink}\n\n" .
-    "Ou acesse {$portalBaseUrl} e use o seu código de convite:\n{$code}\n\n" .
-    "(Link válido por 48 horas)"
+    "Oi" . ($patientFirst !== '' ? ", {$patientFirst}" : '') . "! " . ($senderName !== '' ? "Aqui é {$senderName}. " : '') .
+    "Liberei seu acesso ao Clyo Nutri, onde você vê seu plano alimentar e registra seu diário.\n\n" .
+    "Para entrar e criar sua senha, toque no link:\n{$directLink}\n\n" .
+    "Se preferir, abra {$portalBaseUrl} e digite o código {$code}.\n\n" .
+    "O link vale por 48 horas."
 );
 $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($patient['phone']) ? '&phone=' . preg_replace('/\D/', '', $patient['phone']) : '');
 ?>
 
-<div style="max-width: 840px; margin: 0 auto; padding-bottom: 40px;">
-  <div style="margin-bottom: var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+<div class="u-maxw-wide u-my-0 u-mx-auto u-pb-10">
+  <div class="u-mb-6 u-flex u-justify-between u-items-center u-wrap u-gap-3">
     <div>
-      <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-bottom: 4px;">
-        <a href="/pacientes/<?= (int)$patientId ?>" style="color: var(--brand-copper-600); text-decoration: none;">← Voltar ao perfil de <?= htmlspecialchars($patientName) ?></a>
+      <div class="u-text-compact u-color-neutral-gray-500 u-mb-1">
+        <a href="/pacientes/<?= (int)$patientId ?>" class="u-color-botanical-copper-600 u-no-underline">← Voltar ao perfil de <?= htmlspecialchars($patientName) ?></a>
       </div>
-      <h1 style="font-size: 1.75rem; font-weight: 700; color: var(--brand-navy-900); margin: 0;">Primeiro Acesso ao App do Paciente</h1>
-      <p style="color: var(--neutral-gray-500); margin-top: 4px; font-size: 0.95rem;">
+      <h1 class="u-text-h1 u-font-bold u-color-botanical-forest-900 u-m-0">Primeiro acesso ao app do paciente</h1>
+      <p class="u-color-neutral-gray-500 u-mt-1 u-text-body">
         Gere e compartilhe as credenciais de primeiro acesso para <?= htmlspecialchars($patientName) ?> acompanhar seu plano alimentar e diário.
       </p>
     </div>
   </div>
 
   <?php if (!empty($error)): ?>
-    <div class="card" style="padding: 24px; border-left: 4px solid #ef4444; background: #fff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px;">
-      <div style="display: flex; gap: 16px; align-items: flex-start;">
-        <div style="width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; color: #b91c1c; font-size: 1.25rem; flex-shrink: 0;">
+    <div class="card u-p-6 u-accent u-accent-semantic-error u-bg-neutral-white u-radius-card u-shadow-md u-mb-6">
+      <div class="u-flex u-gap-4 u-items-start">
+        <div class="ds-icon-badge ds-icon-badge--error u-text-h3">
           ✕
         </div>
         <div>
-          <h2 style="font-size: 1.1rem; font-weight: 600; color: #991b1b; margin: 0 0 8px 0;">Não foi possível gerar o convite</h2>
-          <p style="color: #4b5563; margin: 0 0 16px 0; font-size: 0.95rem; line-height: 1.5;">
+          <h2 class="u-text-card-title u-font-semibold u-color-semantic-error-strong u-mt-0 u-mb-2 u-mx-0">Não foi possível gerar o convite</h2>
+          <p class="u-color-neutral-gray-600 u-mt-0 u-mb-4 u-mx-0 u-text-body u-leading-body">
             <?= htmlspecialchars($error) ?>
           </p>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="/pacientes/<?= (int)$patientId ?>" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.875rem;">Voltar ao perfil do paciente</a>
-            <a href="/app" target="_blank" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.875rem;">Acessar Portal do Paciente</a>
+          <div class="u-flex u-gap-2 u-wrap">
+            <a href="/pacientes/<?= (int)$patientId ?>" class="btn btn-secondary u-py-2 u-px-4 u-text-compact">Voltar ao perfil do paciente</a>
+            <a href="/paciente/app" target="_blank" class="btn btn-outline u-py-2 u-px-4 u-text-compact">Acessar portal do paciente</a>
           </div>
         </div>
       </div>
     </div>
   <?php else: ?>
 
+    <?php if (!empty($emailStatus)): ?>
+      <?php
+        $patientEmail = trim((string)($patient['email'] ?? ''));
+        [$emailBg, $emailBorder, $emailColor, $emailText] = match ($emailStatus) {
+            'sent' => ['success', '', '', 'Convite enviado por e-mail' . ($patientEmail !== '' ? ' para ' . htmlspecialchars($patientEmail) : '') . '. O link também está abaixo, caso precise enviar por outro canal.'],
+            'logged' => ['info', '', '', 'Ambiente sem SMTP: o e-mail foi apenas registrado no log, não enviado de verdade. Use o link abaixo para enviar manualmente.'],
+            'skipped' => ['warning', '', '', 'Não enviamos por e-mail (' . htmlspecialchars((string)$emailReason) . '). Use o link ou o botão de WhatsApp abaixo.'],
+            default => ['error', '', '', 'O e-mail não pôde ser enviado (' . htmlspecialchars((string)$emailReason) . '). O convite é válido; envie o link abaixo manualmente.'],
+        };
+      ?>
+      <div class="op-message op-message--<?= $emailBg ?> u-mb-5" role="<?= $emailBg === 'error' ? 'alert' : 'status' ?>" data-testid="invitation-email-status">
+        <?= $emailText ?>
+      </div>
+    <?php endif; ?>
+
     <!-- Resumo do Paciente -->
-    <div class="card" style="padding: 20px 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div class="card u-py-5 u-px-6 u-bg-neutral-gray-50 u-border u-radius-card u-mb-6">
+      <div class="u-flex u-justify-between u-items-center u-wrap u-gap-4">
         <div>
-          <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em;">Paciente</span>
-          <div style="font-size: 1.15rem; font-weight: 700; color: var(--brand-navy-900);"><?= htmlspecialchars($patientName) ?></div>
-          <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">
+          <span class="u-text-caption u-font-bold u-uppercase u-color-neutral-gray-500 u-tracking-wide">Paciente</span>
+          <div class="u-text-card-title u-font-bold u-color-botanical-forest-900"><?= htmlspecialchars($patientName) ?></div>
+          <div class="u-text-compact u-color-neutral-gray-500 u-mt-0">
             <?= !empty($patient['email']) ? htmlspecialchars($patient['email']) : 'Sem e-mail cadastrado' ?>
             <?= !empty($patient['phone']) ? ' • ' . htmlspecialchars($patient['phone']) : '' ?>
           </div>
         </div>
-        <div style="text-align: right;">
-          <span style="display: inline-block; padding: 4px 10px; border-radius: 9999px; background: #E3F4F2; color: #0A5F63; font-size: 0.8rem; font-weight: 600;">
+        <div class="u-text-right">
+          <span class="u-inline-block u-py-1 u-px-2 u-radius-pill u-bg-semantic-success-light u-color-semantic-success-text u-text-compact u-font-semibold">
             ✓ Convite Ativo (Válido por 48 horas)
           </span>
-          <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">
+          <div class="u-text-caption u-color-neutral-gray-500 u-mt-1">
             Expira em: <?= htmlspecialchars($invitation['expires_at'] ?? '48h') ?>
           </div>
         </div>
@@ -75,52 +93,52 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
     </div>
 
     <!-- Grid de Compartilhamento -->
-    <div style="display: grid; grid-template-columns: 1fr 240px; gap: 24px; margin-bottom: 24px; align-items: start;" class="invitation-grid">
+    <div class="invitation-grid u-grid u-cols-aside u-gap-6 u-mb-6 u-items-start">
       <!-- Coluna Principal: Links e Botões -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div class="u-flex u-flex-col u-gap-4">
 
         <!-- Link Direto (Recomendado) -->
-        <div class="card" style="padding: 20px; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label for="direct-link-input" style="font-weight: 600; font-size: 0.9rem; color: var(--brand-navy-900);">
-              🔗 Link Direto de Ativação (Recomendado)
+        <div class="card u-p-5 u-bg-neutral-white u-border u-bc-neutral-gray-300 u-radius-card u-shadow-sm">
+          <div class="u-flex u-justify-between u-items-center u-mb-2">
+            <label for="direct-link-input" class="u-font-semibold u-text-compact u-color-botanical-forest-900">
+              Link de ativação (mais fácil para o paciente)
             </label>
-            <span style="font-size: 0.75rem; background: #E5F0E5; color: #0F3E17; padding: 2px 8px; border-radius: 4px; font-weight: 600;">1 clique</span>
+            <span class="u-text-caption u-bg-botanical-sage-100 u-color-botanical-forest-900 u-py-0 u-px-2 u-radius-input u-font-semibold">1 clique</span>
           </div>
-          <p style="font-size: 0.825rem; color: #64748b; margin: 0 0 10px 0;">
+          <p class="u-text-compact u-color-neutral-gray-500 u-mt-0 u-mb-2 u-mx-0">
             O paciente clica no link e vai direto para a tela de confirmação e cadastro de senha, com seus dados já carregados.
           </p>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input id="direct-link-input" type="text" readonly value="<?= htmlspecialchars($directLink) ?>" style="flex: 1; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color: #334155;" data-select-all>
-            <button type="button" class="btn btn-primary" id="btn-copy-link" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
-              📋 Copiar Link
+          <div class="u-flex u-gap-2 u-items-center">
+            <input id="direct-link-input" type="text" readonly value="<?= htmlspecialchars($directLink) ?>" class="u-flex-1 u-py-2 u-px-3 u-font-mono u-text-compact u-border u-bc-border-input u-radius-input u-bg-neutral-gray-50 u-color-neutral-gray-700" data-select-all>
+            <button type="button" class="btn btn-primary u-py-2 u-px-4 u-text-compact u-nowrap" id="btn-copy-link">
+              Copiar link
             </button>
           </div>
-          <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
-            <a href="<?= htmlspecialchars($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn" style="background: #25D366; color: #fff; border: none; font-size: 0.85rem; padding: 8px 14px; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
-              <span>💬 Enviar via WhatsApp</span>
+          <div class="u-flex u-gap-2 u-mt-3 u-wrap">
+            <a href="<?= htmlspecialchars($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">
+              <span>Enviar via WhatsApp</span>
             </a>
-            <a href="<?= htmlspecialchars($directLink) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 0.85rem; padding: 8px 14px; text-decoration: none;">
+            <a href="<?= htmlspecialchars($directLink) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary u-text-compact u-py-2 u-px-3 u-no-underline">
               ↗ Abrir e Conferir Tela
             </a>
           </div>
         </div>
 
         <!-- Código de Convite Manual -->
-        <div class="card" style="padding: 20px; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label for="invitation-code" style="font-weight: 600; font-size: 0.9rem; color: var(--brand-navy-900);">
-              🔑 Código de Convite Individual
+        <div class="card u-p-5 u-bg-neutral-white u-border u-bc-neutral-gray-300 u-radius-card u-shadow-sm">
+          <div class="u-flex u-justify-between u-items-center u-mb-2">
+            <label for="invitation-code" class="u-font-semibold u-text-compact u-color-botanical-forest-900">
+              Código de convite individual
             </label>
-            <span style="font-size: 0.75rem; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Manual</span>
+            <span class="u-text-caption u-bg-neutral-gray-100 u-color-neutral-gray-600 u-py-0 u-px-2 u-radius-input u-font-semibold">Manual</span>
           </div>
-          <p style="font-size: 0.825rem; color: #64748b; margin: 0 0 10px 0;">
-            Caso o paciente acerte pelo portal geral <a href="/app" target="_blank" style="color: var(--brand-copper-600);">clyonutri.com/app</a> ou pelo aplicativo instalado:
+          <p class="u-text-compact u-color-neutral-gray-500 u-mt-0 u-mb-2 u-mx-0">
+            Caso o paciente acerte pelo portal geral <a href="/paciente/app" target="_blank" class="u-color-botanical-copper-600">clyonutri.com/paciente/app</a> ou pelo aplicativo instalado:
           </p>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input id="invitation-code" type="text" readonly value="<?= htmlspecialchars($code) ?>" style="flex: 1; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color: #334155; letter-spacing: 0.05em;" data-select-all>
-            <button type="button" class="btn btn-secondary" id="btn-copy-code" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
-              📋 Copiar Código
+          <div class="u-flex u-gap-2 u-items-center">
+            <input id="invitation-code" type="text" readonly value="<?= htmlspecialchars($code) ?>" class="u-flex-1 u-py-2 u-px-3 u-font-mono u-text-compact u-border u-bc-border-input u-radius-input u-bg-neutral-gray-50 u-color-neutral-gray-700 u-tracking-wide" data-select-all>
+            <button type="button" class="btn btn-secondary u-py-2 u-px-4 u-text-compact u-nowrap" id="btn-copy-code">
+              Copiar código
             </button>
           </div>
         </div>
@@ -128,55 +146,55 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
       </div>
 
       <!-- Coluna Lateral: QR Code Presencial -->
-      <div class="card" style="padding: 20px; background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-        <div style="font-weight: 600; font-size: 0.875rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-          QR Code Presencial
+      <div class="card u-p-5 u-bg-neutral-white u-border u-bc-neutral-gray-300 u-radius-card u-text-center u-shadow-sm">
+        <div class="u-font-semibold u-text-compact u-color-botanical-forest-900 u-mb-1">
+          QR code presencial
         </div>
-        <p style="font-size: 0.75rem; color: #64748b; margin: 0 0 12px 0;">
+        <p class="u-text-caption u-color-neutral-gray-500 u-mt-0 u-mb-3 u-mx-0">
           Aponte a câmera do celular do paciente para ativar agora
         </p>
-        <div id="app-qrcode" style="display: flex; justify-content: center; align-items: center; min-height: 160px; margin: 0 auto; background: #fff; padding: 8px; border-radius: 8px; border: 1px solid #f1f5f9;">
+        <div id="app-qrcode" class="u-flex u-justify-center u-items-center u-minh-area u-my-0 u-mx-auto u-bg-neutral-white u-p-2 u-radius-input u-border u-bc-neutral-gray-100">
           <!-- Renderizado via qrcode.min.js -->
         </div>
-        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 10px;">
+        <div class="u-text-caption u-color-neutral-gray-400 u-mt-2">
           Escaneie para abrir o portal web ou baixar o app
         </div>
       </div>
     </div>
 
     <!-- Instruções para o Nutricionista e Paciente -->
-    <div class="card" style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px;">
-      <h3 style="font-size: 1rem; font-weight: 600; color: var(--brand-navy-900); margin: 0 0 12px 0;">
-        Como funciona o Primeiro Acesso do Paciente?
+    <div class="card u-p-6 u-bg-neutral-gray-50 u-border u-radius-card u-mb-6">
+      <h3 class="u-text-body u-font-semibold u-color-botanical-forest-900 u-mt-0 u-mb-3 u-mx-0">
+        Como funciona o primeiro acesso do paciente?
       </h3>
-      <ol style="margin: 0; padding-left: 20px; color: #475569; font-size: 0.875rem; line-height: 1.6;">
-        <li style="margin-bottom: 6px;">
+      <ol class="u-m-0 u-pl-5 u-color-neutral-gray-600 u-text-compact u-leading-body">
+        <li class="u-mb-1">
           <strong>Envie o link ou código ao paciente:</strong> Utilize o botão de WhatsApp acima ou copie o link direto.
         </li>
-        <li style="margin-bottom: 6px;">
+        <li class="u-mb-1">
           <strong>O paciente abre o portal ou app:</strong> O link direciona para o portal seguro da clínica em qualquer dispositivo (navegador de celular, tablet ou computador).
         </li>
-        <li style="margin-bottom: 6px;">
+        <li class="u-mb-1">
           <strong>Confirmação de identidade:</strong> O paciente confere seu nome, telefone e e-mail e cadastra uma senha de 8 a 72 caracteres.
         </li>
-        <li style="margin-bottom: 0;">
+        <li class="u-mb-0">
           <strong>Acesso imediato:</strong> Ao concluir, o paciente já visualiza o plano alimentar, diário de refeições, registro de água e sala de teleconsulta.
         </li>
       </ol>
-      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 0.8rem; color: #64748b;">
-        🔒 <strong>Segurança LGPD:</strong> O convite é de uso único e privado. Gerar outro convite invalida este anterior automaticamente.
+      <div class="u-mt-4 u-pt-4 u-border-t u-text-compact u-color-neutral-gray-500">
+        <strong>Segurança LGPD:</strong> O convite é de uso único e privado. Gerar outro convite invalida este anterior automaticamente.
       </div>
     </div>
 
     <!-- Ações Inferiores -->
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div class="u-flex u-justify-between u-items-center u-wrap u-gap-3">
       <a class="btn btn-secondary" href="/pacientes/<?= (int)$patientId ?>">
         ← Concluir e Voltar ao Perfil
       </a>
-      <form method="post" action="/pacientes/<?= (int)$patientId ?>/convite-app" style="margin:0" data-confirm="Gerar um novo código invalidará o convite anterior. Deseja continuar?">
+      <form method="post" action="/pacientes/<?= (int)$patientId ?>/convite-app" class="u-m-0" data-confirm="Gerar um novo código invalidará o convite anterior. Deseja continuar?">
         <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
-        <button class="btn btn-outline" type="submit" style="font-size: 0.85rem;">
-          🔄 Gerar Novo Convite
+        <button class="btn btn-outline u-text-compact" type="submit">
+          Gerar novo convite
         </button>
       </form>
     </div>
@@ -184,13 +202,6 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
   <?php endif; ?>
 </div>
 
-<style>
-@media (max-width: 680px) {
-  .invitation-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-</style>
 
 <script src="/assets/js/qrcode.min.js"></script>
 <script nonce="<?= $nonce ?>">
@@ -203,8 +214,9 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
       text: directUrl,
       width: 160,
       height: 160,
-      colorDark: "#0f172a",
-      colorLight: "#ffffff",
+      // Canvas não entende var(); lê os tokens já resolvidos do design system.
+      colorDark: getComputedStyle(document.documentElement).getPropertyValue('--neutral-ink-900').trim() || 'black',
+      colorLight: getComputedStyle(document.documentElement).getPropertyValue('--neutral-white').trim() || 'white',
       correctLevel: QRCode.CorrectLevel.M
     });
   }
@@ -231,18 +243,15 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
   }
 
   function showCopied(btn, originalText) {
-    var originalBg = btn.style.background;
-    btn.textContent = '✓ Copiado!';
-    btn.style.background = '#0A7075';
-    btn.style.color = '#fff';
+    btn.textContent = 'Copiado!';
+    btn.classList.add('btn-success-solid');
     setTimeout(function() {
       btn.textContent = originalText;
-      btn.style.background = originalBg;
-      btn.style.color = '';
+      btn.classList.remove('btn-success-solid');
     }, 2000);
   }
 
-  setupCopyButton('btn-copy-link', 'direct-link-input', '📋 Copiar Link');
-  setupCopyButton('btn-copy-code', 'invitation-code', '📋 Copiar Código');
+  setupCopyButton('btn-copy-link', 'direct-link-input', 'Copiar Link');
+  setupCopyButton('btn-copy-code', 'invitation-code', 'Copiar Código');
 })();
 </script>

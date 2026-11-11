@@ -1,0 +1,103 @@
+/* NI2-627: operational aliases of the official Clinical Botanical palette. */
+:root{--op-primary:var(--botanical-green-600,#39734a);--op-primary-hover:var(--botanical-green-700,#2f6140);--op-ink:var(--neutral-ink-900,#1f2937);--op-muted:var(--neutral-gray-600,#475467);--op-surface:var(--neutral-white,#fff);--op-border:var(--border-input,#828b9b);--op-danger:var(--semantic-error,#b42318);--op-focus:var(--botanical-forest-900,#0f3e17);--op-space-1:.25rem;--op-space-2:.5rem;--op-space-3:.75rem;--op-space-4:1rem;--op-space-6:1.5rem;--op-radius:.5rem;--op-radius-card:.75rem;--op-z-header:20;--op-z-menu:40;--op-z-dialog:1000;--op-z-toast:1100;--op-font:Inter,system-ui,sans-serif;--op-text:.9375rem;--op-target:2.75rem}
+.op-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--op-space-2);min-height:var(--op-target);padding:.625rem 1rem;border:1px solid var(--op-border);border-radius:var(--op-radius);font:600 var(--op-text)/1.35 var(--op-font);cursor:pointer;text-decoration:none;white-space:normal;text-align:center}
+.op-button--primary{background:var(--op-primary);color:#fff;border-color:var(--op-primary)}.op-button--primary:hover{background:var(--op-primary-hover)}.op-button--secondary{background:var(--op-surface);color:var(--op-focus)}.op-button--destructive{background:var(--op-danger);border-color:var(--op-danger);color:#fff}
+.op-state{display:flex;align-items:center;flex-wrap:wrap;gap:var(--op-space-2);padding:var(--op-space-3) var(--op-space-4);margin-block:var(--op-space-3);border:1px solid var(--op-border);border-inline-start:4px solid var(--op-primary);border-radius:var(--op-radius);background:var(--op-surface);color:var(--op-ink);font-size:var(--op-text)}.op-state[data-state=editing],.op-state[data-state=conflict]{border-inline-start-color:var(--semantic-warning,#946200)}.op-state[data-state=error],.op-state[data-state=expired]{border-inline-start-color:var(--op-danger)}.op-state[data-state=saving]{border-inline-start-style:dashed}.op-state a{color:var(--op-focus);text-decoration:underline}.op-alert{display:flex;align-items:start;gap:var(--op-space-3);padding:var(--op-space-4);border:1px solid var(--op-border);border-radius:var(--op-radius);margin-block:var(--op-space-3);background:var(--op-surface);color:var(--op-ink)}.op-alert>span{display:grid;place-items:center;flex:none;width:1.5rem;height:1.5rem;border:2px solid currentColor;border-radius:50%;font-weight:800}.op-alert p{margin:.25rem 0 0}.op-alert--critical{border-inline-start:5px solid var(--op-danger)}.op-alert--warning{border-inline-start:5px solid var(--semantic-warning,#946200)}.op-alert--success{border-inline-start:5px solid var(--semantic-success,#0a7075)}
+.op-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:var(--op-space-3);align-items:end}.op-stack{display:grid;gap:var(--op-space-3)}.op-inline-form{margin-block:var(--op-space-4);padding:var(--op-space-4);border:1px solid var(--op-border);border-radius:var(--op-radius)}.op-inline-form label{display:block;font-weight:600}.op-inline-form input:not([type=checkbox]),.op-inline-form select,.op-inline-form textarea{box-sizing:border-box;max-width:100%;min-width:0;width:100%;min-height:var(--op-target);padding:.5rem .75rem;border:1px solid var(--op-border);border-radius:var(--op-radius);background:var(--op-surface);font:inherit;color:var(--op-ink)}.op-help{color:var(--op-muted);font-size:.875rem}.op-error{color:var(--op-danger);font-weight:600;overflow-wrap:anywhere}.op-menu{width:max-content;max-width:min(22rem,calc(100vw - 2rem));padding:.375rem;border:1px solid var(--op-border);border-radius:var(--op-radius);background:var(--op-surface);box-shadow:0 6px 24px #0002;z-index:var(--op-z-menu)}.op-menu a,.op-menu button{display:flex;min-height:var(--op-target);align-items:center;white-space:normal}
+:where(button,a,input,textarea,select,summary,[tabindex]):focus-visible{outline:3px solid var(--op-focus)!important;outline-offset:3px!important;scroll-margin-block:6rem}button,.btn,summary{touch-action:manipulation}.btn,button:not(.food-result__favorite):not(.food-result__equivalents),summary{min-height:24px;min-width:24px}label:has(>input[type=checkbox]),label:has(>input[type=radio]){min-height:24px;display:inline-flex;align-items:center;gap:.375rem}input[type=checkbox],input[type=radio]{min-width:1.125rem;min-height:1.125rem;flex:none}.btn[disabled],button:disabled{cursor:not-allowed;opacity:.65}
+[hidden]{display:none!important}.op-toast{position:fixed;inset:auto 1rem 1rem auto;max-width:min(28rem,calc(100vw - 2rem));z-index:var(--op-z-toast);background:var(--op-surface);border:2px solid var(--op-primary);border-radius:var(--op-radius);padding:1rem;box-shadow:0 6px 24px #0002}.op-progress{width:100%;accent-color:var(--op-primary)}
+@media(max-width:656px){.op-form-grid{grid-template-columns:minmax(0,1fr)}.op-button{width:100%}.op-state{align-items:flex-start}.op-inline-form{padding:var(--op-space-3)}.op-menu{max-height:70vh;overflow:auto}.cn-dialog__panel{max-width:calc(100vw - 1rem)!important;max-height:calc(100dvh - 1rem)!important;overflow:auto!important}.cn-anamnesis-index{position:static!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(forced-colors:active){.op-alert,.op-state,.op-button{border:2px solid CanvasText}:focus-visible{outline:3px solid Highlight!important}}
+.op-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.5rem;align-items:start}.op-week-day{min-width:0;border:1px solid var(--op-border);border-radius:var(--op-radius);overflow:hidden}.op-week-day h3{font-size:.9rem;margin:0;padding:.5rem;background:var(--botanical-sage-100,#e5f0e5)}.op-week-day h3 a{display:block;min-height:24px}.op-hour-list{list-style:none;margin:0;padding:0}.op-hour-row{display:grid;grid-template-columns:minmax(0,1fr);min-height:13rem;border-top:1px solid var(--neutral-gray-200,#e5e7eb);padding:.375rem;gap:.25rem}.op-hour-label{font-size:.75rem;color:var(--op-muted)}.op-hour-row>div{display:flex;flex-direction:column;gap:.25rem}.op-week-slot,.op-week-appointment{display:block;min-height:24px;padding:.25rem;border:1px solid var(--op-border);border-radius:.25rem;text-decoration:none;font-size:.75rem;overflow-wrap:anywhere}.op-week-slot{background:var(--op-surface);color:var(--op-focus)}.op-week-appointment{background:var(--botanical-sage-100,#e5f0e5);color:var(--op-ink)}.op-dialog-panel{background:var(--op-surface);padding:1.5rem;border-radius:var(--op-radius-card);max-width:32rem;margin:auto}#modal-ds-example{position:fixed;inset:0;background:#0008;z-index:var(--op-z-dialog);align-items:center;justify-content:center}
+@media(max-width:800px){.op-week-grid{grid-template-columns:minmax(0,1fr)}.op-hour-row{min-height:0;grid-template-columns:3rem minmax(0,1fr)}.op-hour-row:has(>div:empty){display:none}.op-week-slot,.op-week-appointment{min-height:44px;display:flex;align-items:center;padding:.5rem;font-size:.875rem}.op-hour-label{padding-top:.625rem}}
+@media(max-width:656px){.patient-tabs{overflow:visible;contain:none}.patient-tabs ul{min-width:0;flex-wrap:wrap}.patient-tabs a{padding:.375rem .625rem}.patient-header__actions{max-width:100%;flex-wrap:wrap}}
+.op-dialog-overlay{position:fixed;inset:0;background:#0008;z-index:var(--op-z-dialog);align-items:center;justify-content:center}
+@media(max-width:800px){.op-hour-row.is-empty{display:none}}
+/* v54.19: shared legacy primitives; identifiers and clinical validators stay intact. */
+.op-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr));gap:var(--op-space-4);margin-block:1rem}.op-category-grid .card{margin:0}.op-category-grid h2{font-size:1.15rem}.op-category-grid a{display:block;padding:.5rem 0;min-height:44px}.op-breadcrumb{display:flex;flex-wrap:wrap;gap:.5rem;margin-block:1rem}.op-settings-switch{margin-block:1rem}.cn-settings-nav-tabs{display:flex;flex-wrap:wrap;gap:.5rem;padding:1rem;border:1px solid var(--op-border);border-radius:var(--op-radius)}.cn-settings-nav-tabs a{display:flex;gap:.375rem;align-items:center;padding:.5rem;min-height:44px}.cn-settings-nav-tabs [aria-current=page]{font-weight:700;text-decoration:underline}
+.op-message{padding:1rem!important;margin-block:1rem!important;border:1px solid var(--op-border)!important;border-inline-start-width:5px!important;border-radius:var(--op-radius)!important;background:var(--op-surface)!important;color:var(--op-ink)!important;overflow-wrap:anywhere}.op-message--error{border-inline-start-color:var(--op-danger)!important}.op-message--warning{border-inline-start-color:var(--semantic-warning,#946200)!important}.op-message--info{border-inline-start-color:var(--op-focus)!important}.op-message--critical,.clinical-context__item.is-alert{border:2px solid var(--op-danger)!important;border-inline-start-width:6px!important;background:var(--op-surface)!important;color:var(--op-ink)!important}.op-message--success{border-inline-start-color:var(--semantic-success,#0a7075)!important}
+.care-flow__steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:.75rem;list-style:none;padding:0}.care-flow__step{min-width:0;padding:.75rem;border:1px solid var(--op-border);border-radius:var(--op-radius)}.care-flow__step>a{display:grid;gap:.375rem;overflow-wrap:anywhere}.care-flow__step details{margin-block-start:.75rem}.care-flow__step select{width:100%;min-width:0}.care-flow__step summary{min-height:44px}.op-context-panel{position:relative;max-width:100%;overflow-wrap:anywhere}.op-context-identity{padding:.75rem}.clinical-context__grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr))!important}
+:where(.card,.section-card,.rx-card) :where(button,.btn){max-width:100%;white-space:normal;overflow-wrap:anywhere}:where(.table-responsive){max-width:100%;overflow-x:auto}:where(.op-message,[role=alert]){scroll-margin-block:6rem}
+@media(min-width:1000px){body:has([data-quick-plan]) .op-context-panel{position:sticky;top:.5rem;z-index:5;max-height:45vh;overflow:auto;background:var(--op-surface)}}
+@media(max-width:656px){.care-flow__steps{grid-template-columns:minmax(0,1fr)}.op-context-panel{position:static!important}.rx-columns{grid-template-columns:minmax(0,1fr)!important}.rx-page{min-width:0}.cn-settings-nav-tabs{flex-direction:column}.op-breadcrumb{font-size:.9rem}}
+@media(forced-colors:active){.op-message,.clinical-context__item.is-alert{border-color:CanvasText!important}.op-message--critical{border-style:double!important}}
+.care-flow__step>a{height:auto!important}.care-flow__step{display:flex;flex-direction:column;gap:.5rem}.care-flow__step>details{margin-top:auto}
+.op-message:empty{padding:0!important;margin:0!important;border:0!important}
+
+/* v54.23: busca da Clyo Academy no topo do consultório. v54.24: .form-control e .btn do DS, só tokens */
+.app-header__search { position: relative; display: flex; align-items: center; gap: var(--space-2); flex: 0 1 360px; margin: 0 var(--space-4); }
+.app-header__search > .cn-icon { position: absolute; left: var(--space-3); top: 50%; transform: translateY(-50%); color: var(--neutral-gray-500); pointer-events: none; }
+.app-header__search .form-control { flex: 1; min-width: 0; width: auto; padding-left: var(--space-8); font-size: var(--font-size-compact); }
+.app-header__search .btn.btn { flex: 0 0 auto; min-height: var(--touch-target-min); padding: 0 var(--space-4); font-size: var(--font-size-compact); }
+@media (max-width: 900px) { .app-header__search { display: none; } }
+/* NI2-684: discovery by task and progressive settings forms. */
+.op-task-shortcuts{display:flex;flex-wrap:wrap;gap:.75rem;margin-block:1rem}.op-settings-task{border:1px solid var(--op-border);border-radius:var(--op-radius);margin-block:1rem;padding:.5rem;background:var(--op-surface)}.op-settings-task>summary{padding:.5rem;cursor:pointer;min-height:44px}.op-settings-task>summary h2{display:inline;font-size:1.1rem}.op-settings-task>form{margin-block:.75rem}.op-search-results{list-style:none;padding:0;display:grid;gap:.5rem}.op-search-results>li{padding:1rem;background:var(--op-surface);border:1px solid var(--op-border);border-radius:var(--op-radius)}.op-search-results a{display:block;min-height:44px;padding:.5rem 0;font-weight:700}.op-search-results small{display:block;color:var(--op-muted)}[id^=task-]{scroll-margin-top:6rem}.op-category-grid details>summary{min-height:44px;padding-block:.5rem}.op-category-grid li{margin-block:.5rem}.op-settings-task:has(:focus-visible){border-color:var(--op-focus)}
+@media(max-width:656px){.op-task-shortcuts{display:grid;grid-template-columns:minmax(0,1fr)}.op-settings-task>form{padding:1rem}}
+.settings-subnav a[aria-current=page]{color:#fff!important;background:var(--brand-botanical-900,#0F3E17)!important;font-weight:700}
+@media(forced-colors:active){.settings-subnav a[aria-current=page]{color:HighlightText!important;background:Highlight!important;outline:2px solid CanvasText}}
+/* NI2-685: current clinical context remains available without a floating mobile layer. */
+[data-clinical-context]{margin-block:1rem;scroll-margin-block:5rem;isolation:isolate}[data-clinical-context] summary{gap:.35rem;overflow-wrap:anywhere}[data-clinical-context] .clinical-context__hint{display:block;flex-basis:100%}[data-clinical-context] p{overflow-wrap:anywhere}[data-clinical-context] .clinical-context__grid dd{margin-inline-start:0}[data-clinical-context] .clinical-context__grid a{display:inline-block;min-height:24px}[data-clinical-context] [data-testid=transversal-summary]{margin:.75rem}[data-clinical-context] .clinical-context__item{min-width:0}
+@media(min-width:1000px){[data-clinical-context]{position:sticky;top:.5rem;z-index:5;max-height:42vh;overflow:auto;background:var(--op-surface)}.cn-dialog__panel [data-clinical-context]{position:static;max-height:none;overflow:visible}}
+@media(max-width:999px){[data-clinical-context]{position:static!important;max-height:none!important}.clinical-context__grid{grid-template-columns:minmax(0,1fr)!important}}
+@media print{[data-clinical-context]{position:static!important;max-height:none!important;overflow:visible!important}}
+.cn-dialog__panel [data-clinical-context]{position:static!important;max-height:none!important;overflow:visible!important}
+
+/* v54.29: size by available space, including zoom without a media-query change. */
+.app-header {
+  height: auto;
+  min-height: 64px;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+.app-header > * { min-width: 0; max-width: 100%; }
+.app-header__tenant, .app-header__user { flex-wrap: wrap; overflow-wrap: anywhere; }
+.app-header__tenant-name { min-width: 0; overflow-wrap: anywhere; }
+.app-header__user { margin-inline-start: auto; }
+.app-header__user > span { min-width: 0; overflow-wrap: anywhere; }
+.app-header__search { flex-wrap: wrap; margin-inline: 0; }
+.patient-tabs { overflow: visible; contain: none; }
+.patient-tabs ul { min-width: 0; flex-wrap: wrap; }
+.patient-tabs li { min-width: 0; max-width: 100%; }
+.patient-tabs a { max-width: 100%; overflow-wrap: anywhere; }
+/* Keep selected exam metadata readable against the existing sage selection surface. */
+.ex-item.is-checked .ex-item-meta { color: var(--neutral-gray-700); }
+/* NI2-630: retain visible focus and minimum non-inline targets across shared controls. */
+:where(button, summary, [role="button"]):not([hidden]) { min-width: 24px; min-height: 24px; }
+:where(input[type="checkbox"], input[type="radio"]):not([hidden]):not(.visually-hidden):not(.sr-only) { min-width: 24px; min-height: 24px; }
+.patient-match-option { min-height: 44px; }
+.patient-match-option[aria-selected="true"] { outline: 2px solid var(--op-focus); outline-offset: -2px; background: var(--botanical-sage-100); color: var(--op-ink); }
+.op-menu, [data-more-actions-menu] { overscroll-behavior: contain; }
+.cn-dialog-is-open { overscroll-behavior: contain; }
+.cn-dialog-is-open:focus-visible { outline-offset: -4px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .cn-dialog-is-open, .modal-overlay, .modal { animation: none !important; transition: none !important; }
+}
+@media (forced-colors: active) {
+  .patient-match-option[aria-selected="true"] { outline-color: Highlight; background: Highlight; color: HighlightText; }
+  .op-message--critical { border-style: double !important; }
+}
+
+/* Atomic foreground/background changes avoid transient low-contrast action labels. */
+.btn { transition-property: box-shadow, transform; }
+/* Native table semantics and one keyboard-scrollable wrapper for comparison history. */
+.an-table { display: table !important; overflow: visible !important; }
+@media(max-width:768px){.agenda-day-table thead { display:table-header-group!important;position:absolute;width:1px!important;height:1px!important;padding:0!important;border:0!important;clip-path:inset(50%);overflow:hidden;white-space:nowrap; }}
+@container agenda-day (max-width:900px){.agenda-day-table thead { display:table-header-group!important;position:absolute;width:1px!important;height:1px!important;padding:0!important;border:0!important;clip-path:inset(50%);overflow:hidden;white-space:nowrap; }}
+.session-warning {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: min(360px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+/* The skip link must be visible as soon as it receives keyboard focus. */
+.skip-link, .skip-clinical-content {
+  transition: none;
+  max-width: calc(100vw - 2rem);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

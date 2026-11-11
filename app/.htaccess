@@ -1,5 +1,12 @@
+# v20: a pasta app/ continua bloqueada; só a URL exata /app (link antigo do convite)
+# passa, para o .htaccess da raiz redirecionar (301) para /paciente/app.
 <IfModule mod_authz_core.c>
-    Require all denied
+    <If "%{REQUEST_URI} =~ m#^/app/?$#">
+        Require all granted
+    </If>
+    <Else>
+        Require all denied
+    </Else>
 </IfModule>
 <IfModule !mod_authz_core.c>
     Order allow,deny

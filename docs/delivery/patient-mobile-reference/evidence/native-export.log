@@ -1,0 +1,19 @@
+Starting Metro Bundler
+iOS Bundled 1909ms node_modules/expo/AppEntry.js (677 modules)
+Android Bundled 2726ms node_modules/expo/AppEntry.js (701 modules)
+
+Exporting 3 assets:
+assets/clyonutri-logo-dark.png (11 kB)
+assets/clyonutri-logo-light.png (12.9 kB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf (56.2 kB)
+
+Exporting 1 bundle for ios:
+_expo/static/js/ios/AppEntry-6ee6fb8c53359fb63c8fef689d26ba81.hbc (1.98 MB)
+
+Exporting 1 bundle for android:
+_expo/static/js/android/AppEntry-aa893755df5bffc2436b0c1acd432a0f.hbc (1.99 MB)
+
+Exporting 1 file:
+metadata.json (626 B)
+
+App exported to: /tmp/clyonutri-patient-ds-test-07x6ak/native

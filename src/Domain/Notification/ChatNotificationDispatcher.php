@@ -28,8 +28,8 @@ use PDO;
 final class ChatNotificationDispatcher
 {
     public const EVENT = 'chat.message_created';
-    public const TITLE = 'Nova mensagem no ClyoNutri';
-    public const BODY = 'Você recebeu uma nova mensagem no chat do consultório. Entre no ClyoNutri para ler.';
+    public const TITLE = 'Nova mensagem no Clyo Nutri';
+    public const BODY = 'Você recebeu uma nova mensagem no chat do consultório. Entre no Clyo Nutri para ler.';
     private const EMAIL_COOLDOWN_MINUTES = 30;
 
     private PDO $db;
@@ -118,7 +118,7 @@ final class ChatNotificationDispatcher
         $link = $base !== '' ? ($type === 'professional' ? $base . '/chat/' . $conversationId : $base . '/') : null;
         $text = "Olá,\n\n" . self::BODY . ($link ? "\n\nAcesse: {$link}" : '') . "\n\nPor segurança, o conteúdo da mensagem não vai por e-mail.\n" . \ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE;
         $html = '<p>Olá,</p><p>' . htmlspecialchars(self::BODY) . '</p>'
-            . ($link ? '<p><a href="' . htmlspecialchars($link) . '">Abrir o ClyoNutri</a></p>' : '')
+            . ($link ? '<p><a href="' . htmlspecialchars($link) . '">Abrir o Clyo Nutri</a></p>' : '')
             . '<p>Por segurança, o conteúdo da mensagem não vai por e-mail.</p><p>' . htmlspecialchars(\ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE) . '</p>';
         try {
             $message = new MailMessage($address, $name, self::TITLE, $html, $text);

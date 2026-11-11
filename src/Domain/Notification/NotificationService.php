@@ -40,33 +40,83 @@ final class NotificationService
     public const EVENTS = [
         'chat.message_created' => [
             'category' => 'chat', 'critical' => false, 'immediate' => true, 'quiet' => 'skip',
-            'title' => 'Nova mensagem no ClyoNutri',
-            'body' => 'Você recebeu uma nova mensagem no chat do consultório. Entre no ClyoNutri para ler.',
+            'title' => 'Nova mensagem no Clyo Nutri',
+            'body' => 'Você recebeu uma nova mensagem no chat do consultório. Entre no Clyo Nutri para ler.',
             'push_body' => 'Você tem uma mensagem nova do consultório. Abra o app para ler.',
+        ],
+        'booking.waitlist_offer' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Uma vaga está disponível',
+            'body' => 'Há uma oferta com prazo na sua lista de espera. Entre no Portal do Paciente para conferir o horário e aceitar. A oferta não confirma uma consulta.',
+            'push_body' => 'Há uma atualização na sua lista de espera. Abra o portal para conferir.',
         ],
         'appointment.reminder' => [
             'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Lembrete de consulta',
-            'body' => 'Você tem consulta marcada em {date} às {time}. Abra o ClyoNutri para ver os detalhes.',
+            'body' => 'Você tem consulta marcada em {date} às {time}. Abra o Clyo Nutri para ver os detalhes.',
             'push_body' => 'Sua consulta está chegando. Abra o app para ver o dia e o horário.',
+        ],
+        'appointment.scheduled' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Agendamento recebido',
+            'body' => 'Seu agendamento para {date} às {time} ({timezone}), modalidade {modality}, foi registrado e aguarda confirmação. Acesse o portal para acompanhar.',
+            'push_body' => 'Há uma atualização da sua consulta. Abra o app para acompanhar.',
+        ],
+        'appointment.confirmed' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Consulta confirmada',
+            'body' => 'Sua consulta de {date} às {time} ({timezone}), modalidade {modality}, está confirmada. Acesse o portal autenticado para ver os detalhes e as instruções de acesso.',
+            'push_body' => 'Há uma atualização da sua consulta. Abra o app para acompanhar.',
+        ],
+        // NI2-481 P1f: o paciente agiu sobre a consulta -> avisa o profissional (sem nome do paciente; detalhes no app).
+        'appointment.confirmed_by_patient' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Paciente confirmou a consulta',
+            'body' => 'Um paciente confirmou a consulta de {date} às {time}. Abra o Clyo Nutri para ver os detalhes.',
+            'push_body' => 'Um paciente confirmou uma consulta. Abra o app para ver.',
+        ],
+        'appointment.cancelled_by_patient' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Paciente cancelou a consulta',
+            'body' => 'Um paciente cancelou a consulta de {date} às {time}. Abra o Clyo Nutri para ver a agenda.',
+            'push_body' => 'Um paciente cancelou uma consulta. Abra o app para ver.',
+        ],
+        'appointment.reschedule_requested' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Pedido de reagendamento',
+            'body' => 'Um paciente pediu para remarcar a consulta de {date} às {time}. Abra o Clyo Nutri para responder.',
+            'push_body' => 'Um paciente pediu para remarcar. Abra o app para responder.',
+        ],
+        // O profissional respondeu o pedido de remarcação -> avisa o paciente.
+        'appointment.reschedule_approved' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Reagendamento confirmado',
+            'body' => 'Seu pedido de remarcação foi aceito. A nova data é {date} às {time}. Abra o Clyo Nutri para ver.',
+            'push_body' => 'Seu reagendamento foi aceito. Abra o app para ver a nova data.',
+        ],
+        'appointment.reschedule_declined' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Pedido de reagendamento não aceito',
+            'body' => 'Seu pedido de remarcação não foi aceito. Sua consulta segue no horário atual. Abra o Clyo Nutri para ver as opções.',
+            'push_body' => 'Seu pedido de remarcação não foi aceito. Abra o app para ver.',
         ],
         'meal_plan.published' => [
             'category' => 'plan', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Plano alimentar disponível',
-            'body' => 'Seu plano alimentar foi atualizado pelo consultório. Abra o ClyoNutri para ver.',
+            'body' => 'Seu plano alimentar foi atualizado pelo consultório. Abra o Clyo Nutri para ver.',
             'push_body' => 'O consultório deixou uma novidade para você. Abra o app para ver.',
         ],
         // Check-in diário (NI2-96), criados por CheckinNotificationScheduler. Sem notas, adesão, energia ou fome.
         'checkin.reminder' => [
             'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'skip',
             'title' => 'Lembrete de check-in',
-            'body' => 'Quando puder, registre seu check-in de hoje no app ClyoNutri. Leva menos de um minuto.',
+            'body' => 'Quando puder, registre seu check-in de hoje no app Clyo Nutri. Leva menos de um minuto.',
             'push_body' => 'Quando puder, registre seu check-in de hoje no app.',
         ],
         'checkin.submitted' => [
             'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Check-in recebido',
-            'body' => 'Um novo check-in foi enviado. Entre no ClyoNutri para ver.',
+            'body' => 'Um novo check-in foi enviado. Entre no Clyo Nutri para ver.',
             'push_body' => 'Um novo check-in foi enviado.',
         ],
     ];
@@ -79,7 +129,7 @@ final class NotificationService
         'patient' => ['checkin' => ['email_enabled' => false, 'push_enabled' => true]],
     ];
     public const MAX_ATTEMPTS = 3;
-    public const PUSH_TITLE = 'ClyoNutri';
+    public const PUSH_TITLE = 'Clyo Nutri';
     /** Espera antes de cada nova tentativa de push (minutos); o tamanho define o máximo de tentativas (1 + 3). */
     public const PUSH_RETRY_MINUTES = [1, 5, 15];
     public const RECEIPT_DELAY_MINUTES = 15;
@@ -454,16 +504,20 @@ final class NotificationService
     /** @return array{status: string, reason: ?string} */
     private function deliver(int $deliveryId): array
     {
-        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical, e.read_at, e.created_at
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.title, e.body, e.link, e.critical, e.read_at, e.created_at, e.dedupe_key
             FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
         $st->execute([$deliveryId]);
         $d = $st->fetch(PDO::FETCH_ASSOC);
+        $st->closeCursor();
         if (!$d) {
             return ['status' => 'failed', 'reason' => 'event_missing'];
         }
         $def = self::EVENTS[$d['event_type']] ?? ['immediate' => false, 'quiet' => 'defer'];
         $attempts = (int)$d['attempts'];
         $critical = (bool)$d['critical'];
+        if ($d['recipient_type'] === StaffNotificationService::RECIPIENT_TYPE) {
+            return $this->deliverStaff($deliveryId, $d, $attempts);
+        }
         try {
             $prefs = $this->preferences((int)$d['clinic_id'], (string)$d['recipient_type'], (int)$d['recipient_id']);
             $cat = null;
@@ -506,11 +560,11 @@ final class NotificationService
             }
             $base = rtrim((string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), '/');
             $url = $base !== '' ? $base . ($d['link'] && str_starts_with((string)$d['link'], '/') ? $d['link'] : '/') : null;
-            $text = "Olá,\n\n" . $d['body'] . ($url ? "\n\nAcesse: {$url}" : '') . "\n\nPor segurança, os detalhes ficam só no ClyoNutri."
+            $text = "Olá,\n\n" . $d['body'] . ($url ? "\n\nAcesse: {$url}" : '') . "\n\nPor segurança, os detalhes ficam só no Clyo Nutri."
                 . "\nVocê pode mudar estes avisos no seu perfil.";
             $html = '<p>Olá,</p><p>' . htmlspecialchars((string)$d['body']) . '</p>'
-                . ($url ? '<p><a href="' . htmlspecialchars($url) . '">Abrir o ClyoNutri</a></p>' : '')
-                . '<p>Por segurança, os detalhes ficam só no ClyoNutri.<br>Você pode mudar estes avisos no seu perfil.</p>';
+                . ($url ? '<p><a href="' . htmlspecialchars($url) . '">Abrir o Clyo Nutri</a></p>' : '')
+                . '<p>Por segurança, os detalhes ficam só no Clyo Nutri.<br>Você pode mudar estes avisos no seu perfil.</p>';
             if ($d['event_type'] === 'chat.message_created') {
                 $text .= "\n" . \ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE;
                 $html .= '<p>' . htmlspecialchars(\ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE) . '</p>';
@@ -534,15 +588,80 @@ final class NotificationService
         }
     }
 
+    /**
+     * v34: e-mail de aviso do backoffice (recipient_type = staff). Curto e sem dado de terceiros: só diz que há
+     * aviso novo e aponta para a central. Sem horário de silêncio (a equipe não usa). Mesmas regras de status e
+     * de nova tentativa da entrega comum (MAX_ATTEMPTS, espera crescente).
+     *
+     * @param array<string,mixed> $d
+     */
+    private function deliverStaff(int $deliveryId, array $d, int $attempts): array
+    {
+        try {
+            $staff = new StaffNotificationService($this->db, $this->mailer, $this->clock);
+            $userId = (int)$d['recipient_id'];
+            if ($d['channel'] !== 'email') {
+                return $this->finish($deliveryId, 'skipped', 'channel_unused', $attempts);
+            }
+            if ($d['read_at'] !== null) {
+                return $this->finish($deliveryId, 'skipped', 'already_read', $attempts);
+            }
+            if (!$staff->emailWanted($userId, (string)$d['event_type'])) {
+                return $this->finish($deliveryId, 'skipped', 'preference_off', $attempts);
+            }
+            $u = $this->db->prepare("SELECT email, role FROM users WHERE id = ? AND status = 'active'");
+            $u->execute([$userId]);
+            $row = $u->fetch(PDO::FETCH_ASSOC);
+            if (!$row || !StaffNotificationService::roleReceives((string)$row['role'], (string)$d['event_type'])) {
+                return $this->finish($deliveryId, 'skipped', 'recipient_inactive', $attempts);
+            }
+            $address = strtolower(trim((string)$row['email']));
+            if ($address === '' || !filter_var($address, FILTER_VALIDATE_EMAIL)) {
+                return $this->finish($deliveryId, 'skipped', 'no_email', $attempts);
+            }
+            $describe = MailerFactory::describe();
+            if ($this->mailer === null && (in_array($describe['driver'], ['null', 'none'], true) || !empty($describe['problems']))) {
+                return $this->finish($deliveryId, 'skipped', 'mail_disabled', $attempts);
+            }
+            $base = rtrim((string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), '/');
+            $url = $base !== '' ? $base . '/admin/notificacoes' : null;
+            $title = (string)$d['title']; // texto fixo do catálogo; nunca nome, clínica ou e-mail
+            $text = "Olá,\n\nHá um aviso novo para você na central do Clyo Nutri: {$title}."
+                . ($url ? "\n\nAbrir a central: {$url}" : '')
+                . "\n\nPor segurança, os detalhes ficam só no console."
+                . "\nVocê escolhe quais avisos chegam por e-mail em Notificações > Preferências.";
+            $html = '<p>Olá,</p><p>Há um aviso novo para você na central do Clyo Nutri: ' . htmlspecialchars($title) . '.</p>'
+                . ($url ? '<p><a href="' . htmlspecialchars($url) . '">Abrir a central</a></p>' : '')
+                . '<p>Por segurança, os detalhes ficam só no console.<br>Você escolhe quais avisos chegam por e-mail em Notificações &gt; Preferências.</p>';
+            try {
+                ($this->mailer ?? MailerFactory::fromEnv())->send(new MailMessage($address, '', 'Clyo Nutri: ' . $title, $html, $text));
+            } catch (\Throwable $e) {
+                $reason = str_contains($e->getMessage(), 'não configurado') ? 'mail_not_configured' : 'mail_error';
+                $attempts++;
+                if ($reason === 'mail_error' && $attempts < self::MAX_ATTEMPTS) {
+                    $this->db->prepare("UPDATE notification_deliveries SET status = 'queued', reason = ?, attempts = ?, next_attempt_at = ?, updated_at = ? WHERE id = ?")
+                        ->execute([self::safeReason($reason), $attempts, date('Y-m-d H:i:s', $this->ts() + 900 * $attempts), $this->now(), $deliveryId]);
+                    return ['status' => 'queued', 'reason' => $reason];
+                }
+                return $this->finish($deliveryId, 'failed', $reason, $attempts);
+            }
+            return $this->finish($deliveryId, $this->mailer === null && !$describe['delivers'] ? 'logged' : 'sent', null, $attempts + 1);
+        } catch (\Throwable $e) {
+            error_log('v34 entrega de aviso da equipe falhou: ' . get_class($e));
+            return $this->finish($deliveryId, 'failed', 'internal_error', $attempts + 1);
+        }
+    }
+
     // ---------------------------------------------------------------- push (Expo)
 
     /** Carrega a entrega e decide; devolve o resultado final ou ['tokens' => ..., ...] quando está pronta para sair. */
     private function pushPrecheck(int $deliveryId): array
     {
-        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.critical, e.read_at, e.created_at
+        $st = $this->db->prepare('SELECT d.id, d.channel, d.attempts, e.id AS event_id, e.clinic_id, e.event_type, e.category, e.recipient_type, e.recipient_id, e.critical, e.read_at, e.created_at, e.dedupe_key
             FROM notification_deliveries d JOIN notification_events e ON e.id = d.event_id WHERE d.id = ?');
         $st->execute([$deliveryId]);
         $d = $st->fetch(PDO::FETCH_ASSOC);
+        $st->closeCursor();
         if (!$d) {
             return ['status' => 'failed', 'reason' => 'event_missing'];
         }
@@ -780,6 +899,12 @@ final class NotificationService
     /** Lembrete de check-in que perdeu o sentido: ela já fez o check-in do dia, ou o dia já passou. */
     private function staleReason(array $d): ?string
     {
+        if (($d['event_type'] ?? '') === 'booking.waitlist_offer') {
+            return (new \ClyoNutri\Domain\Booking\BookingWaitlistService($this->db))->staleOffer($d, $this->ts());
+        }
+        if (in_array($d['event_type'] ?? '', ['appointment.scheduled', 'appointment.confirmed'], true)) {
+            return (new AppointmentConfirmationPublisher($this->db))->staleReason($d, $this->ts());
+        }
         if (($d['event_type'] ?? '') !== 'checkin.reminder') {
             return null;
         }

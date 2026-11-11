@@ -1,0 +1,98 @@
+COMPARAÇÃO v42 x v43 (por conteúdo, sha256 de cada arquivo)
+
+v42: clyonutri-v42.zip (sha256 0f3ac4a9f36fa8a20806bfe0b62ca507d230abb6c0fdd983eee79e191b4c9775)  730 itens (arquivos e pastas vazias)
+v43: clyonutri-v43.zip  745 itens (esta lista inclui o próprio COMPARACAO-V42-V43.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 715 (vendor/ inteiro, as migrações 1 a 62, os SQL manuais da v39, v41 e v42, os LEIA-ME e COMPARACAO anteriores, SubscriptionService.php e o restante de src/ e views/)
+Adicionados: 15 (14 + este arquivo)
+Removidos: 0
+Alterados: 15
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v43.md  -> novo: o que muda, SQL da migração 63 aguardando OK, ordem v39, v41, v42 e v43, aviso clínico, USDA opcional, conferências e como voltar
+  bin/importar_usda_fdc.php  -> novo: importação do USDA FoodData Central (Foundation Foods, CSV); sem --apply só conta; nunca sobrescreve
+  database/manual/atualizacao-v43-completa.sql  -> novo: 16 colunas, 6 índices, tabelas food_favorites, food_search_selections e food_equivalence_rules (BIGINT, sem FKs), preenche edição e código das linhas TACO e registra a 63; pode rodar duas vezes
+  database/manual/atualizacao-v43-preflight.sql  -> novo: só leitura; diz se o banco está pronto para a 63 (exige a 62), em estado parcial ou já migrado
+  database/manual/atualizacao-v43-verificacao.sql  -> novo: confere tabelas, colunas, índices, registro da 63 e linhas TACO com edição
+  database/migrations/2026_10_29_000063_food_provenance_equivalence_and_template_targets.php  -> novo: migração 63 (mesma estrutura do SQL manual)
+  docs/benchmark-webdiet/FONTES-E-LICENCAS-V43.md  -> novo: fontes pesquisadas, trechos de licença, links e decisão de cada uma
+  docs/evidencias/ni2-519-520/SMOKE-V43-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (dados TESTE)
+  src/Application/Controllers/FoodEquivalenceController.php  -> novo: /alimentos/equivalencias (criar, editar, revisar, arquivar) e sugestões de troca por item do plano, com escopo de clínica e auditoria
+  src/Domain/Food/FoodCategory.php  -> novo: nome canônico dos grupos TACO e as grafias antigas da base
+  src/Domain/Food/FoodEquivalenceService.php  -> novo: regras da clínica (fonte obrigatória, revisão por CRN), veredito da troca e sugestões dentro da tolerância
+  src/Domain/Food/FoodSourceImporter.php  -> novo: importação de base externa sem sobrescrever (versão nova vira linha nova, a anterior fica is_current = 0)
+  src/Domain/Food/UsdaFdcImporter.php  -> novo: leitura do CSV do USDA com a origem de cada valor em nutrient_flags
+  views/foods/equivalence_rules.php  -> novo: tela de regras de equivalência da clínica
+  COMPARACAO-V42-V43.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  RELEASE_INFO.json  -> alterado: versão v43, base clyonutri-v42.zip (sha256 0f3ac4a9…), arquivos novos e alterados com hashes, SQL aguardando OK
+  database/instalacao_mysql8.sql  -> alterado: colunas, índices e tabelas da 63 e registro da migração
+  public/assets/css/clinical-journeys.css  -> alterado: estilos de preparo não informado, botão de favorito e lista de trocas sugeridas
+  public/assets/js/food-picker.js  -> alterado: mostra fonte e edição, favorito e registra a seleção e a troca de seleção
+  public/index.php  -> alterado: rotas de favorito, seleção, equivalências, sugestões, aprovação e visibilidade de modelo
+  src/Application/Controllers/DashboardController.php  -> alterado: método do plano, veredito e trocas sugeridas nas substituições, barra de totais com a meta de referência do modelo e campos de visibilidade e meta ao salvar modelo
+  src/Application/Controllers/FoodSearchController.php  -> alterado: fonte, preparo e favoritos no resultado; métricas de seleção e correção; relatório com correções
+  src/Application/Controllers/MealPlanTemplateController.php  -> alterado: visibilidade pessoal ou da clínica, aprovação por titular e selo na lista
+  src/Domain/Food/FoodCatalogService.php  -> alterado: filtro e lista de grupos juntam as grafias antigas do mesmo grupo TACO
+  src/Domain/Food/FoodSearchIndex.php  -> alterado: desempate por favorito e preparo; sinônimos contam nos grupos de relevância
+  src/Domain/Food/TacoCatalogImporter.php  -> alterado: grava edição, código e data e não sobrescreve linha de outra fonte ou de outra edição
+  src/Domain/MealPlan/MealPlanService.php  -> alterado: plano qualitativo publica sem itens só com orientação escrita; nova versão mantém modelo de origem, método e meta de referência
+  src/Domain/MealPlan/MealPlanTemplateService.php  -> alterado: visibilidade, aprovação, método e meta de referência; usar modelo gera cópia com a origem
+  views/foods/search_report.php  -> alterado: seção de correções de escolha
+  views/meal_plans/templates.php  -> alterado: selos de pessoal, aprovado e método, meta de referência e botões de aprovar e de visibilidade
+
+== FORA DO ZIP (testes, no repositório) ==
+  tests/ni2_519_520_v43_units_test.php  -> novo: unidades (grupos, tolerância, método, preparo, sinônimos, leitura do USDA, proteção da TACO)
+  tests/ni2_519_520_v43_http_test.php  -> novo: rotas da v43 por HTTP, incluindo isolamento por clínica e permissões
+  tests/ni2_519_520_v43_sql_manual_test.php  -> novo: SQL manual da v43 (estrutura igual à migração, guardas de segunda execução, SQL anteriores intactos)
+  tests/admin_comercial_assinantes_test.php  -> alterado: última migração agora é a 63
+  tests/assinaturas_faltantes_sql_test.php  -> alterado: última migração agora é a 63
+  tests/v34_central_notificacoes_test.php  -> alterado: última migração agora é a 63
+  tests/food_catalog_pagination_test.php  -> alterado: filtro por grupo aceita as grafias antigas do mesmo grupo
+  tests/ni2_514_v42_phase2_http_test.php  -> alterado: a comparação sem regra agora mostra o veredito sem_regra
+  docs/evidencias/ni2-519-520/01 a 08 (*.png)  -> novos: capturas da v43; o empacotador tira as imagens do zip, cópias em v43-evidencias
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS (no zip) ==
+5e930f5be29c7d6e10eeed7429de1f7b82d1c42fdc0de9597a46713772bbb812  LEIA-ME-HOSTGATOR-v43.md
+8abe0e727905d39995939f1301e2aad4f1832ea0381f7e81f653293202063497  bin/importar_usda_fdc.php
+e22a7e744e813e94f0f0533c42725dd959dec9d9126050ff30fc5aa93b2bb767  database/manual/atualizacao-v43-completa.sql
+700ee0c34979352aa6fb86f8dc37549b549646a47440eadbae20d8150ca08ecb  database/manual/atualizacao-v43-preflight.sql
+f8863f2622b647f4eadafb5850b9ceac593e0374d3306ae97061ffd90b80590d  database/manual/atualizacao-v43-verificacao.sql
+d058fbd7c1ee119d9e9e055919e293d492e4386b39dffac3b1e2e1a20f6ab28f  database/migrations/2026_10_29_000063_food_provenance_equivalence_and_template_targets.php
+861c2a60a88161bf5ff9d0b1dfc39ff524c02258a32db8d8bbb4eff5368580ea  docs/benchmark-webdiet/FONTES-E-LICENCAS-V43.md
+adfe167099b4eee5f0cfd8636bea5c70d02075eb16d6df87a820174b94506059  docs/evidencias/ni2-519-520/SMOKE-V43-mysql57.txt
+81617f960f7ff7cb3b013b242705dedec23d1355b65822985e0301c8ea1bacc6  src/Application/Controllers/FoodEquivalenceController.php
+97a9f78b49011d97426f4051c2bb4e8a15a9f996f609420b53639f5948a9fbdd  src/Domain/Food/FoodCategory.php
+c26edfe1b7e6020ebde7fe636ac5a9bb1e4bcf576b68dff4c5fbe58caaea7760  src/Domain/Food/FoodEquivalenceService.php
+15c69da37d375852dbe4f26c6fe54624261d58e9c1983516378fea17e42190ac  src/Domain/Food/FoodSourceImporter.php
+bd91182936b82b9a136610e0714f29258a6e525c0b788e75f158969dee8259e9  src/Domain/Food/UsdaFdcImporter.php
+18384db4d36280ce0f466749c3779d36e2b95d6b79b1e49159d2befad1c6a75c  views/foods/equivalence_rules.php
+8fe560244d78c0b0b6422a1a4c56d5eaa19ba6a3251a2c52432fe6090a791712  RELEASE_INFO.json
+890994910e672e274a0bfa381caa5c75f1c7649500264caaf85f820765fe3dce  database/instalacao_mysql8.sql
+2e5f6ce4d3fb693c27ace77ea6683f6589e3c9c8fc2cd9f11b2d9378e611fbe8  public/assets/css/clinical-journeys.css
+aa3acdcdac3d40c2b16aabb4806131d60ce0ebbda603ce6d56d5e26be7a6d865  public/assets/js/food-picker.js
+70c9635610b1b0d69b48e5efe05723f0ee1a454c76b529e1b7d5293f2ccd59c7  public/index.php
+b319f79c7e5039bcf89510a62f130093e47cb0f74488ad42a04fdbbd0bf9929d  src/Application/Controllers/DashboardController.php
+9669a8c8c61af5de25cff7459f06f401d5d64b2bb8e9a45d90c64ee9b159f983  src/Application/Controllers/FoodSearchController.php
+2f84994bad07bc4ff617dfe11dc8cec1f0a294a6d0f5669ab237f0a63e0c294c  src/Application/Controllers/MealPlanTemplateController.php
+0865c1b4b04c7986daf05737f1946568662fbabc326ebc9d9dba49b06e7d9a56  src/Domain/Food/FoodCatalogService.php
+b6d31ccee13dd3ff22c129f59dcb4fd609367f86fbf7339e21e23ac301c3fbe8  src/Domain/Food/FoodSearchIndex.php
+c72842c64e1c71f22f613ee3c208f5d6bf10b62faf66bb24fde956059c798c57  src/Domain/Food/TacoCatalogImporter.php
+a20c4910f857a803592291ba2f1150818db457ad9f924f2df0b031d17ef74e2c  src/Domain/MealPlan/MealPlanService.php
+c091d975631f84246c4366bb3494758ff573dd3191ca1394adae5bce918a2c89  src/Domain/MealPlan/MealPlanTemplateService.php
+0c747c87539868ccb94630be30a281025d6a862484605a79120f7e118cf046d2  views/foods/search_report.php
+0b75e0d178426dcf364f6bcd75983e6913bb391705e8dbd70f3448bd249471cc  views/meal_plans/templates.php
+
+== SHA256 DOS TESTES FORA DO ZIP ==
+656d5d44dde5cdae6c0a673fafbe878c2f150fe24fa4c42258b577b4f68e4ffd  tests/ni2_519_520_v43_units_test.php
+e25d9ba2addb8ed3b922494812e19f17e4a4ecb5e86486f415ab463e1d82095d  tests/ni2_519_520_v43_http_test.php
+b9769ff1b112ec0d56532d44ca232de2623afc9f119378f257fa6e9f77b71108  tests/ni2_519_520_v43_sql_manual_test.php
+7e030bfde7fd3660de0d494d8e7641374286fba22322769dac085c0101bd99c4  tests/admin_comercial_assinantes_test.php
+fc3619bfd7d9ea83e9e04bfcc2c01e170f96b62a0a10506487636991411df56b  tests/assinaturas_faltantes_sql_test.php
+ce0e03560d3bc5ccc8fe0061508b996d3cd904c6c0dd2e31208a63166485200b  tests/v34_central_notificacoes_test.php
+fbeb6333fcd2b286b59f9e2321b82041cfbd0325823c4e9a2cc8a1ecf3c6450b  tests/food_catalog_pagination_test.php
+1ce44313b9d1ecebee3f98ec41225532f3499146ac8970eb96341fccb2a6bb9b  tests/ni2_514_v42_phase2_http_test.php

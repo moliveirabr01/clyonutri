@@ -12,44 +12,44 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal do Paciente — ClyoNutri</title>
-  <link rel="stylesheet" href="/assets/css/design-system.css">
+  <title>Portal do Paciente · Clyo Nutri</title>
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <style>
     :root {
       /* Clinical Botanical (NI2-25) com o contraste da NI2-140 (A8): copper-600 só em texto e link, ação em verde. Os nomes --brand-* são legados e ficam só por
          compatibilidade; o valor é a paleta oficial. */
-      --botanical-forest-950: #0A2A10;
-      --botanical-forest-900: #0F3E17;
-      --botanical-green-600: #39734A;
-      --botanical-green-700: #2F6140;
-      --botanical-sage-200: #D3E5D5;
-      --botanical-sage-100: #E5F0E5;
-      --botanical-cream-50: #FAF9F4;
-      --botanical-copper-600: #B04A1B;
+      --botanical-forest-950: var(--botanical-forest-950, #0A2A10);
+      --botanical-forest-900: var(--botanical-forest-900, #0F3E17);
+      --botanical-green-600: var(--botanical-green-600, #39734A);
+      --botanical-green-700: var(--botanical-green-700, #2F6140);
+      --botanical-sage-200: var(--botanical-sage-200, #D3E5D5);
+      --botanical-sage-100: var(--botanical-sage-100, #E5F0E5);
+      --botanical-cream-50: var(--botanical-cream-50, #FAF9F4);
+      --botanical-copper-600: var(--botanical-copper-600, #B04A1B);
       --brand-navy-950: var(--botanical-forest-950);
       --brand-navy-900: var(--botanical-forest-900);
       --brand-copper-600: var(--botanical-copper-600);
-      --brand-copper-500: #EF8F4F;
+      --brand-copper-500: var(--botanical-copper-500, #EF8F4F);
       --neutral-50: var(--botanical-cream-50);
-      --brand-muted: #667085;
-      --neutral-100: #F1F5F9;
-      --neutral-200: #E2E8F0;
-      --neutral-600: #475569;
+      --brand-muted: var(--neutral-gray-500, #667085);
+      --neutral-100: var(--neutral-gray-100, #F4F5F6);
+      --neutral-200: var(--neutral-gray-200, #E5E7EB);
+      --neutral-600: var(--neutral-gray-600, #475467);
       --neutral-900: var(--botanical-forest-900);
     }
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--botanical-cream-50);
-      color: #1F2A22;
+      color: var(--botanical-forest-900, #0F3E17);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
     .portal-header {
       background: #fff;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--neutral-gray-200, #E5E7EB);
       padding: 16px 24px;
       display: flex;
       justify-content: space-between;
@@ -60,7 +60,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       align-items: center;
       gap: 12px;
       text-decoration: none;
-      color: #0F3E17;
+      color: var(--botanical-forest-900, #0F3E17);
       font-weight: 700;
       font-size: 1.1rem;
     }
@@ -82,7 +82,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     }
     .portal-card {
       background: #fff;
-      border: 1px solid #E3E8DF;
+      border: 1px solid var(--botanical-sage-200, #D3E5D5);
       border-radius: 16px;
       padding: 32px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
@@ -102,13 +102,13 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       display: block;
       font-size: 0.875rem;
       font-weight: 600;
-      color: #334155;
+      color: var(--neutral-gray-700, #344054);
       margin-bottom: 6px;
     }
     .form-control {
       width: 100%;
       padding: 10px 14px;
-      border: 1px solid #858D9C;
+      border: 1px solid var(--border-input, #828B9B);
       border-radius: 8px;
       font-size: 0.95rem;
       box-sizing: border-box;
@@ -148,11 +148,11 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       background: var(--botanical-green-700);
     }
     .alert-error {
-      background: #fef2f2;
-      border-left: 4px solid #ef4444;
+      background: var(--semantic-error-light, #FEE2E2);
+      border-left: 4px solid var(--semantic-error, #B42318);
       padding: 14px 16px;
       border-radius: 6px;
-      color: #991b1b;
+      color: var(--semantic-error-strong, #912018);
       font-size: 0.9rem;
       margin-bottom: 20px;
     }
@@ -169,7 +169,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       border: none;
       font-weight: 600;
       font-size: 0.95rem;
-      color: #475569;
+      color: var(--neutral-gray-600, #475467);
       cursor: pointer;
       min-height: 44px;
       border-bottom: 2px solid transparent;
@@ -189,12 +189,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       margin-top: 24px;
     }
     .feature-item {
-      background: #F3F7F1;
+      background: var(--botanical-sage-100, #E5F0E5);
       border: 1px solid var(--botanical-sage-200);
       padding: 12px;
       border-radius: 8px;
       font-size: 0.85rem;
-      color: #475569;
+      color: var(--neutral-gray-600, #475467);
     }
     .sr-only {
       position: absolute;
@@ -216,13 +216,15 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       }
     }
   </style>
+<script src="/assets/js/validacao-ptbr.js" defer></script>
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
 </head>
 <body>
 
   <header class="portal-header">
-    <a href="/app" class="portal-header__brand">
+    <a href="/paciente/app" class="portal-header__brand">
       <img src="/assets/clyonutri-icon.png" alt="" width="28" height="28" style="border-radius:6px;">
-      <span>ClyoNutri</span>
+      <span>Clyo Nutri</span>
     </a>
     <span class="portal-header__badge">Portal do Paciente</span>
   </header>
@@ -231,7 +233,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     <div class="portal-card">
 
       <?php if (!empty($error)): ?>
-        <div class="alert-error" role="alert">
+        <div class="op-message op-message--error alert-error" role="alert">
           <strong>Atenção:</strong> <?= htmlspecialchars($error) ?>
         </div>
       <?php endif; ?>
@@ -242,15 +244,15 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--botanical-sage-100); color: var(--botanical-green-600); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.5rem;" aria-hidden="true">
             <?= htmlspecialchars(mb_substr((string)($preview['patient']['name'] ?? 'P'), 0, 1)) ?>
           </div>
-          <h1 style="font-size: 1.4rem; font-weight: 700; color: #0F3E17; margin: 0 0 6px 0;">
+          <h1 style="font-size: 1.4rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 6px 0;">
             Olá, <?= htmlspecialchars($preview['patient']['name']) ?>!
           </h1>
-          <p style="color: #64748b; font-size: 0.9rem; margin: 0; line-height: 1.5;">
+          <p style="color: var(--neutral-gray-500, #667085); font-size: 0.9rem; margin: 0; line-height: 1.5;">
             Seu nutricionista <strong><?= htmlspecialchars($preview['professional_name']) ?></strong> (<?= htmlspecialchars($preview['clinic_name']) ?>) preparou seu acesso exclusivo ao aplicativo.
           </p>
         </div>
 
-        <form method="POST" action="/app/primeiro-acesso">
+        <form method="POST" action="/paciente/app/primeiro-acesso">
           <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
           <input type="hidden" name="invitation_code" value="<?= htmlspecialchars((string)$codeVal) ?>">
 
@@ -282,9 +284,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
 
           <div style="margin-bottom: 24px;">
-            <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 0.85rem; color: #475569; cursor: pointer;">
+            <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 0.85rem; color: var(--neutral-gray-600, #475467); cursor: pointer;">
               <input type="checkbox" name="terms_accepted" value="1" required style="margin-top: 3px;">
-              <span>Li e concordo com os <a href="/termos" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Termos de Uso<span class="sr-only"> (abre em nova aba)</span></a> e a <a href="/privacidade" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></a> do ClyoNutri.</span>
+              <span>Li e concordo com os <a href="/termos" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Termos de Uso<span class="sr-only"> (abre em nova aba)</span></a> (versão <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::TERMS_VERSION) ?>) e a <a href="/privacidade" target="_blank" style="color: var(--brand-copper-600); text-decoration: underline;">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></a> (versão <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::PRIVACY_VERSION) ?>) do Clyo Nutri.</span>
             </label>
           </div>
 
@@ -294,25 +296,25 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </form>
 
         <div style="text-align: center; margin-top: 20px;">
-          <a href="/app" style="color: #475569; font-size: 0.85rem;">Voltar ao início</a>
+          <a href="/paciente/app" style="color: var(--neutral-gray-600, #475467); font-size: 0.85rem;">Voltar ao início</a>
         </div>
 
       <?php elseif ($step === 'activated'): ?>
         <!-- Tela de Sucesso da Ativação -->
         <div style="text-align: center; padding: 12px 0;">
-          <div style="width: 56px; height: 56px; border-radius: 50%; background: #E3F4F2; color: #0A5F63; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 2rem;" aria-hidden="true">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--semantic-success-light, #E3F4F2); color: var(--semantic-success-text, #0A5F63); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 2rem;" aria-hidden="true">
             ✓
           </div>
-          <h1 style="font-size: 1.5rem; font-weight: 700; color: #0F3E17; margin: 0 0 8px 0;">
+          <h1 style="font-size: 1.5rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 8px 0;">
             Acesso ativado
           </h1>
-          <p style="color: #475569; font-size: 0.95rem; margin: 0 0 24px 0; line-height: 1.5;">
-            Parabéns, <strong><?= htmlspecialchars($patient['name'] ?? 'Paciente') ?></strong>! Sua senha foi criada e seu perfil está pronto para uso.
+          <p style="color: var(--neutral-gray-600, #475467); font-size: 0.95rem; margin: 0 0 24px 0; line-height: 1.5;">
+            Tudo certo, <strong><?= htmlspecialchars($patient['name'] ?? 'Paciente') ?></strong>. Sua senha foi criada e você já pode usar o app.
           </p>
 
-          <div style="background: #F3F7F1; border: 1px solid var(--botanical-sage-200); border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px;">
-            <h3 style="font-size: 0.9rem; font-weight: 700; color: #0F3E17; margin: 0 0 8px 0;">O que você pode fazer agora:</h3>
-            <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: #475569; line-height: 1.6;">
+          <div style="background: var(--botanical-sage-100, #E5F0E5); border: 1px solid var(--botanical-sage-200); border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px;">
+            <h3 style="font-size: 0.9rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 8px 0;">O que você pode fazer agora:</h3>
+            <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--neutral-gray-600, #475467); line-height: 1.6;">
               <li>Acessar seu plano alimentar e prescrições em tempo real.</li>
               <li>Registrar fotos das suas refeições no diário alimentar.</li>
               <li>Acompanhar sua meta de hidratação diária.</li>
@@ -321,7 +323,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            <a href="/app" class="btn-submit" style="display: block; text-decoration: none; text-align: center;">
+            <a href="/paciente/app" class="btn-submit" style="display: block; text-decoration: none; text-align: center;">
               Ir para o meu portal
             </a>
             <div style="font-size: 0.8rem; color: var(--brand-muted); margin-top: 8px;">
@@ -330,47 +332,80 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           </div>
         </div>
 
+      <?php elseif ($step === 'accept_terms'): ?>
+        <?php /* NI2-449: aceite da versão vigente dos Termos e da Política antes de seguir */ ?>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="font-size: 1.35rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 6px 0;">Antes de continuar</h1>
+          <p style="color: var(--neutral-gray-600, #475467); font-size: 0.9rem; margin: 0;">
+            Os textos abaixo têm versão nova ou ainda não temos registro do seu aceite. Leia e confirme para seguir.
+          </p>
+        </div>
+        <ul style="list-style: none; padding: 0; margin: 0 0 20px;">
+          <?php foreach (($pendingLegal ?? []) as $legalDoc): ?>
+            <li style="border: 1px solid var(--border-input, #828B9B); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;">
+              <a href="<?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::url($legalDoc)) ?>" target="_blank" rel="noopener" style="color: var(--brand-copper-600); font-weight: 600; text-decoration: underline;"><?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::title($legalDoc)) ?><span class="sr-only"> (abre em nova aba)</span></a>
+              <span style="display: block; font-size: 0.85rem; color: var(--neutral-gray-500, #667085); margin-top: 4px;">Versão <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::currentVersion($legalDoc)) ?>, de <?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::date($legalDoc)) ?>.</span>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+        <form method="POST" action="/paciente/app/aceite-termos">
+          <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
+          <?php foreach (($pendingLegal ?? []) as $legalDoc): ?>
+            <input type="hidden" name="<?= htmlspecialchars($legalDoc) ?>_version" value="<?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::currentVersion($legalDoc)) ?>">
+          <?php endforeach; ?>
+          <div style="margin-bottom: 20px;">
+            <label for="legal-accepted" style="display: flex; gap: 10px; align-items: flex-start; min-height: 44px; font-size: 0.9rem; color: var(--neutral-gray-600, #475467); cursor: pointer;">
+              <input type="checkbox" id="legal-accepted" name="accepted" value="1" required style="width: 20px; height: 20px; min-width: 20px; margin-top: 2px;">
+              <span>Li e aceito os textos acima.</span>
+            </label>
+          </div>
+          <button type="submit" class="btn-submit">Li e aceito</button>
+        </form>
+
       <?php elseif ($step === 'logged_in'): ?>
+        <p><a href="/paciente/consultas">Agendar e gerenciar minhas consultas</a></p>
+        <p><a href="/paciente/prescricoes">Minhas prescrições de manipulados e suplementação</a></p>
+        <p><a href="/paciente/materiais" data-testid="patient-materials-link">Meus materiais (orientações, receitas e listas)</a></p>
         <!-- Painel Rápido do Paciente Autenticado -->
         <div style="text-align: center; margin-bottom: 24px;">
-          <h1 style="font-size: 1.4rem; font-weight: 700; color: #0F3E17; margin: 0 0 6px 0;">
+          <h1 style="font-size: 1.4rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 6px 0;">
             Área do Paciente
           </h1>
-          <p style="color: #64748b; font-size: 0.9rem; margin: 0;">
-            Acesso conectado ao ClyoNutri
+          <p style="color: var(--neutral-gray-500, #667085); font-size: 0.9rem; margin: 0;">
+            Acesso conectado ao Clyo Nutri
           </p>
         </div>
 
         <div class="feature-list" style="margin-bottom: 24px;">
           <div class="feature-item">
-            <strong style="color: #0F3E17; display: block; margin-bottom: 4px;">Plano alimentar</strong>
+            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Plano alimentar</strong>
             Consulte suas refeições prescritas, gramas e opções de substituição.
           </div>
           <div class="feature-item">
-            <strong style="color: #0F3E17; display: block; margin-bottom: 4px;">Hidratação e diário</strong>
+            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Hidratação e diário</strong>
             Registre água e acompanhe seu consumo ao longo do dia.
           </div>
           <div class="feature-item">
-            <strong style="color: #0F3E17; display: block; margin-bottom: 4px;">Teleconsultas</strong>
+            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Teleconsultas</strong>
             Acesse a sala virtual sem instalar nada.
           </div>
           <div class="feature-item">
-            <strong style="color: #0F3E17; display: block; margin-bottom: 4px;">Chat com o nutricionista</strong>
+            <strong style="color: var(--botanical-forest-900, #0F3E17); display: block; margin-bottom: 4px;">Chat com o nutricionista</strong>
             Envie dúvidas e compartilhe sua rotina.
           </div>
         </div>
 
         <div style="text-align: center;">
-          <a href="/app" style="color: var(--brand-copper-600); font-size: 0.85rem; font-weight: 600;">Sessão ativa · Atualizar página</a>
+          <a href="/paciente/app" style="color: var(--brand-copper-600); font-size: 0.85rem; font-weight: 600;">Sessão ativa · Atualizar página</a>
         </div>
 
       <?php else: ?>
         <!-- Tela Inicial: Abas Primeiro Acesso e Login -->
         <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="font-size: 1.35rem; font-weight: 700; color: #0F3E17; margin: 0 0 6px 0;">
-            Acompanhe seu plano no ClyoNutri
+          <h1 style="font-size: 1.35rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin: 0 0 6px 0;">
+            Acompanhe seu plano no Clyo Nutri
           </h1>
-          <p style="color: #64748b; font-size: 0.875rem; margin: 0;">
+          <p style="color: var(--neutral-gray-500, #667085); font-size: 0.875rem; margin: 0;">
             Acesse seu plano alimentar, diário e consultas de qualquer dispositivo.
           </p>
         </div>
@@ -386,7 +421,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
         <!-- Aba 1: Primeiro Acesso com Código -->
         <div id="tab-first" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-first">
-          <form method="GET" action="/app">
+          <form method="GET" action="/paciente/app">
             <div class="form-group">
               <label class="form-label" for="code-input">Código do convite</label>
               <input class="form-control" id="code-input" type="text" name="code" required placeholder="Cole o código recebido do seu nutricionista" value="<?= htmlspecialchars((string)$codeVal) ?>" style="font-family: monospace; font-size: 0.85rem;" aria-describedby="code-help">
@@ -402,7 +437,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
 
         <!-- Aba 2: Login com Credenciais -->
         <div id="tab-login" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-login" hidden>
-          <form method="POST" action="/app/login">
+          <form method="POST" action="/paciente/app/login">
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
             <div class="form-group">
               <label class="form-label" for="login-input">E-mail ou celular</label>
@@ -417,7 +452,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             </button>
           </form>
           <div style="text-align: center; margin-top: 14px;">
-            <a href="/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600);">
+            <a href="/paciente/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600);">
               Esqueci minha senha
             </a>
           </div>
@@ -439,10 +474,10 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   </main>
 
   <footer class="portal-footer">
-    <div>&copy; <?= date('Y') ?> ClyoNutri • Acompanhamento nutricional.</div>
+    <div>&copy; <?= date('Y') ?> Clyo Nutri • Acompanhamento nutricional.</div>
     <div style="margin-top: 4px;">
-      <a href="/termos" style="color: #64748b; text-decoration: none;">Termos de Uso</a> •
-      <a href="/privacidade" style="color: #64748b; text-decoration: none;">Política de Privacidade</a>
+      <a href="/termos" style="color: var(--neutral-gray-500, #667085); text-decoration: none;">Termos de Uso</a> •
+      <a href="/privacidade" style="color: var(--neutral-gray-500, #667085); text-decoration: none;">Política de Privacidade</a>
     </div>
   </footer>
 

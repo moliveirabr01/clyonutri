@@ -94,7 +94,11 @@ class PasswordResetService
         }
 
         // 1. Verificação de Rate Limiting / Anti-Abuso (15 minutos)
-        $this->assertRateLimitNotExceeded($email, $ipAddress);
+        $genericMessage = 'Se esse e-mail tiver cadastro, enviamos um link para criar uma nova senha. Ele vale por 30 minutos. Confira também o spam.';
+        if (!(new \ClyoNutri\Core\Security\PasswordResetRateLimiter($this->db))->attempt($email, $ipAddress)) {
+            return ['success' => true, 'email' => $email, 'user_found' => false,
+                'email_sent' => false, 'expires_at' => null, 'message' => $genericMessage];
+        }
 
         // 2. Busca do usuário na base
         $stmt = $this->db->prepare("
@@ -107,8 +111,6 @@ class PasswordResetService
         ");
         $stmt->execute(['email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        $genericMessage = 'Se o e-mail informado estiver cadastrado em nossa base, enviamos um link de recuperação com validade de 30 minutos. Verifique sua caixa de entrada e pasta de spam.';
 
         // Se o usuário não existir ou estiver inativo, registra log de segurança mas retorna a MESMA mensagem (não enumerável)
         if (!$user || $user['status'] !== 'active') {
@@ -216,7 +218,7 @@ class PasswordResetService
 
         $stmt = $this->db->prepare("
             SELECT pr.email, pr.token, pr.created_at, pr.expires_at,
-                   u.id AS user_id, u.uuid AS user_uuid, u.name AS user_name, u.status AS user_status,
+                   u.id AS user_id, u.uuid AS user_uuid, u.name AS user_name, u.status AS user_status, u.role AS user_role,
                    cm.clinic_id
             FROM password_resets pr
             JOIN users u ON LOWER(u.email) = LOWER(pr.email)
@@ -231,8 +233,9 @@ class PasswordResetService
             return null;
         }
 
-        // Verifica status da conta
-        if ($row['user_status'] !== 'active') {
+        // Verifica status da conta. 'invited' (v33): equipe convidada que ainda vai definir a primeira senha.
+        // Suspensa e bloqueada nunca redefinem senha por token.
+        if (!in_array((string)$row['user_status'], ['active', 'invited'], true)) {
             return null;
         }
 
@@ -251,8 +254,11 @@ class PasswordResetService
             'user_id' => (int)$row['user_id'],
             'user_uuid' => $row['user_uuid'],
             'user_name' => $row['user_name'],
+            'user_role' => (string)($row['user_role'] ?? ''),
+            'user_status' => (string)$row['user_status'],
             'clinic_id' => !empty($row['clinic_id']) ? (int)$row['clinic_id'] : null,
             'expires_at' => $row['expires_at'],
+            'password_min_length' => PasswordPolicy::minLengthForRole((string)($row['user_role'] ?? '')),
         ];
     }
 
@@ -285,20 +291,37 @@ class PasswordResetService
         $email = (string)$validToken['email'];
         $clinicId = $validToken['clinic_id'];
 
+        // v33: equipe da plataforma exige senha mais forte (mínimo 12, letra e número/símbolo)
+        $policyError = PasswordPolicy::violation($newPassword, (string)($validToken['user_role'] ?? ''), $email);
+        if ($policyError !== null) {
+            throw new InvalidArgumentException($policyError);
+        }
+
+        $firstPassword = ((string)($validToken['user_status'] ?? 'active')) === 'invited';
         $newPasswordHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
 
         $this->db->beginTransaction();
         try {
+            // Reivindica o token exato antes de qualquer efeito; validação anterior pode estar obsoleta.
+            $claim = $this->db->prepare('DELETE FROM password_resets WHERE token = :token AND LOWER(email) = :email AND expires_at > :now');
+            $claim->execute(['token' => (string)$validToken['token_hash'], 'email' => strtolower($email), 'now' => self::nowUtc()]);
+            if ($claim->rowCount() !== 1) {
+                throw new InvalidArgumentException('Link de recuperação inválido ou expirado. Por favor, solicite um novo.');
+            }
             // 1. Atualiza hash da senha do usuário
             $upd = $this->db->prepare("
                 UPDATE users
-                SET password_hash = :hash, auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id
+                SET password_hash = :hash, status = 'active', auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND status IN ('active', 'invited')
             ");
             $upd->execute([
                 'hash' => $newPasswordHash,
                 'id' => $userId,
             ]);
+
+            if ($upd->rowCount() !== 1) {
+                throw new InvalidArgumentException('Link de recuperação inválido ou expirado. Por favor, solicite um novo.');
+            }
 
             // 2. Remove o token utilizado (garantindo Single-Use)
             $delToken = $this->db->prepare("DELETE FROM password_resets WHERE token = :token OR LOWER(email) = :email");
@@ -331,21 +354,54 @@ class PasswordResetService
                     'email' => $email,
                     'sessions_revoked' => true,
                     'method' => 'token_recovery',
+                    'first_password' => $firstPassword,
                 ]
             );
 
             $this->db->commit();
 
+            // v34: convite da equipe aceito (primeira senha) avisa os superadmins. Nunca lança.
+            if ($firstPassword && !$this->db->inTransaction()) {
+                (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyStaffInviteAccepted($userId);
+            }
+
             return [
                 'success' => true,
                 'user_id' => $userId,
                 'email' => $email,
-                'message' => 'Senha alterada com sucesso! Você já pode entrar com sua nova senha.',
+                'message' => 'Senha alterada. Já dá para entrar com a nova senha.',
             ];
         } catch (\Throwable $e) {
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * v33: emite um token de uso único para a administração (convite de equipe ou redefinição pedida por
+     * um superadmin), com validade própria. Só o HASH vai ao banco; o token em claro é devolvido uma vez
+     * ao chamador, que o entrega por e-mail ou o mostra uma única vez. Substitui qualquer token anterior
+     * do mesmo e-mail. Não abre transação própria: o chamador decide (usa a mesma conexão).
+     *
+     * @return array{token:string, expires_at:string} expires_at em UTC (DATETIME)
+     */
+    public function issueAdminToken(string $email, int $validitySeconds): array
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || $validitySeconds < 60) {
+            throw new InvalidArgumentException('Pedido de token inválido.');
+        }
+        $token = bin2hex(random_bytes(32));
+        $this->db->prepare('DELETE FROM password_resets WHERE LOWER(email) = :email')->execute(['email' => $email]);
+        $expiresAt = self::nowUtc($validitySeconds);
+        $this->db->prepare('INSERT INTO password_resets (email, token, created_at, expires_at) VALUES (:email, :token, :created_at, :expires_at)')
+            ->execute([
+                'email' => $email,
+                'token' => self::hashToken($token),
+                'created_at' => self::nowUtc(),
+                'expires_at' => $expiresAt,
+            ]);
+        return ['token' => $token, 'expires_at' => $expiresAt];
     }
 
     /**
@@ -382,56 +438,6 @@ class PasswordResetService
         $stmt = $this->db->prepare("DELETE FROM password_resets WHERE expires_at <= :now");
         $stmt->execute(['now' => self::nowUtc()]);
         return $stmt->rowCount();
-    }
-
-    /**
-     * Validação estrita de rate limiting (máximo 5 pedidos por e-mail e 10 por IP nos últimos 15 min).
-     */
-    private function assertRateLimitNotExceeded(string $email, ?string $ipAddress): void
-    {
-        $cutoff15m = self::nowUtc(-900); // audit_logs desta classe são gravados em UTC
-
-        // 1. Checagem por e-mail
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM audit_logs
-            WHERE action = 'PASSWORD_RESET_REQUESTED'
-              AND details LIKE :emailPattern
-              AND created_at >= :cutoff
-        ");
-        $stmt->execute([
-            'emailPattern' => '%' . $email . '%',
-            'cutoff' => $cutoff15m,
-        ]);
-        $countEmail = (int)$stmt->fetchColumn();
-
-        if ($countEmail >= self::MAX_REQUESTS_PER_EMAIL_15M) {
-            throw new RuntimeException(
-                'Muitas solicitações de recuperação para este e-mail em um curto intervalo. ' .
-                'Por segurança, aguarde alguns minutos antes de tentar novamente.'
-            );
-        }
-
-        // 2. Checagem por IP
-        if ($ipAddress !== null && $ipAddress !== '') {
-            $stmtIp = $this->db->prepare("
-                SELECT COUNT(*) FROM audit_logs
-                WHERE action IN ('PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_ATTEMPT_UNKNOWN')
-                  AND ip_address = :ip
-                  AND created_at >= :cutoff
-            ");
-            $stmtIp->execute([
-                'ip' => $ipAddress,
-                'cutoff' => $cutoff15m,
-            ]);
-            $countIp = (int)$stmtIp->fetchColumn();
-
-            if ($countIp >= self::MAX_REQUESTS_PER_IP_15M) {
-                throw new RuntimeException(
-                    'Muitas solicitações originadas deste endereço IP. ' .
-                    'Por segurança, aguarde alguns minutos antes de tentar novamente.'
-                );
-            }
-        }
     }
 
     /**

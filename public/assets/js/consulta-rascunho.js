@@ -53,7 +53,7 @@
     if (!statusEl) return;
     statusEl.textContent = text;
     statusEl.dataset.tone = tone || 'info';
-    statusEl.dataset.state = state || 'idle';
+    statusEl.dataset.state = ({salvando:'saving',salvo:'saved',erro:'error',conflito:'conflict'}[state]||state||'not_started');
     if (correlationId) {
       statusEl.dataset.correlationId = correlationId;
     } else {
@@ -63,6 +63,18 @@
   function hhmm(utc) { if (!utc) return ''; var d = new Date(utc.replace(' ', 'T') + 'Z'); return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
   function values() { var o = { version: version }; names.forEach(function (n) { var el = form.elements[n]; o[n] = el ? el.value : ''; }); return o; }
 
+  function norm(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+  function sameAsServer(payload, server) {
+    return names.every(function (n) { return n === 'evolution_summary' ? String(payload[n] || '') === String(server[n] || '') : norm(payload[n]) === norm(server[n]); });
+  }
+  // v20: ao voltar pelo botão "Voltar" (página restaurada do cache), a versão embutida no HTML pode estar velha.
+  window.addEventListener('pageshow', function (ev) {
+    if (!ev.persisted) return;
+    fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && typeof j.version === 'number' && sameAsServer(values(), j)) { version = j.version; inConflict = false; } })
+      .catch(function () {});
+  });
   function backupLocally(payload) {
     try { window.sessionStorage.setItem(storageKey, JSON.stringify({ scope: scope, savedAt: Date.now(), values: payload })); } catch (e) {}
   }
@@ -98,13 +110,11 @@
         clearLocalBackup();
         return;
       }
-      names.forEach(function (n) {
-        var el = form.elements[n];
-        if (el && typeof saved.values[n] === 'string') el.value = saved.values[n];
-      });
-      dirty = true;
-      say('Alterações locais não enviadas foram restauradas nesta aba. Salvando rascunho…', 'warn', 'salvando');
-      timer = setTimeout(save, 400);
+      var restore=document.createElement('button');restore.type='button';restore.className='op-button op-button--secondary';restore.textContent='Restaurar e tentar salvar cópia local não confirmada';
+      var note=document.createElement('p');note.className='op-help';note.textContent='A tela mostra o último rascunho confirmado pelo servidor. Há também uma cópia temporária local, sem confirmação de salvamento.';
+      restore.addEventListener('click',function(){names.forEach(function(n){var el=form.elements[n];if(el&&typeof saved.values[n]==='string')el.value=saved.values[n];});dirty=true;say('Em edição — cópia local ainda não confirmada.','warn','editing');restore.remove();note.remove();timer=setTimeout(save,400);});
+      statusEl.after(note,restore);
+
     } catch (e) {}
   }
 
@@ -136,11 +146,25 @@
       })
       .then(function (res) {
         if (res.status === 409 || (res.body && res.body.status === 'conflict')) {
+          // v20: falso conflito — o servidor já tem exatamente este texto (ex.: a 1ª tentativa gravou mas a
+          // resposta se perdeu e o retry foi com a versão antiga, ou a página voltou do cache do "Voltar").
+          if (res.body && res.body.server && sameAsServer(payload, res.body.server) && typeof res.body.version === 'number') {
+            version = res.body.version; inConflict = false;
+            if (!dirty) clearLocalBackup();
+            say('Salvo como rascunho.', 'ok', 'salvo');
+            return true;
+          }
           version = (res.body && typeof res.body.version === 'number') ? res.body.version : version;
           dirty = true;
           inConflict = true;
           backupLocally(payload);
-          say('Conflito de versão: outra aba salvou alterações mais recentes (v' + version + '). Edite o campo para confirmar e sobrescrever com o texto desta aba ou recarregue a página.', 'warn', 'conflito');
+          say('Conflito de edição — outra aba salvou alterações. Compare antes de escolher; nada foi sobrescrito.', 'warn', 'conflict');
+          form.querySelector('[data-draft-conflict]')?.remove();
+          var panel=document.createElement('section');panel.setAttribute('data-draft-conflict','');panel.className='op-alert op-alert--warning';
+          var area=document.createElement('div'),title=document.createElement('strong');title.textContent='Respostas atualmente salvas';area.append(title);
+          names.forEach(function(n){var label=document.createElement('p');label.textContent=({evolution_summary:'Anotações',weight_kg:'Peso',waist_cm:'Cintura'}[n])+': '+String(res.body.server?.[n]||'Não informado');area.append(label);});
+          var keep=document.createElement('button');keep.type='button';keep.className='op-button op-button--secondary';keep.textContent='Retomar o salvo';keep.addEventListener('click',function(){submitting=true;location.reload();});
+          var mine=document.createElement('button');mine.type='button';mine.className='op-button op-button--secondary';mine.textContent='Comparei: salvar alterações desta aba';mine.addEventListener('click',function(){inConflict=false;dirty=true;panel.remove();save();});area.append(keep,mine);panel.append(area);statusEl.after(panel);
           return false;
         }
         if (res.redirected || res.status === 401 || res.status === 403 || (res.body && (res.body.status === 'unauthenticated' || res.body.status === 'forbidden'))) {
@@ -148,7 +172,7 @@
           backupLocally(payload);
           if (statusEl) statusEl.dataset.authExpired = '1';
           var authMsg = (res.body && res.body.error) || 'Sessão expirada ou token inválido (HTTP ' + (res.status || 401) + ').';
-          say(authMsg + ' Seu texto está preservado nesta aba; recarregue a página ou faça login em outra aba para continuar.', 'error', 'erro');
+          say(authMsg + ' Últimas alterações sem confirmação; retome o último rascunho salvo após entrar novamente.', 'error', 'expired');
           return false;
         }
         if (res.status >= 400 || !res.body || res.body.status !== 'saved') {
@@ -162,7 +186,7 @@
         if (!dirty) {
           clearLocalBackup();
         }
-        say('Rascunho salvo às ' + hhmm(res.body.updated_at_utc) + '.', 'ok', 'salvo');
+        say('Salvo como rascunho às ' + hhmm(res.body.updated_at_utc) + '.', 'ok', 'salvo');
         return true;
       })
       .catch(function (err) {
@@ -180,9 +204,9 @@
   }
   function schedule() {
     dirty = true;
-    inConflict = false;
+    if(inConflict){backupLocally(values());say('Conflito de edição — compare com o salvo antes de gravar.','warn','conflict');return;}
     backupLocally(values());
-    say('Alterações não salvas…', 'warn', 'salvando');
+    say('Em edição — alterações não salvas.', 'warn', 'editing');
     clearTimeout(timer);
     timer = setTimeout(save, 1500);
   }
@@ -218,7 +242,6 @@
   if (pause) pause.addEventListener('click', function (ev) {
     if (!dirty && !saving) return; // tudo salvo: segue para a agenda
     ev.preventDefault();
-    inConflict = false;
     save().then(function (ok) {
       if (ok || window.confirm('O rascunho não pôde ser salvo. Sair mesmo assim e perder as últimas alterações?')) {
         submitting = true; window.location.href = pause.href;

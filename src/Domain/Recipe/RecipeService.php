@@ -6,7 +6,6 @@ namespace ClyoNutri\Domain\Recipe;
 
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
-use ClyoNutri\Core\Security\ClinicalEncryptionService;
 use ClyoNutri\Core\Security\TenantGuard;
 use ClyoNutri\Core\Security\TenantSecurityException;
 use ClyoNutri\Domain\Nutrition\NutritionCalculator;
@@ -692,7 +691,7 @@ class RecipeService
         // Filtro por termo de busca
         if (!empty($filters['query'])) {
             $term = '%' . trim($filters['query']) . '%';
-            $sql .= " AND (r.title LIKE :term OR r.summary LIKE :term OR r.instructions LIKE :term)";
+            $sql .= " AND (r.title LIKE :term OR r.summary LIKE :term OR r.instructions LIKE :term OR EXISTS (SELECT 1 FROM recipe_ingredients ri JOIN foods f ON f.id = ri.food_id WHERE ri.recipe_id = r.id AND f.name LIKE :term))";
             $params['term'] = $term;
         }
 
@@ -700,6 +699,11 @@ class RecipeService
         if (!empty($filters['category'])) {
             $sql .= " AND r.category = :category";
             $params['category'] = trim($filters['category']);
+        }
+
+        if (!empty($filters['meal_type'])) {
+            $sql .= " AND LOWER(r.meal_type) = LOWER(:meal_type)";
+            $params['meal_type'] = trim($filters['meal_type']);
         }
 
         // Filtro por dificuldade
@@ -1197,9 +1201,14 @@ class RecipeService
 
             // NI2-74: medida sem peso cadastrado para o alimento só com confirmação da nutricionista (por ingrediente)
             try {
+                if (!empty($ing['require_count_measure'])) { // NI2-609
+                    $this->calculator->converter()->assertCountUnitHasMeasure($unit, $foodId, $food);
+                }
                 $calc = $this->calculator->calculateForPortion($food, $amount, $unit, $foodId, !empty($ing['confirm_estimated']));
             } catch (\ClyoNutri\Domain\Nutrition\UnitConfirmationRequiredException $e) {
                 throw new \ClyoNutri\Domain\Nutrition\UnitConfirmationRequiredException('Ingrediente ' . ($idx + 1) . ': ' . $e->getMessage(), $e->conversion);
+            } catch (InvalidArgumentException $e) {
+                throw new InvalidArgumentException('Ingrediente ' . ($idx + 1) . ': ' . $e->getMessage(), 0, $e);
             }
             $calc['food_name'] = $food['name'];
 
@@ -1311,14 +1320,11 @@ class RecipeService
         $pl->execute(['pid' => $patientId, 'cid' => $clinicId]);
         $plans = $pl->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        $an = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
-        $an->execute(['pid' => $patientId, 'cid' => $clinicId]);
-        $row = $an->fetch(PDO::FETCH_ASSOC);
+        $row = \ClyoNutri\Domain\Anamnesis\AnamnesisVersions::mergeForSafety(\ClyoNutri\Domain\Anamnesis\AnamnesisVersions::pick($this->db, $clinicId, $patientId, 'a.allergies, a.restrictions, a.version'))['row'] ?? false; // NI2-605
         $allergies = [];
-        if ($row) {
-            $al = ClinicalEncryptionService::decrypt($row['allergies'] ?? '');
-            $re = ClinicalEncryptionService::decrypt($row['restrictions'] ?? '');
-            $raw = trim((string)$al . ' ' . (string)$re);
+        $histTxt = $this->historyAllergyText($patientId); // NI2-624
+        if ($row || $histTxt !== '') {
+            $raw = trim((string)($row['allergies'] ?? '') . ' ' . (string)($row['restrictions'] ?? '') . ($histTxt !== '' ? '; ' . $histTxt : ''));
             if ($raw !== '') {
                 $allergies = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $raw))));
             }
@@ -1326,22 +1332,31 @@ class RecipeService
         return ['plans' => $plans, 'allergies' => $allergies];
     }
 
+    /** NI2-624: textos de alergia de versões anteriores (ou do cadastro) que a vigente não confirma. */
+    private function historyAllergyText(int $patientId): string
+    {
+        try {
+            $st = (new \ClyoNutri\Domain\Clinical\AllergenSafetyValidator($this->db))->evaluatePatientAllergyState($patientId);
+            return implode('; ', array_unique(array_column($st['review_findings'] ?? [], 'text')));
+        } catch (\Throwable $e) {
+            error_log('NI2-624 recipe review: ' . $e->getMessage());
+            return '';
+        }
+    }
+
     /**
      * Verifica possíveis incompatibilidades entre alergênicos da receita e anamnese do paciente.
      */
     private function checkPatientAllergenConflicts(int $patientId, array $recipeAllergens, int $clinicId): array
     {
-        $stmt = $this->db->prepare("SELECT allergies, restrictions FROM anamneses WHERE patient_id = :pid AND clinic_id = :cid ORDER BY id DESC LIMIT 1");
-        $stmt->execute(['pid' => $patientId, 'cid' => $clinicId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = \ClyoNutri\Domain\Anamnesis\AnamnesisVersions::mergeForSafety(\ClyoNutri\Domain\Anamnesis\AnamnesisVersions::pick($this->db, $clinicId, $patientId, 'a.allergies, a.restrictions, a.version'))['row'] ?? false; // NI2-605
 
-        if (!$row) {
+        $histTxt = $this->historyAllergyText($patientId); // NI2-624: alergia histórica não confirmada também conta
+        if (!$row && $histTxt === '') {
             return [];
         }
 
-        $al = ClinicalEncryptionService::decrypt($row['allergies'] ?? '');
-        $re = ClinicalEncryptionService::decrypt($row['restrictions'] ?? '');
-        $rawText = ((string)$al) . ' ' . ((string)$re);
+        $rawText = ($row['allergies'] ?? '') . ' ' . ($row['restrictions'] ?? '') . ' ' . $histTxt;
         $normPatient = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $rawText) ?: mb_strtolower($rawText, 'UTF-8');
         $conflicts = [];
 

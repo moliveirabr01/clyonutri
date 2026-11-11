@@ -6,6 +6,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } // v10: script só de
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use ClyoNutri\Core\Database\CatalogSeeder;
+use ClyoNutri\Core\Database\ExampleRecipeCatalogSeeder;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Database\DemoSeeder;
 use ClyoNutri\Core\Security\Env;
@@ -35,6 +36,8 @@ try {
         echo "Modo Solicitado: CATÁLOGO DE REFERÊNCIA NUTRICIONAL (TACO)\n";
         $catalog = new CatalogSeeder($db);
         $count = $catalog->run();
+        $recipes = (new ExampleRecipeCatalogSeeder($db))->run();
+        echo "✓ Catálogo público: {$recipes} receitas de exemplo adicionadas.\n";
         echo "✓ CatalogSeeder executado com sucesso: {$count} alimentos inseridos/atualizados.\n";
     }
 

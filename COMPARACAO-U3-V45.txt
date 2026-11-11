@@ -1,0 +1,73 @@
+COMPARAÇÃO u3 recebida x v45 (por conteúdo: sha256 e permissão de execução)
+
+u3: u3.zip (sha256 7904d0df…)  923 itens; v45: 1234 itens (sem as duas COMPARACAO)
+
+Iguais ao que veio na u3: 877
+Só na v45: 332
+Só na u3 (não vão no zip): 21
+Alterados pela v45: 25
+
+== SÓ NA v45 ==
+  LEIA-ME-HOSTGATOR-v45.md  -> novo: por que não imprimia, o que muda, liberação fechada, SQL a partir da 64 já em produção, ordem de instalação e como voltar
+  bin/exam_gate.php  -> novo: status, approve (só superadmin, com parecer e --confirm) e close da liberação da emissão
+  database/manual/atualizacao-v45-completa.sql  -> novo: idempotente, sem FK, sem DROP/DELETE; ajusta a 64 (padrões 0), aplica a 65 e fecha a liberação aberta sem registro
+  database/manual/atualizacao-v45-preflight.sql  -> novo: só lê; detecta a 64 já aplicada, a 65 e a liberação aberta sem registro
+  database/manual/atualizacao-v45-verificacao.sql  -> novo: só lê; confere tabelas, colunas, padrões, índice, catálogo, migrações e liberação
+  database/migrations/2026_10_29_000065_exam_requests_pdf_review_and_closed_gate.php  -> novo: colunas de aprovação, revisão, emissor e PDF; índice idx_exam_audit_entity; fecha liberação aberta sem registro
+  docs/evidencias/ni2-529-v45/SMOKE-V45-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (SQL v45 sobre banco como a produção, HTTP e navegador)
+  public/assets/css/exame-documento.css  -> novo: documento A4 do pedido (tela, impressão e PDF) no Design System
+  public/assets/css/exames.css  -> novo: telas do módulo de exames com as classes do Design System
+  public/assets/js/exames-solicitacao.js  -> novo: busca de exames, sinônimo usado e filtro por categoria, sem script inline (CSP)
+  src/Domain/LaboratoryExam/ExamReleaseGate.php  -> novo: abre só com superadmin e parecer; fecha mantendo o registro; nunca reabre sozinha
+  src/Domain/LaboratoryExam/ExamRequestPdfService.php  -> novo: PDF com dompdf, fora de public/ (storage/app/exam_requests/<clínica>/), SHA-256, 0640 e .htaccess de bloqueio
+  src/Domain/LaboratoryExam/ExamText.php  -> novo: normalização de texto (acentos, espaços, caixa) para busca e gravação
+  storage/app/exam_requests/  -> nova pasta vazia: onde ficam os PDFs dos pedidos (fora de public/; o sistema cria a subpasta da clínica, os arquivos 0640 e o .htaccess)
+  storage/uploads/  -> pasta vazia que já existia na v44 (na u3 havia só storage/uploads/diary_photos/, vazia e sem uso no código)
+  views/patients/exam_print.php  -> novo: página A4 de impressão com botão Imprimir via prontuario-impressao.js (a CSP bloqueava o onclick da u3)
+  views/patients/partials/exam_document.php  -> novo: documento único usado na prévia, na impressão e no PDF
+  vendor/  (315 arquivos)  -> dompdf 3.1.6 e dependências (php-font-lib, php-svg-lib, masterminds/html5, sabberworm/php-css-parser) e o autoload do Composer refeito
+
+== SÓ NA u3 (ficam fora do zip) ==
+  app/Domain/Clinical/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Engagement/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Finance/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Identity/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/MealPlans/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Patients/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Privacy/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Scheduling/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Domain/Tenancy/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  app/Support/Audit/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  bin/maintenance/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  config/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Application/Services/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Core/Validation/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Domain/Identity/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Domain/Professional/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Domain/Tenancy/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  src/Infrastructure/Repositories/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  storage/uploads/diary_photos/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  views/components/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+  views/professional/  -> pasta vazia na u3, sem nenhum arquivo; o código não usa (a v44 também não tinha)
+
+== ALTERADOS PELA v45 SOBRE A u3 ==
+  RELEASE_INFO.json  -> alterado: versão v45, base clyonutri-v44.zip (d94bdc0a…), schema_changes true, 64/65, arquivos com hashes
+  composer.json  -> alterado: dompdf/dompdf ^3.1
+  composer.lock  -> alterado: dompdf 3.1.6 e dependências PHP puro
+  database/instalacao_mysql8.sql  -> alterado: instalação limpa com as tabelas de exames, a 64 e a 65 registradas e a liberação fechada
+  database/manual/atualizacao-exames-ni2-529-completa.sql  -> veio na u3: SQL avulso da 64; v45 deixa a liberação nascer fechada (0,0) e aponta para o trio v45; só histórico
+  database/manual/atualizacao-exames-ni2-529-preflight.sql  -> veio na u3: preflight da 64; v45 só acrescenta o aviso de usar o trio v45
+  database/manual/atualizacao-exames-ni2-529-verificacao.sql  -> veio na u3: verificação da 64; v45 só acrescenta o aviso de usar o trio v45
+  database/migrations/2026_10_29_000064_create_laboratory_exam_requests_and_catalog.php  -> veio na u3; v45: aprovações com DEFAULT 0 e seed da política 2026.1 fechado (0,0)
+  public/index.php  -> veio na u3 com as rotas; v45: todas as rotas de exames com $requireAuth, incluindo revisar, emitir, imprimir, pdf e editar
+  routes/web.php  -> veio na u3; v45: mesmas rotas, todas com login
+  src/Application/Controllers/DashboardController.php  -> veio na u3: atalho para os pedidos de exames do paciente; v45: texto "Pedidos de exames"
+  src/Application/Controllers/ExamRequestController.php  -> veio na u3; v45: rascunho → revisão → emissão, impressão /imprimir, download autenticado do PDF, API 401 sem sessão, isolamento por clínica
+  src/Domain/LaboratoryExam/ExamCatalogService.php  -> veio na u3; v45: busca sem acento e sem caixa, devolve o sinônimo usado
+  src/Domain/LaboratoryExam/ExamRegulatoryPolicy.php  -> veio na u3; v45: política carregada com quem/quando/parecer da aprovação
+  src/Domain/LaboratoryExam/ExamRequestService.php  -> veio na u3; v45: fluxo rascunho/revisão/emissão, emitido só depois do PDF gravado, ciência real do aviso, sem CPF, AuditLogger
+  src/Domain/LaboratoryExam/ProfessionalEligibilityValidator.php  -> veio na u3; v45: região do CRN obrigatória (CRN-1 a CRN-11) e CRN formatado no documento
+  views/patients/exam_new.php  -> veio na u3; v45: sem script inline, sem "vinculada ao prontuário", classes do Design System
+  views/patients/exam_show.php  -> veio na u3; v45: etapas, mensagens da liberação, Imprimir/Baixar PDF e modal de cancelamento por data-dialog-open
+  views/patients/exams.php  -> veio na u3; v45: lista com situação de cada pedido e classes do Design System
+  vendor/  (6 arquivos)  -> dompdf 3.1.6 e dependências (php-font-lib, php-svg-lib, masterminds/html5, sabberworm/php-css-parser) e o autoload do Composer refeito

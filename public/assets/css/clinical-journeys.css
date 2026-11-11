@@ -1,24 +1,138 @@
-.skip-clinical-content { position: absolute; left: -9999px; }
-.skip-clinical-content:focus { left: var(--space-4); top: var(--space-3); z-index: 2000; background: var(--neutral-white); padding: var(--space-3); }
+.skip-clinical-content, .skip-link { position: absolute; top: -9999px; left: var(--space-4); z-index: 9999; background: var(--botanical-copper-600, #B04A1B); color: #fff; padding: var(--space-2) var(--space-4); border-radius: var(--radius-input, 8px); font-weight: 600; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: top 0.15s ease-in-out; }
+.skip-clinical-content:focus, .skip-clinical-content:focus-visible, .skip-link:focus, .skip-link:focus-visible { top: var(--space-3); outline: 3px solid var(--botanical-forest-900, #0F3E17); outline-offset: 2px; }
 .clinical-mobile-priority, #clinical-menu-toggle { display: none; }
-.badge-success { color: #0A5F63; }
+.badge-success { color: var(--semantic-success-text, #0A5F63); }
 .app-main { min-width: 0; }
 .app-content { min-width: 0; }
 :focus-visible { outline: 3px solid var(--brand-copper-600); outline-offset: 3px; }
 @media (max-width: 768px) {
-  #clinical-menu-toggle { display: block; min-height: 44px; padding: var(--space-2); color: var(--neutral-white); background: transparent; border: 1px solid currentColor; border-radius: var(--radius-input); }
-  .app-sidebar__logo { margin-bottom: var(--space-2); }
-  .app-sidebar__logo img { width: 180px; height: auto; }
-  #clinical-navigation { display: none; }
-  #clinical-navigation.is-open { display: flex; flex-direction: column; margin-top: var(--space-3); }
-  .clinical-mobile-priority { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
-  .clinical-mobile-priority a { color: var(--neutral-white); min-height: 44px; display: inline-flex; align-items: center; padding: var(--space-2); }
-  .app-sidebar > div:last-of-type { display: none; }
-  .app-header { height: auto; min-height: 64px; flex-shrink: 0; overflow-wrap: anywhere; }
-  .app-header__user { flex-wrap: wrap; min-width: 0; }
-  .app-header__user > svg { flex-shrink: 0; }
+  /* NI2-595: Cabeçalho compacto de uma linha (altura máxima 64px) com menu recolhido */
+  .app-sidebar {
+    height: 56px !important;
+    max-height: 64px !important;
+    padding: 0 var(--space-4) !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+  .app-sidebar__logo {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: 0 !important;
+    display: flex;
+    align-items: center;
+  }
+  .app-sidebar__logo img {
+    height: 28px !important;
+    max-height: 28px !important;
+    width: auto !important;
+    max-width: 130px !important;
+  }
+  #clinical-menu-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px !important;
+    height: 38px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    color: var(--neutral-white) !important;
+    background: transparent !important;
+    border: 1px solid currentColor !important;
+    border-radius: var(--radius-input) !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+  }
+  .clinical-mobile-priority {
+    display: none !important;
+  }
+  #clinical-navigation {
+    display: none;
+  }
+  #clinical-navigation.is-open {
+    display: flex !important;
+    flex-direction: column !important;
+    position: absolute !important;
+    top: 56px !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: var(--botanical-forest-950, #0B192C) !important;
+    z-index: 1000 !important;
+    padding: 16px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+    border-bottom: 2px solid var(--brand-copper-500) !important;
+  }
+  .app-sidebar > div:last-of-type {
+    display: none !important;
+  }
+  .app-header {
+    display: none !important;
+  }
+  .app-main {
+    padding: 0 !important;
+    min-width: 0;
+  }
+  .app-content {
+    padding: 12px 14px !important;
+    min-width: 0;
+  }
+
+  /* Compactar topo da agenda para caber acima da dobra em 375x812 */
+  .agenda-controls-layout {
+    gap: 6px !important;
+  }
+  .agenda-controls-layout .btn {
+    min-height: 34px !important;
+    padding: 4px 8px !important;
+    font-size: 0.8rem !important;
+  }
+  .agenda-header-desc, .agenda-secondary-links {
+    display: none !important;
+  }
+  h1 {
+    font-size: 1.25rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Consultas do dia como cartões na visão diária (NI2-595) */
+  .agenda-day-table thead {
+    display: none !important;
+  }
+  .agenda-day-table,
+  .agenda-day-table tbody,
+  .agenda-day-table tr,
+  .agenda-day-table td {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .agenda-day-table tr {
+    background: #fff !important;
+    border: 1px solid var(--neutral-gray-200, #E2E8F0) !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    margin-bottom: 10px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  }
+  .agenda-day-table td {
+    padding: 3px 0 !important;
+    border: none !important;
+    text-align: left !important;
+  }
+  .agenda-day-table td:last-child {
+    margin-top: 8px;
+    padding-top: 8px !important;
+    border-top: 1px solid var(--neutral-gray-100, #F4F5F6) !important;
+  }
+
   .app-content input, .app-content select, .app-content textarea { min-width: 0; max-width: 100%; }
-  .app-content table:not(.meal-plan-items) { display: block; max-width: 100%; overflow-x: auto; }
+  .app-content table:not(.meal-plan-items):not(.agenda-day-table) { display: block; max-width: 100%; overflow-x: auto; }
+  /* NI2-233: quando o invólucro já é a região rolável focável (tabindex), a rolagem fica nele e não na tabela (axe scrollable-region-focusable). */
+  .app-content .table-responsive[tabindex] > table { display: table; overflow-x: visible; }
   .modal-dialog { max-height: 90vh; overflow-y: auto; }
 }
 @media (max-width: 600px) {
@@ -34,9 +148,9 @@
 .cn-dialog__panel .modal-footer { position: sticky; bottom: 0; z-index: 1; }
 .cn-dialog__panel form > div:last-child:has(> button[type="submit"]) { position: sticky; bottom: calc(-1 * var(--space-6, 24px)); background: var(--neutral-white, #fff); padding-block: 12px; }
 html.cn-dialog-open { overflow: hidden; }
-.field-error { color: #B91C1C; font-size: 0.8rem; margin: 4px 0 0; }
+.field-error { color: var(--semantic-error, #B42318); font-size: 0.8rem; margin: 4px 0 0; }
 .field-error:empty { display: none; }
-[aria-invalid="true"] { border-color: #DC2626 !important; }
+[aria-invalid="true"] { border-color: var(--semantic-error, #B42318) !important; }
 /* Grades de formulário por classe (substitui gradualmente o remendo por correspondência de texto no atributo style) */
 .cn-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
 .cn-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-6); }
@@ -45,16 +159,21 @@ html.cn-dialog-open { overflow: hidden; }
 
 /* NI2-415 (UX-03): resultados de alimentos distinguíveis */
 .food-result { display: grid; gap: 2px; text-align: left; }
-.food-result__badge { justify-self: start; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #E5F0E5; color: #0F3E17; }
-.food-result__badge--custom { background: #FBEADF; color: #8F3D14; }
-.food-result__meta { font-size: 0.75rem; color: #475569; }
-/* NI2-73: contraste AA — ".food-result span" (clinical-botanical) tinha mais especificidade e deixava o selo em #64748b sobre #EEF2F7 (4,2:1) */
-.food-result .food-result__badge { color: #0F3E17; }
-.food-result .food-result__badge--custom { color: #8F3D14; }
-.food-result .food-result__meta, .food-result .food-result__portion { color: #475569; }
+.food-result__badge { justify-self: start; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--botanical-sage-100, #E5F0E5); color: var(--botanical-forest-900, #0F3E17); }
+.food-result__badge--custom { background: var(--botanical-copper-100, #FBEADF); color: var(--botanical-copper-700, #8F3D14); }
+.food-result__meta { font-size: 0.75rem; color: var(--neutral-gray-600, #475467); }
+/* NI2-73: contraste AA — ".food-result span" (clinical-botanical) tinha mais especificidade e deixava o selo em var(--neutral-gray-500, #667085) sobre #EEF2F7 (4,2:1) */
+.food-result .food-result__badge { color: var(--botanical-forest-900, #0F3E17); }
+.food-result .food-result__badge--custom { color: var(--botanical-copper-700, #8F3D14); }
+/* NI2-520 (v42): forma de preparo e uso na clínica no resultado da busca */
+.food-result__badge--prep, .food-result .food-result__badge--prep { background: #EEF2F7; color: #1E3A5F; }
+.food-result__used { font-size: 0.72rem; color: var(--semantic-success-text, #0A5F63); font-weight: 600; }
+/* NI2-519 (v42): sugestão de quantidade pela mesma energia na substituição */
+.same-energy-hint { background: var(--neutral-gray-50, #F9FAFB); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; font-size: 0.85rem; color: var(--neutral-gray-700, #344054); }
+.food-result .food-result__meta, .food-result .food-result__portion { color: var(--neutral-gray-600, #475467); }
 /* NI2-73: porção de referência / medidas caseiras no resultado da busca */
-.food-result__portion { display: block; font-size: 0.75rem; color: #475569; }
-.food-result__dup { font-size: 0.72rem; color: #92400E; }
+.food-result__portion { display: block; font-size: 0.75rem; color: var(--neutral-gray-600, #475467); }
+.food-result__dup { font-size: 0.72rem; color: var(--semantic-warning-strong, #7A4A00); }
 /* UX-08 (v14): grupo de cadastros equivalentes */
 .food-result-group { display: flex; flex-direction: column; gap: 4px; }
 .food-result__equivalents { align-self: flex-start; background: none; border: none; padding: 2px 4px; font-size: 0.75rem; color: var(--brand-copper-600, #B04A1B); text-decoration: underline; cursor: pointer; text-align: left; }
@@ -70,10 +189,10 @@ html.cn-dialog-open { overflow: hidden; }
 .cn-anamnesis-index { position: sticky; top: 0; z-index: 5; background: var(--neutral-white, #fff); padding: 8px 0; margin-bottom: 12px; border-bottom: 1px solid var(--neutral-gray-200, #E2E8F0); }
 .cn-anamnesis-index ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
 .cn-anamnesis-index a { display: inline-flex; gap: 4px; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--neutral-gray-300, #CBD5E1); font-size: 0.8rem; text-decoration: none; color: var(--brand-navy-900, #0F3E17); }
-.cn-anamnesis-index a[data-filled="true"]::before { content: "●"; color: #0A7075; }
-.cn-anamnesis-index a[data-filled="false"]::before { content: "○"; color: #94A3B8; }
+.cn-anamnesis-index a[data-filled="true"]::before { content: "●"; color: var(--semantic-success, #0A7075); }
+.cn-anamnesis-index a[data-filled="false"]::before { content: "○"; color: var(--neutral-gray-400, #98A2B3); }
 .cn-sticky-actions { position: sticky; bottom: 0; z-index: 5; background: var(--neutral-white, #fff); display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; border-top: 1px solid var(--neutral-gray-200, #E2E8F0); padding: 12px 0; }
-.cn-sticky-actions__status { margin-right: auto; font-size: 0.8rem; color: #475569; }
+.cn-sticky-actions__status { margin-right: auto; font-size: 0.8rem; color: var(--neutral-gray-600, #475467); }
 
 /* NI2-421 (UX-09): prioridades antes das métricas; 5 métricas em colunas deliberadas (sem linha órfã) */
 .attention-panel { margin-bottom: var(--space-6); }
@@ -94,16 +213,312 @@ html.cn-dialog-open { overflow: hidden; }
 }
 /* NI2-73: linha de ingrediente da receita com a busca do catálogo */
 .recipe-ingredient-row { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 8px; align-items: start; padding: 12px; border: 1px solid var(--neutral-gray-200, #e2e8f0); border-radius: 8px; }
-.recipe-ingredient-row__status { font-size: .8rem; color: #475569; margin: 4px 0 0; }
+.recipe-ingredient-row__status { font-size: .8rem; color: var(--neutral-gray-600, #475467); margin: 4px 0 0; }
 .recipe-ingredient-row__remove { align-self: end; min-height: 38px; padding: 0 12px; border: none; background: var(--semantic-error-light, #fde8e8); color: var(--semantic-error, #b42318); }
 @media (max-width: 720px) { .recipe-ingredient-row { grid-template-columns: 1fr 1fr; } .recipe-ingredient-row__food { grid-column: 1 / -1; } }
 /* NI2-74: peso da medida escolhida e confirmação do peso estimado */
-.unit-check { margin: 4px 0 12px; font-size: .85rem; color: #334155; }
+.unit-check { margin: 4px 0 12px; font-size: .85rem; color: var(--neutral-gray-700, #344054); }
 .unit-check__msg { margin: 0 0 6px; }
-.unit-check--warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; color: #78350f; }
-.unit-check--error { color: #b42318; }
+.unit-check--warn { background: var(--semantic-warning-light, #FEF3C7); border: 1px solid var(--semantic-warning-border, #FEDF89); border-radius: 8px; padding: 10px 12px; color: var(--semantic-warning-strong, #7A4A00); }
+.unit-check--error { color: var(--semantic-error, #B42318); }
 .unit-check__confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 600; }
 .unit-check__confirm .field-error { order: 3; flex-basis: 100%; margin: 0; font-weight: 500; }
 .recipe-ingredient-row__check { grid-column: 1 / -1; }
 /* NI2-74 (axe): texto do resultado selecionado (#edf5fa) precisa de 4,5:1 */
-.food-result[aria-pressed="true"] span { color: #475569; }
+.food-result[aria-pressed="true"] span { color: var(--neutral-gray-600, #475467); }
+/* NI2-520 (v43): preparo não informado e favorito da clínica no seletor de alimentos */
+.food-result__badge--muted, .food-result .food-result__badge--muted { background: #F4F4F2; color: var(--neutral-gray-600, #475467); font-weight: 500; }
+.food-result__favorite { background: none; border: none; color: var(--semantic-success-text, #0A5F63); font-size: 0.78rem; cursor: pointer; padding: 4px 6px; min-height: 32px; text-align: left; }
+.food-result__favorite:focus-visible { outline: 2px solid var(--semantic-success-text, #0A5F63); outline-offset: 2px; }
+.food-result__favorite[aria-pressed="true"] { font-weight: 700; }
+.eq-suggestions { border: 1px solid var(--botanical-sage-200, #D8E3DA); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; background: var(--botanical-sage-50, #F4F8F5); font-size: 0.85rem; }
+.eq-suggestions ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.eq-suggestions li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--botanical-sage-200, #D3E5D5); }
+.eq-suggestions li:first-child { border-top: none; }
+
+/* NI2-567 / UX-001..015 */
+#anamnesis-form [id^="sec-"] { scroll-margin-top: calc(var(--cn-index-height, 150px) + 16px); }
+.cn-settings-index { position:sticky;top:0;z-index:6;background:#fff;border:1px solid var(--botanical-sage-200, #D3E5D5);border-radius:8px;padding:12px;margin:16px 0;display:flex;gap:8px;flex-wrap:wrap; }
+.cn-settings-index a { display:inline-flex;align-items:center;min-height:44px;padding:0 12px;color:var(--botanical-forest-900, #0F3E17); }
+[data-settings-section], #calendar-heading { scroll-margin-top:calc(var(--cn-settings-index-height,140px) + 16px); }
+.cn-form-save-state { display:block;font-size:.85rem;margin:10px 0;color:var(--neutral-gray-600, #475467); }
+.cn-profile-nav { display:flex;flex-wrap:wrap;gap:8px;margin:16px 0; }
+.cn-profile-tools { margin:12px 0; }
+.cn-profile-tools>summary { min-height:44px;display:list-item;cursor:pointer;padding:10px; }
+.cn-profile-tools>div { display:flex;gap:8px;flex-wrap:wrap;padding:12px 0; }
+.food-picker-global-alert { position:sticky;top:0;z-index:1;background:#fff4df;color:#70420c;border-left:4px solid #b06b18;padding:12px;margin:8px 0; }
+.cn-policy-summary { padding:16px;border:1px solid var(--botanical-sage-200, #D3E5D5);border-radius:8px;margin:16px 0;background:#f4f8f5; }
+.cn-policy-summary dl { display:flex;flex-wrap:wrap;gap:16px;margin:0; }
+.cn-policy-summary dt { font-size:.8rem; }.cn-policy-summary dd { margin:0;font-weight:600; }
+
+/* NI2-616: nome do profissional uma vez no topo. Acima de 768 px o cabeçalho já mostra consultório e "Sair";
+   o bloco do usuário no menu lateral só aparece no celular (menu recolhido). Nome longo: uma linha com reticências. */
+@media (min-width: 769px) { .clinical-nav__mobile-user { display: none !important; } }
+.app-header__tenant { min-width: 0; flex: 1 1 auto; }
+.app-header__tenant-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.app-header__user { flex: 0 0 auto; white-space: nowrap; }
+
+/* NI2-609: medidas cadastradas do alimento e origem do peso */
+.unit-check__measures { margin: 0 0 6px; color: var(--neutral-gray-700, #344054); }
+.unit-check__measures a { font-weight: 600; white-space: nowrap; }
+
+/*
+ * NI2-613 (UX-R3-12): a visão diária vira cartões pela largura da ÁREA da agenda (não da janela). Com o menu
+ * lateral aberto, entre ~770 e ~1200 px de janela a tabela tinha 737 px para 440–870 px e Confirmar/Iniciar/
+ * "Mais ações" ficavam fora da vista. Abaixo de 900 px de área: cartões; de 400 a 900 px, os dados ficam lado a lado.
+ */
+.agenda-day-wrap { container-type: inline-size; container-name: agenda-day; }
+@container agenda-day (max-width: 900px) {
+  .agenda-day-table thead { display: none !important; }
+  .agenda-day-table, .agenda-day-table tbody, .agenda-day-table tr, .agenda-day-table td {
+    display: block !important; width: 100% !important; box-sizing: border-box !important;
+  }
+  .agenda-day-table tr {
+    background: #fff !important; border: 1px solid var(--neutral-gray-200, #E2E8F0) !important; border-radius: 8px !important;
+    padding: 12px !important; margin-bottom: 10px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  }
+  .agenda-day-table td { padding: 3px 0 !important; border: none !important; text-align: left !important; }
+  .agenda-day-table td:last-child { margin-top: 8px; padding-top: 8px !important; border-top: 1px solid var(--neutral-gray-100, #F4F5F6) !important; }
+  .agenda-day-table td:last-child > div:first-child { flex-wrap: wrap; justify-content: flex-start !important; }
+  .agenda-day-table td[colspan] { text-align: center !important; }
+}
+@container agenda-day (min-width: 400px) and (max-width: 900px) {
+  .agenda-day-table td:not(:last-child):not([colspan]) {
+    display: inline-block !important; width: auto !important; vertical-align: middle; margin-right: 20px;
+  }
+  .agenda-day-table td:first-child small { display: inline !important; margin-left: 4px; }
+}
+
+/* NI2-610: itens além dos 5 primeiros da lista "exigem atenção" */
+.attention-more { margin-top: 8px; }
+.attention-more > summary { list-style: none; cursor: pointer; display: inline-flex; }
+.attention-more > summary::-webkit-details-marker { display: none; }
+.attention-more[open] > summary { margin-bottom: 8px; }
+
+/* NI2-612: seções da aba Agenda (uma por vez) e aviso único do agendamento online */
+.settings-subnav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.settings-subnav a { padding: 8px 14px; border: 1px solid var(--neutral-gray-300, #CBD5E1); border-radius: 999px; text-decoration: none; color: var(--brand-navy-900, #193d2e); font-weight: 500; font-size: .9rem; background: #fff; }
+.settings-subnav a[aria-current="page"] { background: var(--brand-navy-900, #193d2e); border-color: var(--brand-navy-900, #193d2e); color: #fff; font-weight: 600; }
+.settings-subnav a:focus-visible { outline: 3px solid var(--brand-copper-600, #B45309); outline-offset: 2px; }
+.settings-booking-notice { border-left: 4px solid var(--semantic-warning, #946200); background: var(--semantic-warning-light, #FEF3C7); color: var(--semantic-warning-strong, #7A4A00); }
+.settings-booking-notice a { color: var(--semantic-warning-strong, #7A4A00); font-weight: 600; text-decoration: underline; }
+/* NI2-612: disponibilidade semanal compacta, um dia por linha (cabia em ~2.250 px; agora em menos de 2 telas) */
+.availability-day { display: grid; grid-template-columns: 150px 90px minmax(0, 1fr); align-items: end; gap: 8px 12px; border: 0; border-top: 1px solid var(--neutral-gray-200, #E2E8F0); padding: 10px 0; margin: 0; }
+.availability-day__name { float: left; padding: 0; font-weight: 600; margin: 0; align-self: center; }
+.availability-day__toggle { display: inline-flex; align-items: center; gap: 6px; align-self: center; }
+.availability-day__times { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.availability-day__times .form-label { font-size: .75rem; margin-bottom: 2px; }
+.availability-day__times .form-control { padding: 6px 8px; min-height: 36px; }
+@media (max-width: 900px) { .availability-day { grid-template-columns: 1fr auto; } .availability-day__times { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/*
+ * v54.9 (design system): um só estilo de título nas telas do produto. Antes havia cinco tamanhos de H1
+ * (24 a 32 px, peso 600 ou 700) e cinco telas com Playfair (Exames, Receitas, Financeiro, Ajuda, Onboarding).
+ * A serifada fica só na landing. !important porque várias telas definem o título em style="".
+ */
+.app-content h1 { font-family: var(--font-body) !important; font-size: var(--font-size-h1, 2rem) !important; font-weight: 600 !important; line-height: 1.2 !important; letter-spacing: -0.01em; }
+.app-content h2, .app-content h3, .app-content h4, .app-content legend { font-family: var(--font-body) !important; }
+@media (max-width: 768px) { .app-content h1 { font-size: 1.5rem !important; } }
+/* v54.9: altura mínima de botão do design system (44 px padrão, 40 px compacto). Havia botões de 26 a 38 px. */
+/* Botões que encolhiam a altura em style="" (26–38 px) ficam no mínimo compacto; os demais seguem os 44 px do .btn. */
+.app-content .btn[style*="min-height"], .app-content .btn.btn-sm, .app-content summary.btn { min-height: 40px !important; }
+/* v54.9: link de texto sem classe usava o azul padrão do navegador; o DS usa o cobre 600 sobre fundo claro. */
+.app-content a:not([class]) { color: var(--botanical-copper-600); }
+.app-content a:not([class]):hover { color: var(--botanical-copper-700); }
+
+/* NI2-604: aviso de fim de sessão */
+.session-warning { position: fixed; right: 16px; bottom: 16px; z-index: 2000; max-width: 360px; background: var(--neutral-white, #FFFFFF); border: 1px solid var(--semantic-warning-border, #FEDF89); border-left: 4px solid var(--semantic-warning, #946200); border-radius: var(--radius-card, 12px); box-shadow: var(--shadow-lg); padding: 16px; color: var(--neutral-ink-900, #1F2937); }
+.session-warning p { margin: 6px 0 12px; font-size: .9rem; color: var(--neutral-gray-700, #344054); }
+@media (max-width: 480px) { .session-warning { left: 16px; right: 16px; max-width: none; } }
+
+/* NI2-608: lista da busca de paciente na nova consulta (as classes vinham de um <style> que saiu na v54.1). */
+#appointment-patient-matches { padding: 4px 0; }
+.patient-match-option { display: flex; align-items: center; min-height: 36px; padding: 8px 12px; font-size: .9rem; color: var(--neutral-ink-900, #1F2937); cursor: pointer; border-bottom: 1px solid var(--neutral-gray-100, #F4F5F6); }
+.patient-match-option:hover, .patient-match-option:focus { background: var(--botanical-sage-100, #E5F0E5); color: var(--botanical-forest-900, #0F3E17); outline: none; }
+.patient-match-option:focus-visible { outline: 3px solid var(--botanical-copper-600, #B04A1B); outline-offset: -3px; }
+.patient-match-empty { padding: 10px 12px; font-size: .875rem; color: var(--neutral-gray-600, #475467); }
+.patient-match-new { padding: 6px 8px 4px; border-top: 1px solid var(--neutral-gray-200, #E5E7EB); }
+.patient-match-new .btn-link { min-height: 36px; padding: 6px 8px; background: none; border: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--botanical-copper-600, #B04A1B); cursor: pointer; border-radius: 6px; }
+.patient-match-new .btn-link:hover { color: var(--botanical-copper-700, #8F3D14); text-decoration: underline; }
+.patient-match-new .btn-link:focus-visible { outline: 3px solid var(--botanical-copper-600, #B04A1B); outline-offset: 2px; }
+
+/* NI2-606: Configurações > Equipe */
+.team-flash { padding: 12px 16px; border-radius: var(--radius-card, 12px); margin-bottom: var(--space-4, 16px); }
+.team-flash--success { background: var(--semantic-success-light, #E3F4F2); color: var(--semantic-success-text, #0A5F63); border: 1px solid var(--semantic-success-border, #B7DFDC); }
+.team-flash--error { background: var(--semantic-error-light, #FEE2E2); color: var(--semantic-error-strong, #912018); border: 1px solid var(--semantic-error-border, #FECDCA); }
+.team-flash--warning { background: var(--semantic-warning-light, #FEF3C7); color: var(--semantic-warning-strong, #7A4A00); border: 1px solid var(--semantic-warning-border, #FEDF89); }
+.team-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.team-inline { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.team-inline select.form-control { width: auto; min-height: 40px; }
+.team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; margin-bottom: 12px; }
+.team-history { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: .9rem; color: var(--neutral-gray-700, #344054); }
+.team-history span { color: var(--neutral-gray-500, #667085); font-variant-numeric: tabular-nums; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (max-width: 768px) {
+  /* NI2-606: no celular cada pessoa vira um bloco, sem rolagem lateral */
+  .team-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .team-table, .team-table tbody, .team-table tr, .team-table td { display: block; width: 100%; }
+  .team-table tr { padding: 12px 0; border-bottom: 1px solid var(--neutral-gray-200, #E5E7EB); }
+  .team-table td { border: 0; padding: 4px 0; text-align: left !important; overflow-wrap: anywhere; }
+  .team-actions { justify-content: flex-start; }
+  .team-inline { flex-wrap: wrap; }
+}
+
+/* NI2-625: checklist de ativação (onboarding passo 5 e painel) */
+.activation-alert { max-width: 620px; margin: 0 auto var(--space-5); text-align: left; padding: 14px 16px; border-radius: var(--radius-card); background: var(--semantic-warning-light, #FEF3C7); border: 1px solid var(--semantic-warning-border, #FEDF89); color: var(--semantic-warning-strong, #7A4A00); }
+.activation-list { list-style: none; margin: 0 auto; padding: 0; max-width: 720px; text-align: left; display: grid; gap: 8px; }
+.activation-item { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: var(--radius-card, 12px); background: #fff; }
+.activation-item__mark { display: inline-flex; color: var(--neutral-gray-400, #98A2B3); }
+.activation-item--done .activation-item__mark { color: var(--semantic-success, #1F7A4D); }
+.activation-item--attention .activation-item__mark { color: var(--semantic-warning-strong, #7A4A00); }
+.activation-item--pending { border-color: var(--semantic-warning-border, #FEDF89); }
+.activation-item--not_applicable { background: var(--neutral-gray-50, #F9FAFB); }
+.activation-item__body { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.activation-item__tag { font-size: .75rem; color: var(--neutral-gray-600, #475467); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 999px; padding: 0 8px; }
+.activation-item__state { font-size: .8rem; font-weight: 600; color: var(--neutral-gray-700, #344054); }
+.activation-item__detail { flex-basis: 100%; font-size: .875rem; color: var(--neutral-gray-600, #475467); }
+@media (max-width: 640px) { .activation-item { grid-template-columns: 24px 1fr; } .activation-item > .btn { grid-column: 2; justify-self: start; } }
+
+/* NI2-624: alergia histórica em revisão (perfil do paciente) */
+.allergy-review { margin-bottom: var(--space-4); border: 1px solid var(--semantic-error-border, #FECDCA); border-left: 4px solid var(--semantic-error, #B42318); background: var(--semantic-error-light, #FEF3F2); }
+.allergy-review--done { border-color: var(--semantic-success-border, #A6E3C4); border-left-color: var(--semantic-success, #1F7A4D); background: var(--semantic-success-light, #E3F4F2); padding: 12px 16px; }
+.allergy-review__title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 1.1rem; color: var(--semantic-error-strong, #912018); }
+.allergy-review__lead { margin: 0 0 10px; }
+.allergy-review__list { margin: 0; padding-left: 18px; display: grid; gap: 10px; }
+.allergy-review__dismiss summary { cursor: pointer; font-size: .9rem; color: var(--neutral-gray-700, #344054); min-height: 32px; display: inline-flex; align-items: center; }
+.allergy-review__dismiss summary:focus-visible { outline: 3px solid var(--brand-copper-500, #C2410C); outline-offset: 2px; }
+.allergy-review__dismiss form { margin-top: 8px; max-width: 560px; }
+.allergy-review__hint { font-size: .85rem; color: var(--neutral-gray-600, #475467); }
+
+/* NI2-622: cabeçalho do paciente com uma ação principal e navegação clínica única */
+.patient-header { margin-bottom: var(--space-5); }
+.patient-header__main { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.patient-header__identity { min-width: 0; flex: 1 1 320px; }
+.patient-header__name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.patient-header__name { margin: 0; overflow-wrap: anywhere; }
+.patient-header__meta { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 0; color: var(--neutral-gray-600, #475467); font-size: .9rem; }
+.patient-header__actions { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.patient-header__more { position: relative; }
+.patient-header__more > summary { list-style: none; min-height: 40px; display: inline-flex; align-items: center; }
+.patient-header__more > summary::-webkit-details-marker { display: none; }
+.patient-header__more:not([open]) > .patient-header__menu { display: none; }
+.patient-header__menu { position: absolute; right: 0; max-width: calc(100vw - 32px); top: calc(100% + 6px); z-index: 30; display: grid; gap: 6px; min-width: 240px; padding: 10px; background: #fff; border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: var(--radius-card, 12px); box-shadow: 0 8px 24px rgba(16, 24, 40, .12); }
+.patient-header__menu .btn { width: 100%; justify-content: flex-start; }
+.patient-header__pref { font-size: .8rem; color: var(--neutral-gray-600, #475467); display: flex; gap: 6px; align-items: center; padding-top: 4px; border-top: 1px solid var(--neutral-gray-200, #E5E7EB); }
+.patient-tabs { position: relative; contain: inline-size; max-width: 100%; margin-top: var(--space-4); border-bottom: 2px solid var(--neutral-gray-200, #E5E7EB); overflow-x: auto; scrollbar-width: thin; }
+.patient-tabs ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: max-content; }
+.patient-tabs a { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; text-decoration: none; font-weight: 500; color: var(--neutral-gray-600, #475467); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.patient-tabs a:hover { color: var(--brand-navy-900, #12372A); }
+.patient-tabs a:focus-visible { outline: 3px solid var(--brand-copper-500, #C2410C); outline-offset: -3px; }
+.patient-tabs a[aria-current="page"] { color: var(--brand-copper-600, #B4501E); font-weight: 700; border-bottom-color: var(--brand-copper-600, #B4501E); }
+.patient-tabs__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-copper-500, #C2410C); }
+.patient-back { margin: 0 0 var(--space-4); font-size: .85rem; }
+.patient-back a { color: var(--brand-copper-600, #B4501E); text-decoration: none; }
+.patient-docs { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+@media (max-width: 640px) {
+  .patient-header__actions { width: 100%; }
+  .patient-header__actions > .btn, .patient-header__actions > form { flex: 1 1 auto; }
+  .patient-header__actions > form .btn { width: 100%; }
+  .patient-header__menu { min-width: min(280px, calc(100vw - 32px)); }
+}
+
+/* NI2-661: título da página interna abaixo do cabeçalho do paciente */
+.patient-page-title { margin: 0 0 4px; font-size: 1.5rem; }
+
+/* NI2-623: etapas do atendimento em andamento */
+.care-flow { margin-top: var(--space-4); padding: 12px 14px; border: 1px solid var(--botanical-sage-200, #D3E5D5); border-radius: var(--radius-card, 12px); background: var(--neutral-warm-50, #FAFAF7); }
+.care-flow__title { margin: 0 0 8px; font-size: .9rem; color: var(--neutral-gray-700, #344054); }
+.care-flow__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.care-flow__step a { display: grid; gap: 2px; height: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 10px; background: #fff; text-decoration: none; color: inherit; }
+.care-flow__step a:hover { border-color: var(--botanical-sage-400, #7FA886); }
+.care-flow__step a:focus-visible { outline: 3px solid var(--brand-copper-500, #C2410C); outline-offset: 2px; }
+.care-flow__step.is-next a { border-color: var(--brand-copper-500, #C2410C); box-shadow: inset 0 0 0 1px var(--brand-copper-500, #C2410C); }
+.care-flow__icon { display: inline-flex; color: var(--neutral-gray-400, #98A2B3); }
+.care-flow__step--done .care-flow__icon { color: var(--semantic-success, #1F7A4D); }
+.care-flow__step--in_progress .care-flow__icon, .care-flow__step--review .care-flow__icon { color: var(--semantic-warning-strong, #7A4A00); }
+.care-flow__label { font-weight: 700; }
+.care-flow__state { font-size: .75rem; font-weight: 600; color: var(--neutral-gray-700, #344054); }
+.care-flow__detail { font-size: .8rem; color: var(--neutral-gray-600, #475467); }
+@media (max-width: 760px) { .care-flow__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* NI2-629: contexto clínico persistente (recolhido por padrão) */
+.clinical-context { margin-top: var(--space-3); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: var(--radius-card, 12px); background: #fff; }
+.clinical-context > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-height: 44px; padding: 10px 14px; list-style-position: inside; }
+.clinical-context > summary:focus-visible { outline: 3px solid var(--brand-copper-500, #C2410C); outline-offset: 2px; }
+.clinical-context__title { font-weight: 700; }
+.clinical-context__hint { font-size: .8rem; color: var(--neutral-gray-600, #475467); }
+.clinical-context__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 0; padding: 0 14px 14px; }
+.clinical-context__item { padding: 10px; border-radius: 8px; background: var(--neutral-gray-50, #F9FAFB); }
+.clinical-context__item.is-alert { background: var(--semantic-error-light, #FEF3F2); }
+.clinical-context__item dt { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--neutral-gray-600, #475467); margin-bottom: 2px; }
+.clinical-context__item dd { margin: 0; font-size: .9rem; overflow-wrap: anywhere; }
+.clinical-context__missing { color: var(--neutral-gray-500, #667085); font-style: italic; }
+.clinical-context__src { font-size: .8rem; color: var(--neutral-gray-600, #475467); }
+.clinical-context__warn { font-size: .8rem; color: var(--semantic-error-strong, #912018); }
+
+/* NI2-639/640/642/652: anamnese adaptativa (condições e módulos) */
+.adaptive { margin-top: var(--space-6); margin-bottom: var(--space-6); }
+.adaptive h2 { font-size: 1.15rem; margin: 0 0 6px; }
+.adaptive h3 { font-size: 1rem; margin: var(--space-4) 0 8px; }
+.adaptive__lead, .adaptive__src { font-size: .85rem; color: var(--neutral-gray-600, #475467); overflow-wrap: anywhere; }
+.adaptive__flags { border-left: 4px solid var(--semantic-error, #B42318); background: var(--semantic-error-light, #FEF3F2); padding: 10px 14px; border-radius: 6px; margin: 12px 0; }
+.adaptive__flags ul { margin: 6px 0 0; padding-left: 18px; }
+.adaptive__flag-action { font-weight: 700; }
+.adaptive__suggestions { border: 1px dashed var(--semantic-warning-strong, #7A4A00); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.adaptive__cond { padding: 8px 0; border-top: 1px solid var(--neutral-gray-200, #E5E7EB); }
+.adaptive__inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.adaptive__inline .form-control { flex: 1 1 160px; min-width: 0; width: auto; }
+.adaptive__inline .btn { min-height: 44px; }
+.adaptive__active { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.adaptive__active li { padding: 8px 10px; background: var(--neutral-gray-50, #F9FAFB); border-radius: 8px; overflow-wrap: anywhere; }
+.adaptive__more > summary, .adaptive__add > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+.adaptive__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; align-items: end; }
+.adaptive__progress { padding-left: 18px; font-size: .9rem; }
+.adaptive__section { border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 8px; padding: 10px 14px; margin: 0 0 12px; min-width: 0; }
+.adaptive__section > legend { font-weight: 700; padding: 0 6px; }
+.adaptive__q fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.adaptive__opt { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.adaptive__err { color: var(--semantic-error-strong, #912018); font-size: .85rem; margin: 4px 0 0; }
+.adaptive__q.has-error .form-control { border-color: var(--semantic-error, #B42318); }
+.adaptive__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.adaptive__actions .btn { min-height: 44px; }
+.adaptive__table-wrap { overflow-x: auto; max-width: 100%; }
+.adaptive__diff { width: 100%; font-size: .85rem; }
+.adaptive__diff td { overflow-wrap: anywhere; vertical-align: top; }
+.adaptive__progress li { margin-bottom: 4px; }
+
+
+/* NI2-710: faixa operacional do Resumo */
+.op-strip { margin-bottom: var(--space-4); padding: 14px 16px; }
+.op-strip__head { margin-bottom: 10px; }
+.op-strip__title { margin: 0 0 4px; font-size: 1.05rem; }
+.op-strip__lead { margin: 0; color: var(--neutral-gray-600, #475467); font-size: .85rem; }
+.op-strip__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 14px; margin: 0; }
+.op-strip__grid > div { min-width: 0; }
+.op-strip__grid dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .02em; color: var(--neutral-gray-500, #667085); margin: 0 0 2px; }
+.op-strip__grid dd { margin: 0; font-weight: 600; color: var(--brand-navy-900, #12372A); overflow-wrap: anywhere; }
+.op-strip__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--neutral-gray-200, #E5E7EB); }
+.op-strip__actions-label { font-size: .8rem; color: var(--neutral-gray-600, #475467); margin-right: 4px; }
+.profile-details { margin: 0 0 var(--space-5); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: var(--radius-card, 12px); background: #fff; }
+.profile-details > summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; padding: 10px 16px; font-weight: 600; }
+.profile-details > summary::-webkit-details-marker { display: none; }
+.profile-details[open] > summary { border-bottom: 1px solid var(--neutral-gray-200, #E5E7EB); }
+.profile-details__body { padding: 12px 16px 16px; }
+
+/* NI2-712: painel Preparar */
+.prep-panel__lead { color: var(--neutral-gray-600, #475467); margin-top: 0; }
+.prep-panel__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; margin: 12px 0 16px; }
+.prep-panel__grid dt { font-size: .75rem; text-transform: uppercase; color: var(--neutral-gray-500, #667085); margin: 0 0 2px; }
+.prep-panel__grid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.prep-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* NI2-714: Modo Atendimento */
+.attendance-mode { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-top: var(--space-3); padding: 10px 14px; border: 1px solid var(--brand-copper-200, #F5D0B5); border-radius: 10px; background: var(--brand-copper-50, #FFF7ED); }
+.attendance-mode__badge { display: inline-block; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--brand-copper-700, #9A3412); }
+.attendance-mode__meta { display: block; font-size: .85rem; color: var(--neutral-gray-700, #344054); }
+.attendance-mode__nav { display: flex; flex-wrap: wrap; gap: 6px; }
+/* v54.47 Z01/G01: resumo das etapas no Modo Atendimento (texto + símbolo, nunca só cor) */
+.attendance-mode__steps { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 0; padding: 0; list-style: none; font-size: .85rem; color: var(--neutral-gray-800, #1D2939); }
+.attendance-mode__step--done { font-weight: 600; }
+.attendance-mode__step--in_progress, .attendance-mode__step--review { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 600px) { .attendance-mode__steps { flex-direction: column; } .attendance-mode [data-testid="attendance-resume"] { width: 100%; min-height: 44px; } }

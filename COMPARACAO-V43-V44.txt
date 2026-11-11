@@ -1,0 +1,50 @@
+COMPARAÇÃO v43 x v44 (por conteúdo, sha256 de cada arquivo)
+
+v43: clyonutri-v43.zip (sha256 6c1803408659fd0e09d8c020a9ae9f0d3ef1d6f218e8123e67de1be0b790cc43)  745 itens (arquivos e pastas vazias)
+v44: clyonutri-v44.zip  748 itens (esta lista inclui o próprio COMPARACAO-V43-V44.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 737 (vendor/ inteiro, todas as migrações 1 a 63, todos os SQL manuais, os LEIA-ME e COMPARACAO anteriores e o restante de src/, views/ e public/)
+Adicionados: 3 (2 + este arquivo)
+Removidos: 0
+Alterados: 8
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v44.md  -> novo: causa do problema da busca, o que muda, outras buscas conferidas, como subir (só código, sem SQL) e como voltar
+  docs/evidencias/v44-busca-alimentos/SMOKE-V44-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 com o catálogo TACO (dados TESTE)
+  COMPARACAO-V43-V44.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  RELEASE_INFO.json  -> alterado: versão v44, base clyonutri-v43.zip (sha256 6c180340…), arquivos novos e alterados com hashes, sem SQL
+  public/assets/js/food-picker.js  -> alterado: mostra "Por sinônimo: aipim = mandioca" no resultado e no rótulo de acessibilidade
+  src/Application/Controllers/DashboardController.php  -> alterado: a Tabela de Alimentos mostra o aviso de sinônimo ao lado do nome
+  src/Application/Controllers/FoodSearchController.php  -> alterado: o resultado da busca do editor devolve synonym_match
+  src/Domain/Food/FoodCatalogService.php  -> alterado: paginate() usa o índice com sinônimos, favoritos e desempate por uso; esconde is_current = 0; isolamento por clínica mais rígido; filtros e paginação mantidos
+  src/Domain/Food/FoodSearchIndex.php  -> alterado: synonymHits() e synonymLabel() dizem quando o alimento casou por sinônimo
+  src/Domain/Nutrition/ClinicHouseholdMeasureService.php  -> alterado: searchFoods() usa o índice (sinônimos, acentos e ordem) e esconde is_current = 0
+  views/meal_plans/clinic_measures.php  -> alterado: resultado da busca de alimento mostra "por sinônimo"
+
+== FORA DO ZIP (testes, no repositório) ==
+  tests/ni2_514_clinic_measures_test.php  -> alterado: a busca agora casa termos soltos, então a checagem de isolamento passou a olhar os ids
+  tests/v44_alimentos_busca_units_test.php  -> novo: unidades do aviso de sinônimo
+  tests/v44_alimentos_busca_sinonimos_http_test.php  -> novo: /alimentos por HTTP com aipim, macaxeira, jerimum e mexerica, ordem, aviso, filtros, paginação, isolamento por clínica, versões antigas, editor e medidas caseiras
+  docs/evidencias/v44-busca-alimentos/*.png  -> novos: capturas da v44; o empacotador tira as imagens do zip, cópias em v44-evidencias
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS (no zip) ==
+906f3170a5ce4c68041125d04a1e8d87d0bbca828032220e7ff4da2f7abd408a  LEIA-ME-HOSTGATOR-v44.md
+f19c62d64369d4dfcb443445eaa122a54ceb0a83e00228b1438a6b262daa6540  docs/evidencias/v44-busca-alimentos/SMOKE-V44-mysql57.txt
+67b314a4f8c7430117cecdf1bdf56de536c454b90f91d44c5c607dd7af188cd3  RELEASE_INFO.json
+037cf3d2cff6cacf8cf56b9e56bccff89c09d6e64fd7bf8fe9a83f114ae586e4  public/assets/js/food-picker.js
+bd5b10f0b6267ab303acc17872f526b086896816682811fb2e3af6fa2b747de2  src/Application/Controllers/DashboardController.php
+a00fb24162a5604f30fac8fa9fb1d4076532adc94b80c278dafd7a99804ad349  src/Application/Controllers/FoodSearchController.php
+17e67b794adde477142be3be2c7b9faf21e1518128e70cf2358538a146df1492  src/Domain/Food/FoodCatalogService.php
+8106f5a1d53044325c03adca568a328b01e41cc37a6bdebfd92e3575ebae569b  src/Domain/Food/FoodSearchIndex.php
+5854e0109350fb221f3acfa8c0a783b4c95748d8f624513a49ef57005aa23bb2  src/Domain/Nutrition/ClinicHouseholdMeasureService.php
+3a52e305ca799b925d27ba7a8e82a597548ffb8a9d5012cbf1a74d25f33f5e5e  views/meal_plans/clinic_measures.php
+
+== SHA256 DOS TESTES FORA DO ZIP ==
+69dc8ebc299c708be5e23c208357e105c1f1121ea39e56e06457bddf3d89bf51  tests/ni2_514_clinic_measures_test.php
+e19518f79749adac816e2d4fec01dd8f94983f0ddaaf8407603565a241239eff  tests/v44_alimentos_busca_units_test.php
+9199dfee533ba4e985eab3a7c7d0afa1d3206dd79a12054d9c8df6fb4abed4b9  tests/v44_alimentos_busca_sinonimos_http_test.php

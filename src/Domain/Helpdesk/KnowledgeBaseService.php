@@ -13,89 +13,94 @@ class KnowledgeBaseService
 
     public const CATEGORIES = [
         'acesso_login' => [
-            'name' => 'Acesso e Login',
+            'name' => 'Acesso e senha',
             'icon' => 'key',
-            'description' => 'Recuperação de senha, autenticação em duas etapas e segurança da conta.',
+            'description' => 'Entrar na conta e criar uma nova senha.',
         ],
         'cadastro_conta' => [
-            'name' => 'Cadastro e Conta',
+            'name' => 'Cadastro e conta',
             'icon' => 'user-check',
-            'description' => 'Dados profissionais (CRN), informações da clínica e perfil.',
+            'description' => 'Seus dados profissionais (CRN) e do consultório.',
         ],
         'pacientes' => [
-            'name' => 'Gestão de Pacientes',
+            'name' => 'Pacientes',
             'icon' => 'users',
-            'description' => 'Cadastro de pacientes, histórico clínico, tags e arquivamento.',
+            'description' => 'Cadastro, perfil e histórico do paciente.',
         ],
         'convites' => [
-            'name' => 'Convites e Acesso do Paciente',
+            'name' => 'Convite e acesso do paciente',
             'icon' => 'mail',
-            'description' => 'Envio de convites por e-mail ou WhatsApp para o app do paciente.',
+            'description' => 'Link, código e QR code para o paciente entrar no app.',
         ],
         'anamnese' => [
-            'name' => 'Anamnese Nutricional',
+            'name' => 'Anamnese',
             'icon' => 'clipboard',
-            'description' => 'Modelos de anamnese, histórico alimentar, patologias e hábitos.',
+            'description' => 'Alergias, restrições, rotina, histórico clínico e versões.',
         ],
         'avaliacao_nutricional' => [
-            'name' => 'Avaliação Nutricional',
+            'name' => 'Avaliação nutricional',
             'icon' => 'activity',
-            'description' => 'Cálculo de necessidades energéticas (Harris-Benedict, Mifflin, DRI) e metas.',
+            'description' => 'Metas e necessidades nutricionais. O cálculo por fórmulas ainda não está disponível.',
         ],
         'antropometria' => [
-            'name' => 'Antropometria e Composição',
+            'name' => 'Antropometria',
             'icon' => 'sliders',
-            'description' => 'Dobras cutâneas (Pollock 3/7, Faulkner, Petroski), bioimpedância e circunferências.',
+            'description' => 'Peso, altura, circunferências, percentual de gordura, IMC e evolução.',
         ],
         'planos_alimentares' => [
-            'name' => 'Planos Alimentares',
+            'name' => 'Planos alimentares',
             'icon' => 'book-open',
-            'description' => 'Montagem de cardápios, tabela TACO, macronutrientes e substituições.',
+            'description' => 'Refeições, alimentos da TACO, medidas caseiras, substituições e publicação.',
         ],
         'prescricoes_orientacoes' => [
-            'name' => 'Prescrições e Orientações',
+            'name' => 'Prescrições e orientações',
             'icon' => 'file-text',
-            'description' => 'Suplementação, fitoterápicos, lâminas de orientação e exportação em PDF.',
+            'description' => 'Receitas prescritas e impressão do plano.',
         ],
         'diario_alimentar' => [
-            'name' => 'Diário Alimentar',
+            'name' => 'Diário alimentar',
             'icon' => 'coffee',
-            'description' => 'Acompanhamento do diário fotográfico e autorrelatos do paciente em tempo real.',
+            'description' => 'Refeições que o paciente registra no app, com foto opcional.',
         ],
         'agenda' => [
-            'name' => 'Agenda e Consultas',
+            'name' => 'Agenda e consultas',
             'icon' => 'calendar',
-            'description' => 'Agendamentos, confirmações automáticas e horários de atendimento.',
+            'description' => 'Agendar, reagendar, iniciar e concluir consultas.',
         ],
         'evolucao' => [
-            'name' => 'Evolução e Acompanhamento',
+            'name' => 'Evolução',
             'icon' => 'trending-up',
-            'description' => 'Gráficos comparativos de evolução de peso, gordura e adesão às metas.',
+            'description' => 'Comparação entre avaliações e histórico do paciente.',
         ],
         'app_paciente' => [
-            'name' => 'Aplicativo do Paciente',
+            'name' => 'App do paciente',
             'icon' => 'smartphone',
-            'description' => 'Instalação do app PWA/Mobile, lembretes de água e visualização do plano alimentar.',
+            'description' => 'Plano publicado, registro de água e diário, pelo navegador.',
         ],
         'assinaturas_cobranca' => [
-            'name' => 'Assinaturas e Cobrança',
+            'name' => 'Assinatura e cobrança',
             'icon' => 'credit-card',
-            'description' => 'Gestão do plano SaaS ClyoNutri II, faturas e formas de pagamento.',
+            'description' => 'Seu plano do Clyo Nutri, faturas e cancelamento.',
         ],
         'configuracoes' => [
-            'name' => 'Configurações do Consultório',
+            'name' => 'Configurações do consultório',
             'icon' => 'settings',
-            'description' => 'Personalização de cabeçalhos, logotipo da clínica e modelos padrão.',
+            'description' => 'Dados do consultório, horários de atendimento e senha.',
         ],
         'seguranca_privacidade' => [
-            'name' => 'Segurança e Privacidade (LGPD)',
+            'name' => 'Segurança e privacidade (LGPD)',
             'icon' => 'shield',
-            'description' => 'Gestão de consentimentos, sigilo profissional CFN e direitos do titular.',
+            'description' => 'Consentimentos, sigilo e direitos do titular dos dados.',
+        ],
+        'teleconsulta' => [
+            'name' => 'Teleconsulta',
+            'icon' => 'video',
+            'description' => 'Convite, sala de espera, câmera, microfone e entrada só com áudio.',
         ],
         'sugestoes_outros' => [
-            'name' => 'Sugestões e Outros',
+            'name' => 'Sugestões e outros',
             'icon' => 'message-square',
-            'description' => 'Envio de feedbacks de melhoria, sugestões de novos recursos e dúvidas gerais.',
+            'description' => 'Sugestões de melhoria e dúvidas gerais.',
         ],
     ];
 
@@ -256,14 +261,14 @@ class KnowledgeBaseService
             }
             $this->db->prepare("INSERT INTO helpdesk_articles (category, slug, title, summary, content_markdown, is_published, view_count, created_at, updated_at)
                 VALUES (:category, :slug, :title, :summary, :content_markdown, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
-                ->execute(self::RESCHEDULE_ARTICLE);
+                ->execute(array_merge(self::RESCHEDULE_ARTICLE, HelpArticlesV21::all()[self::RESCHEDULE_ARTICLE['slug']] ?? []));
         } catch (\PDOException $e) {
             // Artigo de ajuda é acessório: não derruba a central de ajuda (tabela antiga/sem permissão).
         }
     }
 
     /**
-     * Garante que os artigos canônicos do ClyoNutri II estejam pré-cadastrados.
+     * Garante que os artigos canônicos do ClyoNutri estejam pré-cadastrados.
      * Confere artigo por artigo (slug): outras fontes, como a migração 41 com os artigos
      * de teleconsulta, podem ter populado a tabela antes, e os canônicos não podem faltar.
      */
@@ -276,8 +281,8 @@ class KnowledgeBaseService
                 'category' => 'acesso_login',
                 'slug' => 'como-redefinir-minha-senha',
                 'title' => 'Como redefinir minha senha de acesso?',
-                'summary' => 'Passo a passo para recuperar seu acesso ao ClyoNutri II caso tenha esquecido sua credencial.',
-                'content_markdown' => "### Redefinição de Senha no ClyoNutri II\n\n1. Na tela de login (`/login`), clique no link **Esqueceu sua senha?**.\n2. Informe o endereço de e-mail cadastrado na sua conta profissional.\n3. Você receberá um e-mail com instruções seguras e um link único de validação criptografada.\n4. Defina sua nova senha com no mínimo 8 caracteres, contendo letras e números.\n5. Em caso de dúvidas ou se não receber o e-mail, verifique sua caixa de spam ou abra um chamado pelo nosso Service Desk.",
+                'summary' => 'Passo a passo para recuperar seu acesso ao Clyo Nutri caso tenha esquecido sua credencial.',
+                'content_markdown' => "### Redefinição de Senha no Clyo Nutri\n\n1. Na tela de login (`/login`), clique no link **Esqueceu sua senha?**.\n2. Informe o endereço de e-mail cadastrado na sua conta profissional.\n3. Você receberá um e-mail com instruções seguras e um link único de validação criptografada.\n4. Defina sua nova senha com no mínimo 8 caracteres, contendo letras e números.\n5. Em caso de dúvidas ou se não receber o e-mail, verifique sua caixa de spam ou abra um chamado pelo nosso Service Desk.",
                 'view_count' => 124,
             ],
             [
@@ -285,7 +290,7 @@ class KnowledgeBaseService
                 'slug' => 'como-elaborar-um-plano-alimentar-com-taco',
                 'title' => 'Como elaborar um plano alimentar utilizando a Tabela TACO?',
                 'summary' => 'Aprenda a criar cardápios balanceados calculando macronutrientes e micronutrientes automaticamente pela tabela TACO.',
-                'content_markdown' => "### Elaboração de Plano Alimentar com Tabela TACO\n\nO ClyoNutri II integra nativamente a Tabela Brasileira de Composição de Alimentos (TACO 4ª edição).\n\n#### Passos para montagem:\n1. Acesse o menu **Planos Alimentares** e selecione o paciente desejado.\n2. Clique em **Criar Novo Plano** e dê um título identificador (ex: *Hipertrofia Fase 1*).\n3. Adicione as refeições do dia (Café da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia).\n4. Em cada refeição, pesquise o alimento pelo nome na barra de busca (ex: *Arroz integral cozido*, *Peito de frango grelhado*).\n5. Ajuste a quantidade em gramas ou medidas caseiras.\n6. O gráfico superior recalcula em tempo real o VET (Valor Energético Total), Carboidratos, Proteínas e Lipídios.\n7. Clique em **Publicar Plano** para disponibilizá-lo instantaneamente no app do paciente.",
+                'content_markdown' => "### Elaboração de Plano Alimentar com Tabela TACO\n\nO Clyo Nutri integra nativamente a Tabela Brasileira de Composição de Alimentos (TACO 4ª edição).\n\n#### Passos para montagem:\n1. Acesse o menu **Planos Alimentares** e selecione o paciente desejado.\n2. Clique em **Criar Novo Plano** e dê um título identificador (ex: *Hipertrofia Fase 1*).\n3. Adicione as refeições do dia (Café da Manhã, Almoço, Lanche da Tarde, Jantar, Ceia).\n4. Em cada refeição, pesquise o alimento pelo nome na barra de busca (ex: *Arroz integral cozido*, *Peito de frango grelhado*).\n5. Ajuste a quantidade em gramas ou medidas caseiras.\n6. O gráfico superior recalcula em tempo real o VET (Valor Energético Total), Carboidratos, Proteínas e Lipídios.\n7. Clique em **Publicar Plano** para disponibilizá-lo instantaneamente no app do paciente.",
                 'view_count' => 312,
             ],
             [
@@ -293,7 +298,7 @@ class KnowledgeBaseService
                 'slug' => 'como-registrar-avaliacao-antropometrica-pollock-7-dobras',
                 'title' => 'Como registrar avaliação antropométrica com protocolo Pollock 7 dobras?',
                 'summary' => 'Orientações para medição e inserção de dobras cutâneas com cálculo de densidade e percentual de gordura.',
-                'content_markdown' => "### Antropometria: Protocolo Pollock 7 Dobras\n\nO protocolo de Jackson & Pollock 7 dobras cutâneas é ideal para estimativa precisa da composição corporal.\n\n#### Procedimento no ClyoNutri II:\n1. Acesse o prontuário do paciente e clique na aba **Antropometria**.\n2. Clique em **Nova Avaliação** e selecione o protocolo **Pollock 7 Dobras**.\n3. Insira as medidas aferidas pelo adipômetro em milímetros (mm):\n   - Subescapular\n   - Tricipital\n   - Peitoral (ou axilar média)\n   - Axilar média\n   - Suprailíaca\n   - Abdominal\n   - Coxa\n4. O sistema calcula automaticamente a densidade corporal (\(D_c\)), percentual de gordura corporal (%G via fórmula de Siri) e massa magra em kg.\n5. Você pode gerar o gráfico evolutivo e liberar o relatório ao paciente.",
+                'content_markdown' => "### Antropometria: Protocolo Pollock 7 Dobras\n\nO protocolo de Jackson & Pollock 7 dobras cutâneas é ideal para estimativa precisa da composição corporal.\n\n#### Procedimento no Clyo Nutri:\n1. Acesse o prontuário do paciente e clique na aba **Antropometria**.\n2. Clique em **Nova Avaliação** e selecione o protocolo **Pollock 7 Dobras**.\n3. Insira as medidas aferidas pelo adipômetro em milímetros (mm):\n   - Subescapular\n   - Tricipital\n   - Peitoral (ou axilar média)\n   - Axilar média\n   - Suprailíaca\n   - Abdominal\n   - Coxa\n4. O sistema calcula automaticamente a densidade corporal (\(D_c\)), percentual de gordura corporal (%G via fórmula de Siri) e massa magra em kg.\n5. Você pode gerar o gráfico evolutivo e liberar o relatório ao paciente.",
                 'view_count' => 245,
             ],
             [
@@ -309,7 +314,7 @@ class KnowledgeBaseService
                 'slug' => 'como-preencher-anamnese-nutricional-estruturada',
                 'title' => 'Como preencher e personalizar a anamnese nutricional?',
                 'summary' => 'Estrutura completa de histórico alimentar, patologias, aversões e estilo de vida.',
-                'content_markdown' => "### Anamnese Nutricional Estruturada\n\nO módulo de anamnese do ClyoNutri II é projetado para rapidez e profundidade clínica:\n\n- **Histórico Clínico:** Alergias, intolerâncias alimentares e histórico familiar.\n- **Hábito Intestinal e Hidratação:** Escala de Bristol e consumo hídrico diário.\n- **Recordatório Alimentar:** Registro de 24h com cálculo aproximado de calorias.\n- **Aversões e Preferências:** O sistema sinaliza restrições ao montar o plano alimentar para evitar erros prescritivos.",
+                'content_markdown' => "### Anamnese Nutricional Estruturada\n\nO módulo de anamnese do Clyo Nutri é projetado para rapidez e profundidade clínica:\n\n- **Histórico Clínico:** Alergias, intolerâncias alimentares e histórico familiar.\n- **Hábito Intestinal e Hidratação:** Escala de Bristol e consumo hídrico diário.\n- **Recordatório Alimentar:** Registro de 24h com cálculo aproximado de calorias.\n- **Aversões e Preferências:** O sistema sinaliza restrições ao montar o plano alimentar para evitar erros prescritivos.",
                 'view_count' => 180,
             ],
             [
@@ -317,15 +322,15 @@ class KnowledgeBaseService
                 'slug' => 'como-o-paciente-registra-agua-e-refeicoes-no-app',
                 'title' => 'Como o paciente registra hidratação e refeições no aplicativo?',
                 'summary' => 'Oriente seus pacientes a utilizarem o diário alimentar e o monitor de hidratação diário.',
-                'content_markdown' => "### Uso do Aplicativo pelo Paciente\n\nNo app ClyoNutri, o paciente tem acesso a:\n\n1. **Meta de Água:** Registro com um toque de 250ml ou 500ml, com acompanhamento da barra de meta diária.\n2. **Plano Alimentar:** Lista das refeições programadas com substituições autorizadas pelo nutricionista.\n3. **Diário com Fotos:** O paciente pode fotografar pratos e relatar saciedade e humor, sincronizando com o consultório.",
+                'content_markdown' => "### Uso do Aplicativo pelo Paciente\n\nNo app Clyo Nutri, o paciente tem acesso a:\n\n1. **Meta de Água:** Registro com um toque de 250ml ou 500ml, com acompanhamento da barra de meta diária.\n2. **Plano Alimentar:** Lista das refeições programadas com substituições autorizadas pelo nutricionista.\n3. **Diário com Fotos:** O paciente pode fotografar pratos e relatar saciedade e humor, sincronizando com o consultório.",
                 'view_count' => 210,
             ],
             [
                 'category' => 'seguranca_privacidade',
                 'slug' => 'como-o-clyonutri-garante-a-privacidade-lgpd',
-                'title' => 'Como o ClyoNutri II protege os dados dos pacientes conforme a LGPD?',
+                'title' => 'Como o Clyo Nutri protege os dados dos pacientes conforme a LGPD?',
                 'summary' => 'Entenda como cumprimos as diretrizes da LGPD e do Conselho Federal de Nutricionistas (CFN).',
-                'content_markdown' => "### Conformidade com a LGPD e Segurança dos Dados\n\n- **Isolamento de Dados (Multi-tenancy):** Os dados da sua clínica são isolados logicamente por meio do TenantGuard.\n- **Criptografia:** Senhas utilizam bcrypt/Argon2 e comunicações são protegidas por HTTPS/TLS.\n- **Termo de Consentimento:** O paciente assina digitalmente o consentimento para tratamento de dados sensíveis de saúde.\n- **Privacidade no Suporte:** Os operadores do Service Desk têm acesso estritamente restrito aos chamados, sem visibilidade de prontuários médicos ou dados clínicos confidenciais.",
+                'content_markdown' => "### Conformidade com a LGPD e Segurança dos Dados\n\n- **Isolamento de Dados (Multi-tenancy):** Os dados da sua clínica são isolados logicamente por meio do TenantGuard.\n- **Criptografia:** As senhas são guardadas com hash bcrypt e as comunicações trafegam por conexão criptografada (HTTPS/TLS).\n- **Termo de Consentimento:** O paciente assina digitalmente o consentimento para tratamento de dados sensíveis de saúde.\n- **Privacidade no Suporte:** Os operadores do Service Desk têm acesso estritamente restrito aos chamados, sem visibilidade de prontuários médicos ou dados clínicos confidenciais.",
                 'view_count' => 155,
             ],
         ];
@@ -339,6 +344,7 @@ class KnowledgeBaseService
             if (isset($existing[$art['slug']])) {
                 continue;
             }
+            $art = array_merge($art, HelpArticlesV21::all()[$art['slug']] ?? []); // v21: texto revisado
             $stmt->execute([
                 'category' => $art['category'],
                 'slug' => $art['slug'],

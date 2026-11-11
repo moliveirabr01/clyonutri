@@ -1,0 +1,25 @@
+COMPARAÇÃO v37 x v38 (por conteúdo, sha256 de cada arquivo)
+
+v37: clyonutri-v37.zip (sha256 c78d168177840d6733b56344cecfb7fddd3d431567a89e37e89ccfa586302d32)  683 itens (arquivos e pastas vazias)
+v38: clyonutri-v38.zip  685 itens (esta lista inclui o próprio COMPARACAO-V37-V38.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 681 (vendor/ inteiro, migrações, SQL manual e instalador, rotas, controladores, serviços e todas as outras telas; o SQL da v37 é o mesmo byte a byte)
+Adicionados: 2 (1 + este arquivo)
+Removidos: 0
+Alterados: 2
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v38.md  -> novo: instruções da v38 (sem SQL novo; o SQL da v37 segue aguardando o OK; onde a explicação de cobrança manual ainda aparece)
+  COMPARACAO-V37-V38.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  RELEASE_INFO.json  -> alterado: versão v38, base clyonutri-v37.zip (sha256 c78d1681…), sem mudança de SQL; os campos v37_* seguem como eram
+  views/settings/_plano_resumo.php  -> alterado: removida 1 linha, a frase "A cobrança é combinada manualmente com a nossa equipe." do cabeçalho do plano no perfil; resto igual
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+d48e0f270de6040d0f443d371bad5a49150c6e2a2326f72a2179169b33937c3d  LEIA-ME-HOSTGATOR-v38.md
+5c97f47b58e29fcd153ba67633f6f8bdeb7f23684fbc8d93279db61393935f9b  RELEASE_INFO.json
+e367c487c1556efee6911c8ee8bc4b8cc338e426c0b7c599645bb0e1137e509d  views/settings/_plano_resumo.php

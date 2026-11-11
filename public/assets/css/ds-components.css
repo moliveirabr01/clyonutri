@@ -1,0 +1,211 @@
+/*
+ * Clyo Nutri — componentes do design system para as telas antigas (NI2-687, v54.28).
+ * Só tokens do clinical-botanical.css. Nada de hex solto nem style="" nas views.
+ * Documentação: docs/design-system/COMPONENTES-NI2-687.md
+ */
+
+/* ── Mensagens e alertas (.op-message) ────────────────────────────────────────
+ * Cada gravidade tem ícone de forma própria, além da cor e do texto:
+ *   crítico = octógono com "!", erro = círculo com "×", atenção = triângulo com "!",
+ *   concluído = círculo com "✓", informação = círculo com "i".
+ * O alerta clínico crítico ainda ganha fundo, borda dupla e rótulo visível,
+ * para não se confundir com sucesso nem com aviso comum (Von Restorff). */
+.op-message[class*="op-message--"] {
+  position: relative;
+  padding-inline-start: calc(var(--space-4) + var(--space-6)) !important;
+}
+.op-message[class*="op-message--"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: var(--space-3);
+  top: calc(var(--space-4) + 1px);
+  width: var(--space-5);
+  height: var(--space-5);
+  background-color: var(--op-msg-icon, var(--botanical-forest-900));
+  -webkit-mask: var(--op-msg-mask) center / contain no-repeat;
+  mask: var(--op-msg-mask) center / contain no-repeat;
+}
+.op-message:empty::before { display: none; }
+.op-message--info, .op-alert--info {
+  --op-msg-icon: var(--botanical-forest-900);
+  --op-msg-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='11' x2='12' y2='17'/%3E%3Cline x1='12' y1='7.5' x2='12' y2='7.6'/%3E%3C/svg%3E");
+}
+.op-message--success, .op-alert--success {
+  --op-msg-icon: var(--semantic-success);
+  --op-msg-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='7.5 12.5 10.5 15.5 16.5 9'/%3E%3C/svg%3E");
+}
+.op-message--warning, .op-alert--warning {
+  --op-msg-icon: var(--semantic-warning);
+  --op-msg-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 2.5 20h19z'/%3E%3Cline x1='12' y1='10' x2='12' y2='14'/%3E%3Cline x1='12' y1='17' x2='12' y2='17.1'/%3E%3C/svg%3E");
+}
+.op-message--error, .op-alert--error {
+  --op-msg-icon: var(--semantic-error);
+  --op-msg-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='8.5' y1='8.5' x2='15.5' y2='15.5'/%3E%3Cline x1='15.5' y1='8.5' x2='8.5' y2='15.5'/%3E%3C/svg%3E");
+}
+.op-message--critical, .op-alert--critical {
+  --op-msg-icon: var(--semantic-error-strong);
+  --op-msg-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z'/%3E%3Cline x1='12' y1='7' x2='12' y2='13'/%3E%3Cline x1='12' y1='16.5' x2='12' y2='16.6'/%3E%3C/svg%3E");
+}
+.op-message--critical {
+  background: var(--semantic-error-light) !important;
+  color: var(--semantic-error-strong) !important;
+}
+.op-message__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.op-message--critical .op-message__label { color: var(--semantic-error-strong); }
+.op-message > :last-child { margin-bottom: 0; }
+
+/* A mensagem de erro de validação vem antes da de sucesso e não some com ela. */
+.op-feedback-stack { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
+.op-feedback-stack > .op-message { margin-block: 0 !important; }
+
+/* op-alert (OperationalUI::alert): mesmo ícone por gravidade */
+.op-alert__icon { flex: none; width: var(--space-5); height: var(--space-5); margin-top: 2px; background-color: var(--op-msg-icon, var(--botanical-forest-900)); -webkit-mask: var(--op-msg-mask) center / contain no-repeat; mask: var(--op-msg-mask) center / contain no-repeat; }
+.op-alert--critical { border: 2px solid var(--semantic-error) !important; border-inline-start-width: 6px !important; background: var(--semantic-error-light) !important; }
+.op-alert--warning { border-inline-start: 4px solid var(--semantic-warning) !important; }
+.op-alert--success { border-inline-start: 4px solid var(--semantic-success) !important; }
+.op-alert--info { border-inline-start: 4px solid var(--botanical-forest-900) !important; }
+.op-alert--error { border-inline-start: 4px solid var(--semantic-error) !important; }
+.op-alert--critical .op-alert__icon { --op-msg-icon: var(--semantic-error-strong); }
+
+@media (forced-colors: active) {
+  .op-message[class*="op-message--"]::before, .op-alert__icon { forced-color-adjust: none; background-color: CanvasText; }
+}
+
+/* ── Campos destacados quando há erro ─────────────────────────────────────── */
+.form-control[aria-invalid="true"], [aria-invalid="true"].form-control {
+  border-color: var(--semantic-error) !important;
+  box-shadow: 0 0 0 1px var(--semantic-error);
+}
+
+/* ── Janelas (modais antigos) e menus suspensos ───────────────────────────── */
+.ds-menu-panel {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 100%;
+  margin-top: var(--space-1);
+  z-index: 60;
+  min-width: calc(var(--space-10) * 3.5);
+  max-width: min(calc(var(--space-10) * 8), calc(100vw - var(--space-8)));
+  padding: var(--space-1) 0;
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-300);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-md);
+  text-align: left;
+}
+.ds-menu-panel--wide { min-width: calc(var(--space-10) * 5.5); }
+.ds-menu-panel a,
+.ds-menu-panel button { display: flex; align-items: center; width: 100%; min-height: var(--touch-target-min); }
+.ds-menu-panel a:focus-visible,
+.ds-menu-panel button:focus-visible { outline: 3px solid var(--botanical-copper-600); outline-offset: -3px; }
+.ds-combobox-list {
+  position: absolute;
+  z-index: 50;
+  width: 100%;
+  max-height: calc(var(--space-12) * 4.5);
+  overflow-y: auto;
+  background: var(--neutral-white);
+  border: 1px solid var(--neutral-gray-300);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Barra lateral no celular ─────────────────────────────────────────────── */
+.clinical-nav__mobile-user {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in srgb, var(--neutral-white) 15%, transparent);
+  color: var(--neutral-white);
+  font-size: var(--font-size-compact);
+}
+.clinical-nav__logout.btn {
+  width: 100%;
+  min-height: var(--touch-target-min);
+  color: var(--neutral-white);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--neutral-white) 30%, transparent);
+}
+.clinical-nav__logout.btn:hover { background: color-mix(in srgb, var(--neutral-white) 10%, transparent); }
+
+/* ── Cabeçalho de página com ações (um só CTA principal) ──────────────────── */
+.ds-page-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); }
+.ds-page-header > :first-child { flex: 1 1 20rem; min-width: 0; }
+.ds-page-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ds-page-actions > .btn { min-height: var(--touch-target-min); white-space: nowrap; }
+@media (max-width: 656px) {
+  .ds-page-actions { width: 100%; }
+  .ds-page-actions > .btn { flex: 1 1 auto; white-space: normal; }
+}
+
+/* ── Abas de navegação simples (Assinatura) ───────────────────────────────── */
+.ds-tabs { display: flex; flex-wrap: wrap; gap: var(--space-4); border-bottom: 2px solid var(--neutral-gray-200); margin-bottom: var(--space-6); }
+.ds-tabs__item { display: inline-flex; align-items: center; min-height: var(--touch-target-min); padding: var(--space-2) var(--space-1); margin-bottom: -2px; border-bottom: 2px solid transparent; color: var(--neutral-gray-600); font-weight: var(--font-weight-medium); text-decoration: none; }
+.ds-tabs__item[aria-current="page"] { color: var(--botanical-copper-600); font-weight: var(--font-weight-semibold); border-bottom-color: var(--botanical-copper-600); }
+
+/* ── Barra de uso (Assinatura) ────────────────────────────────────────────── */
+.ds-meter { display: block; width: 100%; height: var(--space-2); margin-bottom: var(--space-2); border: 0; border-radius: var(--radius-pill); background: var(--neutral-gray-200); overflow: hidden; -webkit-appearance: none; appearance: none; }
+.ds-meter::-webkit-progress-bar { background: var(--neutral-gray-200); border-radius: var(--radius-pill); }
+.ds-meter::-webkit-progress-value { background: var(--ds-meter-fill, var(--botanical-green-600)); border-radius: var(--radius-pill); }
+.ds-meter::-moz-progress-bar { background: var(--ds-meter-fill, var(--botanical-green-600)); border-radius: var(--radius-pill); }
+.ds-meter--copper { --ds-meter-fill: var(--brand-copper-500); }
+.ds-meter--forest { --ds-meter-fill: var(--botanical-forest-900); }
+
+/* ── Botões de ação com cor fixa ─────────────────────────────────────────── */
+.btn-success-solid { background: var(--semantic-success); border-color: var(--semantic-success); color: var(--neutral-white); }
+.btn-success-solid:hover { background: var(--semantic-success-text); border-color: var(--semantic-success-text); color: var(--neutral-white); }
+.btn-danger-solid { background: var(--semantic-error); border: 0; color: var(--neutral-white); font-weight: var(--font-weight-semibold); }
+.btn-danger-solid:hover { background: var(--semantic-error-strong); color: var(--neutral-white); }
+.btn-whatsapp { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--touch-target-min); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-input); background: var(--botanical-green-700); color: var(--neutral-white); font-size: var(--font-size-compact); font-weight: var(--font-weight-semibold); text-decoration: none; }
+.btn-whatsapp:hover { background: var(--botanical-forest-900); color: var(--neutral-white); }
+
+/* ── Peças pequenas ───────────────────────────────────────────────────────── */
+.ds-check { width: var(--space-4); height: var(--space-4); min-width: var(--space-4); min-height: var(--space-4); }
+.ds-icon-badge { display: flex; align-items: center; justify-content: center; flex: none; width: var(--space-10); height: var(--space-10); border-radius: 50%; }
+.ds-icon-badge--lg { width: var(--space-16); height: var(--space-16); }
+.ds-icon-badge--error { background: var(--semantic-error-light); color: var(--semantic-error); }
+.ds-icon-badge--copper { background: var(--botanical-copper-100); color: var(--botanical-copper-600); }
+.ds-pill { display: inline-block; padding: 2px var(--space-2); border-radius: var(--radius-pill); font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
+.ds-pill--copper { background: var(--botanical-copper-600); color: var(--neutral-white); }
+.ds-pill--neutral { background: var(--neutral-gray-100); color: var(--neutral-gray-700); }
+.ds-pill--warning { background: var(--semantic-warning-light); color: var(--semantic-warning-strong); }
+.ds-pill--success { background: var(--semantic-success-light); color: var(--semantic-success-text); }
+.ds-pill--error { background: var(--semantic-error-light); color: var(--semantic-error-strong); }
+/* Conflito com alergia registrada: além da cor, borda e peso extra para não depender só do tom. */
+.ds-pill--critical { border: 1px solid var(--semantic-error-strong); font-weight: var(--font-weight-bold); }
+.ds-hint-tight { margin-top: calc(var(--space-2) * -1) !important; }
+.ds-panel-muted { padding: var(--space-4) var(--space-5); background: var(--botanical-cream-50); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-input); margin-bottom: var(--space-6); }
+.ds-sticky-summary { position: sticky; top: 0; z-index: 5; background: var(--neutral-white); border: 1px solid var(--neutral-gray-200); border-radius: var(--radius-input); }
+.ds-is-muted { opacity: .75; }
+.ds-is-archived { opacity: .7; }
+
+/* Variação clínica (sobe/desce): cor + sinal no texto */
+.ds-delta--down { color: var(--semantic-success); }
+.ds-delta--up { color: var(--botanical-copper-600); }
+.ds-delta--flat { color: var(--neutral-gray-600); }
+.ds-tone-ok { color: var(--semantic-success-text); }
+.ds-tone-copper { color: var(--botanical-copper-700); }
+.ds-tone-info { color: var(--semantic-info); }
+.ds-tone-warn { color: var(--semantic-warning-strong); }
+.ds-tone-bad { color: var(--semantic-error); }
+.ds-tone-muted { color: var(--neutral-gray-500); }
+.ds-tone-ink { color: var(--neutral-gray-700); }
+
+/* Resumo de alergias e restrições no perfil */
+.ds-clinical-flag { padding: var(--space-2) var(--space-3); border-radius: var(--radius-input); background: var(--neutral-gray-50); border: 1px solid var(--neutral-gray-200); }
+.ds-clinical-flag__title { display: block; font-size: var(--font-size-caption); font-weight: var(--font-weight-bold); color: var(--neutral-gray-500); }
+.ds-clinical-flag--critical { background: var(--semantic-error-light); border: 2px solid var(--semantic-error); }
+.ds-clinical-flag--critical .ds-clinical-flag__title { color: var(--semantic-error-strong); }
+.ds-clinical-flag--warning { background: var(--semantic-warning-light); border-color: var(--semantic-warning-border); }
+.ds-clinical-flag--warning .ds-clinical-flag__title { color: var(--semantic-warning-strong); }
+.ds-clinical-flag__title .cn-flag-icon { display: inline-block; width: var(--space-3); height: var(--space-3); margin-inline-end: var(--space-1); vertical-align: -1px; background-color: currentColor; -webkit-mask: var(--op-msg-mask) center / contain no-repeat; mask: var(--op-msg-mask) center / contain no-repeat; }
+@media (forced-colors: active) { .ds-clinical-flag--critical { border-style: double; } .ds-clinical-flag__title .cn-flag-icon { forced-color-adjust: none; background-color: CanvasText; } }
+
+/* Diálogo do OperationalUI::modal(): fechado por padrão; o ClyoDialog abre pelo display. */
+.op-dialog-overlay { display: none; }

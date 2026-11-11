@@ -154,6 +154,14 @@ class PreConsultationController
         });
     }
 
+    public function suggestConditions(array $params): void
+    {
+        $this->professionalAction($params, function (PreConsultationService $s, int $qid, int $patientId) {
+            $r = (new \ClyoNutri\Domain\ClinicalProtocol\AdaptivePreConsultation($this->db))->suggestSubmitted((int)TenantContext::getClinicId(), $patientId, $s->get($qid), (int)TenantContext::getUserId());
+            return count($r['made']) . ' sugestão(ões) pendentes. Confirme ou descarte na anamnese; nenhuma condição foi documentada automaticamente.';
+        });
+    }
+
     public function import(array $params): void
     {
         $this->professionalAction($params, function (PreConsultationService $s, int $qid, int $patientId, int $prof) {
@@ -169,16 +177,26 @@ class PreConsultationController
         $this->patientHeaders();
         try {
             $this->rateLimit('precons_ip', (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 30, 600);
-            $row = (new PreConsultationService($this->db))->redeem((string)($params['token'] ?? ''));
+            $service = new PreConsultationService($this->db);
+            $token = (string)($params['token'] ?? '');
+            $prior = $_SESSION['precons'] ?? null;
+            if (is_array($prior) && isset($prior['id'], $prior['h'])) {
+                try {
+                    $existing = $service->forPatient((int)$prior['id'], (string)$prior['h']);
+                    if (hash_equals((string)$existing['token_hash'], hash('sha256', $token))) {
+                        header('Location: /pre-consulta', true, 303); exit;
+                    }
+                } catch (PreConsultationException $e) { /* A new invitation may replace an expired session. */ }
+            }
+            $row = $service->redeem($token);
         } catch (\Throwable $e) {
-            unset($_SESSION['precons']);
             $this->patientMessage($e);
             return;
         }
         if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
             session_regenerate_id(true);
         }
-        $_SESSION['precons'] = ['id' => (int)$row['id'], 'h' => (string)$row['token_hash'], 'verified' => false];
+        $_SESSION['precons'] = ['id' => (int)$row['id'], 'h' => (string)($row['session_hash'] ?? $row['token_hash']), 'verified' => false];
         header('Location: /pre-consulta', true, 303);
         exit;
     }
@@ -208,6 +226,7 @@ class PreConsultationController
             'answers' => $flash['answers'] ?? $ctx['answers'],
             'errors' => $flash['errors'] ?? [],
             'notice' => $flash['message'] ?? null,
+            'conflict' => !empty($flash['conflict']),
         ]);
     }
 
@@ -237,6 +256,7 @@ class PreConsultationController
         $this->patientHeaders();
         $service = new PreConsultationService($this->db);
         try {
+            $this->rateLimit('precons_save_ip', (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 60, 600);
             $row = $this->patientRow($service, false);
             if (empty($_SESSION['precons']['verified']) && $service->needsBirthDate($row)) {
                 header('Location: /pre-consulta', true, 303);
@@ -244,18 +264,23 @@ class PreConsultationController
             }
             $answers = is_array($_POST['answers'] ?? null) ? $_POST['answers'] : [];
             if (($_POST['action'] ?? '') === 'submit') {
-                $res = $service->submit($row, $answers, !empty($_POST['consent']), (string)($_SERVER['REMOTE_ADDR'] ?? ''), (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+                $res = $service->submit($row, $answers, !empty($_POST['consent']), (string)($_SERVER['REMOTE_ADDR'] ?? ''), (string)($_SERVER['HTTP_USER_AGENT'] ?? ''), isset($_POST['answer_revision']) ? (int)$_POST['answer_revision'] : null);
                 if ($res['errors']) {
                     $_SESSION['precons_flash'] = ['type' => 'error', 'message' => 'Revise as perguntas indicadas. O que você já respondeu foi salvo.',
                         'errors' => $res['errors'], 'answers' => $answers];
                 }
             } else {
-                $service->saveDraft($row, $answers);
-                $this->flash('success', 'Respostas salvas. Você pode fechar e continuar depois pelo mesmo link.');
+                $service->saveDraft($row, $answers, !empty($_POST['consent']), isset($_POST['answer_revision']) ? (int)$_POST['answer_revision'] : null);
+                $this->flash('success', 'Respostas salvas. Você pode fechar e continuar depois neste dispositivo.');
             }
+        } catch (PreConsultationException $e) {
+            if (isset($answers)) {
+                $_SESSION['precons_flash'] = ['type'=>'error', 'message'=>$e->getMessage(), 'answers'=>$answers, 'conflict'=>$e->httpStatus() === 409];
+                header('Location: /pre-consulta', true, 303); exit;
+            }
+            $this->patientMessage($e); return;
         } catch (\Throwable $e) {
-            $this->patientMessage($e);
-            return;
+            $this->patientMessage($e); return;
         }
         header('Location: /pre-consulta', true, 303);
         exit;
@@ -287,7 +312,7 @@ class PreConsultationController
                 throw new PreConsultationException('Pré-consulta não encontrada.', 404);
             }
             $this->flash('success', (string)$fn($service, $qid, $patientId, $prof));
-        } catch (PreConsultationException | \InvalidArgumentException $e) {
+        } catch (PreConsultationException | \InvalidArgumentException | \DomainException $e) {
             $this->flash('error', $e->getMessage());
         }
         $this->redirect("/pacientes/{$patientId}/pre-consulta/{$qid}");

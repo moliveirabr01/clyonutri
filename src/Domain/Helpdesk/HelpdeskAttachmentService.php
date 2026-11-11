@@ -77,13 +77,7 @@ class HelpdeskAttachmentService
         $destinationPath = $this->storageDir . DIRECTORY_SEPARATOR . $storedFilename;
 
         // Salvar em disco fora do webroot
-        $moved = false;
-        if (is_uploaded_file($fileInfo['tmp_name'])) {
-            $moved = move_uploaded_file($fileInfo['tmp_name'], $destinationPath);
-        } else {
-            // Em testes ou chamadas diretas
-            $moved = copy($fileInfo['tmp_name'], $destinationPath);
-        }
+        $moved = \ClyoNutri\Core\Http\UploadMover::move((string)$fileInfo['tmp_name'], $destinationPath); // CR-NI2-011
 
         if (!$moved) {
             throw new RuntimeException('Não foi possível persistir o anexo no armazenamento seguro.');

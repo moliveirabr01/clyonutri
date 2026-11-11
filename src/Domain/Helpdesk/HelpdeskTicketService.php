@@ -200,6 +200,9 @@ class HelpdeskTicketService
 
             if ($startedTx && $this->db->inTransaction()) {
                 $this->db->commit();
+                // v34: aviso ao backoffice só depois do commit (nunca lança). Com transação do chamador em aberto,
+                // a varredura (sweep) gera o aviso quando ela fechar.
+                (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyTicketCreated($ticketId);
             }
 
             return $this->getTicketById($ticketId, $userId, $clinicId, false);
@@ -332,14 +335,14 @@ class HelpdeskTicketService
     /**
      * Fila de atendimento e triagem do backoffice (operadores / administradores).
      */
-    public function listBackofficeQueue(?string $status = null, ?string $priority = null, ?int $assignedTo = null): array
+    /**
+     * Cláusulas FROM/WHERE compartilhadas entre a lista e a contagem da fila do backoffice.
+     *
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private function backofficeQueueFilter(?string $status, ?string $priority, ?int $assignedTo): array
     {
-        $sql = "
-            SELECT t.*, u.name as author_name, u.email as author_email, c.name as clinic_name,
-                   op.name as assigned_operator_name,
-                   (SELECT COUNT(*) FROM helpdesk_ticket_messages WHERE ticket_id = t.id) as total_messages,
-                   (SELECT COUNT(*) FROM helpdesk_attachments WHERE ticket_id = t.id) as attachments_count,
-                   fb.rating as csat_rating
+        $from = "
             FROM helpdesk_tickets t
             JOIN users u ON u.id = t.user_id
             JOIN clinics c ON c.id = t.clinic_id
@@ -350,31 +353,69 @@ class HelpdeskTicketService
         $params = [];
 
         if (!empty($status)) {
-            $sql .= " AND t.status = :status";
+            $from .= " AND t.status = :status";
             $params['status'] = $status;
         }
 
         if (!empty($priority)) {
-            $sql .= " AND t.priority_operational = :priority";
+            $from .= " AND t.priority_operational = :priority";
             $params['priority'] = $priority;
         }
 
         if ($assignedTo !== null) {
-            $sql .= " AND t.assigned_to_user_id = :assigned";
+            $from .= " AND t.assigned_to_user_id = :assigned";
             $params['assigned'] = $assignedTo;
         }
 
+        return [$from, $params];
+    }
+
+    /** Total de chamados da fila do backoffice para os mesmos filtros de listBackofficeQueue(). */
+    public function countBackofficeQueue(?string $status = null, ?string $priority = null, ?int $assignedTo = null): int
+    {
+        [$from, $params] = $this->backofficeQueueFilter($status, $priority, $assignedTo);
+        $stmt = $this->db->prepare("SELECT COUNT(*) " . $from);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Fila do backoffice. Sem $limit devolve tudo (comportamento anterior);
+     * com $limit devolve uma página (LIMIT/OFFSET inteiros, vinculados).
+     */
+    public function listBackofficeQueue(?string $status = null, ?string $priority = null, ?int $assignedTo = null, ?int $limit = null, int $offset = 0): array
+    {
+        [$from, $params] = $this->backofficeQueueFilter($status, $priority, $assignedTo);
+        $sql = "
+            SELECT t.*, u.name as author_name, u.email as author_email, c.name as clinic_name,
+                   op.name as assigned_operator_name,
+                   (SELECT COUNT(*) FROM helpdesk_ticket_messages WHERE ticket_id = t.id) as total_messages,
+                   (SELECT COUNT(*) FROM helpdesk_attachments WHERE ticket_id = t.id) as attachments_count,
+                   fb.rating as csat_rating
+        " . $from;
+
         // Ordenação inteligente: P0 primeiro, depois P1, P2, P3, e chamados mais antigos
+        // (t.id no fim garante ordem estável entre páginas)
         $sql .= " ORDER BY CASE t.priority_operational 
                             WHEN 'P0' THEN 1 
                             WHEN 'P1' THEN 2 
                             WHEN 'P2' THEN 3 
                             WHEN 'P3' THEN 4 
                             ELSE 5 END ASC, 
-                 t.updated_at ASC";
+                 t.updated_at ASC, t.id ASC";
+        if ($limit !== null) {
+            $sql .= " LIMIT :limit OFFSET :offset";
+        }
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', max(1, $limit), PDO::PARAM_INT);
+            $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
+        }
+        $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         foreach ($rows as &$r) {

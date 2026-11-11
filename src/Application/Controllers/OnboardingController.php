@@ -8,6 +8,7 @@ use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Domain\Onboarding\OnboardingService;
+use ClyoNutri\Domain\Subscription\SubscriptionService;
 use PDO;
 
 class OnboardingController
@@ -82,7 +83,17 @@ class OnboardingController
 
         $firstPatient = $progress['first_patient_id'] ? $this->onboardingService->getFirstPatient($auth['userId'], $auth['clinicId']) : null;
 
-        $title = 'Configuração do Consultório — Onboarding';
+        // NI2-625: ativação conferida no banco (perfil, horários, link, primeiro paciente, consulta e plano).
+        // Substitui o "90%" fixo da NI2-603: o percentual e o "pronto para atender" vêm do checklist.
+        $activation = (new \ClyoNutri\Domain\Onboarding\ActivationChecklist($this->db))->forUser((int)$auth['clinicId'], (int)$auth['userId']);
+        $bookingState = $activation['booking_state'];
+        $progress['progress_pct'] = $activation['pct']; // a barra "Progresso de Ativação" mostra o que está feito de fato
+
+        $subscriptions = new SubscriptionService($this->db);
+        $canChoosePlan = $step === 1 && $subscriptions->canChooseOnboardingPlan($auth['clinicId'], $auth['userId']);
+        $availablePlans = $canChoosePlan ? $subscriptions->getOnboardingPlans() : [];
+
+        $title = 'Configurar consultório';
         $activeNav = 'dashboard';
         $clinicName = $auth['clinicName'];
         $userName = $auth['userName'];
@@ -94,11 +105,11 @@ class OnboardingController
           <!-- Cabeçalho do Onboarding -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 12px;">
             <div>
-              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid #D3E5D5; padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 6px;">
+              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid var(--botanical-sage-200, #D3E5D5); padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 6px;">
                 Ativação do Consultório
               </span>
               <h1 style="font-family: var(--font-editorial); font-size: 1.85rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                Bem-vindo ao ClyoNutri, <?= htmlspecialchars(explode(' ', $auth['userName'])[0]) ?>!
+                Bem-vindo ao Clyo Nutri, <?= htmlspecialchars(explode(' ', $auth['userName'])[0]) ?>!
               </h1>
               <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.95rem;">
                 Configure seu consultório em 5 passos rápidos para começar seus atendimentos com segurança e conformidade.
@@ -106,7 +117,7 @@ class OnboardingController
             </div>
             <div>
               <a href="/dashboard" style="color: var(--neutral-gray-500); text-decoration: none; font-size: 0.85rem; font-weight: 600;" title="Você pode retomar esta configuração a qualquer momento">
-                Retomar Depois / Ir ao Dashboard →
+                Continuar depois e ir ao painel →
               </a>
             </div>
           </div>
@@ -129,7 +140,7 @@ class OnboardingController
                   1 => ['title' => 'Boas-vindas', 'desc' => 'Foco clínico'],
                   2 => ['title' => 'Profissional', 'desc' => 'CRN & Registro'],
                   3 => ['title' => 'Atendimento', 'desc' => 'Preferências'],
-                  4 => ['title' => '1º Paciente', 'desc' => 'Cadastro real'],
+                  4 => ['title' => '1º Paciente', 'desc' => 'Opcional'],
                   5 => ['title' => 'Ativação', 'desc' => 'Pronto para uso'],
               ];
               ?>
@@ -158,6 +169,25 @@ class OnboardingController
               <input type="hidden" name="step" value="<?= $step ?>">
 
               <?php if ($step === 1): ?>
+                <?php if ($canChoosePlan): ?>
+                  <fieldset style="border: 0; padding: 0; margin: 0 0 var(--space-6);">
+                    <legend style="font-family: var(--font-editorial); font-size: 1.4rem;">Escolha seu plano Clyo Nutri</legend>
+                    <p id="onboarding-plan-help">Escolha o plano para seu período de teste. Esta seleção não inicia cobrança nem renova o prazo de avaliação.</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                      <?php foreach ($availablePlans as $plan): ?>
+                        <label style="display: block; padding: 16px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-card); cursor: pointer;">
+                          <input type="radio" name="plan_code" value="<?= htmlspecialchars($plan['code'], ENT_QUOTES, 'UTF-8') ?>" required aria-describedby="onboarding-plan-help" <?= ($progress['focus_objectives']['plan_code'] ?? '') === $plan['code'] ? 'checked' : '' ?>>
+                          <strong><?= htmlspecialchars($plan['name'], ENT_QUOTES, 'UTF-8') ?></strong>
+                          <p>R$ <?= number_format((int)$plan['price_cents'] / 100, 2, ',', '.') ?> / <?= $plan['billing_cycle'] === 'yearly' ? 'ano' : 'mês' ?></p>
+                          <p><?= (int)$plan['max_patients'] === 0 ? 'Pacientes ilimitados' : (int)$plan['max_patients'] . ' pacientes' ?><br>
+                          <?= (int)$plan['max_professionals'] === 0 ? 'Profissionais ilimitados' : (int)$plan['max_professionals'] . ' profissional(is)' ?><br>
+                          <?= number_format((int)$plan['storage_mb'] / 1024, 0, ',', '.') ?> GB de armazenamento</p>
+                        </label>
+                      <?php endforeach; ?>
+                    </div>
+                    <?php if (!$availablePlans): ?><p role="alert">Nenhum plano disponível. Entre em contato com o suporte para continuar.</p><?php endif; ?>
+                  </fieldset>
+                <?php endif; ?>
                 <!-- PASSO 1: Boas-vindas & Objetivos -->
                 <div style="margin-bottom: var(--space-5);">
                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
@@ -169,7 +199,7 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-5);">
-                  <p id="ob-grupo-1" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Áreas de Especialidade / Atuação (Selecione uma ou mais):</p>
+                  <p id="ob-grupo-1" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Áreas de especialidade / atuação (selecione uma ou mais):</p>
                   <div role="group" aria-labelledby="ob-grupo-1" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     <?php
                     $focusOptions = [
@@ -194,27 +224,6 @@ class OnboardingController
                   </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
-                  <div>
-                    <label for="ob1-monthly_patients_goal" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Meta de Pacientes Ativos / Mês</label>
-                    <select id="ob1-monthly_patients_goal" name="monthly_patients_goal" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
-                      <option value="15" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 15) ? 'selected' : '' ?>>Até 15 pacientes/mês</option>
-                      <option value="30" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 30) ? 'selected' : '' ?>>15 a 30 pacientes/mês</option>
-                      <option value="60" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 60) ? 'selected' : '' ?>>30 a 60 pacientes/mês</option>
-                      <option value="100" <?= (($progress['focus_objectives']['monthly_patients_goal'] ?? 20) === 100) ? 'selected' : '' ?>>Mais de 60 pacientes/mês</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label for="ob2-clinical_experience_years" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Tempo de Atuação Clínica</label>
-                    <select id="ob2-clinical_experience_years" name="clinical_experience_years" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
-                      <option value="0">Recém-formado / Iniciando consultório</option>
-                      <option value="2">1 a 3 anos de experiência</option>
-                      <option value="5">3 a 7 anos de experiência</option>
-                      <option value="10">Mais de 7 anos de experiência</option>
-                    </select>
-                  </div>
-                </div>
-
               <?php elseif ($step === 2): ?>
                 <!-- PASSO 2: Dados Profissionais Reais -->
                 <?php
@@ -225,7 +234,7 @@ class OnboardingController
                 ?>
                 <div style="margin-bottom: var(--space-5);">
                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                    Passo 2 de 5: Validação do Registro Profissional (CFN / CRN)
+                    Passo 2 de 5: validação do registro profissional (CFN / CRN)
                   </h3>
                   <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">
                     Os dados abaixo aparecem nos cabeçalhos de receitas, planos alimentares e atestados clínicos emitidos para seus pacientes.
@@ -235,11 +244,11 @@ class OnboardingController
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
                     <label for="ob3-crn" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Número de Registro CRN *</label>
-                    <input id="ob3-crn" type="text" name="crn" required value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" placeholder="Ex: 12345" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <input id="ob3-crn" type="text" name="crn" required value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" placeholder="Ex: 12345" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                   <div>
                     <label for="ob4-crn_region" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Região do CRN *</label>
-                    <select id="ob4-crn_region" name="crn_region" required style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <select id="ob4-crn_region" name="crn_region" required style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <?php for ($r = 1; $r <= 11; $r++): ?>
                         <option value="CRN-<?= $r ?>" <?= (($profCurrent['crn_region'] ?? 'CRN-3') === "CRN-{$r}") ? 'selected' : '' ?>>CRN-<?= $r ?></option>
                       <?php endfor; ?>
@@ -248,13 +257,13 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-4);">
-                  <label for="ob5-specialty" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Especialidade / Título Principal</label>
-                  <input id="ob5-specialty" type="text" name="specialty" value="<?= htmlspecialchars($profCurrent['specialty'] ?? 'Nutricionista Clínico') ?>" placeholder="Ex: Nutricionista Clínico e Esportivo - Pós-Graduado" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                  <label for="ob5-specialty" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Especialidade / título principal</label>
+                  <input id="ob5-specialty" type="text" name="specialty" value="<?= htmlspecialchars($profCurrent['specialty'] ?? 'Nutricionista clínico') ?>" placeholder="Ex: Nutricionista Clínico e Esportivo - Pós-Graduado" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                 </div>
 
                 <div style="margin-bottom: var(--space-6);">
-                  <label for="ob6-bio" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Apresentação / Minibiografia</label>
-                  <textarea id="ob6-bio" name="bio" rows="3" placeholder="Breve resumo da sua metodologia de acompanhamento e formação..." style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);"><?= htmlspecialchars($profCurrent['bio'] ?? '') ?></textarea>
+                  <label for="ob6-bio" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Apresentação / minibiografia</label>
+                  <textarea id="ob6-bio" name="bio" rows="3" placeholder="Breve resumo da sua metodologia de acompanhamento e formação..." style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);"><?= htmlspecialchars($profCurrent['bio'] ?? '') ?></textarea>
                 </div>
 
               <?php elseif ($step === 3): ?>
@@ -274,23 +283,23 @@ class OnboardingController
                 </div>
 
                 <div style="margin-bottom: var(--space-5);">
-                  <p id="ob-grupo-2" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Modalidades Aceitas:</p>
+                  <p id="ob-grupo-2" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Modalidades aceitas:</p>
                   <div role="group" aria-labelledby="ob-grupo-2" style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
                       <input type="checkbox" name="modalities[]" value="presencial" <?= in_array('presencial', $currentModalities, true) ? 'checked' : '' ?>>
-                      🏢 Consultório Presencial
+                      Consultório presencial
                     </label>
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
                       <input type="checkbox" name="modalities[]" value="online" <?= in_array('online', $currentModalities, true) ? 'checked' : '' ?>>
-                      💻 Teleconsulta / Online
+                      Teleconsulta / online
                     </label>
                   </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
                   <div>
-                    <label for="ob7-default_duration_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Duração Padrão da Consulta</label>
-                    <select id="ob7-default_duration_minutes" name="default_duration_minutes" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob7-default_duration_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Duração padrão da consulta</label>
+                    <select id="ob7-default_duration_minutes" name="default_duration_minutes" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="30" <?= (($savedPref['default_duration_minutes'] ?? 60) === 30) ? 'selected' : '' ?>>30 minutos (Retorno rápido)</option>
                       <option value="45" <?= (($savedPref['default_duration_minutes'] ?? 60) === 45) ? 'selected' : '' ?>>45 minutos</option>
                       <option value="60" <?= (($savedPref['default_duration_minutes'] ?? 60) === 60) ? 'selected' : '' ?>>60 minutos (Recomendado para 1ª consulta)</option>
@@ -299,12 +308,12 @@ class OnboardingController
                   </div>
                   <div>
                     <label for="ob8-default_price" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Valor Médio da Consulta (R$)</label>
-                    <input id="ob8-default_price" type="number" step="any" min="0" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <input id="ob8-default_price" type="number" step="any" min="0" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250.00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="margin-bottom: var(--space-6);">
-                  <p id="ob-grupo-3" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Dias de Atendimento na Semana:</p>
+                  <p id="ob-grupo-3" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Dias de atendimento na semana:</p>
                   <div role="group" aria-labelledby="ob-grupo-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <?php
                     $weekDays = ['seg' => 'Segunda', 'ter' => 'Terça', 'qua' => 'Quarta', 'qui' => 'Quinta', 'sex' => 'Sexta', 'sab' => 'Sábado'];
@@ -322,22 +331,23 @@ class OnboardingController
                 <!-- PASSO 4: Criação do Primeiro Paciente Real -->
                 <div style="margin-bottom: var(--space-5);">
                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                    Passo 4 de 5: Cadastre o seu Primeiro Paciente
+                    Passo 4 de 5: Primeiro paciente (opcional)
                   </h3>
                   <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">
-                    Pode ser um paciente real da sua agenda ou um paciente de teste para explorar os cálculos de anamnese, antropometria e planos.
+                    Você pode cadastrar seu primeiro paciente agora ou escolher “Cadastrar paciente depois” para continuar. O cadastro ficará disponível na área Pacientes.
+                  </p>
+                  <p style="color: var(--neutral-gray-500); font-size: 0.9rem; margin-top: 6px;">
+                    Já tem os pacientes numa planilha? Depois de concluir, use <a href="/pacientes/importar" data-testid="onboarding-import-link">Importar pacientes</a> em Pacientes, com prévia antes de gravar.
                   </p>
                 </div>
 
                 <?php if ($firstPatient): ?>
-                  <div style="background: var(--semantic-success-light); border: 1px solid #B7DFDC; border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-5);">
+                  <div style="background: var(--semantic-success-light); border: 1px solid var(--semantic-success-border, #B7DFDC); border-radius: var(--radius-card); padding: var(--space-4); margin-bottom: var(--space-5);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                       <div>
-                        <strong style="color: var(--semantic-success); font-size: 0.95rem; display: block;">✓ Paciente Cadastrado com Sucesso:</strong>
+                        <strong style="color: var(--semantic-success); font-size: 0.95rem; display: block;">✓ Paciente cadastrado com sucesso:</strong>
                         <span style="font-size: 1.1rem; font-weight: 700; color: var(--brand-navy-900);"><?= htmlspecialchars($firstPatient['name']) ?></span>
-                        <div style="font-size: 0.85rem; color: var(--neutral-gray-500); margin-top: 2px;">
-                          <?= htmlspecialchars($firstPatient['email'] ?? 'Sem e-mail') ?> • <?= htmlspecialchars($firstPatient['phone'] ?? 'Sem telefone') ?>
-                        </div>
+                        <?php /* NI2-617: resumo sem e-mail e telefone (minimização LGPD); os dados ficam nos campos abaixo, para edição. */ ?>
                       </div>
                       <a href="/pacientes/<?= (int)$firstPatient['id'] ?>" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;" target="_blank">
                         Ver perfil do paciente ↗
@@ -348,37 +358,37 @@ class OnboardingController
 
                 <div style="display: grid; grid-template-columns: 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
-                    <label for="ob9-name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Nome Completo do Paciente *</label>
-                    <input id="ob9-name" type="text" name="name" required value="<?= $firstPatient ? htmlspecialchars($firstPatient['name']) : '' ?>" placeholder="Ex: Roberto da Silva" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob9-name" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Nome completo do paciente *</label>
+                    <input id="ob9-name" type="text" name="name" required value="<?= $firstPatient ? htmlspecialchars($firstPatient['name']) : '' ?>" placeholder="Ex: Roberto da Silva" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
                   <div>
                     <label for="ob10-email" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">E-mail do Paciente</label>
-                    <input id="ob10-email" type="email" name="email" value="<?= $firstPatient ? htmlspecialchars($firstPatient['email'] ?? '') : '' ?>" placeholder="paciente@exemplo.com.br" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <input id="ob10-email" type="email" name="email" value="<?= $firstPatient ? htmlspecialchars($firstPatient['email'] ?? '') : '' ?>" placeholder="paciente@exemplo.com.br" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                   <div>
-                    <label for="ob11-phone" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">WhatsApp / Telefone</label>
-                    <input id="ob11-phone" type="tel" name="phone" value="<?= $firstPatient ? htmlspecialchars($firstPatient['phone'] ?? '') : '' ?>" placeholder="(11) 98888-7777" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <label for="ob11-phone" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">WhatsApp / telefone</label>
+                    <input id="ob11-phone" type="tel" name="phone" value="<?= $firstPatient ? htmlspecialchars($firstPatient['phone'] ?? '') : '' ?>" placeholder="(11) 98888-7777" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                   </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6);">
                   <div>
                     <label for="ob12-birth_date" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Data de Nascimento</label>
-                    <input id="ob12-birth_date" type="date" name="birth_date" max="<?= date('Y-m-d') ?>" value="<?= $firstPatient ? htmlspecialchars($firstPatient['birth_date'] ?? '') : '' ?>" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                    <input id="ob12-birth_date" type="date" name="birth_date" max="<?= date('Y-m-d') ?>" value="<?= $firstPatient ? htmlspecialchars($firstPatient['birth_date'] ?? '') : '' ?>" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
                     <span style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Usado para cálculo de idade e protocolos metabólicos.</span>
                   </div>
                   <div>
-                    <label for="ob13-gender" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Gênero / Sexo Biológico</label>
-                    <select id="ob13-gender" name="gender" aria-describedby="ob-gender-help" style="width: 100%; padding: 10px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                    <label for="ob13-gender" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Sexo registrado para referências clínicas</label>
+                    <select id="ob13-gender" name="gender" aria-describedby="ob-gender-help" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
                       <option value="" <?= (!$firstPatient || empty($firstPatient['gender'])) ? 'selected' : '' ?>>Não informado (opcional)</option>
                       <option value="male" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'male') ? 'selected' : '' ?>>Masculino</option>
                       <option value="female" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'female') ? 'selected' : '' ?>>Feminino</option>
                       <option value="other" <?= ($firstPatient && ($firstPatient['gender'] ?? '') === 'other') ? 'selected' : '' ?>>Outro</option>
                     </select>
-                    <span id="ob-gender-help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Relevante para equações preditivas basais. No ClyoNutri, hoje é usado só para escolher os pontos de corte da relação cintura-quadril (OMS) na avaliação antropométrica; vazio ou &quot;Outro&quot; deixam essa classificação sem faixa. O sistema não deduz este dado de nenhum outro.</span>
+                    <span id="ob-gender-help" style="display: block; font-size: 0.75rem; color: var(--neutral-gray-500); margin-top: 4px;">Opcional. Relevante para equações preditivas basais. O parâmetro usado nas equações não define a identidade de gênero. Quando confirmado pelo profissional, pode ser usado na classificação da RCQ e na elegibilidade de protocolos de dobras, junto com a idade. Sem os dados exigidos, a classificação ou equação fica indisponível; confirme o parâmetro no contexto da avaliação. Não o deduza da identidade de gênero.</span>
                   </div>
                 </div>
 
@@ -386,57 +396,39 @@ class OnboardingController
               <?php elseif ($step === 5): ?>
                 <!-- PASSO 5: Orientação Contextual & Ativação Concluída -->
                 <div style="text-align: center; padding: var(--space-4) 0 var(--space-6);">
-                  <div style="width: 64px; height: 64px; border-radius: var(--radius-pill); background: var(--semantic-success-light); color: var(--semantic-success); display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto var(--space-4);">
-                    ✓
-                  </div>
-                  <h2 style="font-family: var(--font-editorial); font-size: 2rem; color: var(--brand-navy-900); margin-bottom: 8px;">
-                    Parabéns! Seu Consultório Está Ativado!
+                  <?php if ($activation['ready']): ?><div style="width: 64px; height: 64px; border-radius: var(--radius-pill); background: var(--semantic-success-light); color: var(--semantic-success); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4);" aria-hidden="true"><?= \ClyoNutri\Application\View\Icon::svg('circle-check', 32) ?></div><?php endif; ?>
+                  <?php $pendReq = array_values(array_filter($activation['items'], static fn($i) => $i['required'] && $i['state'] === 'pending')); ?>
+                  <h2 style="font-family: var(--font-editorial); font-size: 2rem; color: var(--brand-navy-900); margin-bottom: 8px;" data-testid="activation-title">
+                    <?= $activation['ready'] ? 'Consultório pronto para atender.' : 'Quase pronto: ' . (count($pendReq) === 1 ? 'falta 1 item obrigatório.' : 'faltam ' . count($pendReq) . ' itens obrigatórios.') ?>
                   </h2>
-                  <p style="color: var(--neutral-gray-500); font-size: 1rem; max-width: 620px; margin: 0 auto var(--space-6);">
-                    Sua conta está 100% configurada, suas regras de agendamento estão ativas e seus primeiros registros clínicos foram criados com segurança e governança LGPD.
+                  <p style="color: var(--neutral-gray-600, #475467); font-size: 1rem; max-width: 620px; margin: 0 auto var(--space-5);">
+                    Conferido agora no sistema: <strong data-testid="activation-count"><?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></strong> itens feitos. Os três últimos são primeiros passos: não impedem começar.
                   </p>
+                  <ol class="activation-list" data-testid="activation-checklist">
+                    <?php foreach ($activation['items'] as $it): $stLabel = ['done' => 'Feito', 'pending' => $it['required'] ? 'Pendente' : 'A fazer', 'attention' => 'Feito, com aviso', 'not_applicable' => 'Não se aplica'][$it['state']]; ?>
+                      <li class="activation-item activation-item--<?= htmlspecialchars($it['state']) ?>" data-testid="activation-<?= htmlspecialchars($it['key']) ?>" data-state="<?= htmlspecialchars($it['state']) ?>">
+                        <span class="activation-item__mark" aria-hidden="true"><?= \ClyoNutri\Application\View\Icon::svg($it['state'] === 'done' ? 'circle-check' : ($it['state'] === 'attention' ? 'triangle-alert' : ($it['state'] === 'not_applicable' ? 'minus' : 'circle')), 18) ?></span>
+                        <span class="activation-item__body">
+                          <strong><?= htmlspecialchars($it['label']) ?></strong><?= $it['required'] ? '' : ' <span class="activation-item__tag">primeiro passo</span>' ?>
+                          <span class="activation-item__state"><?= $stLabel ?></span>
+                          <span class="activation-item__detail"<?= $it['key'] === 'hours' && $it['state'] === 'pending' ? ' data-testid="onboarding-booking-pending" role="alert"' : '' ?>><?= htmlspecialchars($it['detail']) ?></span>
+                        </span>
+                        <?php if ($it['action_url'] && $it['state'] !== 'done'): ?>
+                          <a class="btn <?= $it['state'] === 'pending' && $it['required'] ? 'btn-primary' : 'btn-secondary' ?> btn-sm" href="<?= htmlspecialchars($it['action_url']) ?>"<?= $it['key'] === 'hours' ? ' data-testid="onboarding-booking-activate"' : '' ?>><?= htmlspecialchars((string)$it['action_label']) ?></a>
+                        <?php endif; ?>
+                      </li>
+                    <?php endforeach; ?>
+                  </ol>
 
                   <?php if ($firstPatient): ?>
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4); margin: 0 auto var(--space-5); max-width: 620px; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                      <div>
-                        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--brand-copper-600);">Primeiro Paciente Vinculado</div>
-                        <div style="font-size: 1.05rem; font-weight: 700; color: var(--brand-navy-900);"><?= htmlspecialchars($firstPatient['name']) ?></div>
-                        <div style="font-size: 0.85rem; color: var(--neutral-gray-500);"><?= htmlspecialchars($firstPatient['email'] ?? 'Sem e-mail') ?></div>
-                      </div>
-                      <a href="/pacientes/<?= (int)$firstPatient['id'] ?>" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;" target="_blank">
-                        Abrir Prontuário 360 ↗
-                      </a>
-                    </div>
+                    <p style="max-width: 620px; margin: var(--space-4) auto 0; text-align: left;">Primeiro paciente vinculado: <a href="/pacientes/<?= (int)$firstPatient['id'] ?>"><?= htmlspecialchars($firstPatient['name']) ?></a>.</p>
+                    <?php /* NI2-617: só o nome; e-mail e telefone não aparecem nesta tela (minimização LGPD). */ ?>
                   <?php endif; ?>
-
-                  <!-- Cards de Ações Recomendadas -->
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); text-align: left; margin-bottom: var(--space-6);">
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
-                      <div style="font-size: 1.5rem; margin-bottom: 8px;">📅</div>
-                      <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Agendar Consulta</strong>
-                      <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Abra a agenda clínica e marque o primeiro atendimento com detecção anti-conflito.</p>
-                      <a href="/agenda" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Ir para Agenda →</a>
-                    </div>
-
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
-                      <div style="font-size: 1.5rem; margin-bottom: 8px;">🥗</div>
-                      <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Prescrever Plano Alimentar</strong>
-                      <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Monte dietas com cálculos oficiais TACO, medidas caseiras e histórico de versões publicadas.</p>
-                      <a href="/planos" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Criar Plano →</a>
-                    </div>
-
-                    <div style="background: var(--neutral-warm-50); border: 1px solid #D3E5D5; border-radius: var(--radius-card); padding: var(--space-4);">
-                      <div style="font-size: 1.5rem; margin-bottom: 8px;">🍳</div>
-                      <strong style="color: var(--brand-navy-900); display: block; margin-bottom: 4px;">Biblioteca de Receitas</strong>
-                      <p style="color: var(--neutral-gray-500); font-size: 0.85rem; margin-bottom: var(--space-3);">Explore o catálogo culinário, crie variantes e prescreva receitas personalizadas.</p>
-                      <a href="/receitas" class="btn btn-secondary" style="min-height: 36px; font-size: 0.85rem;">Ver Receitas →</a>
-                    </div>
-                  </div>
                 </div>
               <?php endif; ?>
 
               <!-- Rodapé de Ações do Formulário -->
-              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-5);">
+              <div class="onboarding-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-5);">
                 <div>
                   <?php if ($step > 1): ?>
                     <a href="/onboarding?passo=<?= $step - 1 ?>" class="btn btn-secondary">
@@ -445,12 +437,16 @@ class OnboardingController
                   <?php endif; ?>
                 </div>
 
-                <div style="display: flex; gap: var(--space-3); align-items: center;">
+                <div style="display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;">
+                  <?php if ($step === 4): ?>
+                    <button type="submit" name="skip_patient" value="1" formnovalidate class="btn btn-secondary">Cadastrar paciente depois</button>
+                  <?php else: ?>
                   <a href="/dashboard" style="color: var(--neutral-gray-500); text-decoration: none; font-size: 0.85rem;">
                     Pular por enquanto
                   </a>
-                  <button type="submit" class="btn btn-accent" style="min-width: 180px;">
-                    <?= ($step === 5) ? 'Concluir & Ir ao Dashboard ✓' : 'Salvar & Próximo Passo →' ?>
+                  <?php endif; ?>
+                  <button type="submit" class="btn btn-accent" style="min-width: min(180px, 100%);">
+                    <?= ($step === 5) ? 'Concluir e ir ao painel' : 'Salvar e continuar →' ?>
                   </button>
                 </div>
               </div>
@@ -519,6 +515,7 @@ class OnboardingController
             'current_step' => $progress['current_step'],
             'completed_steps' => $progress['completed_steps'],
             'progress_pct' => $progress['progress_pct'],
+            'activation' => (new \ClyoNutri\Domain\Onboarding\ActivationChecklist($this->db))->forUser((int)$auth['clinicId'], (int)$auth['userId']), // NI2-625
         ]);
     }
 }

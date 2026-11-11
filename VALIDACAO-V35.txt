@@ -1,0 +1,10 @@
+PHP lint: 336 arquivos; 0 falhas.
+Base: clyonutri-v34.zip fornecido pelo proprietário.
+release_check: PASS.
+Seleção de plano: PASS — catálogo, persistência, prazo do trial, sem faturas, papéis, isolamento, planos inválidos/inativos e assinatura ativa.
+Paciente opcional: PASS — adiamento, formulário parcial ignorado, conclusão, preservação de paciente existente, validação e isolamento.
+Receitas públicas: PASS — seis exemplos, leitura por clínicas novas, detalhes, idempotência e privacidade.
+Instalação real do catálogo em SQLite isolado: PASS — primeira execução 6 receitas; segunda execução 0 receitas, sem duplicatas.
+Nenhum teste executado contra banco de produção.
+Sem validação visual autenticada em navegador ou execução real na HostGator.
+Comparação: nenhum arquivo removido; cinco arquivos originais alterados; 649 originais idênticos.

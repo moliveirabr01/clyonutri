@@ -1,0 +1,39 @@
+COMPARAÇÃO v38 x v39 (por conteúdo, sha256 de cada arquivo)
+
+v38: clyonutri-v38.zip (sha256 06dd32abcc782236af74f23bb9d8e7abe764da334f76c670d389671b767fd97a)  685 itens (arquivos e pastas vazias)
+v39: clyonutri-v39.zip  687 itens (esta lista inclui o próprio COMPARACAO-V38-V39.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 677 (vendor/ inteiro, todo o código em src/ e views/, rotas, as outras migrações, o app, o .htaccess e as demais telas; o código do sistema é o mesmo byte a byte)
+Adicionados: 5 (4 + este arquivo)
+Removidos: 3
+Alterados: 5
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v39.md  -> novo: causa do #1215 (id bigint(20) em produção x INT nas colunas novas), ordem de uso do SQL e o que esperar em cada passo
+  database/manual/atualizacao-v39-preflight.sql  -> novo: só lê; passa a mostrar engine, collation e tipo do id das tabelas-base e o estado parcial das duas tabelas novas
+  database/manual/atualizacao-v39-completa.sql  -> novo: cria as duas tabelas SEM chave estrangeira; funciona sem tabelas, com uma delas já criada ou com as duas; registra a migração 60 uma só vez
+  database/manual/atualizacao-v39-verificacao.sql  -> novo: confere tabelas, 18 e 22 colunas, índices únicos e a migração 60
+  COMPARACAO-V38-V39.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  database/manual/atualizacao-v37-preflight.sql  -> substituído pelo atualizacao-v39-preflight.sql
+  database/manual/atualizacao-v37-completa.sql  -> substituído pelo atualizacao-v39-completa.sql (o da v37 falhava com #1215)
+  database/manual/atualizacao-v37-verificacao.sql  -> substituído pelo atualizacao-v39-verificacao.sql
+
+== ALTERADOS ==
+  database/migrations/2026_10_28_000060_create_plan_changes_and_account_deletion_requests.php  -> alterado: sem as 4 chaves estrangeiras de subscription_plan_changes; cria os índices das colunas; mesmo nome e número da migração
+  database/instalacao_mysql8.sql  -> alterado: só o bloco de subscription_plan_changes (sem as chaves estrangeiras; índices mantidos)
+  LEIA-ME-HOSTGATOR-v37.md  -> alterado: aviso no topo, nomes dos SQL e a frase sobre exclusão em cascata do histórico
+  LEIA-ME-HOSTGATOR-v38.md  -> alterado: aviso no topo e nomes dos SQL
+  RELEASE_INFO.json  -> alterado: versão v39, base clyonutri-v38.zip (sha256 06dd32ab…), causa, arquivos novos/removidos e hashes
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+77d3aafb8f468bce32f18e24f83d63a5524c5347b711fee52dc8722238921784  LEIA-ME-HOSTGATOR-v39.md
+de69646af7e71db85a958ed622133d602f1511d48e647bdcdc63d530fc0aabde  database/manual/atualizacao-v39-preflight.sql
+15991828ffa7472103c56ca82bc1e6869820305cb33b9ed0f151e63f6ebb6121  database/manual/atualizacao-v39-completa.sql
+d69937ee85e683ee9e0b55dc8a69142384c28cf688ef091a947c3fb2e65941ba  database/manual/atualizacao-v39-verificacao.sql
+a62b20aa52eb4f696479a6b307832a3c70c7333c20ecd1823c66925eca327ad1  database/migrations/2026_10_28_000060_create_plan_changes_and_account_deletion_requests.php
+7d5b2fb7e0902248a4f1938c0d850276cbd635ddaad3571515095089552d66be  database/instalacao_mysql8.sql
+c1d62263ea92abf6865ba8b6fb3e1c5ed2d04bcaee0871130b0634811f5c63df  LEIA-ME-HOSTGATOR-v37.md
+b928878bc05aa40be8356b35316f55e8b72ac4c3d99984adaee05aaedad789e4  LEIA-ME-HOSTGATOR-v38.md
+c3f0c1002abdd8417c208b5a62245d484d6773667d6cb279d6624e77152cb6ee  RELEASE_INFO.json

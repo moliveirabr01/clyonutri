@@ -65,25 +65,12 @@ class TeleconsultationController
             $this->redirect('/teleconsulta/' . (int)$existing['id'] . '/atendimento');
         }
         // NI2-24 (B1): consulta de outra clínica (ou inexistente) não mostra a tela de abrir o consultório.
-        $own = $this->db->prepare('SELECT 1 FROM appointments WHERE id = :a AND clinic_id = :c');
-        $own->execute(['a' => $appointmentId, 'c' => $clinicId]);
-        if (!$own->fetchColumn()) {
-            http_response_code(404);
-            echo 'Consulta não encontrada.';
-            return;
-        }
+        $own=$this->db->prepare("SELECT a.*,p.name AS patient_name,u.name AS professional_name FROM appointments a JOIN patients p ON p.id=a.patient_id AND p.clinic_id=a.clinic_id JOIN professionals pr ON pr.id=a.professional_id JOIN users u ON u.id=pr.user_id JOIN clinic_members m ON m.user_id=u.id AND m.clinic_id=a.clinic_id AND m.status='active' WHERE a.id=:a AND a.clinic_id=:c AND a.professional_id=:prof");
+        $own->execute(['a'=>$appointmentId,'c'=>$clinicId,'prof'=>$professionalId]);$appointment=$own->fetch(PDO::FETCH_ASSOC);
+        if(!$appointment){http_response_code(404);echo 'Consulta não encontrada.';return;}
         $csrf = Csrf::generate();
         $this->securityHeaders();
-        $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<title>Consultório Online</title><link rel="stylesheet" href="/assets/css/teleconsulta.css"></head><body>'
-            . '<main class="tc-narrow"><div class="tc-card"><h2>Abrir o Consultório Online</h2>'
-            . '<p>Isso cria a sala desta consulta e gera o convite do paciente.</p>'
-            . '<form method="POST" action="/teleconsulta/sessao-agenda/' . $appointmentId . '">'
-            . '<input type="hidden" name="_csrf" value="' . $e($csrf) . '">'
-            . '<div class="tc-controls"><button type="submit" class="tc-btn tc-btn-primary">Abrir consultório</button>'
-            . '<a class="tc-btn" style="display:inline-flex;align-items:center;text-decoration:none" href="/consulta/' . $appointmentId . '">Voltar</a></div>'
-            . '</form></div></main></body></html>';
+        require __DIR__.'/../../../views/teleconsultation/confirm_open.php';
     }
 
     public function createFromAppointment(array $params = []): void
@@ -127,6 +114,7 @@ class TeleconsultationController
         $stmtEmail = $this->db->prepare('SELECT email FROM patients WHERE id = :id AND clinic_id = :c');
         $stmtEmail->execute(['id' => $session['patient_id'], 'c' => $clinicId]);
         $patientHasEmail = filter_var((string)$stmtEmail->fetchColumn(), FILTER_VALIDATE_EMAIL) !== false;
+        $clock = $this->service->waitingRoomClock($session); // v54.27: "a sala do paciente abre às HH:MM"
         $csrf = Csrf::generate();
 
         $this->securityHeaders();
@@ -308,6 +296,7 @@ class TeleconsultationController
             $this->patientErrorPage(new TeleconsultationStateException('Termo da teleconsulta não configurado.'));
             return;
         }
+        $clock = $this->service->waitingRoomClock($session); // v54.27: contagem regressiva com o relógio do servidor
         $csrf = Csrf::generate();
         $this->securityHeaders();
         require __DIR__ . '/../../../views/teleconsultation/patient_waiting.php';
@@ -523,8 +512,8 @@ class TeleconsultationController
         http_response_code($this->statusFor($e));
         $this->securityHeaders();
         echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:#1F2937">'
-            . '<h1 style="font-size:22px;color:#0F3E17">Não foi possível abrir a teleconsulta</h1><p>'
+            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:var(--neutral-ink-900, #1F2937)">'
+            . '<h1 style="font-size:22px;color:var(--botanical-forest-900, #0F3E17)">Não foi possível abrir a teleconsulta</h1><p>'
             . htmlspecialchars($this->safeMessage($e)) . '</p><p><a href="' . htmlspecialchars($back) . '">Voltar</a></p></body></html>';
         exit;
     }
@@ -537,8 +526,8 @@ class TeleconsultationController
             ? $e->getMessage()
             : 'Este link de teleconsulta não está disponível. Ele pode ter expirado, sido substituído ou a consulta pode ter sido encerrada. Fale com seu nutricionista para receber um novo convite.';
         echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:#1F2937">'
-            . '<h1 style="font-size:22px;color:#0F3E17">Teleconsulta indisponível</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
+            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:var(--neutral-ink-900, #1F2937)">'
+            . '<h1 style="font-size:22px;color:var(--botanical-forest-900, #0F3E17)">Teleconsulta indisponível</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
         exit;
     }
 

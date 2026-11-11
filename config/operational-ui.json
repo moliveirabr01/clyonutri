@@ -1,0 +1,14 @@
+{
+  "version": "v54.18",
+  "palette": "Clinical Botanical",
+  "legacy_aliases": {"brand-navy-900": "botanical-forest-900", "brand-copper-500": "botanical-copper-500"},
+  "typography": {"family": "Inter, system-ui, sans-serif", "body_rem": 0.9375, "help_rem": 0.875, "line_height": 1.5},
+  "spacing_rem": [0.25, 0.5, 0.75, 1, 1.5],
+  "radius_rem": {"control": 0.5, "card": 0.75},
+  "z_index": {"header": 20, "menu": 40, "dialog": 1000, "toast": 1100},
+  "breakpoints_css_px": {"compact": 656, "calendar_list": 800},
+  "targets_css_px": {"wcag_minimum": 24, "preferred_control": 44},
+  "states": ["not_started", "editing", "saving", "saved", "review", "completed", "published", "issued", "conflict", "error", "expired"],
+  "signature_rule": "A file hash is not a verified digital signature.",
+  "primary_action_rule": "One main action per task context; independent forms can each have a primary action."
+}

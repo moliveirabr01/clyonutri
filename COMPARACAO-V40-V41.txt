@@ -1,0 +1,77 @@
+COMPARAÇÃO v40 x v41 (por conteúdo, sha256 de cada arquivo)
+
+v40: clyonutri-v40.zip (sha256 0ee397979e5ffe5cc9cbf6076b2af0ac464f0f6b2c606d3134fde46d449441d5)  689 itens (arquivos e pastas vazias)
+v41: clyonutri-v41.zip  709 itens (esta lista inclui o próprio COMPARACAO-V40-V41.txt)
+
+Iguais (mesmo sha256 ou pasta vazia igual): 679 (vendor/ inteiro, as migrações 1 a 60 e o SQL manual da v39, os LEIA-ME e COMPARACAO anteriores, SubscriptionService.php e o restante de src/ e views/)
+Adicionados: 20 (19 + este arquivo)
+Removidos: 0
+Alterados: 10
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v41.md  -> novo: o que muda, SQL da migração 61 aguardando OK, ordem de execução, aviso clínico e como voltar
+  database/manual/atualizacao-v41-preflight.sql  -> novo: só leitura; diz se o banco está pronto para a migração 61
+  database/manual/atualizacao-v41-completa.sql  -> novo: cria as duas tabelas (BIGINT, sem FKs), deixa meal_plans.patient_id aceitar vazio e registra a 61; pode rodar duas vezes
+  database/manual/atualizacao-v41-verificacao.sql  -> novo: confere tabelas, colunas, índices e o registro da 61
+  database/migrations/2026_10_29_000061_plan_energy_clinic_measures_and_planless_plans.php  -> novo: migração 61 (mesma estrutura do SQL manual)
+  docs/benchmark-webdiet/FASE-0-RECONCILIACAO-NI2-514.md  -> novo: relatório da Fase 0 (issues x código da v40)
+  docs/benchmark-webdiet/CONTAGEM-DE-CLIQUES-NI2-514.md  -> novo: contagem de cliques v40 x v41
+  docs/evidencias/ni2-514/SMOKE-V41-mysql57.txt  -> novo: saída do teste de fumaça em MySQL 5.7.44 (dados TESTE)
+  docs/evidencias/ni2-514/cliques-v40-com-paciente.json  -> novo: resultado bruto da contagem (v40)
+  docs/evidencias/ni2-514/cliques-v41-com-paciente.json  -> novo: resultado bruto da contagem (v41 com paciente)
+  docs/evidencias/ni2-514/cliques-v41-sem-paciente.json  -> novo: resultado bruto da contagem (v41 sem paciente)
+  public/assets/js/plan-energy.js  -> novo: prévia do cálculo no cartão de energia (o servidor recalcula ao salvar)
+  src/Application/Controllers/ClinicMeasuresController.php  -> novo: /medidas-caseiras (lista, cadastro, remoção, modelo CSV e importação)
+  src/Application/Controllers/MealPlanEnergyController.php  -> novo: gravar a meta do plano e atribuir o paciente a um plano sem paciente
+  src/Domain/MealPlan/EnergyTargetService.php  -> novo: grava e lê a meta por plano, com auditoria e escopo de clínica
+  src/Domain/Nutrition/ClinicHouseholdMeasureService.php  -> novo: medidas da clínica com fonte obrigatória, importação tudo ou nada, auditoria
+  src/Domain/Nutrition/EnergyCalculator.php  -> novo: TMB/GET/VET (Mifflin-St Jeor, Harris-Benedict revisada, Cunningham), FAO/OMS/UNU, macros
+  views/meal_plans/_energy_card.php  -> novo: cartão "Energia e metas do plano"
+  views/meal_plans/clinic_measures.php  -> novo: tela de medidas caseiras da clínica
+  COMPARACAO-V40-V41.txt  -> novo: esta lista
+
+== REMOVIDOS ==
+  (nenhum)
+
+== ALTERADOS ==
+  database/instalacao_mysql8.sql  -> alterado: as duas tabelas novas, patient_id aceitando vazio e o registro da migração 61
+  public/index.php  -> alterado: rotas novas (/planos/{id}/energia, /planos/{id}/paciente, /medidas-caseiras*)
+  scripts/build_hostgator_zip.sh  -> alterado: o pacote também leva docs/benchmark-webdiet
+  src/Application/Controllers/DashboardController.php  -> alterado: novo plano com paciente opcional, título padrão e 6 refeições; cartão de energia; publicar exige paciente
+  src/Application/Controllers/FoodSearchController.php  -> alterado: busca e conversão usam as medidas da clínica
+  src/Domain/MealPlan/MealPlanService.php  -> alterado: plano sem paciente, refeições padrão, atribuição de paciente
+  src/Domain/Nutrition/HouseholdMeasureConverter.php  -> alterado: medidas da clínica antes das globais, com origem
+  src/Domain/Privacy/LgpdService.php  -> alterado: a exportação LGPD inclui as metas de energia do paciente
+  views/meal_plans/print.php  -> alterado: impressão mostra a meta e a fórmula usada
+  RELEASE_INFO.json  -> alterado: versão v41, base clyonutri-v40.zip (sha256 0ee39797…), arquivos novos e alterados com hashes, SQL aguardando OK
+
+== SHA256 DOS ARQUIVOS ADICIONADOS E ALTERADOS ==
+862cac6a880b058d16640d047f5f7c1bef8f7b490a39ec64b4eba7f3012a3904  LEIA-ME-HOSTGATOR-v41.md
+05a4a4a19ba25a9576faf3c768eebd652fbd16fa86036272191fd99631cb19e1  database/manual/atualizacao-v41-preflight.sql
+d6e931fc20ed2c3800473548626d572bb3a617fe2a0e053676a3beda22698c4f  database/manual/atualizacao-v41-completa.sql
+5e2dead5c3aac9e16c8ae80caf1e582017a730a4d9fe2752d63bbfe95620eb08  database/manual/atualizacao-v41-verificacao.sql
+494e91cea2000b42d2394aabf3a94ac80cf2e39dec5789959f65acb92a0ad02e  database/migrations/2026_10_29_000061_plan_energy_clinic_measures_and_planless_plans.php
+63facc9b2fdc3a8256b608b2b6da2b9ec2b6aae63a21b6d6aa3e183d1e886460  docs/benchmark-webdiet/FASE-0-RECONCILIACAO-NI2-514.md
+0c2b40d322b33d00cae1a05b8e7097e175e95aa994e2927c7fab1317a7f6b786  docs/benchmark-webdiet/CONTAGEM-DE-CLIQUES-NI2-514.md
+679e07318c288ba34537ca6330741b6adaa37da3a3c390ac8d12e44d32325b93  docs/evidencias/ni2-514/SMOKE-V41-mysql57.txt
+90b070c419da689b7f4ad2e2fb3c6c558fa242632c5bca5e35dd45595ca005d9  docs/evidencias/ni2-514/cliques-v40-com-paciente.json
+c03e3a919de6fbcc9ee5fb3d049ac870d0a4f0104e392a4477e52a08f37efd42  docs/evidencias/ni2-514/cliques-v41-com-paciente.json
+9c11af310ee81563ce12f751cb08906d4ef718d3626da1eaae827e8cdaaa0ccf  docs/evidencias/ni2-514/cliques-v41-sem-paciente.json
+568c768c556d9d309fbbeb92645455884eeee0c141bfdfecedcfce70d2ff5237  public/assets/js/plan-energy.js
+7960f254e0db937f06b9cd60d963305d6d613223554bf460ca2df6a954e82673  src/Application/Controllers/ClinicMeasuresController.php
+4a6f057551ae56d437d6224d49db04c8a96a58779ad65bf9017fe596716dfa1f  src/Application/Controllers/MealPlanEnergyController.php
+3c1bd51030c64df63b156ace3039e45cd0b586e74ac0731cb398f27d5e31fbdf  src/Domain/MealPlan/EnergyTargetService.php
+182bb5fc9915e13138b668c6903044a69125baeabced1daa92b4502489227973  src/Domain/Nutrition/ClinicHouseholdMeasureService.php
+49c74d9952660e69f0b825ac1990bb6c065740462eb1370823b002018ebc90bb  src/Domain/Nutrition/EnergyCalculator.php
+5e444d3d963aef94321f4e625b2f49dc945da6fa79827afd47ba4cacd7ec9fa9  views/meal_plans/_energy_card.php
+84dda9373b10b4a38789f63152ab940ab753824a1c6b4b5e8b79c2e20bf750bd  views/meal_plans/clinic_measures.php
+0527f16e447039767b3870eb192ca10a77f00a594830fcdc238ed54b291dd6b2  database/instalacao_mysql8.sql
+e21a3a401d0d27d52bcc8825cc76f2a97108b4991d733c99c00e2c29017e716c  public/index.php
+5fb15ac34b436e2fca50498e17a7df49cbd6df777778cd7f736a83d3558a980d  scripts/build_hostgator_zip.sh
+0e33291670aac6b6acd3c9cc14cb845eab56863897a4b73fcbd419e216dc3ffe  src/Application/Controllers/DashboardController.php
+de0e65011d2ac1d19599fa00f3a9d8c540e15d2428d16bfc54e1d4fe668cbf6f  src/Application/Controllers/FoodSearchController.php
+9cd76b030502e3226fc2ffc39fd7ea1f128500ca1d0e428ff0b459ae9a7b74cb  src/Domain/MealPlan/MealPlanService.php
+134ebd4dfdb048aa873217e3b1c3c48f82c5250549905d4cb5e79000b73471f6  src/Domain/Nutrition/HouseholdMeasureConverter.php
+cea3656966b1aa102d60cd9e09709de7a9646eaa13d5ab842e7083322dc22da1  src/Domain/Privacy/LgpdService.php
+e917fde48b107d30742f39217dab39ae301ac3694bcc5dbd2d67ab039f725d07  views/meal_plans/print.php
+827257dfe1e3f1b632d6a1838fe69b52a50bf478183881b9eba30f1c975783bc  RELEASE_INFO.json

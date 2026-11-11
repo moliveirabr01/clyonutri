@@ -1,0 +1,154 @@
+COMPARAÇÃO v48 x v49 (por conteúdo: sha256 de cada arquivo)
+
+v48: clyonutri-v48.zip (sha256 6485c487dbd99b7911522bd3e318eafc15af7d38931a1366c0535dbb88fffad3)  1264 arquivos
+v49: clyonutri-v49.zip  1233 arquivos (inclui este)
+
+Iguais: 1135
+Adicionados: 7 (inclui este arquivo)
+Removidos: 38 (imagens de evidência de testes, que não vão mais no pacote)
+Alterados: 91
+vendor/: igual ao da v48.
+
+Regressões conhecidas: nenhuma. Suíte com as mesmas falhas herdadas (mais 2 que dependem do horário e falham igual com a v48).
+
+== ADICIONADOS ==
+  LEIA-ME-HOSTGATOR-v49.md  -> novo: o que muda, ordem de instalação (v47, v48, v49), SQL, conferência, validação
+  PACOTE-V49-2026-10-31.md  -> novo: resumo do pacote para o Maicon e o que ainda depende dele
+  database/manual/atualizacao-v49-completa.sql  -> novo: migração 68 (17 colunas NULL), idempotente, banco selecionado com reserva
+  database/manual/atualizacao-v49-preflight.sql  -> novo: só lê; exige a 67; diz se a 68 já está aplicada
+  database/manual/atualizacao-v49-verificacao.sql  -> novo: só lê; 7 conferências
+  src/Core/Brand.php  -> novo: nome visível do produto (Clyo Nutri) num lugar só; textoExibido() para texto antigo vindo do banco
+  COMPARACAO-V48-V49.txt  -> este arquivo
+
+== REMOVIDOS ==
+  docs/validation/NI2-281/evidence/food-search-1280.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-281/evidence/settings-1280.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-281/evidence/settings-320.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-281/evidence/settings-375.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-281/evidence/settings-768.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/empty-plan.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/evolution-error.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/login-invalid.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/logout-network-error.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/logout.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/published-plan.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-294/evidence/session-expired.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-298/evidence/agenda.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-298/evidence/dashboard.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-298/evidence/database-error.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-298/evidence/empty-agenda.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-299/evidence/historical-v1.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-310/evidence/editor-1440.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-310/evidence/editor-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-310/evidence/success-1440.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-312/evidence/negative-1440.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-312/evidence/negative-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-312/evidence/positive-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-312/evidence/publication-pending.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-312/evidence/unassessed-1440.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-319/evidence/diary-partial-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-319/evidence/evolution-stale-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-319/evidence/invalid-json-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/NI2-319/evidence/offline-stale-390.png  -> imagem de evidência, fora do pacote
+  docs/validation/mobile-brand/login-1280.png  -> imagem de evidência, fora do pacote
+  docs/validation/mobile-brand/login-375.png  -> imagem de evidência, fora do pacote
+  docs/validation/mobile-brand/professional-error.png  -> imagem de evidência, fora do pacote
+  docs/validation/patient-birthdays/1280.png  -> imagem de evidência, fora do pacote
+  docs/validation/patient-birthdays/375.png  -> imagem de evidência, fora do pacote
+  docs/validation/patient-mobile-onboarding/patient-onboarding-home.png  -> imagem de evidência, fora do pacote
+  docs/validation/patient-mobile-onboarding/patient-onboarding-mobile.png  -> imagem de evidência, fora do pacote
+  docs/validation/professional-settings/settings-1280.png  -> imagem de evidência, fora do pacote
+  docs/validation/professional-settings/settings-375.png  -> imagem de evidência, fora do pacote
+
+== ALTERADOS ==
+  .env.example  (d409896831da8645c6f8693dd1c2a3ae0e85edfd1db41e0e341866cba16539a1)  -> APP_NAME e MAIL_FROM_NAME de exemplo com "Clyo Nutri"
+  RELEASE_INFO.json  (9171f183684d17d3e69f1f32ac1838d163d7cfd707351a721035cdeea77049df)  -> v49 (produto Clyo Nutri); dados da v48 guardados em previous_*_v48
+  bin/build_release.sh  (0cc1e5a368b8dd52981d9476fa4f52d02ad2a03cc7f17d4a10793580e9915ab2)  -> nome visível passa a ser Clyo Nutri
+  bin/test_mail.php  (b3f660e3c6eeff3395dbdd9452c677f96876698904bf040ea596cd025c808dd1)  -> nome visível passa a ser Clyo Nutri
+  database/instalacao_mysql8.sql  (b1e3aad2409ddc80ebcf86e0c4e43d8521570467facaaa44ed263713abe8efbe)  -> acrescenta a migração 68 no fim (instalação limpa)
+  database/manual/atualizacao-v41-completa.sql  (d6e931fc20ed2c3800473548626d572bb3a617fe2a0e053676a3beda22698c4f)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v41-preflight.sql  (05a4a4a19ba25a9576faf3c768eebd652fbd16fa86036272191fd99631cb19e1)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v41-verificacao.sql  (5e2dead5c3aac9e16c8ae80caf1e582017a730a4d9fe2752d63bbfe95620eb08)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v42-completa.sql  (d35ba3966b7cd65f28e958b25a9ca3b8cbe51a91f1a90c2dc8bccda56ec1ab62)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v42-preflight.sql  (40ed85c74d4040099f466c5de1c1c39ef45e9d0735bbd879ae9b91bb4a1d92ea)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v42-verificacao.sql  (2cdf10ec5bd820d543652b32a1c9cfbd9c26d89ce382046533a7d22a828e4a67)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v43-completa.sql  (e22a7e744e813e94f0f0533c42725dd959dec9d9126050ff30fc5aa93b2bb767)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v43-preflight.sql  (700ee0c34979352aa6fb86f8dc37549b549646a47440eadbae20d8150ca08ecb)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v43-verificacao.sql  (f8863f2622b647f4eadafb5850b9ceac593e0374d3306ae97061ffd90b80590d)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v46-completa.sql  (1072b76d1a4bbc4fe7342e60ac883fa207637d677bd87ad9368b74aaea51e9a2)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v46-preflight.sql  (b34d58880165f927996a2d804fe40bdf23ea55f699b63963da10cb90e6964d45)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v46-verificacao.sql  (7417ea45a0a669b8e8e555eaa29f5572dfcba9f6096b72654b39467bc08582bb)  -> volta ao conteúdo publicado (a v48 tinha reescrito com banco fixo)
+  database/manual/atualizacao-v47-completa.sql  (aaea51ca6dc57a69b0696fe4ed3001c1b26b07ab27d37fc007a51c8f81fd9aa4)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/manual/atualizacao-v47-preflight.sql  (86ded961cdff17e21f57e142eee1d37e75752762ad608b84e5ee43ce00e8db68)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/manual/atualizacao-v47-verificacao.sql  (3569458188624b37d7882b2269ad26f00d4b93e3069a98cf6d442c82a5749433)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/manual/atualizacao-v48-completa.sql  (ad673d3cdaa0d470bbe282fb03abfc936d65fe9a2ab2d81b4de050a567457a77)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/manual/atualizacao-v48-preflight.sql  (9f431ab3a4c80e635cb54ec28657f301cadac1c4a5b2067f222e576e3efe6f36)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/manual/atualizacao-v48-verificacao.sql  (565722ceef8b241040d972670042ae13a48ee843e9e5e98b329f897197a0f9bf)  -> usa o banco selecionado, com reserva maic6824_Clyonutri2 para o phpMyAdmin; SQL das tabelas igual
+  database/migrations/2026_10_31_000068_ni2_514_phase3_anthropometry_allergens_and_agenda.php  (7400eab2f423c8b82a5bcf6c10422867ea96a5e30828ed619c18c75c42b6a50c)  -> só o comentário de cabeçalho (dizia migração 65)
+  public/index.php  (6d74d442a256a256ad1d8585d7241252dfcaefe35bf0fa5c79b27d1735809da2)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/AdminController.php  (0cbe3ba76d19322eb2edf063b4d99a705ed302b8caca668d9b242c63a7e9c17b)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/AuthController.php  (bb1e5b9cde4011deaa0c4c962d913cbe8bf35472704d46cc86f9b30deccb95e4)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/BookingController.php  (4f3a4f8ac82afa028d05e402a9eb0bb2a0ef125a6a4546c194f2a6747b740f49)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/ChatController.php  (1afc80173591d800e4b6f8176bf9d23c4e11b1b528324333cd894438a5de7659)  -> comentário NI2 sai do HTML
+  src/Application/Controllers/DashboardController.php  (2e0d6823bce8a3cb9e14c1f8268118c83d09992421bae3a97a4e8851fd8771cb)  -> prévia de confirmação: erro interno vira mensagem genérica com log; nome visível
+  src/Application/Controllers/ExamRequestController.php  (108a5355247f62f4f7435bb73d3e698e77ea929d9e4421bb2a4105557d72d2fd)  -> erro de banco não aparece na tela de exames
+  src/Application/Controllers/ExamResultController.php  (150936c84c88ffb245293f684780f908c2506f57ab6a51c6434fda3d1922735b)  -> erro de banco (PDOException) não aparece na tela; vai para o log como EXAM_RESULT_DB_ERROR
+  src/Application/Controllers/HelpdeskController.php  (f899d7fd8ae7af299d71e77eabe3175e2447c25f4fad0b153a2155f6f1305d46)  -> comentários NI2 saem do HTML; nome visível
+  src/Application/Controllers/LandingController.php  (050980a33594f4b9d0c7a42112971f9f44ffbb7f1018e56c000e7e2c2f01929e)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/OnboardingController.php  (ef04e759d66efcd37157a0fcdb25870291568b22ee85f0afaad667f52cd388a7)  -> nome visível passa a ser Clyo Nutri
+  src/Application/Controllers/PatientPasswordResetController.php  (2369feedfd561a3385c704795320c06c5a2903d29b9130a2c6447fe4743f17ce)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Auth/ProfessionalSecurityNotifier.php  (1845ddfc9118795adbf0213a5e3c283541a0b26561c8be2981d15b124b71a75e)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Database/ExampleRecipeCatalogSeeder.php  (8edfeaeb0c7881c0e76ac8a73450b6f1ec4f1ab8c75a07aff12abafcb68135a3)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Http/ErrorExposure.php  (09b90d213b12ab5d37c2237791736b76c1163adadece5cf3cafd91ce34c7c77e)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Http/Router.php  (69b1fd8418b7cb26edac382ef69324b9c9aef5d3d7625ac8e936a210080f5d5c)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Mail/MailerFactory.php  (bc6fbdc17ad6f6c726e4cfef8be285abc7ffe65247d185805d5bac0797599dfb)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Mail/PasswordResetEmail.php  (2e789c1b9325b0ea772d73ee8a9edc33028969dfacd26e9cf6a37a7f88785e70)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Mail/PatientInviteEmail.php  (056129bb60919f5037fb9dd0a3133680c3dc3ad8640cf32355b79e4d6ff7ddde)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Mail/PatientPasswordResetEmail.php  (6ec3324b532941d8d9d790aeaa824cc72e3039486a3316fae9b06f0944b1a79d)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Mail/SecurityNoticeEmail.php  (2deb77ddcdf4d92ea7cd6f2793eb16b63e451a4462a3be75375f52ac32f78d33)  -> nome visível passa a ser Clyo Nutri
+  src/Core/Security/ClinicalAuthorization.php  (fd5cca30ef2d71414cb320b9949718d209b144a14c273957d68195d6418b68f7)  -> recepção: libera /agenda/{id}/previa-confirmacao (a v48 liberava um endereço que não existe)
+  src/Core/Settings/PlatformSettings.php  (7a6462fe6c80b6c94390c4720c4331c2c0a1e5c00c3367a8d6eed0037bfb9e55)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Admin/UserAdministration.php  (2026efc30d646065b8f0f7fb69e6223238fe64f124d782f21c736b9e8170c259)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Appointment/AppointmentService.php  (4876e4f598ecc8c4c97fbc8e0c7d1906c2b4ff3b6113695292773f9872b75cf9)  -> prévias de confirmação do dia numa consulta só; profissional sem usuário não derruba a agenda
+  src/Domain/Helpdesk/KnowledgeBaseService.php  (703cdc096373e23eec3dda9bd255f518870274ea764f513e4f777f7c0c92f686)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/LaboratoryExam/ExamFileInspector.php  (005910f75d516e5674c50f84a00d75eba78fb339148b2cc0ffd5c225259f80ac)  -> PDF: descompacta e verifica fluxos de objetos (ObjStm), recusa o que não dá para inspecionar; modo auto sem ClamAV grava EXAM_RESULT_ANTIVIRUS_UNAVAILABLE no log
+  src/Domain/LaboratoryExam/ExamRequestPdfService.php  (323aed790fec3058d6c60aed556e3dacbb7d7258dd2b85863732f548d7a51ec1)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/LaboratoryExam/ExamRequestService.php  (40aa21595982271f4abfddb1d437eb4a1ef2584079b86621d349e02348aaa4ad)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Legal/LegalAcceptanceService.php  (cc6dc40283a774991276823a5d57d71d5a99fcd7c1561ab2d0e5e43b1eb25df7)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Notification/ChatNotificationDispatcher.php  (118166d656856cf88e4abf2ddf96ecd9232996daa58409ee9ee3a18632a6462b)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Notification/NotificationService.php  (8ae79ca82cd5b71efaf5d8d6951108f1e4ffb53364a57afa78d4785e19e46b73)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/PatientPortal/PatientSecurityNotifier.php  (277471342e785f33162bd033c6fc7fca4c44a7d410a38137be8230cd1ef74114)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/PreConsultation/PreConsultationMail.php  (ccfdad41ea0b09180d94b9b14b497f0d3bb88756178e9f7bb8fb6c1f0bbf5e36)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Subscription/SubscriptionService.php  (896ae37aa1e60426dbb269a1f6850a99b92ac204f9b0fdc6a4509125241e0ae9)  -> nome visível passa a ser Clyo Nutri
+  src/Domain/Telehealth/TeleconsultationInviteMail.php  (4c4ae8bc7b97e58bed9440176450a4efcb74db15ed29aa02fb340b16d1f9ca0a)  -> nome visível passa a ser Clyo Nutri
+  views/admin/clinicas.php  (1d34b50acaf331b4fd004795d883f3a15b07426a48c3f392935727a658b14771)  -> nome visível passa a ser Clyo Nutri
+  views/admin/configuracoes.php  (5c3f153d87eeeb47829cb3094b75f55803480b3adc55eb2e3a7024556d67cfc2)  -> nome visível passa a ser Clyo Nutri
+  views/admin/dashboard.php  (b931b496d31ddc3ac45b4e33e2a6b44ebccde0ca968a54b278ecb36bea91ee95)  -> nome visível passa a ser Clyo Nutri
+  views/auth/forgot-password.php  (be775299375122664e5338dc4a205a7f63b41d5c5f80667f9d30be58f46b81a2)  -> nome visível passa a ser Clyo Nutri
+  views/auth/login.php  (6969ebc50ab4a137b75175c9b03a2d60f8aeef6946739f4f3fbb10aaf5fb3674)  -> nome visível passa a ser Clyo Nutri
+  views/auth/register.php  (686063f69cb1c0c399f57beec54adc4827d5d76c00db332f18c1bcbc7b8ad794)  -> nome visível passa a ser Clyo Nutri
+  views/auth/reset-password.php  (c319241b9199e844199578d10dc2aa1a24f5e0d0b39dac54ee282fd1a94be02f)  -> nome visível passa a ser Clyo Nutri
+  views/booking/public_booking.php  (34b0a09c3734749fec64ba05b6c2d6b154deabe5eec23f18160caab3a1fdd704)  -> nome visível passa a ser Clyo Nutri
+  views/exams/policy.php  (51a6378626db2640ea4e0e2d9230a7f06aaad5e445727899c11350e23fae42bf)  -> nome visível passa a ser Clyo Nutri
+  views/foods/equivalence_rules.php  (3a3bb693ebe709e080f25b067179bbff757a72c5c897da8a9198313327f10d07)  -> nome visível passa a ser Clyo Nutri
+  views/helpdesk/new-ticket.php  (15ebb133d00fa4d209b7a5ac1d74d9572902fa606a3a14fea72a132959ed6569)  -> comentário NI2 sai do HTML; nome visível
+  views/landing/index.php  (48c9ef937e81ed9c8e8d27ec689e4570404f4ca67062d50e95fcc7e44b1c7355)  -> nome visível passa a ser Clyo Nutri
+  views/landing/plans.php  (17f5e11609e93f8358e2612c824af6e62c85d6cd886ee858e27474fdc375b2fd)  -> nome visível passa a ser Clyo Nutri
+  views/layouts/admin-shell.php  (b04d9487a91ffabb4f0a13cc4f0674a0d19521397d08993194c3b0d7a798b653)  -> nome visível passa a ser Clyo Nutri
+  views/layouts/professional-shell.php  (d01490e98eaceb093c8fd0f0fb240e5f1cfd20e1b988bbec917675ad7bba5b67)  -> nome visível passa a ser Clyo Nutri
+  views/legal/acceptance.php  (01f4cbabb5f9592738cd69eee4261a6184fb9b4d730ba49a1e2784346766cd6b)  -> nome visível passa a ser Clyo Nutri
+  views/legal/privacy.php  (be4ff705d1462eb1aa16c6542272feae5e42e860c37861c519a915b0d97852a5)  -> nome visível passa a ser Clyo Nutri
+  views/legal/terms.php  (18bb017a9c124fcc1b43c99ae4ac1fa127567e3f95215a4b80eaaec1d4c58864)  -> nome visível passa a ser Clyo Nutri
+  views/meal_plans/clinic_measures.php  (2f8a1b9d0209517928930d81ed8542d0ebda1fd8305abb3e648fec60cbf8689e)  -> nome visível passa a ser Clyo Nutri
+  views/meal_plans/print.php  (b8aba31baab9fee2dc3fd3d4f77b56cd79ac07cd8ee5e17d2eccb8f99986c56f)  -> nome visível passa a ser Clyo Nutri
+  views/meal_plans/shopping_list.php  (770faab8194e079419b9c76154a57e22e64b99da3df30596cdf7101d5817e149)  -> nome visível passa a ser Clyo Nutri
+  views/patient/app.php  (445aad5c932ec268812d2001c21952138565e6d743f60b94e86acd7be0ccaa38)  -> comentário NI2 sai do HTML; nome visível
+  views/patients/app-invitation.php  (fd5b175a608d7cf75f555afdca6f2e4374f8eedcda2402e82b60e79d42e64170)  -> nome visível passa a ser Clyo Nutri
+  views/patients/edit.php  (ddf5755dfdf67ef640fac3c41d5680bf4cb5b7c7cb11af6ce15545859d131a2a)  -> nome visível passa a ser Clyo Nutri
+  views/patients/exam_new.php  (9291a6e2535f3c3d9c1e220c26abd32de349143c4762b8ed86255545d446d395)  -> nome visível passa a ser Clyo Nutri
+  views/patients/exam_show.php  (a3b4f96b96c93ed38ae909a91994c2d259d9d71b914a0ab1e28c79b5b238d7f6)  -> nome visível passa a ser Clyo Nutri
+  views/patients/medical_record_print.php  (8bc898f6320ab0b01299b1aefa1c50ef0e4bf25e573fb5318bb7ce77b554f2e6)  -> nome visível passa a ser Clyo Nutri
+  views/patients/partials/exam_document.php  (48f163c633c8aa323d59e33a917e272d80a71ed7276028b09929e84e874f5544)  -> nome visível passa a ser Clyo Nutri
+  views/preconsultation/patient_head.php  (6c8e04d1c9ad73f1a5e899f7dfc0db59d7c681bb967deb25649dbec4e33ce459)  -> nome visível passa a ser Clyo Nutri
+  views/settings/_plano_trocar.php  (9080f5d579873f88170f110c5cdea8bf769882d33daf110a582f7a82355e1125)  -> nome visível passa a ser Clyo Nutri
+  views/settings/subscription.php  (f59fa0af5ab451deac5be638e2b9bf9af77884705b86c757981d8ff04aab35eb)  -> comentário sai do HTML; nome visível

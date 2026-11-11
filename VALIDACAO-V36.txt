@@ -1,0 +1,10 @@
+Base: clyonutri-v35.zip, por sua vez baseada na v34 enviada pelo proprietário.
+PASS: biblioteca iniciada a partir de banco isolado sem alimentos ou receitas, via controlador autenticado.
+PASS: busca Mingau + Café da Manhã retorna a receita esperada (cenário da imagem).
+PASS: busca por ingrediente, filtro de refeição, limite de calorias e opção de limpar filtros.
+PASS: visitas repetidas sem duplicatas; catálogo público e detalhes; privacidade das receitas particulares.
+PASS: renderização do onboarding sem meta de pacientes ou tempo de atuação; escolha do plano mantida; campos removidos também da persistência.
+PASS: paciente opcional, escolha de planos, papéis, isolamento e preservação do prazo de teste.
+PHP lint: 336 arquivos, zero erros.
+release_check: PASS.
+Não foram acessados banco de produção, pacientes reais ou HostGator. MySQL GET_LOCK revisado estaticamente; execução dos testes foi em SQLite isolado. Sem garantia absoluta de ausência de regressão em produção.

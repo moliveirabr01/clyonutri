@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "file": "src/services/api.ts",
+      "unchanged": true,
+      "sha256": "5b8f0c514586e99da82a850d76abe985b9767af57be9768efeb804d295ea557d"
+    },
+    {
+      "file": "src/services/hydrationQueue.ts",
+      "unchanged": true,
+      "sha256": "30c985f383969b998e630f562714f6d7eadf819f9dac9ff92fa4c1a753919a5b"
+    },
+    {
+      "file": "src/services/pushNotifications.ts",
+      "unchanged": true,
+      "sha256": "a149f71a587668544779fe9d406c94b05f7102bd9fbef29a5e005725e7b92290"
+    },
+    {
+      "file": "src/screens/ProfessionalHomeScreen.tsx",
+      "unchanged": true,
+      "sha256": "019c2610e2c428746dc150a4be7453b36382824a20ed06941d21b544adfcf4bf"
+    },
+    {
+      "file": "src/theme/tokens.ts",
+      "unchanged": true,
+      "sha256": "518b9ed8d629a849b658b0c1e12c1614796e3c9c02e17cb51651a4d076104cf3"
+    },
+    {
+      "file": "src/theme/clinicalBotanical.ts",
+      "unchanged": true,
+      "sha256": "b9eaf08b740cbae80fe0b483e51352bae2e3201112628e9a3785aa2f30289b5c"
+    },
+    {
+      "scope": "PatientHomeScreen state, effects and write handlers before render",
+      "unchanged": true,
+      "sha256": "0722b14050b5f0586b6460fe75a8a4046b76fd327d153b00de9df0596ab96b94"
+    }
+  ]
+}

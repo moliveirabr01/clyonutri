@@ -1,4 +1,4 @@
-<fieldset class="form-group" style="margin-top: var(--space-4);">
+<fieldset class="form-group u-mt-4">
 <legend class="form-label">Registro de consentimento</legend>
 <?php if ($term): ?>
 <details><summary>Consultar termo v<?= htmlspecialchars($term['version']) ?></summary><p><?= nl2br(htmlspecialchars($term['term_text'])) ?></p></details>

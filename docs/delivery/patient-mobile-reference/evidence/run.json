@@ -1,0 +1,221 @@
+{
+  "at_utc": "2026-11-04T23:58:26.318Z",
+  "technical_result": "PASS",
+  "backend": {
+    "integrity": "consistent",
+    "package_version": "v54.32",
+    "ui_version": "v54.27",
+    "build_id": "v54.32-973e7dfeaf062a5c",
+    "built_at_utc": "2026-11-04T20:18:36Z",
+    "content_sha256": "973e7dfeaf062a5cdd77142b16d1d5142f384116ea9eb2b792fab34171033111",
+    "file_count": 1589,
+    "scope": "runtime-sha256-v1"
+  },
+  "api": {
+    "backend": "v54.32",
+    "synthetic": true,
+    "transport": "Actual production TypeScript client compiled to CommonJS; real HTTP to unchanged PHP backend, no response mocks.",
+    "checks": [
+      {
+        "name": "production client authenticates against v54.32",
+        "pass": true
+      },
+      {
+        "name": "published plan read from real snapshot",
+        "pass": true
+      },
+      {
+        "name": "v54.32 confirmed guidance reaches mobile contract",
+        "pass": true
+      },
+      {
+        "name": "authorized substitution amount and notes preserved",
+        "pass": true
+      },
+      {
+        "name": "goal and confirmed hydration come from backend",
+        "pass": true
+      },
+      {
+        "name": "actual appointment read",
+        "pass": true
+      },
+      {
+        "name": "native-client hydration retry is idempotent",
+        "pass": true
+      },
+      {
+        "name": "native-client diary retry is idempotent",
+        "pass": true
+      },
+      {
+        "name": "diary persisted with actual description",
+        "pass": true
+      },
+      {
+        "name": "prescribed recipe available",
+        "pass": true
+      },
+      {
+        "name": "recipe snapshot includes ingredients and preparation",
+        "pass": true
+      },
+      {
+        "name": "clinical history and source available",
+        "pass": true
+      },
+      {
+        "name": "privacy contract loads",
+        "pass": true
+      },
+      {
+        "name": "notifications contract loads",
+        "pass": true
+      },
+      {
+        "name": "other clinic authenticates separately",
+        "pass": true
+      },
+      {
+        "name": "other clinic cannot see first patient plan",
+        "pass": true
+      },
+      {
+        "name": "cross clinic hydration mutation denied",
+        "pass": true
+      },
+      {
+        "name": "logout revokes API access",
+        "pass": true
+      }
+    ]
+  },
+  "ui": {
+    "checks": 137,
+    "states": 39
+  },
+  "native_exports": [
+    "android Hermes JS",
+    "ios Hermes JS"
+  ],
+  "physical_devices_tested": false,
+  "app_store_publication": false,
+  "source_files": [
+    {
+      "path": "App.tsx",
+      "sha256": "ae748d6a4c5c4fe158e5ff070ada7a4412426109379b5613e5aa003bc6cf3a10"
+    },
+    {
+      "path": "app.json",
+      "sha256": "ea7f10c87939b4a6b744a1cc4524de9f66f62810f653c9ca667ff2b325304bda"
+    },
+    {
+      "path": "eas.json",
+      "sha256": "c1d93a774234d8c3c9aa3bc113d1f12a29cdf759f14cd7eed0255118465be7e9"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "5b2df8b1a1b716c443c29928d53b938d06b733ae6a646c2bf42f2b910d089a1c"
+    },
+    {
+      "path": "package.json",
+      "sha256": "904ff1b2e4fb67961b0c5f9a26036b3c18061f76f19c7f2296a15e757e05dc11"
+    },
+    {
+      "path": "src/components/BrandLogo.tsx",
+      "sha256": "ce466201062d7e6ced82a6d11d77b3b9dee9f95fb7d66f8bfb2e38689be30a74"
+    },
+    {
+      "path": "src/components/DailyCheckinCard.tsx",
+      "sha256": "3afba8dab5e2210e293a0e62434cf83996221afd61251ba27aacacad9aefb1e5"
+    },
+    {
+      "path": "src/components/EvolutionChart.tsx",
+      "sha256": "a58372e1c9a7a4ed5420452f893616fb8dfb9534abd8874709827ad57e545099"
+    },
+    {
+      "path": "src/components/HydrationHistory.tsx",
+      "sha256": "19c43280f7db64712374af1386c9fd3911a94631dfb20485f1cf9d6e7b39239e"
+    },
+    {
+      "path": "src/components/NextAppointmentCard.tsx",
+      "sha256": "2feef1977db8e8b5614c6901b439c3502b0e67947be0b015da4afaaba7acb606"
+    },
+    {
+      "path": "src/components/PatientChat.tsx",
+      "sha256": "6852c495104c1802ea2d0e44d116726a13055c6a327e475f3b2ff15894443494"
+    },
+    {
+      "path": "src/components/PatientNotifications.tsx",
+      "sha256": "43f99a7c6ad982ef979c17dcf2c31df5644662f8287c7d6b825c9b84306e9e1a"
+    },
+    {
+      "path": "src/components/PatientOverview.tsx",
+      "sha256": "64bd25247ba9319b2188cafb1e5ec0d285270451b02d58c044a05a69d16a2444"
+    },
+    {
+      "path": "src/screens/PatientHomeScreen.tsx",
+      "sha256": "724445aef352923c9e552117e33526d47b3b4a876ce5c94814e3088d49b5f353"
+    },
+    {
+      "path": "src/screens/PatientOnboardingScreen.tsx",
+      "sha256": "9e42bb63ada8086afdc6a30997e8cfe4763505f77ba94ec44c9c24789495db5b"
+    },
+    {
+      "path": "src/screens/ProfessionalHomeScreen.tsx",
+      "sha256": "019c2610e2c428746dc150a4be7453b36382824a20ed06941d21b544adfcf4bf"
+    },
+    {
+      "path": "src/services/api.ts",
+      "sha256": "5b8f0c514586e99da82a850d76abe985b9767af57be9768efeb804d295ea557d"
+    },
+    {
+      "path": "src/services/hydrationQueue.ts",
+      "sha256": "30c985f383969b998e630f562714f6d7eadf819f9dac9ff92fa4c1a753919a5b"
+    },
+    {
+      "path": "src/services/pushNotifications.ts",
+      "sha256": "a149f71a587668544779fe9d406c94b05f7102bd9fbef29a5e005725e7b92290"
+    },
+    {
+      "path": "src/theme/clinicalBotanical.ts",
+      "sha256": "b9eaf08b740cbae80fe0b483e51352bae2e3201112628e9a3785aa2f30289b5c"
+    },
+    {
+      "path": "src/theme/patient.ts",
+      "sha256": "1d27b05e997be131a4e37cfac76301d96afa183c901ea93dc7394b084309b822"
+    },
+    {
+      "path": "src/theme/tokens.ts",
+      "sha256": "518b9ed8d629a849b658b0c1e12c1614796e3c9c02e17cb51651a4d076104cf3"
+    },
+    {
+      "path": "src/utils/a11y.ts",
+      "sha256": "0153a17e9a9ebc23362146ff3cc4f532123f265418ef5a0e89d05baf5afe70e0"
+    },
+    {
+      "path": "src/utils/presentation.ts",
+      "sha256": "9886bbd453c197fa08d78250b11a19543ea085832321b18309b757adc4629388"
+    },
+    {
+      "path": "tests/patient-reference-api.cjs",
+      "sha256": "57d54b7c5a82f4c8567c5e8c6e3eb728b855eb25c925b3d783ee25d656f93a6e"
+    },
+    {
+      "path": "tests/patient-reference-fixture.php",
+      "sha256": "d493adcda9926d8881d04326c3543ac117d848cddd5c2d708db0d18af3813dc4"
+    },
+    {
+      "path": "tests/patient-reference-router.php",
+      "sha256": "c4bc15c7ff40d84563edf74d803f10563e71b8c8b4fb593e49ac4beefe9cb5a0"
+    },
+    {
+      "path": "tests/patient-reference-ui.cjs",
+      "sha256": "294d0d844dae789962b034f635429be6f294a5725c0c8528940f903168946361"
+    },
+    {
+      "path": "tests/patient-reference-verify.cjs",
+      "sha256": "a3ceb0fd6cef10b2ad27d917ae411ce3545c774fe97015bcfdb54e6d62b34c51"
+    }
+  ]
+}

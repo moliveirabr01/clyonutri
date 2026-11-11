@@ -24,6 +24,42 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `account_deletion_requests` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `clinic_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `protocol` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `open_flag` int DEFAULT NULL,
+  `requested_by` int NOT NULL,
+  `requester_name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `requester_role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason_text` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `confirmation_method` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'password_and_phrase',
+  `legal_notice_version` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `requested_at` datetime NOT NULL,
+  `deadline_at` datetime NOT NULL,
+  `in_review_at` datetime DEFAULT NULL,
+  `canceled_at` datetime DEFAULT NULL,
+  `canceled_by` int DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
+  `resolved_by` int DEFAULT NULL,
+  `resolution_note` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_account_deletion_protocol` (`protocol`),
+  UNIQUE KEY `uq_account_deletion_open` (`clinic_id`,`open_flag`),
+  KEY `idx_account_deletion_status` (`status`,`deadline_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `account_deletion_requests` WRITE;
+/*!40000 ALTER TABLE `account_deletion_requests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `account_deletion_requests` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `analytics_daily_metrics` (
   `id` int NOT NULL AUTO_INCREMENT,
   `metric_date` date NOT NULL,
@@ -567,6 +603,25 @@ LOCK TABLES `checkins` WRITE;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `clinic_household_measures` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `food_id` BIGINT(20) NOT NULL,
+  `measure_name` VARCHAR(100) NOT NULL,
+  `grams_equivalent` DECIMAL(7,2) NOT NULL,
+  `source` VARCHAR(255) NOT NULL,
+  `source_ref` VARCHAR(255) NULL,
+  `created_by_user_id` BIGINT(20) NULL,
+  `updated_by_user_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_clinic_measure` (`clinic_id`, `food_id`, `measure_name`),
+  KEY `idx_clinic_measure_food` (`food_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `clinic_members` (
   `id` int NOT NULL AUTO_INCREMENT,
   `clinic_id` int NOT NULL,
@@ -914,6 +969,21 @@ INSERT INTO `food_household_measures` VALUES (1,1,'colher de sopa',25.00,'2026-1
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `food_search_metrics` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `metric_date` DATE NOT NULL,
+  `term` VARCHAR(80) NOT NULL,
+  `searches` INT NOT NULL DEFAULT 0,
+  `zero_results` INT NOT NULL DEFAULT 0,
+  `last_result_count` INT NOT NULL DEFAULT 0,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_food_search_metric` (`clinic_id`, `metric_date`, `term`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `foods` (
   `id` int NOT NULL AUTO_INCREMENT,
   `clinic_id` int DEFAULT NULL,
@@ -991,7 +1061,7 @@ CREATE TABLE `helpdesk_articles` (
 
 LOCK TABLES `helpdesk_articles` WRITE;
 /*!40000 ALTER TABLE `helpdesk_articles` DISABLE KEYS */;
-INSERT INTO `helpdesk_articles` VALUES (1,'teleconsulta','como-funciona-a-sala-de-teleconsulta-e-o-teste-de-dispositivos','Como funciona a sala de teleconsulta e o teste de dispositivos?','Guia passo a passo para o nutricionista e o paciente realizarem consultas por vídeo com teste de câmera, microfone e modo de contingência em áudio.','A teleconsulta do ClyoNutri permite atendimentos remotos seguros, criptografados de ponta a ponta.\n\n### Como iniciar a teleconsulta:\n1. Acesse sua agenda e clique na consulta agendada como modalidade Teleconsulta.\n2. Clique em **Abrir Sala de Teleconsulta** para ingressar na recepção virtual.\n3. O paciente recebe um link de acesso exclusivo e acessa a sala de espera sem precisar instalar aplicativos pesados.\n4. Na sala de espera, o paciente realiza o teste de câmera e microfone e concorda com o Termo de Teleconsulta (LGPD).\n\n### E se a câmera do paciente falhar?\nO paciente tem a opção de clicar em **Entrar apenas com microfone (áudio)** ou **Continuar sem câmera**. O profissional é avisado na tela sobre o estado do dispositivo do paciente e pode conduzir o atendimento normalmente.',1,0,'2026-10-23 22:53:17','2026-10-23 22:53:17'),(2,'teleconsulta','o-que-fazer-se-a-c-mera-ou-microfone-n-o-forem-autorizados-no-navegador','O que fazer se a câmera ou microfone não forem autorizados no navegador?','Solução rápida para permissões bloqueadas no Google Chrome, Safari, Firefox e navegadores móveis.','Quando o navegador bloqueia a câmera ou o microfone, um ícone de cadeado ou câmera bloqueada aparece na barra de endereço.\n\n### Como liberar o acesso:\n1. No computador: clique no ícone de cadeado ao lado de https://clyonutri.com na barra de endereço.\n2. Ative as permissões de **Câmera** e **Microfone** para \'Permitir\'.\n3. Recarregue a página da sala de espera.\n4. No celular: vá em Configurações do aparelho > Aplicativos > Navegador > Permissões e autorize a Câmera e o Microfone.',1,0,'2026-10-23 22:53:17','2026-10-23 22:53:17'),(3,'app_paciente','como-orientar-o-paciente-no-acesso-ao-link-web-e-aplicativo','Como orientar o paciente no acesso ao link web e aplicativo?','Como gerar convite com link direto, QR code e orientar o paciente para acessar prescrições e diário.','O ClyoNutri oferece acesso imediato para o paciente sem atritos.\n\n### Como enviar o convite:\n1. No prontuário do paciente, acesse a aba **Convite do App** ou **Acesso do Paciente**.\n2. O sistema gera um link web direto e um QR code de acesso válido.\n3. Você pode clicar em **Copiar Link** ou enviar por WhatsApp/e-mail.\n4. Pelo link web, o paciente consegue visualizar o plano alimentar publicado, registrar água e refeições em qualquer celular ou computador.',1,0,'2026-10-23 22:53:17','2026-10-23 22:53:17');
+INSERT INTO `helpdesk_articles` VALUES (1,'teleconsulta','como-funciona-a-sala-de-teleconsulta-e-o-teste-de-dispositivos','Como funciona a teleconsulta','Convite, sala de espera, teste de câmera e entrada só com áudio.','1. Na agenda, abra a consulta marcada como teleconsulta e entre na sala.\n2. Envie o convite ao paciente por e-mail ou copie o link. O link é pessoal e serve só para essa consulta.\n3. O paciente abre o link no navegador (não precisa instalar nada), testa câmera e microfone e aceita o termo da teleconsulta.\n4. Ele entra na sala de espera e você admite a entrada.\n\nA chamada é feita direto entre os dois navegadores e não é gravada.\n\n**Sem câmera?** O paciente pode escolher **Entrar apenas com áudio** ou **Continuar sem câmera**. Você vê na sua tela qual modo ele usou.\n\nSe a consulta for remarcada, o convite anterior deixa de valer: envie um novo.',1,0,'2026-10-24 03:45:17','2026-10-24 03:45:17'),(2,'teleconsulta','o-que-fazer-se-a-c-mera-ou-microfone-n-o-forem-autorizados-no-navegador','Câmera ou microfone bloqueados no navegador','Como liberar a permissão no computador e no celular.','Quando o navegador bloqueia a câmera ou o microfone, aparece um ícone de cadeado ou de câmera riscada na barra de endereço.\n\n**No computador**\n1. Clique no cadeado ao lado do endereço clyonutri.com.\n2. Em **Câmera** e **Microfone**, escolha **Permitir**.\n3. Recarregue a página da sala de espera.\n\n**No celular**\nAbra os Ajustes do aparelho, vá até o navegador que está usando (Chrome, Safari…), libere câmera e microfone e volte para a página.\n\nSe mesmo assim não funcionar, o paciente pode entrar só com áudio.',1,0,'2026-10-24 03:45:17','2026-10-24 03:45:17'),(3,'app_paciente','como-orientar-o-paciente-no-acesso-ao-link-web-e-aplicativo','Como orientar o paciente no primeiro acesso','O que dizer ao paciente para ele entrar no app sem travar.','O paciente entra pelo link ou pelo QR code e cria a própria senha. Não precisa instalar nada.\n\nVale combinar com ele:\n- O link vale por 48 horas. Se vencer, você gera outro.\n- Depois do primeiro acesso, ele entra com e-mail e senha em clyonutri.com/paciente/app.\n- No app ele vê o plano publicado, registra a água e as refeições do diário.\n- Se esquecer a senha, ele fala com você.',1,0,'2026-10-24 03:45:17','2026-10-24 03:45:17');
 /*!40000 ALTER TABLE `helpdesk_articles` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1194,6 +1264,49 @@ LOCK TABLES `login_attempts` WRITE;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `meal_plan_energy_targets` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `meal_plan_id` BIGINT(20) NOT NULL,
+  `patient_id` BIGINT(20) NULL,
+  `formula` VARCHAR(40) NOT NULL,
+  `formula_version` VARCHAR(20) NOT NULL,
+  `sex` VARCHAR(10) NULL,
+  `age_years` DECIMAL(5,1) NULL,
+  `weight_kg` DECIMAL(6,2) NOT NULL,
+  `height_cm` DECIMAL(5,1) NULL,
+  `ffm_kg` DECIMAL(6,2) NULL,
+  `inputs_source` VARCHAR(255) NULL,
+  `activity_factor` DECIMAL(4,2) NOT NULL,
+  `activity_label` VARCHAR(80) NULL,
+  `goal_type` VARCHAR(20) NOT NULL DEFAULT 'maintenance',
+  `goal_note` VARCHAR(255) NULL,
+  `adjust_mode` VARCHAR(10) NOT NULL DEFAULT 'kcal',
+  `adjust_value` DECIMAL(7,2) NOT NULL DEFAULT 0,
+  `tmb_kcal` DECIMAL(7,1) NOT NULL,
+  `get_kcal` DECIMAL(7,1) NOT NULL,
+  `vet_kcal` DECIMAL(7,1) NOT NULL,
+  `macro_mode` VARCHAR(10) NOT NULL,
+  `protein_g` DECIMAL(7,1) NOT NULL,
+  `carbohydrate_g` DECIMAL(7,1) NOT NULL,
+  `lipid_g` DECIMAL(7,1) NOT NULL,
+  `protein_pct` DECIMAL(5,1) NOT NULL,
+  `carbohydrate_pct` DECIMAL(5,1) NOT NULL,
+  `lipid_pct` DECIMAL(5,1) NOT NULL,
+  `protein_g_kg` DECIMAL(5,2) NULL,
+  `carbohydrate_g_kg` DECIMAL(5,2) NULL,
+  `lipid_g_kg` DECIMAL(5,2) NULL,
+  `warnings_json` TEXT NULL,
+  `calculated_by_user_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_energy_targets_plan` (`meal_plan_id`),
+  KEY `idx_energy_targets_clinic` (`clinic_id`, `patient_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `meal_plan_items` (
   `id` int NOT NULL AUTO_INCREMENT,
   `meal_id` int NOT NULL,
@@ -1282,8 +1395,15 @@ CREATE TABLE `meal_plan_templates` (
   `target_energy_kcal` decimal(7,2) DEFAULT NULL,
   `payload_json` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+  `source_plan_id` BIGINT(20) NULL,
+  `created_by_user_id` BIGINT(20) NULL,
+  `is_clinic_default` TINYINT(1) NOT NULL DEFAULT 0,
+  `archived_at` DATETIME NULL,
+  `updated_at` DATETIME NULL,
   PRIMARY KEY (`id`),
   KEY `clinic_id` (`clinic_id`),
+  KEY `idx_plan_templates_clinic_status` (`clinic_id`, `status`),
   CONSTRAINT `meal_plan_templates_ibfk_1` FOREIGN KEY (`clinic_id`) REFERENCES `clinics` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1331,7 +1451,7 @@ UNLOCK TABLES;
 CREATE TABLE `meal_plans` (
   `id` int NOT NULL AUTO_INCREMENT,
   `clinic_id` int NOT NULL,
-  `patient_id` int NOT NULL,
+  `patient_id` int DEFAULT NULL,
   `professional_id` int NOT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `version` int NOT NULL DEFAULT '1',
@@ -1373,7 +1493,7 @@ CREATE TABLE `migrations` (
 
 LOCK TABLES `migrations` WRITE;
 /*!40000 ALTER TABLE `migrations` DISABLE KEYS */;
-INSERT INTO `migrations` VALUES (1,'2026_10_07_000001_create_tenants_and_users_table','2026-10-24 01:53:13'),(2,'2026_10_07_000002_create_clinical_domain_tables','2026-10-24 01:53:13'),(3,'2026_10_07_000003_create_food_and_meal_plan_tables','2026-10-24 01:53:13'),(4,'2026_10_07_000004_create_operations_and_finance_tables','2026-10-24 01:53:13'),(5,'2026_10_07_000005_create_advanced_prescription_and_recipes_tables','2026-10-24 01:53:13'),(6,'2026_10_07_000006_create_food_diary_and_chat_tables','2026-10-24 01:53:13'),(7,'2026_10_07_000007_create_scale_and_integration_tables','2026-10-24 01:53:13'),(8,'2026_10_07_000008_create_clinical_safety_and_integrity_tables','2026-10-24 01:53:13'),(9,'2026_10_07_000009_create_privacy_and_lgpd_tables','2026-10-24 01:53:13'),(10,'2026_10_08_000010_create_personal_access_tokens_table','2026-10-24 01:53:13'),(11,'2026_10_08_000011_create_appointment_lifecycle_and_history_tables','2026-10-24 01:53:14'),(12,'2026_10_08_000012_enhance_anthropometry_and_sharing_tables','2026-10-24 01:53:14'),(13,'2026_10_08_000013_enhance_meal_plans_and_prescriptions_tables','2026-10-24 01:53:14'),(14,'2026_10_08_000014_create_patient_documents_and_files_tables','2026-10-24 01:53:14'),(15,'2026_10_08_000015_add_authentication_and_credentials_to_patients_table','2026-10-24 01:53:14'),(16,'2026_10_08_000016_enhance_anamnesis_structured_fields','2026-10-24 01:53:15'),(17,'2026_10_08_000017_create_teleconsultation_sessions_table','2026-10-24 01:53:15'),(18,'2026_10_08_000018_create_helpdesk_and_service_desk_tables','2026-10-24 01:53:15'),(19,'2026_10_08_000019_enhance_chat_secure_messaging_tables','2026-10-24 01:53:15'),(20,'2026_10_08_000020_enhance_culinary_recipes_and_prescriptions_tables','2026-10-24 01:53:15'),(21,'2026_10_08_000021_create_onboarding_and_activation_tables','2026-10-24 01:53:16'),(22,'2026_10_08_000022_create_patient_self_metrics_table','2026-10-24 01:53:16'),(23,'2026_10_09_000023_add_allergy_assessment_to_anamneses','2026-10-24 01:53:16'),(24,'2026_10_09_000024_add_professional_account_settings','2026-10-24 01:53:16'),(25,'2026_10_09_000025_create_patient_app_invitations','2026-10-24 01:53:16'),(26,'2026_10_09_000026_bind_access_tokens_to_clinic','2026-10-24 01:53:16'),(27,'2026_10_09_000027_version_clinical_record_integrity','2026-10-24 01:53:16'),(28,'2026_10_09_000028_add_idempotency_to_food_diary','2026-10-24 01:53:16'),(29,'2026_10_10_000029_enforce_food_diary_idempotency','2026-10-24 01:53:16'),(30,'2026_10_10_000030_create_saas_subscriptions_and_cancellation_tables','2026-10-24 01:53:16'),(31,'2026_10_10_000031_create_platform_settings_table','2026-10-24 01:53:16'),(32,'2026_10_14_000032_create_login_attempts_table','2026-10-24 01:53:16'),(33,'2026_10_15_000033_convert_login_attempts_to_bucket_key_primary','2026-10-24 01:53:16'),(34,'2026_10_15_000034_add_taco_code_to_foods','2026-10-24 01:53:16'),(35,'2026_10_15_000035_harden_teleconsultation_sessions','2026-10-24 01:53:16'),(36,'2026_10_15_000036_add_teleconsultation_webrtc_and_join_window','2026-10-24 01:53:16'),(37,'2026_10_15_000037_create_teleconsultation_note_drafts','2026-10-24 01:53:16'),(38,'2026_10_15_000038_link_legacy_teleconsultation_consents_to_terms','2026-10-24 01:53:16'),(39,'2026_10_15_000039_create_teleconsultation_ticket_redemptions','2026-10-24 01:53:16'),(40,'2026_10_15_000040_create_consultation_note_drafts','2026-10-24 01:53:16'),(41,'2026_10_16_000041_enhance_clinical_care_consent_and_clinic_branding','2026-10-24 01:53:17'),(42,'2026_10_16_000042_create_booking_holds_and_self_service_tables','2026-10-24 01:53:17'),(43,'2026_10_19_000043_harden_meal_plan_prescriptions','2026-10-24 01:53:18'),(44,'2026_10_19_000044_create_skinfold_measurements','2026-10-24 01:53:18'),(45,'2026_10_19_000045_create_preconsultation_tables','2026-10-24 01:53:18'),(46,'2026_10_21_000046_create_self_metric_permissions_and_goals','2026-10-24 01:53:18'),(47,'2026_10_21_000047_create_patient_appointment_actions','2026-10-24 01:53:18'),(48,'2026_10_22_000048_create_chat_links_and_retention','2026-10-24 01:53:18'),(49,'2026_10_22_000049_create_adherence_analytics','2026-10-24 01:53:18'),(50,'2026_10_23_000050_add_food_search_text','2026-10-24 01:53:18'),(51,'2026_10_24_000051_harden_hydration_logs','2026-10-24 12:00:00'),(52,'2026_10_24_000052_create_notification_domain','2026-10-24 12:00:00'),(53,'2026_10_24_000053_create_notification_checkin_settings','2026-10-24 12:00:00'),(54,'2026_10_24_000054_harden_food_diary_entries','2026-10-24 12:00:00');
+INSERT INTO `migrations` VALUES (1,'2026_10_07_000001_create_tenants_and_users_table','2026-10-24 01:53:13'),(2,'2026_10_07_000002_create_clinical_domain_tables','2026-10-24 01:53:13'),(3,'2026_10_07_000003_create_food_and_meal_plan_tables','2026-10-24 01:53:13'),(4,'2026_10_07_000004_create_operations_and_finance_tables','2026-10-24 01:53:13'),(5,'2026_10_07_000005_create_advanced_prescription_and_recipes_tables','2026-10-24 01:53:13'),(6,'2026_10_07_000006_create_food_diary_and_chat_tables','2026-10-24 01:53:13'),(7,'2026_10_07_000007_create_scale_and_integration_tables','2026-10-24 01:53:13'),(8,'2026_10_07_000008_create_clinical_safety_and_integrity_tables','2026-10-24 01:53:13'),(9,'2026_10_07_000009_create_privacy_and_lgpd_tables','2026-10-24 01:53:13'),(10,'2026_10_08_000010_create_personal_access_tokens_table','2026-10-24 01:53:13'),(11,'2026_10_08_000011_create_appointment_lifecycle_and_history_tables','2026-10-24 01:53:14'),(12,'2026_10_08_000012_enhance_anthropometry_and_sharing_tables','2026-10-24 01:53:14'),(13,'2026_10_08_000013_enhance_meal_plans_and_prescriptions_tables','2026-10-24 01:53:14'),(14,'2026_10_08_000014_create_patient_documents_and_files_tables','2026-10-24 01:53:14'),(15,'2026_10_08_000015_add_authentication_and_credentials_to_patients_table','2026-10-24 01:53:14'),(16,'2026_10_08_000016_enhance_anamnesis_structured_fields','2026-10-24 01:53:15'),(17,'2026_10_08_000017_create_teleconsultation_sessions_table','2026-10-24 01:53:15'),(18,'2026_10_08_000018_create_helpdesk_and_service_desk_tables','2026-10-24 01:53:15'),(19,'2026_10_08_000019_enhance_chat_secure_messaging_tables','2026-10-24 01:53:15'),(20,'2026_10_08_000020_enhance_culinary_recipes_and_prescriptions_tables','2026-10-24 01:53:15'),(21,'2026_10_08_000021_create_onboarding_and_activation_tables','2026-10-24 01:53:16'),(22,'2026_10_08_000022_create_patient_self_metrics_table','2026-10-24 01:53:16'),(23,'2026_10_09_000023_add_allergy_assessment_to_anamneses','2026-10-24 01:53:16'),(24,'2026_10_09_000024_add_professional_account_settings','2026-10-24 01:53:16'),(25,'2026_10_09_000025_create_patient_app_invitations','2026-10-24 01:53:16'),(26,'2026_10_09_000026_bind_access_tokens_to_clinic','2026-10-24 01:53:16'),(27,'2026_10_09_000027_version_clinical_record_integrity','2026-10-24 01:53:16'),(28,'2026_10_09_000028_add_idempotency_to_food_diary','2026-10-24 01:53:16'),(29,'2026_10_10_000029_enforce_food_diary_idempotency','2026-10-24 01:53:16'),(30,'2026_10_10_000030_create_saas_subscriptions_and_cancellation_tables','2026-10-24 01:53:16'),(31,'2026_10_10_000031_create_platform_settings_table','2026-10-24 01:53:16'),(32,'2026_10_14_000032_create_login_attempts_table','2026-10-24 01:53:16'),(33,'2026_10_15_000033_convert_login_attempts_to_bucket_key_primary','2026-10-24 01:53:16'),(34,'2026_10_15_000034_add_taco_code_to_foods','2026-10-24 01:53:16'),(35,'2026_10_15_000035_harden_teleconsultation_sessions','2026-10-24 01:53:16'),(36,'2026_10_15_000036_add_teleconsultation_webrtc_and_join_window','2026-10-24 01:53:16'),(37,'2026_10_15_000037_create_teleconsultation_note_drafts','2026-10-24 01:53:16'),(38,'2026_10_15_000038_link_legacy_teleconsultation_consents_to_terms','2026-10-24 01:53:16'),(39,'2026_10_15_000039_create_teleconsultation_ticket_redemptions','2026-10-24 01:53:16'),(40,'2026_10_15_000040_create_consultation_note_drafts','2026-10-24 01:53:16'),(41,'2026_10_16_000041_enhance_clinical_care_consent_and_clinic_branding','2026-10-24 01:53:17'),(42,'2026_10_16_000042_create_booking_holds_and_self_service_tables','2026-10-24 01:53:17'),(43,'2026_10_19_000043_harden_meal_plan_prescriptions','2026-10-24 01:53:18'),(44,'2026_10_19_000044_create_skinfold_measurements','2026-10-24 01:53:18'),(45,'2026_10_19_000045_create_preconsultation_tables','2026-10-24 01:53:18'),(46,'2026_10_21_000046_create_self_metric_permissions_and_goals','2026-10-24 01:53:18'),(47,'2026_10_21_000047_create_patient_appointment_actions','2026-10-24 01:53:18'),(48,'2026_10_22_000048_create_chat_links_and_retention','2026-10-24 01:53:18'),(49,'2026_10_22_000049_create_adherence_analytics','2026-10-24 01:53:18'),(50,'2026_10_23_000050_add_food_search_text','2026-10-24 01:53:18'),(51,'2026_10_24_000051_harden_hydration_logs','2026-10-24 12:00:00'),(52,'2026_10_24_000052_create_notification_domain','2026-10-24 12:00:00'),(53,'2026_10_24_000053_create_notification_checkin_settings','2026-10-24 12:00:00'),(54,'2026_10_24_000054_harden_food_diary_entries','2026-10-24 12:00:00'),(55,'2026_10_24_000055_update_help_center_copy_v21','2026-10-24 12:00:00'),(56,'2026_10_26_000056_create_user_legal_acceptances','2026-10-26 12:00:00'),(57,'2026_10_26_000057_add_trial_ends_at_to_clinic_subscriptions','2026-10-26 12:00:00'),(58,'2026_10_26_000058_create_patient_password_resets','2026-10-26 12:00:00'),(59,'2026_10_27_000059_add_last_login_at_to_users','2026-10-27 12:00:00'),(60,'2026_10_28_000060_create_plan_changes_and_account_deletion_requests','2026-10-28 12:00:00'),(61,'2026_10_29_000061_plan_energy_clinic_measures_and_planless_plans','2026-10-29 12:00:00'),(62,'2026_10_29_000062_plan_templates_food_search_and_patient_import','2026-10-29 18:00:00'),(63,'2026_10_29_000063_food_provenance_equivalence_and_template_targets','2026-10-29 20:00:00'),(64,'2026_10_29_000064_create_laboratory_exam_requests_and_catalog','2026-10-29 22:00:00'),(65,'2026_10_29_000065_exam_requests_pdf_and_review','2026-10-29 22:00:00');
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1775,6 +1895,46 @@ LOCK TABLES `patient_goals` WRITE;
 /*!40000 ALTER TABLE `patient_goals` DISABLE KEYS */;
 /*!40000 ALTER TABLE `patient_goals` ENABLE KEYS */;
 UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `patient_import_batches` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `file_sha256` CHAR(64) NOT NULL,
+  `file_name` VARCHAR(255) NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'preview',
+  `mapping_json` TEXT NULL,
+  `total_rows` INT NOT NULL DEFAULT 0,
+  `valid_rows` INT NOT NULL DEFAULT 0,
+  `created_rows` INT NOT NULL DEFAULT 0,
+  `skipped_rows` INT NOT NULL DEFAULT 0,
+  `error_rows` INT NOT NULL DEFAULT 0,
+  `created_by_user_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `confirmed_at` DATETIME NULL,
+  `rolled_back_at` DATETIME NULL,
+  `rolled_back_rows` INT NOT NULL DEFAULT 0,
+  UNIQUE KEY `uq_patient_import_file` (`clinic_id`, `file_sha256`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `patient_import_rows` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `batch_id` BIGINT(20) NOT NULL,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `line_no` INT NOT NULL,
+  `raw_json` TEXT NULL,
+  `outcome` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  `message` VARCHAR(255) NULL,
+  `patient_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_patient_import_rows_batch` (`batch_id`, `line_no`),
+  KEY `idx_patient_import_rows_clinic` (`clinic_id`, `patient_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `patient_packages` (
@@ -2465,6 +2625,42 @@ LOCK TABLES `subscription_invoices` WRITE;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `subscription_plan_changes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `subscription_id` int NOT NULL,
+  `protocol` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `change_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `from_plan_id` int NOT NULL,
+  `to_plan_id` int NOT NULL,
+  `from_plan_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `to_plan_code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `from_price_cents` int NOT NULL,
+  `to_price_cents` int NOT NULL,
+  `subscription_status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `billing_mode` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manual',
+  `usage_json` text COLLATE utf8mb4_unicode_ci,
+  `idempotency_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `requested_by` int NOT NULL,
+  `effective_at` datetime NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_plan_changes_protocol` (`protocol`),
+  UNIQUE KEY `uq_plan_changes_idem` (`clinic_id`,`idempotency_key`),
+  KEY `idx_plan_changes_clinic` (`clinic_id`,`created_at`),
+  KEY `idx_plan_changes_recent` (`created_at`),
+  KEY `idx_plan_changes_subscription` (`subscription_id`),
+  KEY `idx_plan_changes_from_plan` (`from_plan_id`),
+  KEY `idx_plan_changes_to_plan` (`to_plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `subscription_plan_changes` WRITE;
+/*!40000 ALTER TABLE `subscription_plan_changes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `subscription_plan_changes` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `teleconsultation_access_attempts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `bucket` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2651,6 +2847,51 @@ LOCK TABLES `telehealth_sessions` WRITE;
 UNLOCK TABLES;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_legal_acceptances` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `clinic_id` int DEFAULT NULL,
+  `document` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `version` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `accepted_at` datetime NOT NULL,
+  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `source` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_legal_acceptances_lookup` (`user_id`,`document`,`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `user_legal_acceptances` WRITE;
+/*!40000 ALTER TABLE `user_legal_acceptances` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_legal_acceptances` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `patient_password_resets` (NI2-481, migração 58)
+--
+DROP TABLE IF EXISTS `patient_password_resets`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+CREATE TABLE `patient_password_resets` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clinic_id` int NOT NULL,
+  `patient_id` int NOT NULL,
+  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token_hash` (`token_hash`),
+  KEY `idx_patient_pwreset_patient` (`patient_id`,`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `patient_password_resets` WRITE;
+/*!40000 ALTER TABLE `patient_password_resets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `patient_password_resets` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
   `id` int NOT NULL AUTO_INCREMENT,
   `uuid` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2664,9 +2905,11 @@ CREATE TABLE `users` (
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `auth_version` int NOT NULL DEFAULT '0',
+  `last_login_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_users_last_login` (`last_login_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2674,6 +2917,359 @@ LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
+
+-- ----------------------------------------------------------------------------
+-- v43 (migração 63, NI2-519 e NI2-520): colunas acrescentadas depois dos dados, porque as linhas de
+-- foods e food_household_measures acima usam a ordem original das colunas.
+-- ----------------------------------------------------------------------------
+-- Colunas novas de foods: cada uma só é criada se ainda não existe.
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD COLUMN `source_version` VARCHAR(60) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND COLUMN_NAME = 'source_version');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD COLUMN `source_code` VARCHAR(40) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND COLUMN_NAME = 'source_code');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD COLUMN `source_imported_at` DATETIME NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND COLUMN_NAME = 'source_imported_at');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD COLUMN `preparation` VARCHAR(30) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND COLUMN_NAME = 'preparation');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD COLUMN `is_current` TINYINT(1) NOT NULL DEFAULT 1', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND COLUMN_NAME = 'is_current');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+
+-- Colunas novas de food_household_measures: cada uma só é criada se ainda não existe.
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `food_household_measures` ADD COLUMN `source` VARCHAR(80) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'food_household_measures' AND COLUMN_NAME = 'source');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `food_household_measures` ADD COLUMN `source_version` VARCHAR(60) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'food_household_measures' AND COLUMN_NAME = 'source_version');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+
+-- Colunas novas de meal_plan_templates: cada uma só é criada se ainda não existe.
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `visibility` VARCHAR(20) NOT NULL DEFAULT ''clinica''', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'visibility');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `approval_status` VARCHAR(20) NOT NULL DEFAULT ''nao_aprovado''', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'approval_status');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `approved_by_user_id` BIGINT(20) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'approved_by_user_id');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `approved_at` DATETIME NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'approved_at');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `plan_method` VARCHAR(20) NOT NULL DEFAULT ''alimentos''', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'plan_method');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD COLUMN `target_json` LONGTEXT NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND COLUMN_NAME = 'target_json');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+
+-- Colunas novas de meal_plans: cada uma só é criada se ainda não existe.
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plans` ADD COLUMN `template_id` BIGINT(20) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plans' AND COLUMN_NAME = 'template_id');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plans` ADD COLUMN `plan_method` VARCHAR(20) NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plans' AND COLUMN_NAME = 'plan_method');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plans` ADD COLUMN `reference_target_json` LONGTEXT NULL', 'SELECT 1')
+  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plans' AND COLUMN_NAME = 'reference_target_json');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+
+-- Índices (só se ainda não existem).
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD UNIQUE INDEX `uq_foods_source_version_code` (`source`, `source_version`, `source_code`)', 'SELECT 1')
+  FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND INDEX_NAME = 'uq_foods_source_version_code');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `foods` ADD INDEX `idx_foods_source_code` (`source`, `source_code`)', 'SELECT 1')
+  FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'foods' AND INDEX_NAME = 'idx_foods_source_code');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+SET @c = (SELECT IF(COUNT(*) = 0, 'ALTER TABLE `meal_plan_templates` ADD INDEX `idx_plan_templates_visibility` (`clinic_id`, `visibility`, `created_by_user_id`)', 'SELECT 1')
+  FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'meal_plan_templates' AND INDEX_NAME = 'idx_plan_templates_visibility');
+PREPARE stmt_c FROM @c; EXECUTE stmt_c; DEALLOCATE PREPARE stmt_c;
+
+-- Procedência da TACO: a linha de menor id de cada número TACO recebe a edição e o código, se ainda não houver uma
+-- linha com esse código e essa edição. As tabelas derivadas são materializadas antes do UPDATE (sem erro 1093).
+UPDATE `foods` f
+  JOIN (SELECT MIN(id) AS id FROM `foods` WHERE `source` = 'TACO' AND `taco_code` IS NOT NULL AND `clinic_id` IS NULL GROUP BY `taco_code`) m ON m.id = f.id
+  LEFT JOIN (SELECT DISTINCT `source_code` FROM `foods` WHERE `source` = 'TACO' AND `source_version` = '4ª ed. rev. e ampl. (2011)' AND `source_code` IS NOT NULL LIMIT 1000000) x
+    ON x.source_code = CAST(f.taco_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci
+SET f.`source_version` = '4ª ed. rev. e ampl. (2011)', f.`source_code` = CAST(f.taco_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci
+WHERE f.`source_version` IS NULL AND f.`source_code` IS NULL AND x.source_code IS NULL;
+
+CREATE TABLE IF NOT EXISTS `food_favorites` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `food_id` BIGINT(20) NOT NULL,
+  `created_by_user_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_food_favorites_clinic_food` (`clinic_id`, `food_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `food_search_selections` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `metric_date` DATE NOT NULL,
+  `term` VARCHAR(80) NOT NULL,
+  `food_id` BIGINT(20) NOT NULL,
+  `selections` INT(11) NOT NULL DEFAULT 0,
+  `corrections` INT(11) NOT NULL DEFAULT 0,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_food_search_selection` (`clinic_id`, `metric_date`, `term`, `food_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `food_equivalence_rules` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `name` VARCHAR(120) NOT NULL,
+  `food_groups` LONGTEXT NOT NULL,
+  `energy_tolerance_pct` DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+  `macro_tolerance_pct` DECIMAL(5,2) NOT NULL DEFAULT 20.00,
+  `source_note` VARCHAR(500) NOT NULL,
+  `review_status` VARCHAR(20) NOT NULL DEFAULT 'pendente',
+  `reviewed_by_user_id` BIGINT(20) NULL,
+  `reviewed_at` DATETIME NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+  `created_by_user_id` BIGINT(20) NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL,
+  `archived_at` DATETIME NULL,
+  KEY `idx_food_equivalence_rules_clinic` (`clinic_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- v46 (migrações 64 e 65, NI2-529): pedido de exames laboratoriais. A emissão não depende de liberação;
+-- is_approved_clinical/is_approved_legal ficam como na 64 (1,1) e o sistema não as lê.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `exam_regulatory_policies` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `policy_version` VARCHAR(20) NOT NULL UNIQUE,
+  `legal_basis` LONGTEXT NOT NULL,
+  `statement` LONGTEXT NOT NULL,
+  `disclaimer_coverage` LONGTEXT NOT NULL,
+  `is_approved_clinical` TINYINT(1) NOT NULL DEFAULT 1,
+  `is_approved_legal` TINYINT(1) NOT NULL DEFAULT 1,
+  `effective_from` DATE NOT NULL,
+  `created_at` DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `exam_catalog` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `code` VARCHAR(60) NOT NULL UNIQUE,
+  `canonical_name` VARCHAR(255) NOT NULL,
+  `short_name` VARCHAR(100) NULL,
+  `category` VARCHAR(100) NOT NULL,
+  `sample_type` VARCHAR(100) NOT NULL,
+  `fasting_hours` INT NULL,
+  `nutritional_indication` LONGTEXT NOT NULL,
+  `synonyms` LONGTEXT NULL,
+  `search_text` LONGTEXT NOT NULL,
+  `is_laboratorial` TINYINT(1) NOT NULL DEFAULT 1,
+  `is_nutritional_scope` TINYINT(1) NOT NULL DEFAULT 1,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `version` INT NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  KEY `idx_exam_catalog_category` (`category`),
+  KEY `idx_exam_catalog_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `exam_requests` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `patient_id` BIGINT(20) NOT NULL,
+  `professional_id` BIGINT(20) NOT NULL,
+  `policy_version` VARCHAR(20) NOT NULL,
+  `request_number` VARCHAR(50) NOT NULL UNIQUE,
+  `clinical_justification` LONGTEXT NOT NULL,
+  `diagnostic_hypothesis_nutritional` VARCHAR(255) NULL,
+  `status` VARCHAR(30) NOT NULL DEFAULT 'draft',
+  `professional_snapshot` LONGTEXT NOT NULL,
+  `patient_snapshot` LONGTEXT NOT NULL,
+  `coverage_disclaimer_acknowledged` TINYINT(1) NOT NULL DEFAULT 0,
+  `issued_at` DATETIME NULL,
+  `cancelled_at` DATETIME NULL,
+  `cancellation_reason` LONGTEXT NULL,
+  `pdf_hash` VARCHAR(64) NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `reviewed_at` DATETIME NULL,
+  `issued_by_user_id` BIGINT(20) NULL,
+  `pdf_path` VARCHAR(255) NULL,
+  `pdf_size` INT NULL,
+  `pdf_generated_at` DATETIME NULL,
+  KEY `idx_exam_requests_clinic_patient` (`clinic_id`, `patient_id`),
+  KEY `idx_exam_requests_professional` (`professional_id`),
+  KEY `idx_exam_requests_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `exam_request_items` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `exam_request_id` BIGINT(20) NOT NULL,
+  `exam_id` BIGINT(20) NOT NULL,
+  `exam_canonical_name` VARCHAR(255) NOT NULL,
+  `exam_code` VARCHAR(60) NOT NULL,
+  `sample_type` VARCHAR(100) NOT NULL,
+  `specific_instructions` VARCHAR(500) NULL,
+  `matched_synonym` VARCHAR(255) NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  KEY `idx_exam_request_items_req` (`exam_request_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `exam_audit_logs` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `user_id` BIGINT(20) NOT NULL,
+  `action` VARCHAR(50) NOT NULL,
+  `entity_type` VARCHAR(50) NOT NULL,
+  `entity_id` BIGINT(20) NOT NULL,
+  `ip_address` VARCHAR(45) NULL,
+  `details` LONGTEXT NULL,
+  `created_at` DATETIME NOT NULL,
+  KEY `idx_exam_audit_clinic_user` (`clinic_id`, `user_id`),
+  KEY `idx_exam_audit_entity` (`entity_type`, `entity_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO `exam_regulatory_policies` (`policy_version`, `legal_basis`, `statement`, `disclaimer_coverage`, `is_approved_clinical`, `is_approved_legal`, `effective_from`, `created_at`)
+VALUES ('2026.1', 'Lei Federal nº 8.234/1991 (art. 4º, inciso VIII) e Resolução CFN nº 306/2003.', 'O nutricionista é legalmente habilitado a solicitar exames laboratoriais estritamente necessários ao acompanhamento dietoterápico e avaliação nutricional, sendo vedada a solicitação de exames invasivos não laboratoriais (como exames de imagem, endoscopias e biópsias) e a realização de diagnóstico clínico médico.', 'Atenção: A cobertura de exames laboratoriais solicitados por nutricionistas depende das cláusulas contratuais de cada operadora de plano de saúde e das diretrizes da ANS/laboratórios locais. O ClyoNutri II não garante cobertura automática nem reembolso.', 1, 1, '2026-01-01', NOW());
+
+INSERT IGNORE INTO `exam_catalog` (`code`, `canonical_name`, `short_name`, `category`, `sample_type`, `fasting_hours`, `nutritional_indication`, `synonyms`, `search_text`, `is_laboratorial`, `is_nutritional_scope`, `is_active`, `version`, `created_at`, `updated_at`) VALUES
+('HEMOGRAMA_COMPLETO', 'Hemograma completo com contagem de plaquetas', 'Hemograma completo', 'Hematologia', 'Sangue total (EDTA)', 4, 'Avaliação de anemias nutricionais (ferropriva, megaloblástica por carência de B12/folato), estado imune e contagem celular de base.', 'hemograma, hemoglobina, hematocrito, leucograma, plaquetas, serie vermelha, contagem celular', 'hemograma completo com contagem de plaquetas hemograma completo hematologia hemograma, hemoglobina, hematocrito, leucograma, plaquetas, serie vermelha, contagem celular', 1, 1, 1, 1, NOW(), NOW()),
+('GLICEMIA_JEJUM', 'Glicemia de jejum', 'Glicemia', 'Glicemia e Metabolismo', 'Plasma fluoretado', 8, 'Avaliação do metabolismo glicídico basal, rastreamento de resistência à insulina e monitoramento do plano dietético no diabetes/pré-diabetes.', 'glicose, acucar no sangue, glicemia basal, glicemia de jejum', 'glicemia de jejum glicemia glicemia e metabolismo glicose, acucar no sangue, glicemia basal, glicemia de jejum', 1, 1, 1, 1, NOW(), NOW()),
+('HEMOGLOBINA_GLICADA', 'Hemoglobina glicada (HbA1c)', 'HbA1c', 'Glicemia e Metabolismo', 'Sangue total (EDTA)', 0, 'Controle glicêmico retrospectivo dos últimos 90 a 120 dias para ajuste na ingestão de carboidratos e índice glicêmico da dieta.', 'hba1c, a1c, hemoglobina glicosilada, media glicemica', 'hemoglobina glicada (hba1c) hba1c glicemia e metabolismo hba1c, a1c, hemoglobina glicosilada, media glicemica', 1, 1, 1, 1, NOW(), NOW()),
+('INSULINA_JEJUM', 'Insulina basal em jejum', 'Insulina de jejum', 'Glicemia e Metabolismo', 'Soro', 8, 'Avaliação de hiperinsulinemia e cálculo de índices de resistência insulínica (HOMA-IR, HOMA-BETA) para adequação macronutricional.', 'insulina, homa ir, homa beta, insulinemia, curva de insulina', 'insulina basal em jejum insulina de jejum glicemia e metabolismo insulina, homa ir, homa beta, insulinemia, curva de insulina', 1, 1, 1, 1, NOW(), NOW()),
+('PERFIL_LIPIDICO', 'Perfil lipídico (Colesterol total, HDL, LDL, VLDL e Triglicerídeos)', 'Lipidograma completo', 'Perfil Lipídico', 'Soro', 12, 'Diagnóstico dietoterápico de dislipidemias, estratificação de risco cardiometabólico e direcionamento na proporção de ácidos graxos (saturados, mono e poli-insaturados).', 'lipidograma, colesterol, triglicerideos, hdl, ldl, vldl, lipidios, gordura no sangue', 'perfil lipidico (colesterol total, hdl, ldl, vldl e triglicerideos) lipidograma completo perfil lipidico lipidograma, colesterol, triglicerideos, hdl, ldl, vldl, lipidios, gordura no sangue', 1, 1, 1, 1, NOW(), NOW()),
+('FERRITINA_SERICA', 'Ferritina sérica', 'Ferritina', 'Micronutrientes e Vitaminas', 'Soro', 4, 'Avaliação das reservas orgânicas de ferro corporal e marcador inflamatório de fase aguda para prescrição e intervenção alimentar rica em ferro e facilitadores de absorção.', 'ferritina, reserva de ferro, estoque de ferro', 'ferritina serica ferritina micronutrientes e vitaminas ferritina, reserva de ferro, estoque de ferro', 1, 1, 1, 1, NOW(), NOW()),
+('FERRO_SERICO', 'Ferro sérico', 'Ferro', 'Micronutrientes e Vitaminas', 'Soro', 8, 'Determinação da concentração de ferro circulante para cálculo de saturação de transferrina e diagnóstico diferencial nutricional.', 'ferro serico, ferro circulante, sideremia', 'ferro serico ferro micronutrientes e vitaminas ferro serico, ferro circulante, sideremia', 1, 1, 1, 1, NOW(), NOW()),
+('VITAMINA_B12', 'Vitamina B12 (Cobalamina)', 'Vitamina B12', 'Micronutrientes e Vitaminas', 'Soro', 4, 'Monitoramento do estado nutricional em vegetarianos, veganos, pós-cirurgia bariátrica e idosos para prevenção de manifestações hematológicas e neurológicas.', 'b12, cobalamina, cianocobalamina, vit b12', 'vitamina b12 (cobalamina) vitamina b12 micronutrientes e vitaminas b12, cobalamina, cianocobalamina, vit b12', 1, 1, 1, 1, NOW(), NOW()),
+('VITAMINA_D_25OH', '25-Hidroxivitamina D [25(OH)D]', 'Vitamina D', 'Micronutrientes e Vitaminas', 'Soro', 0, 'Avaliação do status corporal de colecalciferol, metabolismo ósseo de cálcio/fósforo e imunomodulação nutricional.', 'vitamina d, 25 hidroxivitamina d, vit d, 25-oh-d, calcidiol', '25-hidroxivitamina d [25(oh)d] vitamina d micronutrientes e vitaminas vitamina d, 25 hidroxivitamina d, vit d, 25-oh-d, calcidiol', 1, 1, 1, 1, NOW(), NOW()),
+('ACIDO_FOLICO', 'Ácido fólico sérico (Folato)', 'Folato / Ácido fólico', 'Micronutrientes e Vitaminas', 'Soro', 4, 'Avaliação do metabolismo de um carbono, metilação e aporte dietético de vegetais folhosos escuros, gestação e risco de anemia macrocítica.', 'folato, vitamina b9, b9, folacina, acido folico', 'acido folico serico (folato) folato / acido folico micronutrientes e vitaminas folato, vitamina b9, b9, folacina, acido folico', 1, 1, 1, 1, NOW(), NOW()),
+('UREIA', 'Ureia sérica', 'Ureia', 'Função Renal', 'Soro', 4, 'Avaliação do catabolismo proteico, equilíbrio de nitrogênio e tolerância à prescrição de dietas hiperproteicas ou hipoproteicas.', 'ureia, nitrogenio ureico, bun', 'ureia serica ureia funcao renal ureia, nitrogenio ureico, bun', 1, 1, 1, 1, NOW(), NOW()),
+('CREATININA_SERICA', 'Creatinina sérica com estimativa da Taxa de Filtração Glomerular (eTFG)', 'Creatinina', 'Função Renal', 'Soro', 4, 'Avaliação da função de filtração renal, cálculo da depuração para dimensionamento seguro da carga proteica da dieta e hidratação.', 'creatinina, taxa de filtracao glomerular, tfg, clearence de creatinina', 'creatinina serica com estimativa da taxa de filtracao glomerular (etfg) creatinina funcao renal creatinina, taxa de filtracao glomerular, tfg, clearence de creatinina', 1, 1, 1, 1, NOW(), NOW()),
+('TGO_AST', 'Transaminase Oxalacética (TGO / AST)', 'TGO / AST', 'Função Hepática', 'Soro', 4, 'Marcador de integridade hepática e muscular, monitorando intervenções nutricionais em esteatose hepática metabólica (EHNA).', 'tgo, ast, aspartato aminotransferase', 'transaminase oxalacetica (tgo / ast) tgo / ast funcao hepatica tgo, ast, aspartato aminotransferase', 1, 1, 1, 1, NOW(), NOW()),
+('TGP_ALT', 'Transaminase Alanina (TGP / ALT)', 'TGP / ALT', 'Função Hepática', 'Soro', 4, 'Marcador específico de integridade hepatocelular para acompanhamento dietoterápico na perda de peso e controle de gordura no fígado.', 'tgp, alt, alanina aminotransferase, enzimas do figado', 'transaminase alanina (tgp / alt) tgp / alt funcao hepatica tgp, alt, alanina aminotransferase, enzimas do figado', 1, 1, 1, 1, NOW(), NOW()),
+('GAMA_GT', 'Gama Glutamiltransferase (Gama-GT)', 'Gama-GT', 'Função Hepática', 'Soro', 4, 'Marcador de estresse oxidativo, sobrecarga metabólica hepática e consumo de etanol para conduta nutricional desintoxicante.', 'ggt, gamagt, gama glutamil transferase', 'gama glutamiltransferase (gama-gt) gama-gt funcao hepatica ggt, gamagt, gama glutamil transferase', 1, 1, 1, 1, NOW(), NOW()),
+('ACIDO_URICO', 'Ácido úrico sérico', 'Ácido úrico', 'Glicemia e Metabolismo', 'Soro', 8, 'Avaliação do metabolismo das purinas e frutose, orientando a modulação dietética de alimentos ricos em purinas, frutos do mar e açúcares simples.', 'acido urico, urato, uricemia, gota', 'acido urico serico acido urico glicemia e metabolismo acido urico, urato, uricemia, gota', 1, 1, 1, 1, NOW(), NOW()),
+('PROTEINAS_TOTAIS_FRACIONADAS', 'Proteínas totais e frações (Albumina e Globulinas)', 'Proteínas totais e frações', 'Nutrição e Proteínas', 'Soro', 4, 'Avaliação do estado de desnutrição proteico-calórica, pressão oncótica e síntese hepática para ajuste proteico dietético.', 'albumina, globulina, proteinas totais, relacao a g, fracoes proteicas', 'proteinas totais e fracoes (albumina e globulinas) proteinas totais e fracoes nutricao e proteinas albumina, globulina, proteinas totais, relacao a g, fracoes proteicas', 1, 1, 1, 1, NOW(), NOW()),
+('SODIO_POTASSIO', 'Eletrólitos séricos (Sódio e Potássio)', 'Sódio e Potássio', 'Eletrólitos e Minerais', 'Soro', 0, 'Equilíbrio hidroeletrolítico, conduta dietética em hipertensão (DASH), doença renal ou atletas em desidratação.', 'sodio, potassio, eletrolitos, ionograma', 'eletrolitos sericos (sodio e potassio) sodio e potassio eletrolitos e minerais sodio, potassio, eletrolitos, ionograma', 1, 1, 1, 1, NOW(), NOW()),
+('MAGNESIO_SERICO', 'Magnésio sérico', 'Magnésio', 'Eletrólitos e Minerais', 'Soro', 4, 'Avaliação de cofator enzimático essencial em vias energéticas e sensibilidade insulínica, orientando consumo de sementes, oleaginosas e folhas verdes.', 'magnesio, mg serico, magnesemia', 'magnesio serico magnesio eletrolitos e minerais magnesio, mg serico, magnesemia', 1, 1, 1, 1, NOW(), NOW()),
+('ZINCO_SERICO', 'Zinco sérico', 'Zinco', 'Micronutrientes e Vitaminas', 'Soro', 8, 'Avaliação de oligoelemento antioxidante, função imunológica, cicatrização e paladar na conduta alimentar.', 'zinco, zn, zinco plasmatico', 'zinco serico zinco micronutrientes e vitaminas zinco, zn, zinco plasmatico', 1, 1, 1, 1, NOW(), NOW()),
+('TSH_T4_LIVRE', 'Hormônio Tireoestimulante (TSH) e Tiroxina Livre (T4 Livre)', 'TSH e T4 Livre', 'Tireoide e Hormonal', 'Soro', 4, 'Avaliação do ritmo metabólico basal na determinação do gasto energético total e orientações quanto ao iodo, selênio e bociogênicos da dieta.', 'tsh, t4 livre, tireoide, perfil tireoidiano, tiroxina', 'hormonio tireoestimulante (tsh) e tiroxina livre (t4 livre) tsh e t4 livre tireoide e hormonal tsh, t4 livre, tireoide, perfil tireoidiano, tiroxina', 1, 1, 1, 1, NOW(), NOW()),
+('URINA_TIPO_1_EAS', 'Urina tipo 1 (EAS / Elementos Anormais e Sedimento)', 'EAS / Urina tipo 1', 'Urinálise', 'Urina (jato médio)', 0, 'Rastreamento de glicosúria, proteinúria, densidade urinária para hidratação e presença de cristais urinários (uratos, oxalato de cálcio) para conduta preventiva de litíase.', 'eas, urina 1, urina tipo 1, sumario de urina, sedimento urinario', 'urina tipo 1 (eas / elementos anormais e sedimento) eas / urina tipo 1 urinalise eas, urina 1, urina tipo 1, sumario de urina, sedimento urinario', 1, 1, 1, 1, NOW(), NOW());
+
+-- ============================================================================
+-- v47 · migração 66 (2026_10_29_000066_exam_catalog_favorites_versions_and_links): instalação limpa.
+-- Catálogo com exame da clínica e validação, código padronizado e revisão clínica; favoritos; atendimento e
+-- versões da solicitação. Sem chave estrangeira.
+-- ============================================================================
+ALTER TABLE `exam_regulatory_policies` ADD COLUMN `change_summary` TEXT NULL;
+ALTER TABLE `exam_catalog`
+  ADD COLUMN `clinic_id` BIGINT(20) NULL,
+  ADD COLUMN `origin` VARCHAR(20) NOT NULL DEFAULT 'curated',
+  ADD COLUMN `validation_status` VARCHAR(20) NOT NULL DEFAULT 'approved',
+  ADD COLUMN `submitted_by_user_id` BIGINT(20) NULL,
+  ADD COLUMN `validated_by_user_id` BIGINT(20) NULL,
+  ADD COLUMN `validated_at` DATETIME NULL,
+  ADD COLUMN `validation_note` VARCHAR(500) NULL,
+  ADD COLUMN `standard_code_system` VARCHAR(20) NULL,
+  ADD COLUMN `standard_code` VARCHAR(40) NULL,
+  ADD COLUMN `clinical_review_status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  ADD COLUMN `clinical_reviewed_by` VARCHAR(255) NULL,
+  ADD COLUMN `clinical_reviewed_at` DATETIME NULL,
+  ADD INDEX `idx_exam_catalog_clinic_validation` (`clinic_id`, `validation_status`);
+CREATE TABLE IF NOT EXISTS `exam_favorites` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `user_id` BIGINT(20) NOT NULL,
+  `exam_id` BIGINT(20) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  UNIQUE INDEX `uq_exam_favorites_user_exam` (`clinic_id`, `user_id`, `exam_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE `exam_requests`
+  ADD COLUMN `appointment_id` BIGINT(20) NULL,
+  ADD COLUMN `supersedes_request_id` BIGINT(20) NULL,
+  ADD COLUMN `root_request_id` BIGINT(20) NULL,
+  ADD COLUMN `version_number` INT NOT NULL DEFAULT 1,
+  ADD INDEX `idx_exam_requests_appointment` (`clinic_id`, `appointment_id`),
+  ADD INDEX `idx_exam_requests_root` (`root_request_id`);
+INSERT INTO `migrations` (`migration`) SELECT '2026_10_29_000066_exam_catalog_favorites_versions_and_links' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = '2026_10_29_000066_exam_catalog_favorites_versions_and_links');
+
+-- ============================================================================
+-- v48 · migração 67 (2026_10_29_000067_exam_result_documents): laudos anexados (NI2-539). Sem chave estrangeira.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `exam_result_documents` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT(20) NOT NULL,
+  `patient_id` BIGINT(20) NOT NULL,
+  `exam_request_id` BIGINT(20) NOT NULL,
+  `uploaded_by_type` VARCHAR(20) NOT NULL,
+  `uploaded_by_user_id` BIGINT(20) NULL,
+  `uploaded_by_patient_id` BIGINT(20) NULL,
+  `original_name` VARCHAR(255) NOT NULL,
+  `stored_path` VARCHAR(255) NOT NULL,
+  `mime_type` VARCHAR(100) NOT NULL,
+  `size_bytes` INT NOT NULL,
+  `sha256` CHAR(64) NOT NULL,
+  `security_check` VARCHAR(255) NOT NULL,
+  `laboratory_name` VARCHAR(255) NULL,
+  `collected_at` DATE NULL,
+  `report_issued_at` DATE NULL,
+  `notes` VARCHAR(1000) NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending_review',
+  `reviewed_by_user_id` BIGINT(20) NULL,
+  `reviewed_at` DATETIME NULL,
+  `review_note` VARCHAR(1000) NULL,
+  `version_number` INT NOT NULL DEFAULT 1,
+  `supersedes_document_id` BIGINT(20) NULL,
+  `root_document_id` BIGINT(20) NULL,
+  `correction_reason` VARCHAR(1000) NULL,
+  `created_at` DATETIME NOT NULL,
+  INDEX `idx_exam_result_docs_request` (`clinic_id`, `exam_request_id`),
+  INDEX `idx_exam_result_docs_patient` (`clinic_id`, `patient_id`, `status`),
+  INDEX `idx_exam_result_docs_supersedes` (`supersedes_document_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `exam_result_document_items` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `document_id` BIGINT(20) NOT NULL,
+  `exam_request_item_id` BIGINT(20) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  UNIQUE INDEX `uq_exam_result_doc_item` (`document_id`, `exam_request_item_id`),
+  INDEX `idx_exam_result_doc_item_item` (`exam_request_item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO `migrations` (`migration`) SELECT '2026_10_29_000067_exam_result_documents' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = '2026_10_29_000067_exam_result_documents');
+
+-- ============================================================================
+-- v49 · migração 68 (2026_10_31_000068_ni2_514_phase3_anthropometry_allergens_and_agenda): instalação limpa.
+-- Antropometria com 14 circunferências e bioimpedância (NI2-524); alerta e justificativa de alérgeno nos itens e
+-- substituições do plano (NI2-525). Só colunas que aceitam vazio. Sem chave estrangeira.
+-- ============================================================================
+ALTER TABLE `anthropometric_assessments`
+  ADD COLUMN `abdomen_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `shoulder_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `arm_contracted_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `forearm_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `wrist_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `thigh_proximal_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `calf_left_cm` DECIMAL(5,2) NULL,
+  ADD COLUMN `body_fat_source` VARCHAR(40) NULL,
+  ADD COLUMN `bioimpedance_device` VARCHAR(120) NULL,
+  ADD COLUMN `visceral_fat_level` DECIMAL(5,2) NULL,
+  ADD COLUMN `total_body_water_pct` DECIMAL(5,2) NULL,
+  ADD COLUMN `bone_mass_kg` DECIMAL(5,2) NULL,
+  ADD COLUMN `phase_angle_deg` DECIMAL(4,2) NULL;
+ALTER TABLE `meal_plan_items`
+  ADD COLUMN `allergen_alert_json` LONGTEXT NULL,
+  ADD COLUMN `allergen_ack_reason` VARCHAR(500) NULL;
+ALTER TABLE `meal_plan_substitutions`
+  ADD COLUMN `allergen_alert_json` LONGTEXT NULL,
+  ADD COLUMN `allergen_ack_reason` VARCHAR(500) NULL;
+INSERT INTO `migrations` (`migration`) SELECT '2026_10_31_000068_ni2_514_phase3_anthropometry_allergens_and_agenda' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `migrations` WHERE `migration` = '2026_10_31_000068_ni2_514_phase3_anthropometry_allergens_and_agenda');
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -2684,3 +3280,18 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+-- NI2-703 / v54.32: executar SOMENTE após confirmar a linhagem existente até 086 e backup testado.
+-- Alternativa ao Migrator; idempotente. Não insere protocolos, aprovações ou dados de pacientes.
+CREATE TABLE IF NOT EXISTS dietary_confirmations (
+ id INT AUTO_INCREMENT PRIMARY KEY,
+ clinic_id INT NOT NULL, patient_id INT NOT NULL, plan_id INT NOT NULL,
+ user_id INT NOT NULL, professional_id INT NOT NULL, request_key VARCHAR(80) NOT NULL,
+ context_sha256 CHAR(64) NOT NULL, suggestions_json LONGTEXT NOT NULL,
+ rationale TEXT NOT NULL, created_at DATETIME NOT NULL,
+ UNIQUE(clinic_id,user_id,request_key),
+ FOREIGN KEY (clinic_id) REFERENCES clinics(id) ON DELETE RESTRICT,
+ FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT,
+ FOREIGN KEY (plan_id) REFERENCES meal_plans(id) ON DELETE RESTRICT,
+ FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+ FOREIGN KEY (professional_id) REFERENCES professionals(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -18,17 +18,25 @@ final class AcademyFavoriteService
     /**
      * Alterna o estado de favorito de um artigo para o profissional.
      * Retorna true se agora é favorito, false se foi removido.
+     * v54.22: só se favorita artigo publicado; tirar dos favoritos vale sempre (inclusive artigo que a equipe arquivou).
      */
     public function toggleFavorite(int $clinicId, int $userId, int $articleId, string $collection = 'Geral'): bool
     {
+        $collection = mb_substr(trim($collection), 0, 100, 'UTF-8') ?: 'Geral';
         $stmt = $this->db->prepare('SELECT id FROM academy_favorites WHERE clinic_id = ? AND user_id = ? AND article_id = ?');
         $stmt->execute([$clinicId, $userId, $articleId]);
         $existingId = $stmt->fetchColumn();
 
         if ($existingId) {
-            $del = $this->db->prepare('DELETE FROM academy_favorites WHERE id = ?');
-            $del->execute([$existingId]);
+            $del = $this->db->prepare('DELETE FROM academy_favorites WHERE id = ? AND clinic_id = ? AND user_id = ?');
+            $del->execute([$existingId, $clinicId, $userId]);
             return false;
+        }
+
+        $a = $this->db->prepare("SELECT 1 FROM academy_articles WHERE id = ? AND status = 'published'");
+        $a->execute([$articleId]);
+        if (!$a->fetchColumn()) {
+            throw new \DomainException('Artigo não encontrado.');
         }
 
         $ins = $this->db->prepare('
@@ -57,11 +65,11 @@ final class AcademyFavoriteService
     public function listFavorites(int $clinicId, int $userId, ?string $collection = null): array
     {
         $sql = "
-            SELECT f.id as favorite_id, f.collection_name, f.personal_notes, f.created_at as saved_at,
+            SELECT f.id as favorite_id, f.collection_name, f.created_at as saved_at,
                    a.*
             FROM academy_favorites f
             JOIN academy_articles a ON a.id = f.article_id
-            WHERE f.clinic_id = ? AND f.user_id = ?
+            WHERE f.clinic_id = ? AND f.user_id = ? AND a.status = 'published'
         ";
         $params = [$clinicId, $userId];
 
@@ -75,19 +83,6 @@ final class AcademyFavoriteService
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    /**
-     * Atualiza anotações pessoais do profissional sobre o artigo.
-     */
-    public function updatePersonalNotes(int $clinicId, int $userId, int $articleId, ?string $notes, string $collection = 'Geral'): bool
-    {
-        $stmt = $this->db->prepare("
-            UPDATE academy_favorites
-            SET personal_notes = ?, collection_name = ?
-            WHERE clinic_id = ? AND user_id = ? AND article_id = ?
-        ");
-        return $stmt->execute([$notes, $collection, $clinicId, $userId, $articleId]);
     }
 
     /**

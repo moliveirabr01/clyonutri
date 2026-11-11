@@ -1,0 +1,14 @@
+Starting Metro Bundler
+Web Bundled 129ms node_modules/expo/AppEntry.js (357 modules)
+
+Exporting 1 bundle for web:
+_expo/static/js/web/AppEntry-2f69e865fc1625ff1f41f0e36d5e1799.js (671 kB)
+
+Exporting 5 files:
+assets/assets/clyonutri-logo-dark.e7590f31c442a53e1407b43cba1abfb1.png (11 kB)
+assets/assets/clyonutri-logo-light.fff4ecfebd0854ef6022a8f09daeb91a.png (12.9 kB)
+assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.a76d309774d33d9856f650bed4292a23.ttf (56.2 kB)
+index.html (1.24 kB)
+metadata.json (49 B)
+
+App exported to: dist-patient-reference

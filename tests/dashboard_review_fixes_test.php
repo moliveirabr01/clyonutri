@@ -144,7 +144,7 @@ check($http('GET', '/dashboard')['status'] === 200, 'Sessão continua ativa apó
 $ok = $http('POST', '/logout', ['_csrf_token' => $token($get['body'])]);
 check($ok['status'] === 302 && $ok['location'] === '/login', 'POST /logout com CSRF encerra sessão e redireciona para /login');
 $after = $http('GET', '/dashboard');
-check($after['status'] === 302 && $after['location'] === '/login', 'Após logout o dashboard exige login');
+check($after['status'] === 302 && parse_url((string)$after['location'], PHP_URL_PATH) === '/login', 'Após logout o dashboard exige login (com ou sem contexto de retorno)');
 proc_terminate($proc);
 proc_close($proc);
 

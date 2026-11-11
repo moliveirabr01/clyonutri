@@ -60,7 +60,7 @@ $cat = 'Cereais e derivados';
 $byCat = $svc->paginate(['category' => $cat, 'per_page' => 100]);
 aud_check($byCat['total'] > 0 && $byCat['total'] < $expectedTotal, "filtro por grupo TACO '{$cat}' reduz o total ({$byCat['total']})");
 foreach ($byCat['foods'] as $f) {
-    if (($f['category'] ?? '') !== $cat) {
+    if (!in_array($f['category'] ?? '', FoodCatalogService::categorySpellings($cat), true)) {
         aud_check(false, 'filtro category vazou outra categoria');
         break;
     }

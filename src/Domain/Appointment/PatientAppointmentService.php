@@ -49,7 +49,7 @@ final class PatientAppointmentService
     {
         $this->db = $db ?? Connection::getInstance();
         $this->fixedNow = $now;
-        $this->tz = new DateTimeZone(date_default_timezone_get());
+        $this->tz = \ClyoNutri\Domain\Booking\BookingCalendarService::tz();
     }
 
     private function now(): DateTimeImmutable
@@ -206,7 +206,7 @@ final class PatientAppointmentService
      */
     private function videoAccess(int $appointmentId, int $clinicId, int $patientId, DateTimeImmutable $start): array
     {
-        $early = (int)(is_numeric(getenv('TELECONSULT_JOIN_EARLY_MINUTES')) ? max(0, min(120, (int)getenv('TELECONSULT_JOIN_EARLY_MINUTES'))) : 15);
+        $early = TeleconsultationService::joinEarlyMinutes();
         $opensAt = $start->modify("-{$early} minutes");
         $session = null;
         if (SchemaInfo::hasTable($this->db, 'teleconsultation_sessions')) {
@@ -215,7 +215,9 @@ final class PatientAppointmentService
             $session = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
         if ($session !== null && !empty($session['join_opens_at_utc'])) {
-            $opensAt = (new DateTimeImmutable((string)$session['join_opens_at_utc'], new DateTimeZone('UTC')))->setTimezone($this->tz);
+            // v54.27: mesma regra da sala de espera — vale o que abrir antes (gravado ou configuração atual)
+            $stored = (new DateTimeImmutable((string)$session['join_opens_at_utc'], new DateTimeZone('UTC')))->setTimezone($this->tz);
+            $opensAt = min($stored, $opensAt);
         }
         if ($this->now() < $opensAt) {
             return [null, $opensAt, 'aguardando_horario'];
@@ -330,8 +332,8 @@ final class PatientAppointmentService
             $patientId,
             AppointmentService::STATUS_CONFIRMED,
             'Presença confirmada pela paciente (' . $this->channelLabel() . ').',
-            function (array $row) use ($settings): void {
-                $this->assertAllowed('confirm', $row, $settings, $this->pendingRequestFor((int)$row['id']));
+            function (array $row) use ($clinicId): void {
+                $this->assertAllowed('confirm', $row, $this->booking()->getSettings($clinicId), $this->pendingRequestFor((int)$row['id']));
             }
         );
         $this->audit('APPOINTMENT_CONFIRMED_BY_PATIENT', $appointmentId, $patientId, [
@@ -339,6 +341,7 @@ final class PatientAppointmentService
             'to_status' => $result['to_status'],
             'scheduled_at' => $result['appointment']['scheduled_at'],
         ]);
+        $this->notifyAppointment('appointment.confirmed_by_patient', 'professional', (int)($result['appointment']['professional_id'] ?? 0), $appointmentId, (string)$result['appointment']['scheduled_at'], 'confirmed');
         return [
             'success' => true,
             'appointment_id' => $appointmentId,
@@ -357,8 +360,8 @@ final class PatientAppointmentService
             $patientId,
             AppointmentService::STATUS_CANCELLED,
             'Cancelada pela paciente (' . $this->channelLabel() . ').' . ($reason !== '' ? ' Motivo: ' . $reason : ''),
-            function (array $row) use ($settings): void {
-                $this->assertAllowed('cancel', $row, $settings, null);
+            function (array $row) use ($clinicId): void {
+                $this->assertAllowed('cancel', $row, $this->booking()->getSettings($clinicId), null);
             }
         );
         // Pedido de remarcação em aberto deixa de fazer sentido.
@@ -373,6 +376,7 @@ final class PatientAppointmentService
             'scheduled_at' => $result['appointment']['scheduled_at'],
             'reason_given' => $reason !== '',
         ]);
+        $this->notifyAppointment('appointment.cancelled_by_patient', 'professional', (int)($result['appointment']['professional_id'] ?? 0), $appointmentId, (string)$result['appointment']['scheduled_at'], 'cancelled');
         return [
             'success' => true,
             'appointment_id' => $appointmentId,
@@ -435,8 +439,12 @@ final class PatientAppointmentService
         $requestedSql = $requested->format('Y-m-d H:i:s');
         $clinicId = TenantContext::getClinicId();
 
-        $requestId = $this->transaction(function () use ($patientId, $appointmentId, $clinicId, $requestedSql, $reason): int {
+        $notifyProfId = 0;
+        $notifyCurrentAt = '';
+        $requestId = $this->transaction(function () use ($patientId, $appointmentId, $clinicId, $requestedSql, $reason, &$notifyProfId, &$notifyCurrentAt): int {
             $appt = $this->lockOwnedAppointment($patientId, $appointmentId, $clinicId);
+            $notifyProfId = (int)$appt['professional_id'];
+            $notifyCurrentAt = (string)$appt['scheduled_at'];
             $settings = $this->booking()->getSettings($clinicId);
             $this->assertAllowed('reschedule', $appt, $settings, $this->pendingRequestFor($appointmentId));
             if ($requestedSql === $this->local((string)$appt['scheduled_at'])->format('Y-m-d H:i:s')) {
@@ -465,6 +473,8 @@ final class PatientAppointmentService
             ]);
             return $id;
         });
+
+        $this->notifyAppointment('appointment.reschedule_requested', 'professional', $notifyProfId, $appointmentId, $notifyCurrentAt, 'resched.' . $requestId);
 
         return [
             'success' => true,
@@ -551,11 +561,17 @@ final class PatientAppointmentService
     public function approveRequest(int $requestId, ?int $userId): array
     {
         $clinicId = TenantContext::getClinicId();
-        return $this->transaction(function () use ($requestId, $userId, $clinicId): array {
+        $notifyPatientId = 0;
+        $notifyApptId = 0;
+        $notifyNewAt = '';
+        $updated = $this->transaction(function () use ($requestId, $userId, $clinicId, &$notifyPatientId, &$notifyApptId, &$notifyNewAt): array {
             $request = $this->lockRequest($requestId, $clinicId);
             if ($request['status'] !== self::REQUEST_PENDING) {
                 throw new InvalidArgumentException('Este pedido já foi respondido ou encerrado.');
             }
+            $notifyPatientId = (int)$request['patient_id'];
+            $notifyApptId = (int)$request['appointment_id'];
+            $notifyNewAt = (string)$request['requested_scheduled_at'];
             $requestedAt = $this->local((string)$request['requested_scheduled_at']);
             if ($requestedAt <= $this->now()) {
                 throw new InvalidArgumentException('O horário pedido já passou. Recuse o pedido e combine outro horário com a paciente.');
@@ -586,17 +602,26 @@ final class PatientAppointmentService
             ]);
             return $updated;
         });
+
+        $this->notifyAppointment('appointment.reschedule_approved', 'patient', $notifyPatientId, $notifyApptId, $notifyNewAt, 'resched.approved.' . $requestId);
+        return $updated;
     }
 
     public function declineRequest(int $requestId, ?int $userId, string $note): array
     {
         $clinicId = TenantContext::getClinicId();
         $note = $this->cleanReason($note);
-        return $this->transaction(function () use ($requestId, $userId, $clinicId, $note): array {
+        $notifyPatientId = 0;
+        $notifyApptId = 0;
+        $notifyFromAt = '';
+        $result = $this->transaction(function () use ($requestId, $userId, $clinicId, $note, &$notifyPatientId, &$notifyApptId, &$notifyFromAt): array {
             $request = $this->lockRequest($requestId, $clinicId);
             if ($request['status'] !== self::REQUEST_PENDING) {
                 throw new InvalidArgumentException('Este pedido já foi respondido ou encerrado.');
             }
+            $notifyPatientId = (int)$request['patient_id'];
+            $notifyApptId = (int)$request['appointment_id'];
+            $notifyFromAt = (string)$request['from_scheduled_at'];
             $this->db->prepare("UPDATE appointment_change_requests SET status = 'declined', decided_by_user_id = :u, decided_at = :now, decision_note = :n, updated_at = :now2
                 WHERE id = :id AND clinic_id = :c AND status = 'pending'")
                 ->execute(['u' => $userId, 'now' => $this->nowSql(), 'now2' => $this->nowSql(), 'n' => $note !== '' ? $note : null, 'id' => $requestId, 'c' => $clinicId]);
@@ -609,6 +634,9 @@ final class PatientAppointmentService
             ]);
             return $this->findRequest($requestId, $clinicId);
         });
+
+        $this->notifyAppointment('appointment.reschedule_declined', 'patient', $notifyPatientId, $notifyApptId, $notifyFromAt, 'resched.declined.' . $requestId);
+        return $result;
     }
 
     // =========================================================================
@@ -745,6 +773,32 @@ final class PatientAppointmentService
             'actor_id' => $patientId,
             'channel' => $this->channel(),
         ] + $details);
+    }
+
+    /**
+     * NI2-481 P1f: publica o evento de consulta na fila durável (NotificationService) depois do commit.
+     * Nunca lança: uma falha de notificação não desfaz a ação já confirmada. E-mail neutro, sem nome do
+     * paciente (os detalhes ficam no app). $scheduledAtSql é o horário da consulta (formato SQL local).
+     */
+    private function notifyAppointment(string $eventType, string $recipientType, int $recipientId, int $appointmentId, string $scheduledAtSql, string $dedupeSuffix): void
+    {
+        if ($recipientId <= 0) {
+            return;
+        }
+        try {
+            $when = $this->local($scheduledAtSql);
+            (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish(
+                TenantContext::getClinicId(),
+                $eventType,
+                $recipientType,
+                $recipientId,
+                'appt.' . $appointmentId . '.' . $dedupeSuffix,
+                $recipientType === 'professional' ? '/agenda' : '/paciente/app',
+                ['date' => $when->format('d/m/Y'), 'time' => $when->format('H:i')]
+            );
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][appointment-notify] ' . $eventType . ' falhou: ' . $e->getMessage());
+        }
     }
 
     private function transaction(callable $fn): mixed

@@ -47,9 +47,9 @@ try {
     MailerFactory::fromEnv()->send(new MailMessage(
         $to,
         '',
-        'Teste de e-mail — ClyoNutri',
-        '<p>Este é um teste de envio do <strong>ClyoNutri</strong>.</p><p>Se você recebeu, a recuperação de senha por e-mail está pronta para funcionar.</p>',
-        "Este é um teste de envio do ClyoNutri.\nSe você recebeu, a recuperação de senha por e-mail está pronta para funcionar.\n"
+        'Teste de e-mail — Clyo Nutri',
+        '<p>Este é um teste de envio do <strong>Clyo Nutri</strong>.</p><p>Se você recebeu, a recuperação de senha por e-mail está pronta para funcionar.</p>',
+        "Este é um teste de envio do Clyo Nutri.\nSe você recebeu, a recuperação de senha por e-mail está pronta para funcionar.\n"
     ));
     printf("\n✓ Mensagem entregue ao servidor em %.1f s. Confira a caixa de entrada (e o spam) de %s.\n", microtime(true) - $started, $to);
 } catch (Throwable $e) {

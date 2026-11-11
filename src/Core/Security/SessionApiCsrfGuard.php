@@ -56,8 +56,8 @@ final class SessionApiCsrfGuard
         }
         $host = (string)($server['HTTP_HOST'] ?? '');
         if ($host !== '') {
-            $https = (!empty($server['HTTPS']) && strtolower((string)$server['HTTPS']) !== 'off')
-                || strtolower((string)($server['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+            // X-Forwarded-Proto só vale vindo de TRUSTED_PROXIES (auditoria v27, item 2).
+            $https = \ClyoNutri\Core\Http\Transport::isHttps($server);
             $out[] = strtolower(($https ? 'https' : 'http') . '://' . $host);
         }
         return array_values(array_unique($out));

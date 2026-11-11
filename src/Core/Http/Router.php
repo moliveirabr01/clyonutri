@@ -49,7 +49,7 @@ class Router
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>Sessão expirada · ClyoNutri</title></head>'
+            . '<title>Sessão expirada · Clyo Nutri</title></head>'
             . '<body style="font-family: Inter, Arial, sans-serif; background: #f8fafc; color: #1f2937; margin: 0; padding: 24px;">'
             . '<main style="max-width: 460px; margin: 10vh auto 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px;">'
             . '<h1 style="font-size: 1.3rem; margin: 0 0 12px;">Sua sessão expirou</h1>'
@@ -64,9 +64,14 @@ class Router
     {
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
 
-        // Validação CSRF em requisições de mutação Web. Exceções: /api/ (bearer) e /teleconsulta/sinal/
-        // (credencial de mídia no cabeçalho). F05: o paciente usa cookie + X-CSRF-Token, sem exceção.
-        if ($method === 'POST' && !str_starts_with($path, '/api/') && !str_starts_with($path, '/teleconsulta/sinal/')) {
+        // Validação CSRF em requisições de mutação Web. Exceções: /api/ (bearer), /teleconsulta/sinal/
+        // (credencial de mídia no cabeçalho) e /webhooks/asaas (NI2-727: endpoint público autenticado por
+        // asaas-access-token em hash_equals; não usa sessão/cookie, portanto CSRF não se aplica).
+        // F05: o paciente usa cookie + X-CSRF-Token, sem exceção.
+        $csrfExempt = str_starts_with($path, '/api/')
+            || str_starts_with($path, '/teleconsulta/sinal/')
+            || $path === '/webhooks/asaas';
+        if ($method === 'POST' && !$csrfExempt) {
             $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!Csrf::validate($token)) {
                 http_response_code(403);

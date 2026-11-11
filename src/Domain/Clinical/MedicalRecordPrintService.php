@@ -25,24 +25,7 @@ use PDO;
  */
 class MedicalRecordPrintService
 {
-    /** Campos técnicos que não vão para o papel. */
-    private const HIDDEN_KEYS = [
-        'teleconsultation_session_id', 'appointment_id', 'recorded_during_telehealth', 'source',
-        'type', 'recorded_by', 'revised_by', 'scheduled_at', 'concluded_at',
-    ];
-
-    private const LABELS = [
-        'text' => 'Anotação',
-        'notes' => 'Anotações',
-        'evolution_summary' => 'Resumo da evolução',
-        'goals' => 'Metas',
-        'category' => 'Categoria',
-        'conduct' => 'Conduta',
-        'complaint' => 'Queixa',
-        'diagnosis' => 'Diagnóstico nutricional',
-        'plan' => 'Plano',
-        'observations' => 'Observações',
-    ];
+    // v54.27: o conteúdo de cada registro é lido por ClinicalRecordContent (mesma regra da tela).
 
     private PDO $db;
 
@@ -90,14 +73,15 @@ class MedicalRecordPrintService
             if (($fromDate && $localDate < $fromDate) || ($toDate && $localDate > $toDate)) {
                 continue;
             }
-            $content = is_array($row['content']) ? $row['content'] : [];
+            // v54.27: mesma leitura da tela (ClinicalRecordContent); JSON inválido sai como texto simples.
+            $content = is_array($row['content'] ?? null) ? $row['content'] : ($row['content_unparsed'] ?? null);
             $entries[] = [
                 'version' => (int)$row['version'],
                 'title' => (string)$row['title'],
                 'created_at_local' => $this->localDateTime((string)$row['created_at']),
                 'author' => (string)$row['professional_name'],
-                'fields' => $this->flatten($content),
-                'via_teleconsultation' => !empty($content['recorded_during_telehealth']),
+                'fields' => ClinicalRecordContent::printFields($content),
+                'via_teleconsultation' => ClinicalRecordContent::present($content)['via_teleconsultation'],
                 'is_revision' => !empty($row['supersedes_id']),
                 'revision_reason' => $row['revision_reason'] ?? null,
                 'superseded_by_version' => $isSuperseded ? (int)$supersededBy[(int)$row['id']]['version'] : null,
@@ -162,27 +146,6 @@ class MedicalRecordPrintService
             throw new InvalidArgumentException('A data inicial é posterior à data final.');
         }
         return [$f, $t];
-    }
-
-    /** Conteúdo do registro em pares rótulo/valor, sem campos técnicos. */
-    private function flatten(array $content, string $prefix = ''): array
-    {
-        $out = [];
-        foreach ($content as $key => $value) {
-            if (in_array((string)$key, self::HIDDEN_KEYS, true) || $value === null || $value === '' || $value === []) {
-                continue;
-            }
-            $label = self::LABELS[$key] ?? ucfirst(str_replace('_', ' ', (string)$key));
-            $label = $prefix !== '' ? $prefix . ' › ' . $label : $label;
-            if (is_array($value)) {
-                $out = array_merge($out, $this->flatten($value, $label));
-            } elseif (is_bool($value)) {
-                $out[] = ['label' => $label, 'value' => $value ? 'Sim' : 'Não'];
-            } else {
-                $out[] = ['label' => $label, 'value' => (string)$value];
-            }
-        }
-        return $out;
     }
 
     private function anthropometry(int $patientId, int $clinicId, ?string $from, ?string $to): array

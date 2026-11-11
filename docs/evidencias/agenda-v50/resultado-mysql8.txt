@@ -1,0 +1,43 @@
+PASS: migration is repeatable
+PASS: clinic holiday closes public availability
+PASS: clinic holiday blocks internal scheduling
+PASS: partial closure subtracts exact interval
+PASS: special opening replaces weekly hours
+PASS: internal scheduling uses special opening
+PASS: buffers reserve preparation and cleanup for both appointments
+PASS: preparation buffer must fit in workday
+PASS: internal conflict detection includes buffers
+PASS: internal schedule respects active public holds
+PASS: hold conversion revalidates newly added holiday
+PASS: invalid calendar dates rejected
+PASS: buffer limits enforced server-side
+PASS: calendar isolation between clinics
+PASS: cross-clinic calendar deletion rejected
+PASS: waitlist join is idempotent per active request
+PASS: worker creates only one offer for one slot
+PASS: FIFO is respected among matching requests
+PASS: repeated worker does not duplicate active offer
+PASS: patient cannot read another patient offer token
+PASS: offer is visible only to recipient
+PASS: anonymous route cannot accept private offer
+PASS: another patient cannot accept private offer
+PASS: acceptance creates canonical appointment and fulfills request
+PASS: accepted offer notification is stale
+PASS: patient can withdraw waiting request
+PASS: expired offer releases request and capacity
+PASS: offer TTL is enforced in hold
+PASS: withdrawal releases an offered hold
+PASS: active offer passes pre-dispatch revalidation
+PASS: new closure suppresses obsolete offer notification
+PASS: disabling waitlist releases pending offers
+PASS: paused request retains its original queue position
+PASS: waitlist is opt-in
+PASS: two MySQL workers create exactly one offer for one slot
+PASS: FIFO survives concurrent MySQL workers
+PASS: concurrent acceptance creates one canonical appointment
+PASS: concurrent acceptance queues one confirmation event
+[ClyoNutri][waitlist] PDOException
+PASS: notification failure rolls back offer and hold atomically
+PASS: failed offer retains original waiting request
+PASS: worker retries a failed offer without duplicate holds
+All calendar and waitlist integration checks passed.

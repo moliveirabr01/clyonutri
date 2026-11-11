@@ -1,0 +1,88 @@
+/* Pedido de exames laboratoriais (NI2-529, v45) — classes do módulo sobre o Botanical Design System. */
+.ex-page{max-width:960px;margin:0 auto}
+.ex-back{display:inline-block;margin-bottom:16px;color:var(--botanical-copper-600);font-weight:600;font-size:.9rem;text-decoration:none}
+.ex-back:hover{text-decoration:underline}
+.ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.ex-title{font-family:var(--font-editorial,Georgia,serif);font-size:1.7rem;color:var(--botanical-forest-900);margin:0 0 4px}
+.ex-sub{color:var(--neutral-gray-600);font-size:.95rem;margin:0}
+.ex-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ex-actions form{margin:0}
+.ex-msg{border-radius:8px;padding:12px 16px;margin-bottom:16px;border:1px solid;font-size:.92rem}
+.ex-msg-success{background:var(--semantic-success-light);border-color:var(--botanical-sage-300);color:var(--botanical-forest-900)}
+.ex-msg-error{background:var(--semantic-error-light);border-color:var(--semantic-error);color:var(--semantic-error)}
+.ex-msg-warning{background:var(--botanical-copper-100);border-color:var(--botanical-copper-400);color:var(--botanical-copper-700)}
+.ex-msg a{color:inherit;font-weight:700}
+.ex-card{padding:22px;margin-bottom:18px}
+.ex-card h2{font-size:1.05rem;color:var(--botanical-forest-900);margin:0 0 12px}
+.ex-muted{color:var(--neutral-gray-500);font-size:.85rem}
+.ex-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;word-break:break-all}
+.ex-empty{padding:40px 24px;text-align:center;background:var(--botanical-cream-50);border:1px dashed var(--botanical-sage-300)}
+.ex-search{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px}
+@media (max-width:640px){.ex-search{grid-template-columns:1fr}}
+.ex-catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:10px;max-height:460px;overflow-y:auto;padding:4px}
+.ex-item{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--neutral-gray-200);border-radius:8px;padding:10px 12px;background:#fff;cursor:pointer}
+.ex-item:hover{border-color:var(--botanical-sage-300)}
+.ex-item.is-checked{border-color:var(--botanical-green-600);background:var(--botanical-sage-100)}
+.ex-item[hidden]{display:none}
+.ex-item input{margin-top:3px}
+.ex-item-name{font-weight:600;color:var(--botanical-forest-900);font-size:.92rem}
+.ex-item-meta{font-size:.78rem;color:var(--neutral-gray-500)}
+.ex-item-syn{font-size:.78rem;color:var(--botanical-copper-700)}
+.ex-count{font-size:.85rem;color:var(--neutral-gray-600);margin:8px 0 0}
+.ex-none{display:none;padding:12px;color:var(--neutral-gray-500)}
+.ex-none.is-visible{display:block}
+.ex-check{display:flex;gap:10px;align-items:flex-start;font-size:.9rem;line-height:1.45}
+.ex-check input{margin-top:4px}
+.ex-disclaimer{background:var(--botanical-cream-50);border:1px solid var(--botanical-copper-400);border-radius:8px;padding:14px 16px}
+.ex-steps{display:flex;gap:8px;flex-wrap:wrap;list-style:none;padding:0;margin:0 0 16px}
+.ex-step{font-size:.8rem;padding:4px 10px;border-radius:999px;border:1px solid var(--neutral-gray-300);color:var(--neutral-gray-500)}
+.ex-step.is-current{border-color:var(--botanical-green-600);background:var(--botanical-sage-100);color:var(--botanical-forest-900);font-weight:700}
+.ex-step.is-done{border-color:var(--botanical-sage-300);color:var(--botanical-forest-800)}
+.ex-preview{background:#fff;border:1px solid var(--neutral-gray-200);border-radius:10px;padding:28px}
+.ex-dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;font-size:.88rem;margin:0}
+.ex-dl dt{color:var(--neutral-gray-500)}
+.ex-dl dd{margin:0}
+.ex-table td,.ex-table th{vertical-align:middle}
+.ex-modal-actions{display:flex;justify-content:flex-end;gap:10px}
+/* v47 (NI2-532, NI2-533, NI2-537): favoritos, ordem dos exames, catálogo, versões e linha do tempo. */
+.ex-star{color:var(--botanical-copper-600)}
+.ex-fav-btn{min-width:44px;font-size:.82rem;line-height:1.2;white-space:nowrap}
+.ex-fav-btn[aria-pressed=true]{border-color:var(--botanical-copper-400);color:var(--botanical-copper-700);background:var(--botanical-cream-50)}
+.ex-order{list-style:decimal;margin:0;padding-left:22px}
+.ex-order li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--neutral-gray-200)}
+.ex-order-name{font-size:.92rem;color:var(--botanical-forest-900)}
+.ex-order-btns{display:flex;gap:6px}
+.ex-order-btns .btn{padding:4px 10px;font-size:.8rem;min-height:32px}
+.ex-h3{font-size:.98rem;color:var(--botanical-forest-900);margin:20px 0 10px}
+.ex-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.ex-span2{grid-column:1 / -1}
+@media (max-width:640px){.ex-form-grid{grid-template-columns:1fr}}
+.ex-validate{display:grid;gap:6px;justify-items:end;min-width:220px}
+.ex-validate .form-control{width:100%}
+.ex-version{font-size:.85rem;color:var(--neutral-gray-600);margin:6px 0 0}
+.ex-timeline{list-style:none;margin:0;padding:0}
+.ex-timeline li{border-left:3px solid var(--botanical-sage-300);padding:8px 0 10px 14px;margin-left:4px}
+.ex-timeline li.is-cancelled{border-left-color:var(--neutral-gray-300);opacity:.85}
+.ex-timeline-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.9rem}
+.ex-timeline-exams{font-size:.85rem;color:var(--neutral-gray-600);margin:4px 0 0}
+/* v48 (NI2-539): laudos e resultados. */
+.ex-coverage{margin-bottom:14px}
+.ex-docs{list-style:none;margin:0 0 14px;padding:0}
+.ex-doc{border:1px solid var(--neutral-gray-200);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#fff}
+.ex-doc.is-superseded{background:var(--botanical-cream-50);opacity:.9}
+.ex-doc-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ex-doc-head .btn{margin-left:auto}
+.ex-doc-meta{font-size:.82rem;color:var(--neutral-gray-600);margin:4px 0 0}
+.ex-details{margin-top:10px;border-top:1px dashed var(--neutral-gray-200);padding-top:8px}
+.ex-details summary{cursor:pointer;font-weight:600;color:var(--botanical-forest-900);font-size:.9rem;padding:4px 0}
+.ex-details[open] summary{margin-bottom:8px}
+.ex-fieldset{border:0;padding:0;margin:0 0 10px;display:grid;gap:4px}
+
+/* v54.25 NI2-220: card da linha do tempo de exames sem estilo inline (prontuário e sala de consulta). */
+.ex-timeline-card { margin-bottom: var(--space-6); }
+.ex-timeline-card__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.ex-timeline-card__head h3, .ex-flush { margin: 0; }
+
+/* NI2-630: catalog choices reflow at 320 CSS px without an internal horizontal scroll. */
+.ex-item > span{min-width:0;overflow-wrap:anywhere}
+.ex-item input{flex-shrink:0}

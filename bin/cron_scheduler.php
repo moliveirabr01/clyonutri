@@ -54,8 +54,11 @@ class HostGatorCronScheduler
             return ['heartbeat' => 'SKIPPED', 'status' => 'ALREADY_RUNNING', 'duration_seconds' => 0, 'timestamp' => date('c')];
         }
         $this->recordHeartbeat();
+        $this->sweepStaffNotifications(); // v34: antes da fila, para o e-mail de aviso da equipe sair no mesmo ciclo
         $this->drainDatabaseQueue();
+        $this->processBookingWaitlist();
         $this->purgeNotifications();
+        $this->purgeStaffNotifications();
         $this->pruneExpiredTokens();
         $this->pruneLoginAttempts();
         $this->pruneOldLogs();
@@ -105,6 +108,13 @@ class HostGatorCronScheduler
         }
     }
 
+    /** Notification dispatch runs first; waitlist exploration has its own bounded cycle. */
+    private function processBookingWaitlist(): void
+    {
+        try{$this->executionLog['waitlist']=(new \ClyoNutri\Domain\Booking\BookingWaitlistService(Connection::getInstance()))->process(20,25,100,3.0);}
+        catch(\Throwable $e){$this->executionLog['waitlist']=['status'=>'WARNING','error'=>get_class($e)];}
+    }
+
     /** NI2-95: retenção dos avisos (lidos há mais de 180 dias, aparelhos desativados, recibos antigos). Uma vez por dia. */
     private function purgeNotifications(): void
     {
@@ -118,6 +128,36 @@ class HostGatorCronScheduler
             @file_put_contents($marker, (string)time());
         } catch (\Throwable $e) {
             $this->executionLog['notifications_retention'] = 'error: ' . get_class($e);
+        }
+    }
+
+    /**
+     * v34: avisos da equipe (backoffice). Recupera cadastros/chamados cujo aviso se perdeu e cria os avisos de
+     * teste vencendo/vencido. No máximo a cada 10 minutos (mesma marca usada pela tela do console). Não precisa de cron novo.
+     */
+    private function sweepStaffNotifications(): void
+    {
+        try {
+            $ran = \ClyoNutri\Domain\Notification\StaffNotificationService::sweepIfDue(Connection::getInstance(), 'superadmin', $this->storageDir . '/staff_notifications_last_sweep');
+            $this->executionLog['staff_notifications_sweep'] = $ran ? 'ran' : 'not_due';
+        } catch (\Throwable $e) {
+            $this->executionLog['staff_notifications_sweep'] = 'error: ' . get_class($e);
+        }
+    }
+
+    /** v34: retenção dos avisos da equipe (lidos há mais de 90 dias). Uma vez por dia. Nunca toca em audit_logs. */
+    private function purgeStaffNotifications(): void
+    {
+        $marker = $this->storageDir . '/staff_notifications_retention_last_run';
+        if (is_file($marker) && time() - (int)@file_get_contents($marker) < 86400) {
+            $this->executionLog['staff_notifications_retention'] = 'already_ran_today';
+            return;
+        }
+        try {
+            $this->executionLog['staff_notifications_retention'] = (new \ClyoNutri\Domain\Notification\StaffNotificationService(Connection::getInstance()))->purge();
+            @file_put_contents($marker, (string)time());
+        } catch (\Throwable $e) {
+            $this->executionLog['staff_notifications_retention'] = 'error: ' . get_class($e);
         }
     }
 
@@ -233,6 +273,8 @@ if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIP
     echo " Login     : " . ($report['login_attempts_pruned'] ?? '-') . " registro(s) antigo(s) de tentativa removido(s)\n";
     $ap = $report['analytics_purge'] ?? '-';
     echo " Métricas  : " . (is_array($ap) ? "analytics_purge pseudônimos {$ap['subjects']}, sais {$ap['salts']}, agregados antigos {$ap['aggregates']}" : "analytics_purge {$ap}") . "\n";
+    $sr = $report['staff_notifications_retention'] ?? '-';
+    echo " Equipe    : varredura " . ($report['staff_notifications_sweep'] ?? '-') . ", retenção " . (is_array($sr) ? "{$sr['events']} aviso(s) lido(s) antigo(s) removido(s)" : $sr) . "\n";
     echo " Duração   : " . $report['duration_seconds'] . "s\n";
     echo " Status    : ✓ Concluído dentro da janela de compliance da HostGator.\n";
     echo "========================================================================\n";

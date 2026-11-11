@@ -1,0 +1,11 @@
+Nome;E-mail;Celular;Data de nascimento;Gênero;Observações
+TESTE Paciente Planilha 01;teste.planilha01@avaliacao.clyonutri.local;(11) 99101-0001;14/03/1988;Feminino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 02;teste.planilha02@avaliacao.clyonutri.local;(11) 99101-0002;22/07/1991;Masculino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 03;teste.planilha03@avaliacao.clyonutri.local;(21) 99101-0003;05/11/1979;Feminino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 04;teste.planilha04@avaliacao.clyonutri.local;(31) 99101-0004;19/01/1996;Masculino;Paciente fictício de avaliação NI2-523
+;erro.sem.nome@avaliacao.clyonutri.local;(11) 99101-0005;10/05/1990;Feminino;ERRO PROPOSITAL: linha sem nome (NI2-523 C10)
+TESTE Paciente Planilha 05;teste.planilha05@avaliacao.clyonutri.local;(41) 99101-0006;30/08/1984;Feminino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 06;teste.planilha06@avaliacao.clyonutri.local;(51) 99101-0007;12/12/1993;Masculino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 07;teste.planilha07@avaliacao.clyonutri.local;(61) 99101-0008;03/04/1982;Feminino;Paciente fictício de avaliação NI2-523
+TESTE Paciente Planilha 08;teste.planilha08@avaliacao.clyonutri.local;(71) 99101-0009;25/09/1999;Outro;Paciente fictício de avaliação NI2-523
+TESTE Paciente Data Inválida;erro.data@avaliacao.clyonutri.local;(81) 99101-0010;31/02/1990;Masculino;ERRO PROPOSITAL: data de nascimento inexistente (NI2-523 C10)

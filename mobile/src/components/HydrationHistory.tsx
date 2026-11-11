@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError, ApiService, HydrationEntry, HydrationHistory as History, HydrationHistoryDay, HydrationResult } from '../services/api';
-import { tokens as t } from '../theme/tokens';
+import { patientTokens as t } from '../theme/patient';
 
 const TZ = 'America/Sao_Paulo';
 const fmtDay = (d: string) => {

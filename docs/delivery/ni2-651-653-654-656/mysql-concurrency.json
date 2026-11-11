@@ -1,0 +1,10 @@
+{
+    "build": "v54.17",
+    "driver": "mysql",
+    "parallel_workers": 2,
+    "results": [
+        "conflict",
+        "saved"
+    ],
+    "pass": true
+}

@@ -6,7 +6,7 @@ import PatientOnboardingScreen from './src/screens/PatientOnboardingScreen';
 import PatientHomeScreen from './src/screens/PatientHomeScreen';
 import ProfessionalHomeScreen from './src/screens/ProfessionalHomeScreen';
 import { ApiService, PatientAuthData, ProfessionalAuthData, setApiBaseUrl, setSessionExpiredHandler } from './src/services/api';
-import { tokens as t } from './src/theme/tokens';
+import { patientTokens as t } from './src/theme/patient';
 
 export default function App() {
   const [onboarding, setOnboarding] = useState(false);
@@ -229,9 +229,9 @@ export default function App() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: t.background },
   loginContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20, paddingVertical: 32 },
-  card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E4E7EC', shadowColor: t.navy, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
-  brandPanel: { backgroundColor: t.navy, padding: 28, borderTopWidth: 4, borderTopColor: '#E67E3A', alignItems: 'center', gap: 10 },
-  brandCaption: { color: '#D7E1E9', fontSize: 14, lineHeight: 20 },
+  card: { width: '100%', maxWidth: 460, backgroundColor: t.white, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: t.divider, shadowColor: t.navy, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 4 },
+  brandPanel: { backgroundColor: t.forest, padding: 28, borderTopWidth: 4, borderTopColor: t.mint, alignItems: 'center', gap: 10 },
+  brandCaption: { color: t.onForestMuted, fontSize: 14, lineHeight: 20 },
   formBody: { padding: 24, gap: t.space },
   pageFooter: { color: t.muted, fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
   title: { color: t.navy, fontSize: 23, fontWeight: '700', lineHeight: 30 },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   roleTabText: { color: t.muted, fontSize: 14, fontWeight: '600' },
   roleTabTextActive: { color: t.white, fontWeight: '700' },
   label: { color: t.navy, fontSize: 14, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: t.border, borderRadius: t.inputRadius, padding: 12, fontSize: 16, color: t.ink, minHeight: 48 },
+  input: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.inputRadius, padding: 12, fontSize: 16, color: t.ink, minHeight: 48 },
   message: { color: t.error, backgroundColor: '#FEF3F2', borderLeftWidth: 3, borderLeftColor: t.error, padding: 12, borderRadius: 6, fontSize: 14, lineHeight: 22 },
   button: { backgroundColor: t.copper, padding: 14, borderRadius: t.buttonRadius, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   buttonText: { color: t.white, fontSize: 16, fontWeight: '600' },

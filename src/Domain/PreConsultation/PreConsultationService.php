@@ -64,7 +64,7 @@ class PreConsultationService
         $ins->execute([
             'c' => $clinicId, 'p' => $patientId, 'pr' => $professionalId, 'a' => $appointmentId,
             'o' => self::json($objectives), 's' => self::json($suggestion), 'i' => $ignoreSuggestion ? 1 : 0,
-            'q' => self::json($this->snapshot($questions)), 'v' => QuestionBank::BANK_VERSION, 'u' => $userId,
+            'q' => self::json(array_merge($this->snapshot($questions), (new \ClyoNutri\Domain\ClinicalProtocol\AdaptivePreConsultation($this->db))->questions($clinicId, $patientId))), 'v' => QuestionBank::BANK_VERSION, 'u' => $userId,
         ]);
         $id = (int)$this->db->lastInsertId();
         $this->audit('PRECONSULTATION_CREATED', $id, ['patient_id' => $patientId, 'objectives' => $objectives,
@@ -98,7 +98,7 @@ class PreConsultationService
         $suggestedIds = array_column(json_decode((string)$row['suggestion_json'], true) ?: [], 'id');
         $this->db->prepare("UPDATE preconsultation_questionnaires SET questions_json = :q, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id AND clinic_id = :c AND status = 'draft'")
-            ->execute(['q' => self::json($this->snapshot(array_values($selected))), 'id' => $id, 'c' => TenantContext::getClinicId()]);
+            ->execute(['q' => self::json(array_merge($this->snapshot(array_values($selected)), array_values(array_filter(json_decode($row['questions_json'], true) ?: [], static fn($q) => !empty($q['adaptive']))))), 'id' => $id, 'c' => TenantContext::getClinicId()]);
         $ids = array_keys($selected);
         $this->audit('PRECONSULTATION_EDITED', $id, [
             'question_ids' => $ids,
@@ -119,6 +119,8 @@ class PreConsultationService
         if (!in_array($row['status'], ['draft', 'sent', 'in_progress'], true)) {
             throw new PreConsultationException('Este questionário não pode mais ser enviado.');
         }
+        $adaptive = array_filter(json_decode($row['questions_json'], true) ?: [], static fn($q) => !empty($q['adaptive']));
+        if ($adaptive && (!$this->needsBirthDate($row) || $this->activeTerm() === null)) throw new PreConsultationException('Antes de enviar, cadastre a data de nascimento do paciente e um termo de privacidade ativo.');
         $ttl = max(1, min(self::MAX_TTL_DAYS, $ttlDays ?? self::DEFAULT_TTL_DAYS));
         $expires = time() + $ttl * 86400;
         if (!empty($row['appointment_id'])) {
@@ -132,7 +134,7 @@ class PreConsultationService
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $status = $row['status'] === 'draft' ? 'sent' : $row['status'];
         $this->db->prepare("UPDATE preconsultation_questionnaires
-            SET token_hash = :h, token_generation = token_generation + 1, token_expires_at = :e, status = :s,
+            SET token_hash = :h, access_hash = NULL, token_generation = token_generation + 1, token_expires_at = :e, status = :s,
                 sent_at = COALESCE(sent_at, :now), failed_attempts = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id AND clinic_id = :c")
             ->execute(['h' => hash('sha256', $token), 'e' => date('Y-m-d H:i:s', $expires), 's' => $status,
@@ -147,7 +149,7 @@ class PreConsultationService
         if (in_array($row['status'], ['submitted', 'reviewed'], true)) {
             throw new PreConsultationException('Questionário já respondido: não há link para revogar.');
         }
-        $this->db->prepare("UPDATE preconsultation_questionnaires SET status = 'revoked', token_hash = NULL, revoked_at = :now, updated_at = CURRENT_TIMESTAMP
+        $this->db->prepare("UPDATE preconsultation_questionnaires SET status = 'revoked', token_hash = NULL, access_hash = NULL, revoked_at = :now, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id AND clinic_id = :c")->execute(['now' => date('Y-m-d H:i:s'), 'id' => $id, 'c' => TenantContext::getClinicId()]);
         $this->audit('PRECONSULTATION_REVOKED', $id, []);
     }
@@ -265,7 +267,15 @@ class PreConsultationService
         }
         $row = $this->rowByTokenHash(hash('sha256', $token));
         $this->assertLinkUsable($row, allowAnswered: true);
-        if ($row['opened_at'] === null) {
+        if (array_filter(json_decode($row['questions_json'], true) ?: [], static fn($q) => !empty($q['adaptive']))) {
+            $access = hash('sha256', random_bytes(32));
+            $st = $this->db->prepare("UPDATE preconsultation_questionnaires SET access_hash = ?, opened_at = ? WHERE id = ? AND access_hash IS NULL AND token_hash = ?");
+            $st->execute([$access, date('Y-m-d H:i:s'), $row['id'], $row['token_hash']]);
+            if ($st->rowCount() !== 1) throw new PreConsultationException('Este convite já foi utilizado. Continue no dispositivo em que abriu ou peça um novo convite.', 410);
+            $row['session_hash'] = $access;
+            $this->auditPatient($row, 'PRECONSULTATION_OPENED', []);
+        }
+        if ($row['opened_at'] === null && empty($row['session_hash'])) {
             $this->db->prepare('UPDATE preconsultation_questionnaires SET opened_at = :now WHERE id = :id')->execute(['now' => date('Y-m-d H:i:s'), 'id' => (int)$row['id']]);
             $this->auditPatient($row, 'PRECONSULTATION_OPENED', []);
         }
@@ -275,8 +285,10 @@ class PreConsultationService
     /** Linha do questionário para a sessão do paciente: confere token vigente e validade a cada acesso. */
     public function forPatient(int $id, string $tokenHash, bool $allowAnswered = true): array
     {
-        $row = $this->rowByTokenHash($tokenHash);
-        if ((int)$row['id'] !== $id) {
+        $st = $this->db->prepare('SELECT * FROM preconsultation_questionnaires WHERE id = ? AND (access_hash = ? OR (access_hash IS NULL AND token_hash = ?))');
+        $st->execute([$id, $tokenHash, $tokenHash]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row || (int)$row['id'] !== $id) {
             throw new PreConsultationException('Link inválido ou expirado. Peça um novo link à clínica.', 404);
         }
         $this->assertLinkUsable($row, $allowAnswered);
@@ -321,15 +333,29 @@ class PreConsultationService
     /**
      * Rascunho: aceita respostas parciais (valida tipo e opções; obrigatoriedade só no envio).
      */
-    public function saveDraft(array $row, array $rawAnswers): array
+    public function saveDraft(array $row, array $rawAnswers, bool $consent = false, ?int $baseRevision = null): array
     {
+        $row = $this->freshWritableRow($row);
         $this->assertLinkUsable($row, false);
-        [$answers] = $this->validateAnswers($row, $rawAnswers, final: false);
-        $this->persistAnswers($row, $answers, 'draft');
-        $this->db->prepare("UPDATE preconsultation_questionnaires SET answers_json = :a, draft_saved_at = :now, status = 'in_progress', updated_at = CURRENT_TIMESTAMP
-            WHERE id = :id AND status IN ('sent', 'in_progress')")
-            ->execute(['a' => self::json($answers), 'now' => date('Y-m-d H:i:s'), 'id' => (int)$row['id']]);
-        $this->auditPatient($row, 'PRECONSULTATION_DRAFT_SAVED', ['answered' => count($answers)]);
+        if ($baseRevision !== null && $baseRevision !== (int)$row['answer_revision']) throw new PreConsultationException('Há respostas mais recentes. Suas alterações não foram gravadas; compare antes de salvar novamente.', 409);
+        if (array_filter(json_decode($row['questions_json'], true) ?: [], static fn($q) => !empty($q['adaptive'])) && (!$consent || $this->activeTerm() === null)) throw new PreConsultationException('Confirme o aceite de privacidade antes de salvar.');
+        [$answers, $errors] = $this->validateAnswers($row, $rawAnswers, final: false);
+        if ($errors) throw new PreConsultationException('Corrija as respostas antes de salvar: ' . implode(' ', array_unique($errors)) . ' O formulário mantém o que você digitou.');
+        $own = !$this->db->inTransaction();
+        if ($own) $this->db->beginTransaction();
+        try {
+            $up = $this->db->prepare("UPDATE preconsultation_questionnaires SET answers_json = :a, answer_revision = answer_revision + 1, draft_saved_at = :now, status = 'in_progress', updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id AND clinic_id = :c AND patient_id = :p AND status IN ('sent', 'in_progress') AND token_generation = :g AND answer_revision = :revision");
+            $up->execute(['a' => self::json($answers), 'now' => date('Y-m-d H:i:s'), 'id' => (int)$row['id'], 'c' => $row['clinic_id'], 'p' => $row['patient_id'], 'g' => $row['token_generation'], 'revision' => $row['answer_revision']]);
+            if ($up->rowCount() !== 1) throw new PreConsultationException('Outra edição foi salva. Confira as respostas antes de tentar novamente.', 409);
+            $this->freshWritableRow($row);
+            $this->persistAnswers($row, $answers, 'draft');
+            $this->auditPatient($row, 'PRECONSULTATION_DRAFT_SAVED', ['answered' => count($answers), 'privacy_accepted' => $consent, 'term_version' => $this->activeTerm()['version'] ?? null]);
+            if ($own) $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($own && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
         return $answers;
     }
 
@@ -338,17 +364,21 @@ class PreConsultationService
      *
      * @return array{answers: array, errors: array<string, string>}
      */
-    public function submit(array $row, array $rawAnswers, bool $consent, ?string $ip, ?string $userAgent): array
+    public function submit(array $row, array $rawAnswers, bool $consent, ?string $ip, ?string $userAgent, ?int $baseRevision = null): array
     {
+        $row = $this->freshWritableRow($row);
         $this->assertLinkUsable($row, false);
+        if ($baseRevision !== null && $baseRevision !== (int)$row['answer_revision']) throw new PreConsultationException('Há respostas mais recentes. Suas alterações não foram gravadas; compare antes de salvar novamente.', 409);
         [$answers, $errors] = $this->validateAnswers($row, $rawAnswers, final: true);
         $term = $this->activeTerm();
+        $adaptive = array_filter(json_decode($row['questions_json'], true) ?: [], static fn($q) => !empty($q['adaptive']));
+        if ($adaptive && $term === null) throw new PreConsultationException('Termo de privacidade indisponível. Fale com a clínica.');
         if ($term !== null && !$consent) {
             $errors['_consent'] = 'Para enviar, confirme que leu e aceita o uso das respostas no seu atendimento.';
         }
         if ($errors !== []) {
             // Guarda o que foi preenchido, para o paciente não perder nada.
-            $this->saveDraft($row, $rawAnswers);
+            $this->saveDraft($row, $rawAnswers, $consent, $baseRevision);
             return ['answers' => $answers, 'errors' => $errors];
         }
 
@@ -357,6 +387,8 @@ class PreConsultationService
             $this->db->beginTransaction();
         }
         try {
+            $row = $this->freshWritableRow($row);
+            if ($baseRevision !== null && $baseRevision !== (int)$row['answer_revision']) throw new PreConsultationException('Outra edição foi salva. Confira as respostas.', 409);
             $consentId = null;
             if ($term !== null) {
                 $this->db->prepare("INSERT INTO patient_consents (clinic_id, patient_id, consent_type, granted, ip_address, granted_at, term_id, source_channel, user_agent)
@@ -365,7 +397,7 @@ class PreConsultationService
                         't' => (int)$term['id'], 'ua' => $userAgent !== null ? mb_substr($userAgent, 0, 255) : null]);
                 $consentId = (int)$this->db->lastInsertId();
             }
-            $up = $this->db->prepare("UPDATE preconsultation_questionnaires SET answers_json = :a, submitted_at = :now, status = 'submitted',
+            $up = $this->db->prepare("UPDATE preconsultation_questionnaires SET answers_json = :a, answer_revision = answer_revision + 1, submitted_at = :now, status = 'submitted',
                 consent_id = :cid, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id AND status IN ('sent', 'in_progress')");
             $up->execute(['a' => self::json($answers), 'now' => date('Y-m-d H:i:s'), 'cid' => $consentId, 'id' => (int)$row['id']]);
@@ -410,14 +442,7 @@ class PreConsultationService
     public static function isVisible(array $q, array $answers): bool
     {
         $cond = $q['condition'] ?? null;
-        if (!$cond) {
-            return true;
-        }
-        $v = $answers[$cond['question']] ?? null;
-        if (isset($cond['equals'])) {
-            return $v === $cond['equals'];
-        }
-        return is_array($v) && in_array($cond['includes'], $v, true);
+        return !$cond || \ClyoNutri\Domain\ClinicalProtocol\Conditions::holds($cond, static fn($key) => $answers[$key] ?? null);
     }
 
     /**
@@ -471,6 +496,10 @@ class PreConsultationService
                     return [null, "Use no máximo {$max} caracteres."];
                 }
                 return [$v === '' ? null : $v, null];
+            case 'date':
+                if (!is_string($value) || self::parseDate($value) !== $value) return [null, 'Data inválida.'];
+                return [$value, null];
+            case 'scale':
             case 'number':
                 $s = is_string($value) ? str_replace(',', '.', trim($value)) : $value;
                 if (!is_numeric($s) || !is_finite((float)$s)) {
@@ -538,6 +567,16 @@ class PreConsultationService
             throw new PreConsultationException('Pré-consulta não encontrada.', 404);
         }
         return $row;
+    }
+
+    private function freshWritableRow(array $row): array
+    {
+        $st = $this->db->prepare('SELECT * FROM preconsultation_questionnaires WHERE id = ? AND clinic_id = ? AND patient_id = ?' . ($this->db->inTransaction() && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : ''));
+        $st->execute([$row['id'], $row['clinic_id'], $row['patient_id']]);
+        $fresh = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$fresh || !hash_equals((string)$fresh['token_hash'], (string)$row['token_hash']) || !hash_equals((string)($fresh['access_hash'] ?? ''), (string)($row['access_hash'] ?? ''))) throw new PreConsultationException('Convite alterado. Abra o convite vigente.', 410);
+        $this->assertLinkUsable($fresh, false);
+        return $fresh;
     }
 
     private function rowByTokenHash(string $hash): array
@@ -631,7 +670,7 @@ class PreConsultationService
         $row['answers'] = json_decode((string)($row['answers_json'] ?? ''), true) ?: [];
         $row['is_expired'] = !empty($row['token_expires_at']) && strtotime((string)$row['token_expires_at']) < time()
             && in_array($row['status'], ['sent', 'in_progress'], true);
-        unset($row['token_hash']);
+        unset($row['token_hash'], $row['access_hash'], $row['session_hash']);
         return $row;
     }
 
