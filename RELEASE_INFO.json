@@ -1,69 +1,56 @@
 {
     "product": "Clyo Nutri",
     "title": "ClyoNutri II",
-    "version": "v54.60",
-    "ui_version": "v54.60",
+    "version": "v54.61",
+    "ui_version": "v54.61",
     "status": "CANDIDATE_LOCAL_VALIDATION",
-    "prepared_date": "2026-11-12",
+    "prepared_date": "2026-11-13",
     "production_deployed": false,
     "jira_updated": false,
-    "issue": "NI2-820 (Transcrição em tempo real — modos ao vivo e discreto) & NI2-815 (reintegração e validação UX)",
-    "base_codebase": "/Users/moliveira/Nutri_II (branch feat/v54-59-ni2-815)",
-    "base_version": "v54.59 + NI2-820",
+    "issue": "NI2-830 (SEC-001, P0): consentimento verificável do paciente antes da transcrição em tempo real (NI2-820)",
+    "base_codebase": "/Users/moliveira/Nutri_II (branch feat/v54-61-ni2-830, a partir do snapshot do working tree v54.60)",
+    "base_version": "v54.60",
     "production_version": "v54.51",
-    "schema_changes": "Migration 000092 (consultation_ai_consents, consultation_transcription_sessions, consultation_transcription_segments, consultation_evolution_drafts), com SQL manual em database/manual/atualizacao-v54-60-ni2-820-realtime-transcription.sql. Requer também a migration 000091 caso a base de produção ainda esteja na v54.51.",
+    "schema_changes": "Migration 000093 (consultation_ai_consent_requests), com SQL manual em database/manual/atualizacao-v54-61-ni2-830-consentimento-verificavel.sql. Requer as tabelas da migration 000092 (SQL v54.60). A migration 000091 (production_events/alerts) continua pendente em produção.",
     "summary": [
-        "Implementação integral da transcrição nutricional em tempo real durante a consulta (NI2-820): consentimento afirmativo prévio (LGPD), streaming com idempotência e controle de sequência, alternância imediata entre Modo Ao Vivo e Modo Discreto, resiliência pós-refresh e pausa resiliente.",
-        "Geração de minuta de evolução estruturada nos 8 tópicos nutricionais regulamentares sem alucinações de conduta e aprovação humana explícita vinculada ao prontuário.",
-        "Isolamento multi-tenant estrito (Anti-IDOR) e trilha de auditoria sem vazamento de dados de saúde nos logs.",
-        "Reintegração de correções das versões v54.52 a v54.57 e validações E2E dos filhos de NI2-815."
+        "O profissional não registra mais o aceite: POST .../consent (grantConsent) agora responde 403 e não grava nada. Ele só PEDE o aceite e recebe um link/QR de uso único (validade 15 min, token só como hash).",
+        "O paciente abre o link no próprio aparelho (ou entra no portal com a própria senha), vê finalidade e termos versionados (hash do texto) e aceita ou recusa. Evidência mínima: versão do texto, mecanismo, data/hora, hash HMAC do IP e User-Agent truncado.",
+        "Recusa, expiração (pedido 15 min / aceite 6 h), paciente ou consulta inconsistente e revogação bloqueiam o início, a retomada e cada novo segmento (checagem também no ingestSegment). A revogação pelo paciente pausa a sessão na hora.",
+        "A tela do profissional só afirma que há aceite quando o servidor confirma com evidência.",
+        "Pendente de revisão humana/DPO: base legal, texto dos termos e prazo de retenção (fora do escopo desta entrega)."
     ],
-    "release_gate": "ver LEIA-ME-HOSTGATOR-v54-59.md e RELATORIO.md da pasta de evidências",
-    "previous_version": "v54.58-local",
+    "release_gate": "ver RELATORIO.md e LEIA-ME-HOSTGATOR-v54-61.md da pasta de evidências",
+    "previous_version": "v54.60",
     "previous_release_info": {
         "product": "Clyo Nutri",
-        "version": "v54.58-local",
-        "ui_version": "v54.58 local",
-        "base_version": "v54.51",
-        "issue": "NI2-767 — Central de Eventos de Produção no Backoffice, Hardening de Segurança (NI2-794/802) e Governança Clínica (NI2-703)",
-        "prepared_date": "2026-11-07",
-        "status": "integracao-local",
-        "jira_updated": true,
-        "production_deployed": false,
-        "schema_changes": "Migração 091: Tabelas production_events e production_alerts com índices compostos para observabilidade de alta performance.",
-        "release_gate": "ver LEIA-ME-HOSTGATOR-v54-52.md",
-        "technical_validation": {
-            "production_events_checks": 32,
-            "perf_concurrency_checks": 30,
-            "clinical_comorbidity_checks": 25,
-            "security_hardening_checks": 20,
-            "dietary_checks_per_database": 45,
-            "dietary_browser_checks": 43,
-            "cross_browser_checks": 127,
-            "runtime_files_verified": 1630,
-            "release_assertions_passed": 32
-        },
-        "documentation": [
-            "LEIA-ME-HOSTGATOR-v54-52.md",
-            "release-evidence/v54-52/"
-        ],
-        "previous_release_info": {
-            "version": "v54.51",
-            "ui_version": "v54-51",
-            "issue": "NI2-727 — Assinatura: fatura/recibo clicável (link Asaas em nova aba na tabela Faturas)",
-            "release_gate": "ver LEIA-ME-HOSTGATOR-v54-51.md"
-        },
-        "previous_version": "v54.51",
         "title": "ClyoNutri II",
-        "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk.",
-        "previous_local_release_info": {
+        "version": "v54.60",
+        "ui_version": "v54.60",
+        "status": "CANDIDATE_LOCAL_VALIDATION",
+        "prepared_date": "2026-11-12",
+        "production_deployed": false,
+        "jira_updated": false,
+        "issue": "NI2-820 (Transcrição em tempo real — modos ao vivo e discreto) & NI2-815 (reintegração e validação UX)",
+        "base_codebase": "/Users/moliveira/Nutri_II (branch feat/v54-59-ni2-815)",
+        "base_version": "v54.59 + NI2-820",
+        "production_version": "v54.51",
+        "schema_changes": "Migration 000092 (consultation_ai_consents, consultation_transcription_sessions, consultation_transcription_segments, consultation_evolution_drafts), com SQL manual em database/manual/atualizacao-v54-60-ni2-820-realtime-transcription.sql. Requer também a migration 000091 caso a base de produção ainda esteja na v54.51.",
+        "summary": [
+            "Implementação integral da transcrição nutricional em tempo real durante a consulta (NI2-820): consentimento afirmativo prévio (LGPD), streaming com idempotência e controle de sequência, alternância imediata entre Modo Ao Vivo e Modo Discreto, resiliência pós-refresh e pausa resiliente.",
+            "Geração de minuta de evolução estruturada nos 8 tópicos nutricionais regulamentares sem alucinações de conduta e aprovação humana explícita vinculada ao prontuário.",
+            "Isolamento multi-tenant estrito (Anti-IDOR) e trilha de auditoria sem vazamento de dados de saúde nos logs.",
+            "Reintegração de correções das versões v54.52 a v54.57 e validações E2E dos filhos de NI2-815."
+        ],
+        "release_gate": "ver LEIA-ME-HOSTGATOR-v54-59.md e RELATORIO.md da pasta de evidências",
+        "previous_version": "v54.58-local",
+        "previous_release_info": {
             "product": "Clyo Nutri",
-            "version": "v54.52",
-            "ui_version": "v54-52",
+            "version": "v54.58-local",
+            "ui_version": "v54.58 local",
             "base_version": "v54.51",
             "issue": "NI2-767 — Central de Eventos de Produção no Backoffice, Hardening de Segurança (NI2-794/802) e Governança Clínica (NI2-703)",
             "prepared_date": "2026-11-07",
-            "status": "candidata",
+            "status": "integracao-local",
             "jira_updated": true,
             "production_deployed": false,
             "schema_changes": "Migração 091: Tabelas production_events e production_alerts com índices compostos para observabilidade de alta performance.",
@@ -91,9 +78,46 @@
             },
             "previous_version": "v54.51",
             "title": "ClyoNutri II",
-            "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk."
-        },
-        "integration_scope": "Dashboard, menu e delta UX da v54.58 reconciliados com a codebase local. Não é cópia integral do ZIP e não herda a certificação das suítes do pacote.",
-        "integration_backup": "storage/backups/integracao-v54-58-20261111"
+            "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk.",
+            "previous_local_release_info": {
+                "product": "Clyo Nutri",
+                "version": "v54.52",
+                "ui_version": "v54-52",
+                "base_version": "v54.51",
+                "issue": "NI2-767 — Central de Eventos de Produção no Backoffice, Hardening de Segurança (NI2-794/802) e Governança Clínica (NI2-703)",
+                "prepared_date": "2026-11-07",
+                "status": "candidata",
+                "jira_updated": true,
+                "production_deployed": false,
+                "schema_changes": "Migração 091: Tabelas production_events e production_alerts com índices compostos para observabilidade de alta performance.",
+                "release_gate": "ver LEIA-ME-HOSTGATOR-v54-52.md",
+                "technical_validation": {
+                    "production_events_checks": 32,
+                    "perf_concurrency_checks": 30,
+                    "clinical_comorbidity_checks": 25,
+                    "security_hardening_checks": 20,
+                    "dietary_checks_per_database": 45,
+                    "dietary_browser_checks": 43,
+                    "cross_browser_checks": 127,
+                    "runtime_files_verified": 1630,
+                    "release_assertions_passed": 32
+                },
+                "documentation": [
+                    "LEIA-ME-HOSTGATOR-v54-52.md",
+                    "release-evidence/v54-52/"
+                ],
+                "previous_release_info": {
+                    "version": "v54.51",
+                    "ui_version": "v54-51",
+                    "issue": "NI2-727 — Assinatura: fatura/recibo clicável (link Asaas em nova aba na tabela Faturas)",
+                    "release_gate": "ver LEIA-ME-HOSTGATOR-v54-51.md"
+                },
+                "previous_version": "v54.51",
+                "title": "ClyoNutri II",
+                "notes": "Central de eventos operacional com taxonomia canônica de 9 categorias, fail-safe atômico não bloqueante, sanitização anti-PHI e segredos, timeline investigativa por correlation_id, motor de anomalias com cooldown, purga automática de retenção (90 dias) e integração nativa com Service Desk."
+            },
+            "integration_scope": "Dashboard, menu e delta UX da v54.58 reconciliados com a codebase local. Não é cópia integral do ZIP e não herda a certificação das suítes do pacote.",
+            "integration_backup": "storage/backups/integracao-v54-58-20261111"
+        }
     }
 }
