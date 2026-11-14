@@ -404,6 +404,15 @@ $router->post('/app/primeiro-acesso', [$patientAppCtrl, 'completeFirstAccess']);
 $router->post('/app/login', [$patientAppCtrl, 'login']);
 $router->post('/app/aceite-termos', [$patientAppCtrl, 'acceptTerms']); // NI2-449 (alias, como os demais /app)
 
+// NI2-830 (SEC-001): aceite do paciente para a transcrição da consulta. Públicas (sem sessão de profissional); CSRF nos POST pelo Router.
+$patientConsentCtrl = new \ClyoNutri\Application\Controllers\PatientTranscriptionConsentController($db);
+$router->get('/consentimento-transcricao/{token}', [$patientConsentCtrl, 'showLink']);
+$router->post('/consentimento-transcricao/{token}', [$patientConsentCtrl, 'decideLink']);
+$router->post('/consentimento-transcricao-revogar', [$patientConsentCtrl, 'revokeLink']);
+$router->get('/paciente/consentimento', [$patientConsentCtrl, 'portalPage']);
+$router->post('/paciente/consentimento/{id}/decidir', [$patientConsentCtrl, 'portalDecide']);
+$router->post('/paciente/consentimento/{id}/revogar', [$patientConsentCtrl, 'portalRevoke']);
+
 // Recuperação de senha do paciente (NI2-481). Públicas; CSRF nos POST é validado pelo Router.
 $patientPwResetCtrl = new \ClyoNutri\Application\Controllers\PatientPasswordResetController();
 $router->get('/paciente/recuperar-senha', [$patientPwResetCtrl, 'showRequest']);
@@ -669,6 +678,7 @@ $router->post('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationD
 // NI2-820: Transcrição Nutricional em Tempo Real na Consulta
 $transcriptionCtrl = new \ClyoNutri\Application\Controllers\RealtimeTranscriptionController($db);
 $router->post('/api/consulta/{id}/transcription/consent', $requireAuth([$transcriptionCtrl, 'grantConsent']));
+$router->post('/api/consulta/{id}/transcription/consent/request', $requireAuth([$transcriptionCtrl, 'requestConsent'])); // NI2-830: o profissional PEDE; quem aceita é o paciente
 $router->post('/api/consulta/{id}/transcription/consent/revoke', $requireAuth([$transcriptionCtrl, 'revokeConsent']));
 $router->get('/api/consulta/{id}/transcription/session', $requireAuth([$transcriptionCtrl, 'getSessionStatus']));
 $router->post('/api/consulta/{id}/transcription/start', $requireAuth([$transcriptionCtrl, 'startSession']));

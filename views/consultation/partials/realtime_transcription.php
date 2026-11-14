@@ -19,29 +19,47 @@
         </svg>
         Transcrição em Tempo Real & Assistente de Evolução
       </h3>
-      <p class="cr-card__lead u-mt-1 u-mb-0">Captura de fala com geração de minuta estruturada para o prontuário. Requer consentimento prévio e aprovação humana explícita.</p>
+      <p class="cr-card__lead u-mt-1 u-mb-0">Captura de fala com geração de minuta estruturada para o prontuário. Requer aceite prévio do paciente e aprovação humana explícita.</p>
     </div>
     <div class="u-flex u-items-center u-gap-2">
-      <span id="stt-status-badge" class="badge badge-secondary" role="status" aria-live="polite">Aguardando consentimento</span>
+      <span id="stt-status-badge" class="badge badge-secondary" role="status" aria-live="polite">Aguardando aceite do paciente</span>
     </div>
   </div>
 
-  <!-- 1. BLOCO DE CONSENTIMENTO LGPD -->
+  <!-- 1. ACEITE DO PACIENTE (NI2-830 / SEC-001): quem aceita é o paciente; o profissional só pede -->
   <div id="stt-consent-panel" class="op-message op-message--info u-mt-3" role="region" aria-labelledby="stt-consent-title">
-    <strong id="stt-consent-title">Termo de Consentimento Informado para Captação de Áudio e IA Clínica (LGPD)</strong>
+    <strong id="stt-consent-title">Aceite do paciente para a transcrição desta consulta (LGPD)</strong>
     <p class="u-text-compact u-mt-1">
-      O áudio e a transcrição deste atendimento são confidenciais e restritos ao consultório.
-      Finalidade exclusiva: apoio à elaboração da evolução nutricional.
-      Não há reutilização para treinamento de modelos de inteligência artificial de terceiros.
-      O paciente pode recusar ou revogar o consentimento a qualquer momento sem qualquer prejuízo à consulta convencional.
+      O aceite é feito pelo próprio paciente, no aparelho dele (link de uso único ou QR) ou no portal do paciente. Você não consegue aceitar por ele.
+      Sem aceite válido para esta consulta, nenhum áudio é captado. O texto que o paciente lê é a versão <strong><?= htmlspecialchars(\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::VERSION) ?></strong>.
     </p>
+    <details class="u-mt-1">
+      <summary class="u-text-compact">Ver o texto que o paciente vai ler</summary>
+      <dl class="u-text-compact">
+<?php foreach (\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::sections() as $__t => $__b): ?>
+        <dt class="u-font-bold"><?= htmlspecialchars($__t) ?></dt>
+        <dd><?= htmlspecialchars($__b) ?></dd>
+<?php endforeach; ?>
+      </dl>
+    </details>
+    <p id="stt-consent-state" class="op-message op-message--info u-mt-2 u-text-compact" role="status" aria-live="polite" data-state="none" data-testid="stt-consent-state">Aguardando aceite do paciente. Nenhum áudio é captado.</p>
     <div class="u-flex u-gap-2 u-items-center u-wrap u-mt-2">
-      <button type="button" id="btn-grant-consent" class="btn btn-secondary btn-sm" style="min-height: 44px;">
-        ✓ Registrar consentimento afirmativo do paciente
+      <button type="button" id="btn-request-consent" class="btn btn-secondary btn-sm" style="min-height: 44px;">
+        Pedir aceite ao paciente
       </button>
       <button type="button" id="btn-revoke-consent" class="btn btn-outline btn-sm u-color-danger" style="min-height: 44px;" hidden>
-        Revogar autorização
+        Registrar revogação a pedido do paciente
       </button>
+    </div>
+    <div id="stt-consent-link-box" class="u-mt-2" hidden>
+      <label for="stt-consent-link" class="u-font-bold u-text-compact">Link para o paciente abrir no próprio aparelho:</label>
+      <div class="u-flex u-gap-2 u-items-center u-wrap">
+        <input type="text" id="stt-consent-link" class="form-control" readonly style="flex: 1 1 280px; min-height: 44px;" data-testid="stt-consent-link">
+        <button type="button" id="btn-copy-consent-link" class="btn btn-outline btn-sm" style="min-height: 44px;">Copiar link</button>
+      </div>
+      <div id="stt-consent-qr" class="u-mt-2" aria-label="QR code do link de aceite"></div>
+      <p id="stt-consent-link-expiry" class="u-text-compact u-mt-1" aria-live="off"></p>
+      <p class="u-text-compact">Por segurança o link aparece só agora. Para ver de novo, gere outro (o anterior é cancelado).</p>
     </div>
   </div>
 
@@ -132,4 +150,5 @@
   </div>
 </section>
 
-<script src="/assets/js/realtime-transcription.js?v=v54-60" defer></script>
+<script src="/assets/js/qrcode.min.js?v=v54-61" defer></script>
+<script src="/assets/js/realtime-transcription.js?v=v54-61" defer></script>

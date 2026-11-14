@@ -32,6 +32,12 @@ $router->post('/recuperar-senha', [AuthController::class, 'sendResetLink'])->nam
 $router->get('/recuperar-senha/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
 $router->post('/recuperar-senha/{token}', [AuthController::class, 'resetPassword'])->name('password.update');
 $router->get('/verificar-email/{token}', [AuthController::class, 'verifyEmail'])->name('email.verify');
+$router->get('/consentimento-transcricao/{token}', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'showLink'])->name('transcription.consent.link');
+$router->post('/consentimento-transcricao/{token}', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'decideLink'])->name('transcription.consent.link.decide');
+$router->post('/consentimento-transcricao-revogar', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'revokeLink'])->name('transcription.consent.link.revoke');
+$router->get('/paciente/consentimento', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'portalPage'])->name('transcription.consent.portal');
+$router->post('/paciente/consentimento/{id}/decidir', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'portalDecide'])->name('transcription.consent.portal.decide');
+$router->post('/paciente/consentimento/{id}/revogar', [\ClyoNutri\Application\Controllers\PatientTranscriptionConsentController::class, 'portalRevoke'])->name('transcription.consent.portal.revoke');
 $router->get('/paciente/recuperar-senha', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'showRequest'])->name('patient.password.request');
 $router->post('/paciente/recuperar-senha', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'submitRequest'])->name('patient.password.email');
 $router->get('/paciente/recuperar-senha/{token}', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'showReset'])->name('patient.password.reset');
@@ -109,6 +115,7 @@ $router->post('/consulta/{id}/concluir', [DashboardController::class, 'completeC
 
 // NI2-820: Transcrição Nutricional em Tempo Real
 $router->post('/api/consulta/{id}/transcription/consent', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'grantConsent'])->name('transcription.consent');
+$router->post('/api/consulta/{id}/transcription/consent/request', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'requestConsent'])->name('transcription.consent.request');
 $router->post('/api/consulta/{id}/transcription/consent/revoke', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'revokeConsent'])->name('transcription.consent.revoke');
 $router->get('/api/consulta/{id}/transcription/session', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'getSessionStatus'])->name('transcription.session');
 $router->post('/api/consulta/{id}/transcription/start', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'startSession'])->name('transcription.start');

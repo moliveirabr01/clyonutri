@@ -42,8 +42,9 @@ class RealtimeTranscriptionController
     }
 
     /**
-     * POST /api/consulta/{id}/transcription/consent
-     * Registra consentimento do paciente para captação e IA.
+     * POST /api/consulta/{id}/transcription/consent  (DESCONTINUADO — NI2-830 / SEC-001)
+     * O profissional não concede aceite em nome do paciente. Esta rota não grava nada; só registra a tentativa na
+     * auditoria e orienta a pedir o aceite ao paciente (POST .../consent/request).
      */
     public function grantConsent(array $params): void
     {
@@ -52,15 +53,49 @@ class RealtimeTranscriptionController
         $app = $this->requireAppointment($appointmentId);
         if (!$app) return;
 
+        try {
+            (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('AI_TRANSCRIPTION_CONSENT_GRANT_DENIED', 'appointment', (string)$appointmentId, [
+                'patient_id' => (int)$app['patient_id'], 'user_id' => (int)TenantContext::getUserId(), 'reason' => 'professional_cannot_grant',
+            ]);
+        } catch (Throwable $e) {
+            error_log('AI_TRANSCRIPTION_CONSENT_GRANT_DENIED audit failed: ' . get_class($e));
+        }
+        $this->jsonResponse([
+            'error' => 'O aceite deve ser feito pelo próprio paciente. Peça o aceite ao paciente: ele recebe um link ou usa o portal e decide por conta própria.',
+            'consent_required' => true,
+            'request_endpoint' => '/api/consulta/' . $appointmentId . '/transcription/consent/request',
+        ], 403);
+    }
+
+    /**
+     * POST /api/consulta/{id}/transcription/consent/request
+     * Pede o aceite ao paciente: devolve link de uso único (15 min). Não concede nada.
+     */
+    public function requestConsent(array $params): void
+    {
+        if (!$this->requireAuthAndCsrf()) return;
+        $appointmentId = (int)($params['id'] ?? 0);
+        $app = $this->requireAppointment($appointmentId);
+        if (!$app) return;
+
         $userId = (int)TenantContext::getUserId();
         $patientId = (int)$app['patient_id'];
-        $version = is_string($_POST['version'] ?? null) ? trim($_POST['version']) : 'v1.0';
-
         try {
-            $consent = $this->consentService->grantConsent($appointmentId, $patientId, $userId, $version);
-            $this->jsonResponse(['success' => true, 'consent' => $consent]);
+            (new \ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter($this->db))
+                ->hit('ai_consent_request', TenantContext::getClinicId() . '|' . $appointmentId, 6, 600);
+            $res = $this->consentService->createRequest($appointmentId, $patientId, $userId);
+            $payload = ['success' => true, 'created' => $res['created'], 'consent' => $res['consent']];
+            if (!empty($res['token'])) {
+                $payload['link'] = $this->publicBaseUrl() . '/consentimento-transcricao/' . $res['token'];
+            }
+            $this->jsonResponse($payload);
+        } catch (\ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationRateLimitException $e) {
+            $this->jsonResponse(['error' => 'Muitos pedidos de aceite para este atendimento. Aguarde alguns minutos.'], 429);
+        } catch (DomainException $e) {
+            $this->jsonResponse(['error' => $e->getMessage()], 409);
         } catch (Throwable $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 400);
+            error_log('transcription consent request failed: ' . get_class($e));
+            $this->jsonResponse(['error' => 'Não foi possível criar o pedido de aceite agora.'], 400);
         }
     }
 
@@ -104,6 +139,7 @@ class RealtimeTranscriptionController
 
         $patientId = (int)$app['patient_id'];
         $consentActive = $this->consentService->isConsentActive($appointmentId, $patientId);
+        $consent = $this->consentService->getConsent($appointmentId, $patientId) ?? ['state' => 'none'];
         $session = $this->transcriptionService->getActiveSession($appointmentId);
 
         $segments = [];
@@ -118,6 +154,7 @@ class RealtimeTranscriptionController
             'appointment_id' => $appointmentId,
             'patient_id' => $patientId,
             'consent_active' => $consentActive,
+            'consent' => $consent,
             'session' => $session,
             'segments' => $segments,
             'draft' => $draft,
@@ -220,6 +257,8 @@ class RealtimeTranscriptionController
         try {
             $updated = $this->transcriptionService->resumeSession((int)$session['id']);
             $this->jsonResponse(['success' => true, 'session' => $updated]);
+        } catch (DomainException $e) {
+            $this->jsonResponse(['error' => $e->getMessage(), 'requires_consent' => true], 403);
         } catch (Throwable $e) {
             $this->jsonResponse(['error' => $e->getMessage()], 400);
         }
@@ -255,6 +294,8 @@ class RealtimeTranscriptionController
         try {
             $result = $this->transcriptionService->ingestSegment((int)$session['id'], $seq, $text, $speaker, $isFinal);
             $this->jsonResponse(['success' => true, 'segment' => $result]);
+        } catch (DomainException $e) {
+            $this->jsonResponse(['error' => $e->getMessage(), 'requires_consent' => true], 403);
         } catch (Throwable $e) {
             $this->jsonResponse(['error' => $e->getMessage()], 400);
         }
@@ -389,6 +430,17 @@ class RealtimeTranscriptionController
             return null;
         }
         return $app;
+    }
+
+    /** Base pública para o link do paciente: APP_URL quando definido; senão o esquema e o Host desta requisição. */
+    private function publicBaseUrl(): string
+    {
+        $appUrl = rtrim((string)(\ClyoNutri\Core\Security\Env::get('APP_URL', '') ?? ''), '/');
+        if ($appUrl !== '' && preg_match('#^https?://[A-Za-z0-9.\-]+(:\d+)?$#', $appUrl)) {
+            return $appUrl;
+        }
+        $host = preg_replace('/[^A-Za-z0-9.\-:\[\]]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost')) ?: 'localhost';
+        return (\ClyoNutri\Core\Http\Transport::isHttps($_SERVER) ? 'https' : 'http') . '://' . $host;
     }
 
     private function jsonResponse(array $data, int $status = 200): void
