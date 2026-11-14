@@ -1,0 +1,444 @@
+/**
+ * ClyoNutri II — Transcrição em Tempo Real na Consulta (NI2-820).
+ * Modos Ao Vivo e Discreto, Consentimento LGPD, Ingestão Incremental e Aprovação da Minuta.
+ */
+(() => {
+  'use strict';
+
+  const root = document.getElementById('cn-transcription-module');
+  if (!root) return;
+
+  const appointmentId = root.dataset.appointmentId;
+  const patientId = root.dataset.patientId;
+  const csrfToken = root.dataset.csrf;
+
+  const badgeStatus = document.getElementById('stt-status-badge');
+  const consentPanel = document.getElementById('stt-consent-panel');
+  const btnGrantConsent = document.getElementById('btn-grant-consent');
+  const btnRevokeConsent = document.getElementById('btn-revoke-consent');
+
+  const controlsPanel = document.getElementById('stt-controls-panel');
+  const modeLiveRadio = document.getElementById('mode-live');
+  const modeDiscreteRadio = document.getElementById('mode-discrete');
+  const btnStart = document.getElementById('btn-start-stt');
+  const btnPause = document.getElementById('btn-pause-stt');
+  const btnResume = document.getElementById('btn-resume-stt');
+  const btnFinish = document.getElementById('btn-finish-stt');
+
+  const liveView = document.getElementById('stt-live-view');
+  const discreteView = document.getElementById('stt-discrete-view');
+  const emptyNotice = document.getElementById('stt-empty-notice');
+  const segmentsList = document.getElementById('stt-segments-list');
+
+  const draftPanel = document.getElementById('stt-draft-review-panel');
+  const draftEditor = document.getElementById('stt-evolution-editor');
+  const draftBadge = document.getElementById('stt-draft-status-badge');
+  const btnApprove = document.getElementById('btn-approve-evolution');
+  const btnReopen = document.getElementById('btn-reopen-stt');
+
+  let mediaStream = null;
+  let mediaRecorder = null;
+  let recognition = null;
+  let currentSession = null;
+  let currentMode = 'live';
+  let sequenceCounter = 0;
+  let isCapturing = false;
+
+  // Chamada de API com CSRF e JSON
+  async function api(path, data = null, method = 'POST') {
+    const opts = {
+      method,
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+    };
+    if (data) {
+      if (data instanceof FormData) {
+        data.append('_csrf_token', csrfToken);
+        opts.body = data;
+      } else {
+        const fd = new FormData();
+        fd.append('_csrf_token', csrfToken);
+        for (const [k, v] of Object.entries(data)) {
+          fd.append(k, v);
+        }
+        opts.body = fd;
+      }
+    }
+    const res = await fetch(`/api/consulta/${appointmentId}/transcription/${path}`, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Falha na comunicação' }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }
+
+  function setBadge(text, cls = 'badge-secondary') {
+    if (!badgeStatus) return;
+    badgeStatus.textContent = text;
+    badgeStatus.className = `badge ${cls}`;
+  }
+
+  function addSegmentToUI(seq, text, speaker = 'Interlocutor') {
+    if (emptyNotice) emptyNotice.hidden = true;
+    const div = document.createElement('div');
+    div.className = 'stt-segment u-p-1 u-text-compact';
+    div.dataset.seq = seq;
+    div.innerHTML = `<span class="u-font-bold u-color-botanical-green-700">[#${seq}]</span> ${escapeHtml(text)}`;
+    segmentsList.appendChild(div);
+    segmentsList.parentElement.scrollTop = segmentsList.parentElement.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    const p = document.createElement('p');
+    p.textContent = str;
+    return p.innerHTML;
+  }
+
+  function updateModeUI(mode) {
+    currentMode = mode;
+    if (mode === 'discrete') {
+      modeDiscreteRadio.checked = true;
+      liveView.hidden = true;
+      discreteView.hidden = false;
+    } else {
+      modeLiveRadio.checked = true;
+      liveView.hidden = false;
+      discreteView.hidden = true;
+    }
+  }
+
+  // Inicializa e recupera estado existente
+  async function initStatus() {
+    try {
+      const data = await api('session', null, 'GET');
+      if (data.consent_active) {
+        btnGrantConsent.hidden = true;
+        btnRevokeConsent.hidden = false;
+        controlsPanel.hidden = false;
+        setBadge('Consentimento ativo', 'badge-info');
+      } else {
+        btnGrantConsent.hidden = false;
+        btnRevokeConsent.hidden = true;
+        controlsPanel.hidden = true;
+        setBadge('Aguardando consentimento', 'badge-secondary');
+      }
+
+      if (data.session) {
+        currentSession = data.session;
+        updateModeUI(data.session.mode || 'live');
+
+        if (data.session.status === 'capturing') {
+          setBadge('Captando fala', 'badge-success');
+          btnStart.hidden = true;
+          btnPause.hidden = false;
+          btnResume.hidden = true;
+          btnFinish.hidden = false;
+          isCapturing = true;
+        } else if (data.session.status === 'paused') {
+          setBadge('Captação pausada', 'badge-warning');
+          btnStart.hidden = true;
+          btnPause.hidden = true;
+          btnResume.hidden = false;
+          btnFinish.hidden = false;
+          isCapturing = false;
+        } else if (data.session.status === 'completed') {
+          setBadge('Transcrição concluída', 'badge-info');
+          btnStart.hidden = false;
+          btnPause.hidden = true;
+          btnResume.hidden = true;
+          btnFinish.hidden = true;
+          isCapturing = false;
+        }
+
+        // Recupera segmentos da sessão
+        if (data.segments && data.segments.length > 0) {
+          segmentsList.innerHTML = '';
+          data.segments.forEach(s => {
+            sequenceCounter = Math.max(sequenceCounter, parseInt(s.sequence_number, 10));
+            addSegmentToUI(s.sequence_number, s.text, s.speaker);
+          });
+        }
+      }
+
+      if (data.draft) {
+        showDraftReview(data.draft);
+      }
+    } catch (e) {
+      console.warn('[stt] Falha ao recuperar status inicial:', e);
+    }
+  }
+
+  // Consentimento
+  btnGrantConsent?.addEventListener('click', async () => {
+    try {
+      await api('consent', { version: 'v1.0' });
+      btnGrantConsent.hidden = true;
+      btnRevokeConsent.hidden = false;
+      controlsPanel.hidden = false;
+      setBadge('Consentimento ativo', 'badge-info');
+    } catch (e) {
+      alert('Não foi possível registrar o consentimento: ' + e.message);
+    }
+  });
+
+  btnRevokeConsent?.addEventListener('click', async () => {
+    if (!confirm('Deseja realmente revogar a autorização de transcrição para este atendimento?')) return;
+    try {
+      await api('consent/revoke');
+      btnGrantConsent.hidden = false;
+      btnRevokeConsent.hidden = true;
+      controlsPanel.hidden = true;
+      stopAudioCapture();
+      setBadge('Autorização revogada', 'badge-secondary');
+    } catch (e) {
+      alert('Erro ao revogar consentimento: ' + e.message);
+    }
+  });
+
+  // Alternância de modo Ao Vivo / Discreto
+  modeLiveRadio?.addEventListener('change', () => switchMode('live'));
+  modeDiscreteRadio?.addEventListener('change', () => switchMode('discrete'));
+
+  async function switchMode(newMode) {
+    updateModeUI(newMode);
+    if (currentSession && currentSession.id) {
+      try {
+        await api('mode', { mode: newMode });
+      } catch (e) {
+        console.warn('[stt] Erro ao sincronizar modo no servidor:', e);
+      }
+    }
+  }
+
+  // Iniciar Transcrição
+  btnStart?.addEventListener('click', async () => {
+    try {
+      setBadge('Iniciando...', 'badge-info');
+      const res = await api('start', { mode: currentMode });
+      currentSession = res.session;
+      isCapturing = true;
+
+      btnStart.hidden = true;
+      btnPause.hidden = false;
+      btnResume.hidden = true;
+      btnFinish.hidden = false;
+      setBadge('Captando áudio em tempo real', 'badge-success');
+
+      startAudioCapture();
+    } catch (e) {
+      setBadge('Falha ao iniciar', 'badge-danger');
+      alert('Não foi possível iniciar a transcrição: ' + e.message);
+    }
+  });
+
+  // Pausar
+  btnPause?.addEventListener('click', async () => {
+    try {
+      pauseAudioCapture();
+      await api('pause');
+      btnPause.hidden = true;
+      btnResume.hidden = false;
+      setBadge('Captação pausada', 'badge-warning');
+      isCapturing = false;
+    } catch (e) {
+      alert('Erro ao pausar: ' + e.message);
+    }
+  });
+
+  // Retomar
+  btnResume?.addEventListener('click', async () => {
+    try {
+      await api('resume');
+      resumeAudioCapture();
+      btnPause.hidden = false;
+      btnResume.hidden = true;
+      setBadge('Captando fala', 'badge-success');
+      isCapturing = true;
+    } catch (e) {
+      alert('Erro ao retomar: ' + e.message);
+    }
+  });
+
+  // Finalizar e gerar minuta
+  btnFinish?.addEventListener('click', async () => {
+    if (!confirm('Deseja encerrar a transcrição e gerar a minuta de evolução para revisão?')) return;
+    try {
+      stopAudioCapture();
+      setBadge('Gerando minuta...', 'badge-info');
+      const res = await api('finish');
+      currentSession = res.session;
+      btnPause.hidden = true;
+      btnResume.hidden = true;
+      btnFinish.hidden = true;
+      btnStart.hidden = false;
+      setBadge('Minuta gerada', 'badge-success');
+      showDraftReview(res.draft);
+    } catch (e) {
+      alert('Erro ao finalizar transcrição: ' + e.message);
+      setBadge('Erro', 'badge-danger');
+    }
+  });
+
+  function showDraftReview(draft) {
+    if (!draftPanel || !draftEditor) return;
+    draftPanel.hidden = false;
+    draftEditor.value = draft.full_evolution_text || '';
+    if (draft.approval_status === 'approved') {
+      draftBadge.textContent = 'Evolução Aprovada e Integrada';
+      draftBadge.className = 'badge badge-success';
+      btnApprove.disabled = true;
+      btnApprove.textContent = '✓ Evolução já Aprovada';
+    } else {
+      draftBadge.textContent = 'Minuta em Rascunho (Não aprovada)';
+      draftBadge.className = 'badge badge-warning';
+      btnApprove.disabled = false;
+      btnApprove.textContent = '✓ Aprovar e Integrar ao Prontuário';
+    }
+    draftPanel.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Aprovar e Integrar ao Prontuário
+  btnApprove?.addEventListener('click', async () => {
+    const text = draftEditor.value.trim();
+    if (!text) {
+      alert('O texto da evolução não pode estar vazio.');
+      return;
+    }
+
+    if (!confirm('Confirma a aprovação desta evolução nutricional para inclusão no prontuário oficial?')) return;
+
+    try {
+      btnApprove.disabled = true;
+      btnApprove.textContent = 'Integrando...';
+      const res = await api('draft/approve', { full_evolution_text: text });
+
+      // Atualiza o textarea oficial da consulta na página
+      const officialSummary = document.getElementById('evolution_summary');
+      if (officialSummary) {
+        officialSummary.value = text;
+        officialSummary.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      draftBadge.textContent = 'Evolução Aprovada e Integrada com Sucesso';
+      draftBadge.className = 'badge badge-success';
+      btnApprove.textContent = '✓ Aprovado e Integrado ao Prontuário';
+
+      const statusEl = document.getElementById('consulta-draft-status');
+      if (statusEl) {
+        statusEl.textContent = 'Evolução aprovada via assistente de transcrição e integrada ao rascunho oficial da consulta.';
+      }
+    } catch (e) {
+      btnApprove.disabled = false;
+      btnApprove.textContent = '✓ Aprovar e Integrar ao Prontuário';
+      alert('Erro ao aprovar e integrar: ' + e.message);
+    }
+  });
+
+  btnReopen?.addEventListener('click', () => {
+    draftPanel.hidden = true;
+    controlsPanel.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // Captação de Áudio e Envio Incremental
+  async function startAudioCapture() {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+      }
+
+      // Reconhecimento de fala integrado (Web Speech API quando disponível) ou segmentação por áudio
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'pt-BR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = async (event) => {
+          if (!isCapturing) return;
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              const transcript = event.results[i][0].transcript.trim();
+              if (transcript) {
+                sequenceCounter++;
+                addSegmentToUI(sequenceCounter, transcript);
+                await sendSegment(sequenceCounter, transcript);
+              }
+            }
+          }
+        };
+
+        recognition.onerror = (e) => {
+          console.warn('[stt] SpeechRecognition error:', e.error);
+        };
+
+        recognition.onend = () => {
+          if (isCapturing) {
+            try { recognition.start(); } catch (err) {}
+          }
+        };
+
+        recognition.start();
+      } else if (mediaStream && window.MediaRecorder) {
+        // Fallback por MediaRecorder em pedaços de áudio
+        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data && e.data.size > 0 && isCapturing) {
+            sequenceCounter++;
+            const mockText = `[Segmento de áudio captado #${sequenceCounter}]`;
+            addSegmentToUI(sequenceCounter, mockText);
+            await sendSegment(sequenceCounter, mockText);
+          }
+        };
+        mediaRecorder.start(4000); // chunk a cada 4 segundos
+      }
+    } catch (err) {
+      console.warn('[stt] Acesso a microfone não disponível:', err);
+    }
+  }
+
+  function pauseAudioCapture() {
+    if (recognition) {
+      try { recognition.stop(); } catch (e) {}
+    }
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      try { mediaRecorder.pause(); } catch (e) {}
+    }
+  }
+
+  function resumeAudioCapture() {
+    if (recognition) {
+      try { recognition.start(); } catch (e) {}
+    }
+    if (mediaRecorder && mediaRecorder.state === 'paused') {
+      try { mediaRecorder.resume(); } catch (e) {}
+    }
+  }
+
+  function stopAudioCapture() {
+    isCapturing = false;
+    pauseAudioCapture();
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+  }
+
+  async function sendSegment(seq, text) {
+    try {
+      await api('segment', {
+        sequence_number: seq,
+        text,
+        speaker: 'speaker_uncertain',
+        is_final: 1,
+      });
+    } catch (e) {
+      console.warn('[stt] Erro ao enviar segmento:', e);
+    }
+  }
+
+  // Inicializa o módulo ao carregar
+  initStatus();
+})();

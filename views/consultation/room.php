@@ -95,6 +95,9 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
           <?php if ($err === 'falha' && $errorRef): ?><span class="cr-caption"> Código para o suporte: <?= htmlspecialchars($errorRef) ?>.</span><?php endif; ?>
         </div>
       <?php endif; ?>
+
+      <?php require __DIR__ . '/partials/realtime_transcription.php'; ?>
+
       <form action="/consulta/<?= (int)$app['id'] ?>/concluir" method="POST" data-no-dirty data-consult-draft
             data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-scope="<?= htmlspecialchars($draftScope) ?>"<?= $draftRecoveredFromPost ? ' data-draft-recovered="1"' : '' ?> data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
         <p id="consulta-draft-status" class="op-message op-message--info op-state cr-draft-status" role="status" aria-live="polite" data-testid="draft-status"><?= $draftRecoveredFromPost ? 'Preenchimento recuperado após tentativa de conclusão. Suas anotações estão preservadas.' : ($draftSavedLocal ? 'Salvo como rascunho (confirmado em ' . htmlspecialchars($draftSavedLocal) . '). Continue de onde parou.' : 'As anotações são salvas automaticamente como rascunho enquanto você digita.') ?></p>

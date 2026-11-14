@@ -548,6 +548,33 @@ class AuthController
         }
     }
 
+    /**
+     * NI2-213 / ET08 / ET04: Verificação de e-mail profissional via token HMAC.
+     */
+    public function verifyEmail(array $params = []): void
+    {
+        $token = trim((string)($params['token'] ?? $_GET['token'] ?? ''));
+        if ($token === '') {
+            $_SESSION['flash_error'] = 'Token de verificação ausente.';
+            header('Location: /login');
+            exit;
+        }
+
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $profSec = \ClyoNutri\Core\Auth\ProfessionalSecurityNotifier::make();
+        $userId = $profSec->verifyEmailToken($token, $ip, $ua);
+
+        if ($userId !== null) {
+            $_SESSION['flash_success'] = 'E-mail confirmado com sucesso! Você já pode acessar sua conta.';
+        } else {
+            $_SESSION['flash_error'] = 'Link de verificação inválido ou expirado. Acesse as configurações para solicitar um novo link.';
+        }
+
+        header('Location: /login');
+        exit;
+    }
+
     /** Envia o redirecionamento ao navegador e continua o processamento em segundo plano. */
     private function redirectAndContinue(string $location): void
     {

@@ -53,6 +53,105 @@ final class PatientSecurityNotifier
     }
 
     /**
+     * ET04: Aviso de que o e-mail de acesso da paciente foi alterado (alerta no antigo, confirmação no novo).
+     * @return array{old:array{status:string,reason?:string}, new:array{status:string,reason?:string}}
+     */
+    public function emailChanged(int $clinicId, int $patientId, string $oldEmail, string $newEmail, ?string $ip = null, ?string $ua = null): array
+    {
+        $info = $this->patient($clinicId, $patientId);
+        $name = (string)($info['name'] ?? 'Paciente');
+        $maskedNew = self::maskEmail($newEmail);
+        $maskedOld = self::maskEmail($oldEmail);
+
+        $old = $this->sendExplicit(
+            $clinicId,
+            $patientId,
+            $oldEmail,
+            $name,
+            'PATIENT_EMAIL_CHANGED_OLD',
+            'O e-mail de acesso foi alterado',
+            'O e-mail de acesso foi alterado',
+            [
+                'O e-mail de login da sua conta no app do Clyo Nutri foi alterado para ' . $maskedNew . '.',
+                'Se foi você, pode desconsiderar este aviso.',
+                'Se não foi você, avise o seu consultório imediatamente.',
+            ],
+            null,
+            null,
+            $ip,
+            $ua
+        );
+
+        $new = $this->sendExplicit(
+            $clinicId,
+            $patientId,
+            $newEmail,
+            $name,
+            'PATIENT_EMAIL_CHANGED_NEW',
+            'Este agora é o seu e-mail de acesso',
+            'Este agora é o seu e-mail de acesso',
+            [
+                'Este endereço passou a ser o seu e-mail de acesso ao app do Clyo Nutri (o anterior era ' . $maskedOld . ').',
+                'Se você não fez essa mudança, avise o seu consultório imediatamente.',
+            ],
+            'Acessar o app',
+            '/paciente/app',
+            $ip,
+            $ua
+        );
+
+        return ['old' => $old, 'new' => $new];
+    }
+
+    private static function maskEmail(string $email): string
+    {
+        $email = trim($email);
+        $at = strpos($email, '@');
+        if ($at === false || $at === 0) {
+            return '***';
+        }
+        $local = substr($email, 0, $at);
+        $domain = substr($email, $at);
+        $keep = max(1, min(2, strlen($local) - 1));
+        return substr($local, 0, $keep) . str_repeat('*', max(1, strlen($local) - $keep)) . $domain;
+    }
+
+    private function sendExplicit(int $clinicId, int $patientId, string $email, string $name, string $auditPrefix, string $subject, string $headline, array $lines, ?string $actionLabel, ?string $actionPath, ?string $ip, ?string $ua): array
+    {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->audit($clinicId, $patientId, $auditPrefix . '_SKIPPED', $ip, $ua, 'invalid_email');
+            return ['status' => 'skipped', 'reason' => 'E-mail inválido.'];
+        }
+
+        $delivers = true;
+        if ($this->mailer === null) {
+            $describe = MailerFactory::describe();
+            if (in_array($describe['driver'], ['null', 'none', null], true)) {
+                $this->audit($clinicId, $patientId, $auditPrefix . '_SKIPPED', $ip, $ua, 'mail_disabled');
+                return ['status' => 'skipped', 'reason' => 'Envio desativado.'];
+            }
+            $delivers = (bool)$describe['delivers'];
+        }
+
+        $base = $this->canonicalBase();
+        $actionUrl = ($actionLabel !== null && $actionPath !== null && $base !== null) ? $base . $actionPath : null;
+        if ($actionUrl === null) {
+            $actionLabel = null;
+        }
+
+        try {
+            $message = SecurityNoticeEmail::build($email, $name, $subject, $headline, $lines, $actionLabel, $actionUrl, self::supportReplyTo());
+            ($this->mailer ?? MailerFactory::fromEnv())->send($message);
+        } catch (\Throwable $e) {
+            $this->audit($clinicId, $patientId, $auditPrefix . '_FAILED', $ip, $ua, 'smtp_error');
+            return ['status' => 'failed', 'reason' => 'Falha no envio.'];
+        }
+
+        $this->audit($clinicId, $patientId, $auditPrefix . ($delivers ? '_SENT' : '_LOGGED'), $ip, $ua, $delivers ? null : 'log_driver');
+        return ['status' => $delivers ? 'sent' : 'logged'];
+    }
+
+    /**
      * @param list<string> $lines
      * @return array{status:'sent'|'logged'|'skipped'|'failed', reason?:string}
      */

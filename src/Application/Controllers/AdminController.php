@@ -390,6 +390,20 @@ final class AdminController
         $stmt = $this->db->prepare("UPDATE clinics SET status = :status, updated_at = :updated_at WHERE id = :id");
         $stmt->execute(['status' => $newStatus, 'updated_at' => $now, 'id' => $clinicId]);
 
+        if ($newStatus === 'suspended') {
+            $ownerStmt = $this->db->prepare("SELECT user_id FROM clinic_members WHERE clinic_id = :cid AND role = 'owner' AND status = 'active'");
+            $ownerStmt->execute(['cid' => $clinicId]);
+            $owners = $ownerStmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            foreach ($owners as $ownerId) {
+                $this->db->prepare("UPDATE users SET auth_version = auth_version + 1 WHERE id = :uid")->execute(['uid' => (int)$ownerId]);
+                $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'user' AND tokenable_id = :uid")->execute(['uid' => (int)$ownerId]);
+                try {
+                    \ClyoNutri\Core\Auth\ProfessionalSecurityNotifier::make($this->db)->accountSuspended((int)$ownerId);
+                } catch (\Throwable) {
+                }
+            }
+        }
+
         $this->auditLogger->log(
             'ADMIN_CLINIC_STATUS_CHANGED',
             'clinic',

@@ -152,6 +152,7 @@ class AppointmentService
         (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, $patientId, $professionalId, 'appointment');
 
         (new \ClyoNutri\Domain\Notification\AppointmentConfirmationPublisher($this->db))->publish($clinicId, $id);
+        $this->notifyPatientAppointment($clinicId, $patientId, 'appointment.scheduled', $id, $parsedDate, 'scheduled.' . strtotime($parsedDate));
 
         return [
             'id' => $id,
@@ -320,6 +321,8 @@ class AppointmentService
         if ($ok && !$this->db->inTransaction() && $before !== null && (string)($before['status'] ?? '') !== $newStatus) {
             if ($newStatus === self::STATUS_CANCELLED) {
                 $this->notifyPatientAppointment($clinicId, (int)$before['patient_id'], 'appointment.cancelled_by_clinic', $appointmentId, (string)$before['scheduled_at'], 'clinic_cancelled');
+            } elseif ($newStatus === self::STATUS_CONFIRMED) {
+                $this->notifyPatientAppointment($clinicId, (int)$before['patient_id'], 'appointment.confirmed_by_clinic', $appointmentId, (string)$before['scheduled_at'], 'clinic_confirmed');
             }
         }
         return $ok;

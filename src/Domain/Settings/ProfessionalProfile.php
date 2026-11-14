@@ -72,8 +72,14 @@ final class ProfessionalProfile
                 if($check->fetchColumn())throw new \InvalidArgumentException('Não foi possível utilizar este e-mail. Informe outro.');
                 $this->db->prepare('DELETE FROM password_resets WHERE LOWER(email)=LOWER(?)')->execute([$current['email']]);
             }
-            $changedIdentity=$data['email']!==strtolower($current['email'])||$data['crn']!==$current['crn']||$data['crn_region']!==$current['crn_region'];
-            $this->db->prepare('UPDATE users SET name=?,email=?,phone=?,is_verified=CASE WHEN ?=1 THEN 0 ELSE is_verified END,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['name'],$data['email'],$data['phone'],(int)$changedIdentity,TenantContext::getUserId()]);
+            $emailChanged=$data['email']!==strtolower($current['email']);
+            $changedIdentity=$emailChanged||$data['crn']!==$current['crn']||$data['crn_region']!==$current['crn_region'];
+            if($emailChanged){
+                $this->db->prepare('UPDATE users SET name=?,email=?,phone=?,is_verified=0,auth_version=auth_version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['name'],$data['email'],$data['phone'],TenantContext::getUserId()]);
+                $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'user' AND tokenable_id = ?")->execute([TenantContext::getUserId()]);
+            } else {
+                $this->db->prepare('UPDATE users SET name=?,email=?,phone=?,is_verified=CASE WHEN ?=1 THEN 0 ELSE is_verified END,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$data['name'],$data['email'],$data['phone'],(int)$changedIdentity,TenantContext::getUserId()]);
+            }
             $this->db->prepare('UPDATE professionals SET specialty=?,bio=?,crn=?,crn_region=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?')->execute([$data['specialty'],$data['bio'],$data['crn'],$data['crn_region'],TenantContext::getUserId()]);
             $prefs = json_decode($current['practice_preferences'], true) ?: [];
             $prefs = PublicProfileConfirmation::revise($prefs, $data, $input, (int)TenantContext::getUserId());

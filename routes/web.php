@@ -31,6 +31,11 @@ $router->get('/recuperar-senha', [AuthController::class, 'showForgotPassword'])-
 $router->post('/recuperar-senha', [AuthController::class, 'sendResetLink'])->name('password.email');
 $router->get('/recuperar-senha/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
 $router->post('/recuperar-senha/{token}', [AuthController::class, 'resetPassword'])->name('password.update');
+$router->get('/verificar-email/{token}', [AuthController::class, 'verifyEmail'])->name('email.verify');
+$router->get('/paciente/recuperar-senha', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'showRequest'])->name('patient.password.request');
+$router->post('/paciente/recuperar-senha', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'submitRequest'])->name('patient.password.email');
+$router->get('/paciente/recuperar-senha/{token}', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'showReset'])->name('patient.password.reset');
+$router->post('/paciente/recuperar-senha/{token}', [\ClyoNutri\Application\Controllers\PatientPasswordResetController::class, 'submitReset'])->name('patient.password.update');
 
 // 2. Rotas Protegidas do Profissional / Clínica
 $router->get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -101,6 +106,19 @@ $router->post('/agenda/{id}/editar', [DashboardController::class, 'editAppointme
 $router->post('/agenda/{id}/status', [DashboardController::class, 'updateAppointmentStatus'])->name('agenda.status');
 $router->get('/consulta/{id}', [DashboardController::class, 'consultationRoom'])->name('consultation.room');
 $router->post('/consulta/{id}/concluir', [DashboardController::class, 'completeConsultation'])->name('consultation.complete');
+
+// NI2-820: Transcrição Nutricional em Tempo Real
+$router->post('/api/consulta/{id}/transcription/consent', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'grantConsent'])->name('transcription.consent');
+$router->post('/api/consulta/{id}/transcription/consent/revoke', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'revokeConsent'])->name('transcription.consent.revoke');
+$router->get('/api/consulta/{id}/transcription/session', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'getSessionStatus'])->name('transcription.session');
+$router->post('/api/consulta/{id}/transcription/start', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'startSession'])->name('transcription.start');
+$router->post('/api/consulta/{id}/transcription/mode', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'switchMode'])->name('transcription.mode');
+$router->post('/api/consulta/{id}/transcription/pause', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'pause'])->name('transcription.pause');
+$router->post('/api/consulta/{id}/transcription/resume', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'resume'])->name('transcription.resume');
+$router->post('/api/consulta/{id}/transcription/segment', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'ingestSegment'])->name('transcription.segment');
+$router->post('/api/consulta/{id}/transcription/finish', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'finish'])->name('transcription.finish');
+$router->get('/api/consulta/{id}/transcription/draft', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'getDraft'])->name('transcription.draft');
+$router->post('/api/consulta/{id}/transcription/draft/approve', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'approveDraft'])->name('transcription.draft.approve');
 
 // Nutrição, Planos e Finanças
 $router->get('/alimentos', [DashboardController::class, 'foods'])->name('foods.index');

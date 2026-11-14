@@ -165,18 +165,26 @@ final class PatientAppController
         }
 
         // A tabela patients não tem coluna cpf (nem no instalacao_mysql8.sql nem nas migrations): o login é por e-mail ou celular.
+        // A2: Em casos multi-clínica, testa os candidatos ativos para encontrar o paciente com a senha correta.
         $stmt = $db->prepare("
             SELECT p.*, c.name AS clinic_name 
             FROM patients p 
             JOIN clinics c ON c.id = p.clinic_id 
             WHERE (LOWER(p.email) = LOWER(:login_email) OR p.phone = :login_phone)
               AND p.status = 'active' AND c.status = 'active'
-            LIMIT 1
         ");
         $stmt->execute(['login_email' => $login, 'login_phone' => $login]);
-        $patient = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $candidates = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        if (!$patient || empty($patient['password_hash']) || !password_verify($password, $patient['password_hash'])) {
+        $patient = null;
+        foreach ($candidates as $cand) {
+            if (!empty($cand['password_hash']) && password_verify($password, $cand['password_hash'])) {
+                $patient = $cand;
+                break;
+            }
+        }
+
+        if (!$patient) {
             $limiter->failure('patient', $account, $ip);
             $error = 'Credenciais incorretas. Confira seus dados ou use o Primeiro Acesso com código de convite.';
             require __DIR__ . '/../../../views/patient/app.php';

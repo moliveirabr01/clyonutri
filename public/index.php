@@ -162,6 +162,7 @@ $router->get('/recuperar-senha', [$authCtrl, 'showForgotPassword']);
 $router->post('/recuperar-senha', [$authCtrl, 'sendResetLink']);
 $router->get('/recuperar-senha/{token}', [$authCtrl, 'showResetPassword']);
 $router->post('/recuperar-senha/{token}', [$authCtrl, 'resetPassword']);
+$router->get('/verificar-email/{token}', [$authCtrl, 'verifyEmail']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
 $router->get('/up', function () {
@@ -664,6 +665,20 @@ $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
 $router->get('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftGet']));   // UX-03 (v14)
 $router->post('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftSave'])); // UX-03 (v14)
+
+// NI2-820: Transcrição Nutricional em Tempo Real na Consulta
+$transcriptionCtrl = new \ClyoNutri\Application\Controllers\RealtimeTranscriptionController($db);
+$router->post('/api/consulta/{id}/transcription/consent', $requireAuth([$transcriptionCtrl, 'grantConsent']));
+$router->post('/api/consulta/{id}/transcription/consent/revoke', $requireAuth([$transcriptionCtrl, 'revokeConsent']));
+$router->get('/api/consulta/{id}/transcription/session', $requireAuth([$transcriptionCtrl, 'getSessionStatus']));
+$router->post('/api/consulta/{id}/transcription/start', $requireAuth([$transcriptionCtrl, 'startSession']));
+$router->post('/api/consulta/{id}/transcription/mode', $requireAuth([$transcriptionCtrl, 'switchMode']));
+$router->post('/api/consulta/{id}/transcription/pause', $requireAuth([$transcriptionCtrl, 'pause']));
+$router->post('/api/consulta/{id}/transcription/resume', $requireAuth([$transcriptionCtrl, 'resume']));
+$router->post('/api/consulta/{id}/transcription/segment', $requireAuth([$transcriptionCtrl, 'ingestSegment']));
+$router->post('/api/consulta/{id}/transcription/finish', $requireAuth([$transcriptionCtrl, 'finish']));
+$router->get('/api/consulta/{id}/transcription/draft', $requireAuth([$transcriptionCtrl, 'getDraft']));
+$router->post('/api/consulta/{id}/transcription/draft/approve', $requireAuth([$transcriptionCtrl, 'approveDraft']));
 
 // 3.1 Consultório Online & Teleconsulta (NI2-221 / NI2-411)
 // v11 (NI2-221): criação só por POST; o link do paciente vira cookie e redireciona para URL limpa.

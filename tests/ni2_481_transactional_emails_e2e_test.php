@@ -66,6 +66,15 @@ $db->exec("
         uuid TEXT,
         name TEXT NOT NULL,
         email TEXT,
+        document TEXT,
+        phone TEXT,
+        address_street TEXT,
+        address_number TEXT,
+        address_complement TEXT,
+        address_neighborhood TEXT,
+        address_city TEXT,
+        address_state TEXT,
+        address_zip TEXT,
         status TEXT DEFAULT 'active',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -107,8 +116,17 @@ $db->exec("
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         clinic_id INTEGER NOT NULL,
+        current_step INTEGER NOT NULL DEFAULT 1,
+        completed_steps TEXT NULL,
+        is_completed INTEGER NOT NULL DEFAULT 0,
+        completed_at DATETIME NULL,
+        focus_objectives TEXT NULL,
+        professional_data TEXT NULL,
         practice_preferences TEXT DEFAULT '{}',
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        first_patient_id INTEGER NULL,
+        contextual_notes TEXT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE patients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +460,7 @@ $profileSvc->save([
     'revision' => $rev,
     'name' => 'Dra. Clara Mendes',
     'clinic_name' => 'Clínica Clara',
+    'clinic_document' => '12345678901',
     'specialty' => 'Nutrição Clínica',
     'bio' => 'Bio',
     'email' => 'clara.nova@clinica1.test',

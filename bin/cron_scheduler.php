@@ -204,8 +204,19 @@ class HostGatorCronScheduler
 
     private function pruneExpiredTokens(): void
     {
-        // Purga sessões e tokens com mais de 30 dias
-        $this->executionLog['pruning'] = 'TOKENS_PRUNED';
+        try {
+            $db = Connection::getInstance();
+            $cutoff = gmdate('Y-m-d H:i:s', time() - 30 * 86400);
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($db, 'patient_password_resets')) {
+                $db->prepare("DELETE FROM patient_password_resets WHERE (used_at IS NOT NULL OR expires_at < :c) AND created_at < :c")->execute(['c' => $cutoff]);
+            }
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($db, 'password_resets')) {
+                $db->prepare("DELETE FROM password_resets WHERE (used_at IS NOT NULL OR expires_at < :c) AND created_at < :c")->execute(['c' => $cutoff]);
+            }
+            $this->executionLog['pruning'] = 'TOKENS_PRUNED';
+        } catch (\Throwable $e) {
+            $this->executionLog['pruning'] = 'error: ' . get_class($e);
+        }
     }
 
     /** v6: contadores de login sem atividade há mais de 1 dia e IPs conhecidos vencidos (LoginRateLimiter::purgeStale). */

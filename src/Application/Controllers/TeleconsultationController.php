@@ -67,7 +67,19 @@ class TeleconsultationController
         // NI2-24 (B1): consulta de outra clínica (ou inexistente) não mostra a tela de abrir o consultório.
         $own=$this->db->prepare("SELECT a.*,p.name AS patient_name,u.name AS professional_name FROM appointments a JOIN patients p ON p.id=a.patient_id AND p.clinic_id=a.clinic_id JOIN professionals pr ON pr.id=a.professional_id JOIN users u ON u.id=pr.user_id JOIN clinic_members m ON m.user_id=u.id AND m.clinic_id=a.clinic_id AND m.status='active' WHERE a.id=:a AND a.clinic_id=:c AND a.professional_id=:prof");
         $own->execute(['a'=>$appointmentId,'c'=>$clinicId,'prof'=>$professionalId]);$appointment=$own->fetch(PDO::FETCH_ASSOC);
-        if(!$appointment){http_response_code(404);echo 'Consulta não encontrada.';return;}
+        if (!$appointment) {
+            http_response_code(404);
+            $this->securityHeaders();
+            $title = 'Consulta não encontrada';
+            $message = 'A consulta solicitada não foi localizada nesta clínica ou não está vinculada ao seu usuário profissional.';
+            $backUrl = '/agenda';
+            $backLabel = 'Voltar para a agenda';
+            $clinicName = $this->resolveClinicName($clinicId);
+            $tone = 'warn';
+            $isPatient = false;
+            require __DIR__ . '/../../../views/teleconsultation/error.php';
+            return;
+        }
         $csrf = Csrf::generate();
         $this->securityHeaders();
         require __DIR__.'/../../../views/teleconsultation/confirm_open.php';
@@ -441,11 +453,34 @@ class TeleconsultationController
         $limiter->hit('patient_token', $token, 60, 60);
     }
 
+    private function resolveClinicName(?int $clinicId): ?string
+    {
+        if (!$clinicId) {
+            return null;
+        }
+        try {
+            $stmt = $this->db->prepare('SELECT name FROM clinics WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $clinicId]);
+            $name = $stmt->fetchColumn();
+            return $name ? (string)$name : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function requireCsrfForm(): void
     {
         if (!Csrf::validate(isset($_POST['_csrf']) ? (string)$_POST['_csrf'] : null)) {
             http_response_code(419);
-            echo 'Sessão do formulário expirada. Volte e tente novamente.';
+            $this->securityHeaders();
+            $title = 'Sessão expirada';
+            $message = 'A sessão do formulário expirou por segurança. Volte para a agenda e tente novamente.';
+            $backUrl = '/agenda';
+            $backLabel = 'Voltar para a agenda';
+            $clinicName = $this->resolveClinicName((int)($_SESSION['clinic_id'] ?? 0));
+            $tone = 'warn';
+            $isPatient = false;
+            require __DIR__ . '/../../../views/teleconsultation/error.php';
             exit;
         }
     }
@@ -511,10 +546,14 @@ class TeleconsultationController
     {
         http_response_code($this->statusFor($e));
         $this->securityHeaders();
-        echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:var(--neutral-ink-900, #1F2937)">'
-            . '<h1 style="font-size:22px;color:var(--botanical-forest-900, #0F3E17)">Não foi possível abrir a teleconsulta</h1><p>'
-            . htmlspecialchars($this->safeMessage($e)) . '</p><p><a href="' . htmlspecialchars($back) . '">Voltar</a></p></body></html>';
+        $title = 'Não foi possível abrir a teleconsulta';
+        $message = $this->safeMessage($e);
+        $backUrl = $back ?: '/agenda';
+        $backLabel = 'Voltar para a agenda';
+        $clinicName = $this->resolveClinicName((int)($_SESSION['clinic_id'] ?? 0));
+        $tone = 'warn';
+        $isPatient = false;
+        require __DIR__ . '/../../../views/teleconsultation/error.php';
         exit;
     }
 
@@ -522,12 +561,16 @@ class TeleconsultationController
     {
         http_response_code($this->statusFor($e));
         $this->securityHeaders();
+        $title = 'Teleconsulta indisponível';
         $message = ($e instanceof TeleconsultationRateLimitException || $e instanceof \ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationTicketUsedException)
             ? $e->getMessage()
             : 'Este link de teleconsulta não está disponível. Ele pode ter expirado, sido substituído ou a consulta pode ter sido encerrada. Fale com seu nutricionista para receber um novo convite.';
-        echo '<!DOCTYPE html><html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<title>Teleconsulta</title><body style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;color:var(--neutral-ink-900, #1F2937)">'
-            . '<h1 style="font-size:22px;color:var(--botanical-forest-900, #0F3E17)">Teleconsulta indisponível</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
+        $backUrl = '/paciente/app';
+        $backLabel = 'Ir para o início';
+        $clinicName = null;
+        $tone = 'warn';
+        $isPatient = true;
+        require __DIR__ . '/../../../views/teleconsultation/error.php';
         exit;
     }
 

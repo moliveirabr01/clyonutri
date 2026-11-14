@@ -100,6 +100,25 @@ final class NotificationService
             'body' => 'Seu pedido de remarcação não foi aceito. Sua consulta segue no horário atual. Abra o Clyo Nutri para ver as opções.',
             'push_body' => 'Seu pedido de remarcação não foi aceito. Abra o app para ver.',
         ],
+        // NI2-481 ET06: Ações da clínica sobre a consulta -> avisa o paciente.
+        'appointment.rescheduled' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Consulta reagendada',
+            'body' => 'Sua consulta foi reagendada para {date} às {time}. Acesse o portal para ver os detalhes.',
+            'push_body' => 'Sua consulta foi remarcada. Abra o app para conferir.',
+        ],
+        'appointment.confirmed_by_clinic' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Consulta confirmada pelo consultório',
+            'body' => 'Sua consulta em {date} às {time} foi confirmada pelo consultório. Acesse o portal para ver os detalhes.',
+            'push_body' => 'Sua consulta foi confirmada pelo consultório.',
+        ],
+        'appointment.cancelled_by_clinic' => [
+            'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Consulta cancelada pelo consultório',
+            'body' => 'A consulta agendada para {date} às {time} foi cancelada pelo consultório. Entre em contato para reagendar.',
+            'push_body' => 'Uma consulta foi cancelada pelo consultório.',
+        ],
         'meal_plan.published' => [
             'category' => 'plan', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Plano alimentar disponível',

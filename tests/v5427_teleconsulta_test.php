@@ -131,7 +131,7 @@ preg_match_all('/var\((--[a-z0-9-]+)/', $css, $m);
 $tokens = (string)file_get_contents($root . '/public/assets/css/clinical-botanical.css');
 $missing = array_values(array_filter(array_unique($m[1]), fn($t) => !str_contains($tokens, $t . ':')));
 T::ok($missing === [], 'todo token usado existe em clinical-botanical.css' . ($missing ? ' — ' . implode(', ', $missing) : ''));
-foreach (['professional_room.php', 'patient_room.php', 'patient_waiting.php', 'confirm_open.php'] as $v) {
+foreach (['professional_room.php', 'patient_room.php', 'patient_waiting.php', 'confirm_open.php', 'error.php'] as $v) {
     $src = (string)file_get_contents($root . '/views/teleconsultation/' . $v);
     T::ok(strpos($src, 'clinical-botanical.css') !== false && strpos($src, 'clinical-botanical.css') < strpos($src, 'teleconsulta.css?v=v54-27'), "$v carrega os tokens antes de teleconsulta.css?v=v54-27");
 }

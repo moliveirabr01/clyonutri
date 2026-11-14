@@ -72,7 +72,9 @@ final class PatientPasswordResetService
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Por favor, informe um endereço de e-mail válido.');
         }
-        $this->assertRateLimitNotExceeded($email, $ipAddress);
+        if ($this->isRateLimited($email, $ipAddress)) {
+            return ['success' => true, 'email' => $email, 'message' => self::GENERIC_MESSAGE, 'delivered' => 0];
+        }
 
         // Pacientes ativos, com conta já ativada (senha ou PIN), para este e-mail.
         $stmt = $this->db->prepare(
@@ -84,8 +86,10 @@ final class PatientPasswordResetService
         $stmt->execute(['email' => $email]);
         $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $emailHash = hash('sha256', $email);
+
         if ($patients === []) {
-            $this->audit(null, null, 'PATIENT_PASSWORD_RESET_ATTEMPT_UNKNOWN', null, $ipAddress, $userAgent, ['email' => $email]);
+            $this->audit(null, null, 'PATIENT_PASSWORD_RESET_ATTEMPT_UNKNOWN', null, $ipAddress, $userAgent, ['email_hash' => $emailHash]);
             return ['success' => true, 'email' => $email, 'message' => self::GENERIC_MESSAGE, 'delivered' => 0];
         }
 
@@ -104,7 +108,7 @@ final class PatientPasswordResetService
                     ->execute(['now' => self::nowUtc(), 'pid' => $patientId]);
                 $this->db->prepare('INSERT INTO patient_password_resets (clinic_id, patient_id, token_hash, expires_at, created_at) VALUES (:c, :p, :t, :e, :n)')
                     ->execute(['c' => $clinicId, 'p' => $patientId, 't' => $tokenHash, 'e' => $expiresAt, 'n' => self::nowUtc()]);
-                $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_REQUESTED', (string)$patientId, $ipAddress, $userAgent, ['email' => $email, 'expires_at_utc' => $expiresAt]);
+                $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_REQUESTED', (string)$patientId, $ipAddress, $userAgent, ['email_hash' => $emailHash, 'expires_at_utc' => $expiresAt]);
                 $this->db->commit();
             } catch (\Throwable $e) {
                 $this->db->rollBack();
@@ -180,15 +184,15 @@ final class PatientPasswordResetService
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare("UPDATE patients SET password_hash = :h, otp_code = NULL, otp_expires_at = NULL, updated_at = :now WHERE id = :id AND clinic_id = :c")
-                ->execute(['h' => $hash, 'now' => self::nowUtc(), 'id' => $patientId, 'c' => $clinicId]);
+            $this->db->prepare("UPDATE patients SET password_hash = :h, otp_code = NULL, otp_expires_at = NULL, updated_at = :now WHERE LOWER(email) = LOWER(:email) AND status = 'active'")
+                ->execute(['h' => $hash, 'now' => self::nowUtc(), 'email' => $valid['email']]);
             // uso único: marca este token e qualquer outro pendente do paciente
             $this->db->prepare('UPDATE patient_password_resets SET used_at = :now WHERE patient_id = :pid AND used_at IS NULL')
                 ->execute(['now' => self::nowUtc(), 'pid' => $patientId]);
-            // revoga sessões de app do paciente (bearer)
-            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id = :pid AND clinic_id = :c")
-                ->execute(['pid' => $patientId, 'c' => $clinicId]);
-            $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_COMPLETED', (string)$patientId, $ipAddress, $userAgent, ['email' => $valid['email'], 'sessions_revoked' => true, 'method' => 'token_recovery']);
+            // revoga sessões de app do paciente (bearer) para todos os perfis desse e-mail
+            $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'patient' AND tokenable_id IN (SELECT id FROM patients WHERE LOWER(email) = LOWER(:email))")
+                ->execute(['email' => $valid['email']]);
+            $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_COMPLETED', (string)$patientId, $ipAddress, $userAgent, ['email_hash' => hash('sha256', (string)$valid['email']), 'sessions_revoked' => true, 'method' => 'token_recovery']);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -224,10 +228,11 @@ final class PatientPasswordResetService
                 throw new RuntimeException('APP_URL ausente ou inválida.');
             }
             $delivers = true;
+            $emailHash = hash('sha256', $email);
             if ($this->mailer === null) {
                 $describe = MailerFactory::describe();
                 if (in_array($describe['driver'], ['null', 'none', null], true)) {
-                    $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_EMAIL_SKIPPED', (string)$patientId, $ip, $ua, ['email' => $email, 'reason' => 'mail_disabled']);
+                    $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_EMAIL_SKIPPED', (string)$patientId, $ip, $ua, ['email_hash' => $emailHash, 'reason' => 'mail_disabled']);
                     return 'skipped';
                 }
                 $delivers = (bool)$describe['delivers'];
@@ -237,12 +242,12 @@ final class PatientPasswordResetService
             ($this->mailer ?? MailerFactory::fromEnv())->send($message);
 
             $action = $delivers ? 'PATIENT_PASSWORD_RESET_EMAIL_SENT' : 'PATIENT_PASSWORD_RESET_EMAIL_LOGGED';
-            $this->audit($clinicId, $patientId, $action, (string)$patientId, $ip, $ua, ['email' => $email]);
+            $this->audit($clinicId, $patientId, $action, (string)$patientId, $ip, $ua, ['email_hash' => $emailHash]);
             return $delivers ? 'sent' : 'logged';
         } catch (\Throwable $e) {
             error_log('[ClyoNutri][patient-pwreset] falha ao enviar (patient_id=' . $patientId . '): ' . $e->getMessage());
             try {
-                $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_EMAIL_FAILED', (string)$patientId, $ip, $ua, ['email' => $email, 'error' => mb_substr($e->getMessage(), 0, 200)]);
+                $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_EMAIL_FAILED', (string)$patientId, $ip, $ua, ['email_hash' => hash('sha256', $email), 'error' => mb_substr($e->getMessage(), 0, 200)]);
             } catch (\Throwable) {
             }
             return 'failed';
@@ -261,21 +266,23 @@ final class PatientPasswordResetService
         return $base;
     }
 
-    private function assertRateLimitNotExceeded(string $email, ?string $ipAddress): void
+    private function isRateLimited(string $email, ?string $ipAddress): bool
     {
         $cutoff = self::nowUtc(-900);
-        $st = $this->db->prepare("SELECT COUNT(*) FROM audit_logs WHERE action = 'PATIENT_PASSWORD_RESET_REQUESTED' AND details LIKE :p AND created_at >= :c");
-        $st->execute(['p' => '%' . $email . '%', 'c' => $cutoff]);
+        $emailHash = hash('sha256', $email);
+        $st = $this->db->prepare("SELECT COUNT(*) FROM audit_logs WHERE action IN ('PATIENT_PASSWORD_RESET_REQUESTED','PATIENT_PASSWORD_RESET_ATTEMPT_UNKNOWN') AND details LIKE :p AND created_at >= :c");
+        $st->execute(['p' => '%' . $emailHash . '%', 'c' => $cutoff]);
         if ((int)$st->fetchColumn() >= self::MAX_REQUESTS_PER_EMAIL_15M) {
-            throw new RuntimeException('Muitas solicitações para este e-mail em um curto intervalo. Aguarde alguns minutos.');
+            return true;
         }
         if ($ipAddress !== null && $ipAddress !== '') {
             $st = $this->db->prepare("SELECT COUNT(*) FROM audit_logs WHERE action IN ('PATIENT_PASSWORD_RESET_REQUESTED','PATIENT_PASSWORD_RESET_ATTEMPT_UNKNOWN') AND ip_address = :ip AND created_at >= :c");
             $st->execute(['ip' => $ipAddress, 'c' => $cutoff]);
             if ((int)$st->fetchColumn() >= self::MAX_REQUESTS_PER_IP_15M) {
-                throw new RuntimeException('Muitas solicitações originadas deste endereço. Aguarde alguns minutos.');
+                return true;
             }
         }
+        return false;
     }
 
     private static function supportReplyTo(): ?string

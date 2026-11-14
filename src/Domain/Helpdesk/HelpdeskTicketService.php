@@ -188,6 +188,17 @@ class HelpdeskTicketService
                 'type' => $type,
                 'priority_operational' => $operationalPriority,
             ]);
+            try {
+                $this->db->prepare("
+                    INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
+                    VALUES (:cid, :uid, 'HELPDESK_TICKET_CREATED', 'helpdesk_tickets', :res, :details, CURRENT_TIMESTAMP)
+                ")->execute([
+                    'cid' => $clinicId,
+                    'uid' => $userId,
+                    'res' => (string)$ticketId,
+                    'details' => json_encode(['protocol' => $protocol, 'category' => $category, 'type' => $type], JSON_UNESCAPED_UNICODE),
+                ]);
+            } catch (\Throwable) {}
 
             // Notificação in-app sem PII sensível
             $this->createNotification(
@@ -519,6 +530,17 @@ class HelpdeskTicketService
                 'message_id' => $msgId,
                 'is_internal' => $isInternalNote,
             ]);
+            try {
+                $this->db->prepare("
+                    INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
+                    VALUES (:cid, :uid, 'HELPDESK_TICKET_MESSAGE_ADDED', 'helpdesk_tickets', :res, :details, CURRENT_TIMESTAMP)
+                ")->execute([
+                    'cid' => (int)$ticket['clinic_id'],
+                    'uid' => (int)$ticket['user_id'],
+                    'res' => (string)$ticketId,
+                    'details' => json_encode(['message_id' => $msgId, 'is_internal' => $isInternalNote], JSON_UNESCAPED_UNICODE),
+                ]);
+            } catch (\Throwable) {}
 
             if ($startedTx && $this->db->inTransaction()) {
                 $this->db->commit();
@@ -614,6 +636,17 @@ class HelpdeskTicketService
                 'to' => $newStatus,
                 'resolution_summary' => $resolutionSummary,
             ]);
+            try {
+                $this->db->prepare("
+                    INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at)
+                    VALUES (:cid, :uid, 'HELPDESK_TICKET_STATUS_UPDATED', 'helpdesk_tickets', :res, :details, CURRENT_TIMESTAMP)
+                ")->execute([
+                    'cid' => (int)$ticket['clinic_id'],
+                    'uid' => (int)$ticket['user_id'],
+                    'res' => (string)$ticketId,
+                    'details' => json_encode(['from' => $oldStatus, 'to' => $newStatus], JSON_UNESCAPED_UNICODE),
+                ]);
+            } catch (\Throwable) {}
 
             if ($startedTx && $this->db->inTransaction()) {
                 $this->db->commit();

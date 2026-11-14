@@ -241,6 +241,20 @@ final class SubscriptionService
     public function expireTrials(): int
     {
         $now = (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
+        
+        $stmtFind = $this->db->prepare("
+            SELECT cs.clinic_id, cm.user_id, c.name as clinic_name, sp.name as plan_name
+            FROM clinic_subscriptions cs
+            JOIN clinics c ON c.id = cs.clinic_id
+            JOIN clinic_members cm ON cm.clinic_id = cs.clinic_id AND cm.role = 'owner' AND cm.status = 'active'
+            LEFT JOIN saas_plans sp ON sp.id = cs.plan_id
+            WHERE cs.status = 'trialing' 
+              AND cs.trial_ends_at IS NOT NULL 
+              AND cs.trial_ends_at < :now
+        ");
+        $stmtFind->execute(['now' => $now]);
+        $rows = $stmtFind->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
         $stmt = $this->db->prepare("
             UPDATE clinic_subscriptions 
             SET status = 'expired', updated_at = :now
@@ -249,8 +263,21 @@ final class SubscriptionService
               AND trial_ends_at < :now
         ");
         $stmt->execute(['now' => $now]);
+        $affected = $stmt->rowCount();
 
-        return $stmt->rowCount();
+        foreach ($rows as $r) {
+            try {
+                \ClyoNutri\Core\Auth\ProfessionalSecurityNotifier::make($this->db)->trialExpired(
+                    (int)$r['user_id'],
+                    (string)$r['clinic_name'],
+                    (string)($r['plan_name'] ?? 'Profissional')
+                );
+            } catch (\Throwable $e) {
+                error_log('[SubscriptionService] falha ao notificar trial expirado: ' . $e->getMessage());
+            }
+        }
+
+        return $affected;
     }
 
     /**

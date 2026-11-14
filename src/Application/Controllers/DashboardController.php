@@ -5805,6 +5805,7 @@ class DashboardController
               <input type="search" id="dash-patient-search" name="q" class="form-control dash-search__input" placeholder="Buscar paciente" autocomplete="off" maxlength="100" data-testid="dash-patient-search">
               <button type="submit" class="btn btn-outline dash-search__btn">Buscar</button>
             </form>
+            <a href="/pacientes?novo=1" class="btn btn-outline dash-new-patient" data-testid="quick-new-patient">+ Novo paciente</a>
             <a href="/agenda?novo=1" class="btn btn-primary dash-new-appointment" data-testid="dash-new-appointment">+ Nova consulta</a>
           </div>
         </header>
@@ -5867,7 +5868,7 @@ class DashboardController
           </div>
         <?php endif; ?>
 
-        <?php if ($activation): ?>
+        <?php if ($activation && !$showActivation): ?>
           <p class="dash-readiness dash-readiness--<?= $activation['ready'] ? 'ok' : 'pending' ?>" role="status" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">
             <span class="dash-readiness__dot" aria-hidden="true"></span>
             <span>Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong> · Checklist <?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></span>
@@ -5892,9 +5893,9 @@ class DashboardController
             <div class="dash-kpi__value tabular-nums<?= $adherenceMetrics['has_data'] ? '' : ' dash-kpi__value--empty' ?>"><span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span></div>
             <div class="dash-kpi__foot">
               <?php if ($adherenceMetrics['has_data']): ?>
-                <?= $dashCmp($cmpAdherence) ?><span class="dash-kpi__note"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) · <?= (int)$adherenceMetrics['responding_patients_count'] ?> de <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) · <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
+                <?= $dashCmp($cmpAdherence) ?><span class="dash-kpi__note"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) · <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
               <?php else: ?>
-                <span class="dash-trend dash-trend--neutral" data-testid="dash-trend" data-tone="neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span><span class="dash-kpi__note">0 respostas · <?= (int)$adherenceMetrics['total_eligible_patients'] ?> paciente(s) elegíveis</span>
+                <span class="dash-trend dash-trend--neutral" data-testid="dash-trend" data-tone="neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span><span class="dash-kpi__note">0 respostas · <?= (int)$adherenceMetrics['total_eligible_patients'] ?> elegíveis</span>
               <?php endif; ?>
             </div>
           </div>
@@ -5902,8 +5903,11 @@ class DashboardController
             <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('plan') ?></span><span class="dash-kpi__label">Planos a revisar</span></div>
             <div class="dash-kpi__value tabular-nums"><span data-testid="draft-patients-count"><?= $draftPatientsCount ?></span></div>
             <div class="dash-kpi__foot">
-              <span class="dash-trend dash-trend--<?= $draftPatientsCount > 0 ? 'warn' : 'ok' ?>"><?= $draftPatientsCount > 0 ? 'paciente(s) com rascunho' : 'todos publicados' ?></span>
-              <?php if ($draftPlansTotal > 0): ?><span class="dash-kpi__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> plano(s) em rascunho · <a href="/planos?status=draft">Ver rascunhos</a></span><?php endif; ?>
+              <?php if ($draftPlansTotal > 0): ?>
+                <span class="dash-kpi__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> em rascunho · <a href="/planos?status=draft">Ver rascunhos</a></span>
+              <?php else: ?>
+                <span class="dash-trend dash-trend--ok">todos publicados</span>
+              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -5978,30 +5982,7 @@ class DashboardController
           </section>
         </div>
 
-        <!-- Seção: Pacientes e Prioridades que Exigem Atenção (v54.56: logo abaixo do topo, 4 itens + "Ver todos") -->
-        <section class="dash-card dash-quick" aria-labelledby="quick-actions-title">
-          <div class="dash-card__header">
-            <h2 id="quick-actions-title" class="dash-card__title">Atendimento nutricional</h2>
-          </div>
-          <div class="dash-quick__grid">
-            <a href="/pacientes?novo=1" class="dash-quick__item" data-testid="quick-new-patient">
-              <span class="dash-quick__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
-              <span><span class="dash-quick__label">Novo paciente</span><span class="dash-quick__hint">Cadastro e consentimento</span></span>
-            </a>
-            <a href="/planos" class="dash-quick__item">
-              <span class="dash-quick__icon" aria-hidden="true"><?= $dashIcon('plan') ?></span>
-              <span><span class="dash-quick__label">Criar plano alimentar</span><span class="dash-quick__hint">Prescrição e modelos</span></span>
-            </a>
-            <a href="/alimentos" class="dash-quick__item">
-              <span class="dash-quick__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-              <span><span class="dash-quick__label">Consultar Tabela TACO</span><span class="dash-quick__hint">Composição dos alimentos</span></span>
-            </a>
-            <a href="/agenda" class="dash-quick__item">
-              <span class="dash-quick__icon" aria-hidden="true"><?= $dashIcon('clock') ?></span>
-              <span><span class="dash-quick__label">Agendar consulta</span><span class="dash-quick__hint">Abrir a agenda</span></span>
-            </a>
-          </div>
-        </section>
+        <!-- Seção: Pacientes e Prioridades que Exigem Atenção -->
 
         <section class="dash-card attention-panel dash-attention" aria-labelledby="attention-title" data-testid="attention-panel">
           <div class="dash-card__header">
