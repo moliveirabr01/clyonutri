@@ -63,6 +63,7 @@ SCENARIOS=(
   "p5456|p5456.js|painel|1"
   "p5457|p5457.js|jornadas|1"
   "ni2815|ni2815.js|ni2815|1"
+  "ni2830|ni2830.js|ni2830|1"
 )
 
 run_php() {

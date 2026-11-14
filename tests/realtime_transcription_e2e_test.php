@@ -60,6 +60,9 @@ echo "--> [1/10] Executando Migration 92 e Validando Esquema Relacional...\n";
 require_once __DIR__ . '/../database/migrations/2026_11_11_000092_create_realtime_transcription_tables.php';
 $migration = new CreateRealtimeTranscriptionTables();
 $migration->up($db);
+// NI2-830: o aceite verificável do paciente vive na migration 93
+require_once __DIR__ . '/../database/migrations/2026_11_13_000093_create_transcription_consent_requests.php';
+(new CreateTranscriptionConsentRequests())->up($db);
 
 $tables = ['consultation_ai_consents', 'consultation_transcription_sessions', 'consultation_transcription_segments', 'consultation_evolution_drafts'];
 $allTablesExist = true;
@@ -131,12 +134,18 @@ assertTest(
     "Tentativa de iniciar captação sem autorização é barrada pelo backend"
 );
 
-// Concessão formal de consentimento
-$consentData = $consentService->grantConsent($apptA, $patientA, $professionalA, 'v1.0');
+// NI2-830: o profissional só PEDE o aceite; quem decide é o paciente (aqui, pelo mesmo serviço que a página pública usa)
+$consentReq = $consentService->createRequest($apptA, $patientA, $professionalA);
 assertTest(
-    "grantConsent() registra autorização afirmativa com status 'granted'",
-    ($consentData['status'] ?? '') === 'granted' && $consentService->isConsentActive($apptA, $patientA) === true,
-    "Consentimento registrado em: {$consentData['consented_at_utc']}"
+    "createRequest() deixa o aceite pendente e NÃO libera a captação",
+    ($consentReq['consent']['state'] ?? '') === 'pending' && $consentService->isConsentActive($apptA, $patientA) === false,
+    "Pedido pendente aguardando o paciente"
+);
+$consentData = $consentService->decideByToken((string)$consentReq['token'], 'accept', \ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::sha256(), '203.0.113.7', 'PHPUnit-like TESTE');
+assertTest(
+    "decideByToken() registra o aceite do paciente e só então a captação é liberada",
+    ($consentData['state'] ?? '') === 'accepted' && $consentService->isConsentActive($apptA, $patientA) === true,
+    "Aceite do paciente registrado"
 );
 
 // -----------------------------------------------------------------------------

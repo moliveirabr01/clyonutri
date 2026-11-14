@@ -219,6 +219,29 @@ switch ($scenario) {
         $pdo->exec("DELETE FROM appointments WHERE clinic_id=1 AND date(scheduled_at)=date('now','localtime')");
         file_put_contents($db . '.ids', json_encode(['reception' => $rid]));
         break;
+    case 'ni2830': // v54.61 NI2-830: pacientes A (id 2) e B (id 1) na clínica A, paciente C na clínica B, consultas em andamento hoje, recepção, portal do paciente
+        $v1v2();
+        $pdo->exec("UPDATE users SET name='Nutri TESTE A' WHERE id=1");
+        $pdo->prepare("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status) VALUES (?, 'Recepção TESTE A', 'recepcao.ni2830@teste.invalid', ?, 'receptionist', 1, 'active')")
+            ->execute([bin2hex(random_bytes(8)), password_hash('Teste-Senha-123', PASSWORD_DEFAULT)]);
+        $rid = (int)$pdo->lastInsertId();
+        $pdo->prepare("INSERT INTO clinic_members (clinic_id, user_id, role, status) VALUES (1, ?, 'receptionist', 'active')")->execute([$rid]);
+        $pdo->prepare("INSERT INTO patients (clinic_id, uuid, name, birth_date, gender, status) VALUES (2, ?, 'Carla TESTE Clinica B 830', '1991-01-01', 'F', 'active')")->execute([bin2hex(random_bytes(8))]);
+        $pC = (int)$pdo->lastInsertId();
+        $pdo->exec("UPDATE patients SET name='Ana TESTE Paciente A' WHERE id=2");
+        $pdo->exec("UPDATE patients SET name='Bruno TESTE Paciente B' WHERE id=1");
+        $ph = password_hash('Teste-Paciente-123', PASSWORD_DEFAULT);
+        $pdo->prepare("UPDATE patients SET email='ana.ni2830@teste.invalid', password_hash=? WHERE id=2")->execute([$ph]);
+        $pdo->prepare("UPDATE patients SET email='bruno.ni2830@teste.invalid', password_hash=? WHERE id=1")->execute([$ph]);
+        $pdo->exec("DELETE FROM appointments");
+        $ins = $pdo->prepare("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, status, type) VALUES (?, ?, ?, ?, 45, 'in_progress', 'follow_up')");
+        $when = date('Y-m-d H:i:s', time() - 600);
+        $ins->execute([1, 2, 1, $when]); $apA1 = (int)$pdo->lastInsertId();   // paciente A, consulta A1
+        $ins->execute([1, 1, 1, $when]); $apB1 = (int)$pdo->lastInsertId();   // paciente B, consulta B1
+        $ins->execute([1, 2, 1, date('Y-m-d H:i:s', time() - 7200)]); $apA2 = (int)$pdo->lastInsertId(); // paciente A, outra consulta (A2)
+        $ins->execute([2, $pC, 2, $when]); $apC = (int)$pdo->lastInsertId();  // clínica B
+        file_put_contents($db . '.ids', json_encode(['reception' => $rid, 'patientA' => 2, 'patientB' => 1, 'patientC' => $pC, 'apptA1' => $apA1, 'apptB1' => $apB1, 'apptA2' => $apA2, 'apptC' => $apC]));
+        break;
     default:
         fwrite(STDERR, "cenário desconhecido: $scenario\n"); exit(2);
 }
