@@ -75,7 +75,11 @@ class RealtimeTranscriptionService
         // Verifica se já existe sessão em andamento para esta consulta
         $existing = $this->getActiveSession($appointmentId);
         if ($existing && in_array($existing['status'], ['connected', 'capturing', 'paused'], true)) {
-            // Retorna a sessão existente para permitir continuidade / reconexão
+            // Retorna a sessão existente para permitir continuidade / reconexão. Sessão pausada (ex.: pela revogação e um novo
+            // aceite) é retomada aqui: o aceite vigente acabou de ser conferido acima.
+            if ($existing['status'] === 'paused') {
+                return $this->resumeSession((int)$existing['id']);
+            }
             return $existing;
         }
 
@@ -239,6 +243,15 @@ class RealtimeTranscriptionService
         }
         if ($session['status'] === 'completed') {
             throw new DomainException("Sessão já finalizada.");
+        }
+
+        // NI2-830: cada segmento só entra com aceite do paciente válido para ESTE atendimento e ESTE paciente,
+        // conferido no servidor (revogação, expiração ou troca de consulta/paciente bloqueiam e pausam a sessão).
+        if (!$this->consentService->isConsentActive((int)$session['appointment_id'], (int)$session['patient_id'])) {
+            if (in_array($session['status'], ['capturing', 'connected'], true)) {
+                $this->pauseSession($sessionId);
+            }
+            throw new DomainException("Consentimento do paciente ausente, expirado ou revogado. Nenhum novo trecho foi gravado.");
         }
 
         $cleanText = trim($text);
