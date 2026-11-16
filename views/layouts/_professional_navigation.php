@@ -1,5 +1,7 @@
 <?php
-// v54.62 (NI2-854 / UX-015): 7 itens de 1º nível (5 nucleares de Atendimento + 2 grupos recolhíveis: Biblioteca nutricional ▾ e Gestão ▾).
+// v54.65: três grupos fixos (Atendimento, Gestão, Biblioteca nutricional), sem recolher. Gestão vem antes porque
+// Avisos tem contador e não pode ficar abaixo da dobra.
+// Assinatura, Equipe e Pedidos LGPD ficam em Configurações; Central de ajuda vai para o rodapé do menu.
 $navActor = \ClyoNutri\Core\Auth\AuthContext::get()?->toArray();
 $navAllowed = static fn(string $url): bool => $navActor === null || \ClyoNutri\Core\Security\ClinicalAuthorization::allowsWeb($navActor, $url, 'GET');
 $navNoticeCount = $navAllowed('/avisos') ? \ClyoNutri\Application\Controllers\NotificationsController::unreadForCurrentUser() : 0;
@@ -11,26 +13,20 @@ $navGroups = [
         ['Planos alimentares', '/planos', 'planos'],
         ['Conversas', '/chat', 'chat'],
     ],
+    'Gestão' => [
+        ['Financeiro', '/financeiro', 'financeiro'],
+        ['Avisos', '/avisos', 'avisos'],
+        ['Configurações', '/configuracoes', 'configuracoes'],
+    ],
     'Biblioteca nutricional' => [
         ['Base de alimentos', '/alimentos', 'alimentos'],
         ['Catálogo de exames', '/exames', 'exames'],
         ['Receitas', '/receitas', 'receitas'],
         ['Materiais', '/materiais', 'materiais'],
-        ['Modelos de plano', '/modelos', 'modelos'], // v54.64: a rota é /modelos (/planos/modelos dava 404)
-    ],
-    'Gestão' => [
-        ['Financeiro', '/financeiro', 'financeiro'],
-        ['Assinatura', '/configuracoes/assinatura', 'assinatura'],
-        ['Avisos', '/avisos', 'avisos'],
-        ['Pedidos LGPD', '/privacidade/pedidos', 'privacidade'],
-        ['Configurações', '/configuracoes', 'configuracoes'],
-        ['Central de ajuda', '/ajuda', 'ajuda'],
+        ['Modelos de plano', '/modelos', 'modelos'],
     ],
 ];
-if (in_array($navActor['member_role'] ?? '', ['owner', 'admin'], true) && \ClyoNutri\Core\Security\ClinicalAuthorization::isClinical($navActor)) {
-    $navGroups['Gestão'][] = ['Equipe', '/configuracoes/equipe', 'equipe'];
-}
-if (\ClyoNutri\Application\Controllers\AcademyController::enabled()) $navGroups['Gestão'][] = ['Clyo Academy', '/academy', 'academy'];
+if (\ClyoNutri\Application\Controllers\AcademyController::enabled()) $navGroups['Biblioteca nutricional'][] = ['Clyo Academy', '/academy', 'academy'];
 if (in_array($_SESSION['user_role'] ?? '', ['admin','operator','support_agent'], true)) $navGroups['Gestão'][] = ['Service desk', '/suporte/fila', 'service_desk'];
 $navIcons = [
     '/dashboard' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>',
@@ -55,12 +51,11 @@ $navIcons = [
 $navE = static fn($s): string => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $reqPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $navActive = ($activeNav ?? '');
-if ($navActive === 'configuracoes' && str_starts_with($reqPath, '/configuracoes/equipe')) {
-    $navActive = 'equipe';
-} elseif (str_starts_with($reqPath, '/configuracoes/assinatura')) {
-    $navActive = 'assinatura';
-} elseif ($reqPath === '/modelos' || str_starts_with($reqPath, '/modelos/')) {
+if ($reqPath === '/modelos' || str_starts_with($reqPath, '/modelos/')) {
     $navActive = 'modelos';
+} elseif (str_starts_with($reqPath, '/configuracoes') || str_starts_with($reqPath, '/privacidade/pedidos')
+    || in_array($navActive, ['assinatura', 'equipe', 'privacidade'], true)) {
+    $navActive = 'configuracoes'; // Assinatura, Equipe e Pedidos LGPD vivem dentro de Configurações
 }
 ?>
 <div class="cn58-drawer-heading"><span id="cn58-menu-title">Menu principal</span><button type="button" class="cn58-menu-close" data-nav-close aria-label="Fechar menu">×</button></div>
@@ -69,41 +64,21 @@ if ($navActive === 'configuracoes' && str_starts_with($reqPath, '/configuracoes/
     $links = array_values(array_filter($links, static fn($link) => $navAllowed($link[1])));
     if (!$links) continue;
     $isCoreGroup = ($group === 'Atendimento');
-    $hasActiveInGroup = false;
-    foreach ($links as [, , $k]) {
-        if ($navActive === $k) {
-            $hasActiveInGroup = true;
-            break;
-        }
-    }
     $groupTestId = $group === 'Biblioteca nutricional' ? 'nav-group-biblioteca' : ($group === 'Gestão' ? 'nav-group-gestao' : 'nav-group-atendimento');
 ?>
-  <?php if ($isCoreGroup): ?>
   <div class="cn58-nav-group" data-nav-group="<?= $navE($group) ?>" data-testid="<?= $navE($groupTestId) ?>">
     <p class="app-nav__group-label"><?= $navE($group) ?></p>
     <?php foreach ($links as [$label, $url, $key]): ?>
-    <a href="<?= $navE($url) ?>" class="app-nav__item<?= $navActive === $key ? ' active' : '' ?>"<?= $navActive === $key ? ' aria-current="page"' : '' ?> data-nav-top-item="<?= $navE($key) ?>">
-      <?= $navIcons[$url] ?? $navIcons['/pacientes'] ?><span><?= $navE($label) ?></span>
-    </a>
-    <?php endforeach; ?>
-  </div>
-  <?php else: ?>
-  <details class="cn58-nav-group cn58-nav-collapsible" data-nav-group="<?= $navE($group) ?>" data-testid="<?= $navE($groupTestId) ?>" data-nav-top-item="<?= $navE($group) ?>"<?= $hasActiveInGroup ? ' open' : '' ?>>
-    <summary class="app-nav__group-label app-nav__group-toggle">
-      <span><?= $navE($group) ?></span>
-      <span class="app-nav__chevron" aria-hidden="true">▾</span>
-    </summary>
-    <?php foreach ($links as [$label, $url, $key]): ?>
-    <a href="<?= $navE($url) ?>" class="app-nav__item<?= $navActive === $key ? ' active' : '' ?>"<?= $navActive === $key ? ' aria-current="page"' : '' ?><?= $key === 'materiais' ? ' data-testid="nav-materiais"' : '' ?>>
+    <a href="<?= $navE($url) ?>" class="app-nav__item<?= $navActive === $key ? ' active' : '' ?>"<?= $navActive === $key ? ' aria-current="page"' : '' ?><?= $isCoreGroup ? ' data-nav-top-item="' . $navE($key) . '"' : '' ?><?= $key === 'materiais' ? ' data-testid="nav-materiais"' : '' ?>>
       <?= $navIcons[$url] ?? $navIcons['/pacientes'] ?><span><?= $navE($label) ?></span>
       <?php if ($key === 'avisos' && $navNoticeCount > 0): ?><span class="badge" data-testid="nav-notices-count" aria-label="<?= $navNoticeCount ?> aviso<?= $navNoticeCount === 1 ? '' : 's' ?> não lido<?= $navNoticeCount === 1 ? '' : 's' ?>"><?= $navNoticeCount ?></span><?php endif; ?>
     </a>
     <?php endforeach; ?>
-  </details>
-  <?php endif; ?>
+  </div>
 <?php endforeach; ?>
 </nav>
 <div class="cn58-nav-account">
   <p class="cn58-mobile-identity"><?= $navE($clinicName) ?><br><span><?= $navE($shellFirstName) ?></span></p>
+  <?php if ($navAllowed('/ajuda')): ?><a href="/ajuda" class="cn58-nav-help<?= $navActive === 'ajuda' ? ' active' : '' ?>"<?= $navActive === 'ajuda' ? ' aria-current="page"' : '' ?> data-testid="nav-help"><?= $navIcons['/ajuda'] ?? '' ?><span>Central de ajuda</span></a><?php endif; ?>
   <form method="post" action="/logout"><input type="hidden" name="_csrf_token" value="<?= $navE(\ClyoNutri\Core\Security\Csrf::token()) ?>"><button type="submit" class="cn58-nav-logout">Sair do consultório</button></form>
 </div>

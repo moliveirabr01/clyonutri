@@ -128,7 +128,7 @@ $pct = $energy->save($planId, $base + ['goal_type' => 'loss', 'adjust_mode' => '
 T::ok((float)$pct['vet_kcal'] < (float)$pct['get_kcal'], 'redução em % com vírgula ("-20,0") é aceita');
 
 echo "=== R-002: identidade da versão ===\n";
-T::ok(BuildIdentity::PACKAGE_VERSION === 'v54.63' && BuildIdentity::UI_VERSION === 'v54.63', 'BuildIdentity v54.63');
+T::ok(version_compare(ltrim(BuildIdentity::PACKAGE_VERSION, 'v'), '54.63', '>=') && BuildIdentity::UI_VERSION === BuildIdentity::PACKAGE_VERSION, 'BuildIdentity a partir da v54.63 (' . BuildIdentity::PACKAGE_VERSION . ')');
 $info = json_decode((string)file_get_contents(dirname(__DIR__) . '/RELEASE_INFO.json'), true);
 T::ok(is_array($info) && ($info['version'] ?? '') === BuildIdentity::PACKAGE_VERSION, 'RELEASE_INFO.json igual ao BuildIdentity');
 

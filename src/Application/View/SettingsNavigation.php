@@ -48,6 +48,14 @@ final class SettingsNavigation
         $role=$st->fetchColumn();if(!$role)return [];
         $manage=in_array($role,['owner','admin'],true);
         $protocols=(new \ClyoNutri\Domain\ClinicalProtocol\ProtocolWorkspace($db))->globallyEnabled();
-        return self::areas($manage,$protocols);
+        $areas=self::areas($manage,$protocols);
+        // v54.65: "Pedidos LGPD" saiu do menu lateral e vira uma área de Configurações (mesma regra de acesso da rota).
+        $actor=\ClyoNutri\Core\Auth\AuthContext::get()?->toArray();
+        if($actor===null||\ClyoNutri\Core\Security\ClinicalAuthorization::allowsWeb($actor,'/privacidade/pedidos','GET')){
+            $areas[]=['key'=>'privacidade','label'=>'Pedidos LGPD','hint'=>'Pedidos dos pacientes sobre os próprios dados','url'=>'/privacidade/pedidos','tasks'=>[
+                ['label'=>'Atender pedidos LGPD dos pacientes','url'=>'/privacidade/pedidos','terms'=>'lgpd titular exportar exclusao anonimizar privacidade dados pedido'],
+            ]];
+        }
+        return $areas;
     }
 }

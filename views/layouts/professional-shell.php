@@ -26,7 +26,7 @@ if ($shellFirstName === '') {
   <link rel="stylesheet" href="/assets/css/ux-v54-52.css?v=v54-54">
   <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-57">
   <?php if (!empty($dashboardV5456Styles)): ?><link rel="stylesheet" href="/assets/css/dashboard-v54-56.css?v=v54-56"><?php endif; ?>
-  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-64">
+  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-65">
 </head>
 <?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) {} ?>
 <body class="cn58" data-session-ttl="<?= (int)$shellSessionTtl ?>">

@@ -449,12 +449,16 @@ T::ok(str_contains($dashHtml, 'Olá, <strong>Helena</strong>') && !str_contains(
 T::ok(str_contains($dashHtml, 'data-testid="dash-continue-card"') && str_contains($dashHtml, 'Continuar de onde parou'),
     'NI2-854 (UX-014): dashboard destaca card "Continuar de onde parou" para consulta em andamento');
 
-// Verifica 7 itens de 1º nível no menu lateral (UX-015)
+// UX-015 revisto na v54.65: três grupos fixos (sem recolher), menu enxuto e ajuda no rodapé
 preg_match('~<nav class="cn58-nav-sections"[^>]*>(.*?)</nav>~s', $dashHtml, $navMatch);
 $navHtml = $navMatch[1] ?? '';
-$topItemsCount = preg_match_all('~data-nav-top-item="~', $navHtml);
-T::ok($topItemsCount === 7 && str_contains($navHtml, 'data-testid="nav-group-biblioteca"') && str_contains($navHtml, 'data-testid="nav-group-gestao"'),
-    "NI2-854 (UX-015): menu lateral tem exatamente 7 itens visíveis no 1º nível (5 nucleares + Biblioteca nutricional ▾ + Gestão ▾; encontrado: {$topItemsCount})");
+$navLinks = preg_match_all('~class="app-nav__item~', $navHtml);
+T::ok(!str_contains($navHtml, '<details') && str_contains($navHtml, 'data-testid="nav-group-biblioteca"') && str_contains($navHtml, 'data-testid="nav-group-gestao"'),
+    'v54.65 (UX-015): grupos Biblioteca nutricional e Gestão fixos, sem recolher');
+T::ok($navLinks <= 14 && !preg_match('~href="/(indicadores|configuracoes/assinatura|configuracoes/equipe|privacidade/pedidos|ajuda|planos/modelos)"~', $navHtml),
+    "v54.65 (UX-015): menu enxuto, sem links mortos nem itens de configuração soltos ({$navLinks} itens)");
+T::ok(str_contains($dashHtml, 'data-testid="nav-help"') && str_contains($navHtml, 'href="/modelos"'),
+    'v54.65: Central de ajuda no rodapé do menu e Modelos de plano em /modelos');
 
 // Verifica UX-018: busca sem resultado em /pacientes oferece "Cadastrar «{termo}»"
 $_GET = ['q' => 'Paciente Inexistente XYZ'];
