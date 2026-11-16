@@ -7,7 +7,7 @@ $active = array_filter($shares, static fn($s) => $s['revoked_at'] === null);
 $has = array_flip(array_map(static fn($s) => (int)$s['patient_id'], $active));
 $fmt = static fn($d) => $d ? date('d/m/Y H:i', strtotime((string)$d)) : '';
 ?>
-<link rel="stylesheet" href="/assets/css/materials.css?v=v54-21">
+<link rel="stylesheet" href="/assets/css/materials.css?v=v54-66">
 <div class="mat">
   <p style="margin: 0;"><a href="/materiais">← Materiais educativos</a></p>
   <?php if ($flash): ?><div class="mat-flash mat-flash--<?= $flash['type'] === 'error' ? 'error' : 'success' ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" data-testid="materials-flash"><?= $e($flash['text']) ?></div><?php endif; ?>

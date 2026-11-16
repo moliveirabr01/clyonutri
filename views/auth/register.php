@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cadastre-se · Clyo Nutri</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <style>
     .auth-wrapper {
@@ -75,7 +75,7 @@
     .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #B04A1B); outline-offset: 2px; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <div class="auth-wrapper">

@@ -13,10 +13,10 @@ $recipes = $list['linked_recipes'] ?? [];
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lista de Compras — <?= $e($list['patient_name']) ?> — Clyo Nutri</title>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=v54-17">
   <link rel="stylesheet" href="/assets/css/shopping-list.css?v=v54-44">
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-44">
 <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-44">
 </head>

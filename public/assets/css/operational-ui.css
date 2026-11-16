@@ -101,3 +101,10 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* v54.66: inclusão de alimento dentro da refeição (NI2-845) com os mesmos campos do DS que o formulário do topo usa. */
+[data-meal-inline-add] label{display:block;font-weight:600}
+[data-meal-inline-add] input:not([type=checkbox]):not([type=radio]):not([type=hidden]),[data-meal-inline-add] select{box-sizing:border-box;max-width:100%;min-width:0;width:100%;min-height:var(--op-target);padding:.5rem .75rem;border:1px solid var(--border-input,#828B9B);border-radius:var(--radius-input,8px);background:var(--neutral-white,#fff);color:var(--neutral-ink-900,#1F2937);font:inherit;font-size:var(--font-size-compact,.875rem);margin-top:.25rem}
+[data-meal-inline-add] [data-food-picker]{grid-column:1/-1}
+[data-meal-inline-add] .op-form-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))}
+/* v54.66: select sem classe de fundo fica branco como os demais campos do DS (o padrão do navegador é cinza). */
+:where(.app-content) select{background-color:var(--neutral-white,#fff)}

@@ -3,7 +3,7 @@
 use ClyoNutri\Domain\Materials\MaterialService as M;
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 ?><!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meus materiais — Clyo Nutri</title>
-<link rel="stylesheet" href="/assets/css/materials.css?v=v54-21"></head>
+<link rel="stylesheet" href="/assets/css/materials.css?v=v54-66"></head>
 <body class="mat-patient"><main class="mat" style="max-width: 760px; margin: 0 auto; padding: 24px 16px;">
 <p style="margin: 0;"><a href="/app">← Área do paciente</a></p>
 <div class="mat-head"><div><h1>Meus materiais</h1><p>Orientações, receitas e listas que sua nutricionista enviou para você.</p></div></div>

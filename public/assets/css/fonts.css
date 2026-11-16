@@ -26,6 +26,18 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Inter normal 400 700 — símbolos usados na interface (→ ← ↔ ↗ ↳ ≈ ≠ ≤ ≥ ✓ ✗ ★ ☆ ● ○ ⚠ Δ Σ ⌘).
+   v54.66: antes caíam numa fonte do sistema e mudavam de tamanho e traço conforme o computador.
+   Subconjunto do InterVariable.ttf 4.1 (OFL 1.1), sem sobrepor as faixas acima. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/assets/fonts/inter-normal-symbols.woff2') format('woff2');
+  unicode-range: U+0394, U+03A3, U+2190, U+2192, U+2194, U+2197, U+21B3, U+2248, U+2260, U+2264-2265, U+2713, U+2717, U+2605-2606, U+25CB, U+25CF, U+26A0, U+2318;
+}
+
 /* Playfair Display italic 400 — latin-ext */
 @font-face {
   font-family: 'Playfair Display';

@@ -108,7 +108,7 @@
             <li data-testid="item-diff-removed" class="u-color-semantic-error-strong"><strong>− Retirado:</strong> <?= htmlspecialchars((string)$rm['food_name']) ?> — <?= htmlspecialchars((string)$rm['amount']) ?> <?= htmlspecialchars((string)$rm['measure_unit']) ?> (<?= number_format((float)$rm['energy_kcal'], 0, ',', '.') ?> kcal)</li>
           <?php endforeach; ?>
           <?php foreach ($mDiff['items_modified'] as $md): ?>
-            <li data-testid="item-diff-modified" class="u-color-semantic-warning-strong"><strong>⇄ Porção ajustada:</strong> <?= htmlspecialchars((string)$md['food_name']) ?> de <?= htmlspecialchars((string)$md['amount_from']) ?> <?= htmlspecialchars((string)$md['unit_from']) ?> para <?= htmlspecialchars((string)$md['amount_to']) ?> <?= htmlspecialchars((string)$md['unit_to']) ?> (Δ <?= ($md['delta_kcal'] > 0 ? '+' : '') . number_format((float)$md['delta_kcal'], 0, ',', '.') ?> kcal)</li>
+            <li data-testid="item-diff-modified" class="u-color-semantic-warning-strong"><strong>↔ Porção ajustada:</strong> <?= htmlspecialchars((string)$md['food_name']) ?> de <?= htmlspecialchars((string)$md['amount_from']) ?> <?= htmlspecialchars((string)$md['unit_from']) ?> para <?= htmlspecialchars((string)$md['amount_to']) ?> <?= htmlspecialchars((string)$md['unit_to']) ?> (Δ <?= ($md['delta_kcal'] > 0 ? '+' : '') . number_format((float)$md['delta_kcal'], 0, ',', '.') ?> kcal)</li>
           <?php endforeach; ?>
           <?php foreach ($mDiff['items_unchanged'] as $un): ?>
             <li class="u-color-neutral-gray-500">Mantido: <?= htmlspecialchars((string)$un['food_name']) ?> (<?= htmlspecialchars((string)$un['amount']) ?> <?= htmlspecialchars((string)$un['measure_unit']) ?>)</li>

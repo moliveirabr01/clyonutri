@@ -175,7 +175,7 @@ class OnboardingController
                   <strong style="font-size: 0.8rem; color: <?= $isCurrent ? 'var(--brand-navy-900)' : 'var(--neutral-gray-500)' ?>; display: block; line-height: 1.2;">
                     <?= $sInfo['title'] ?>
                   </strong>
-                  <span style="font-size: 0.7rem; color: var(--neutral-gray-500);"><?= $sInfo['desc'] ?></span>
+                  <span style="font-size: var(--font-size-caption, 0.75rem); color: var(--neutral-gray-500);"><?= $sInfo['desc'] ?></span>
                 </a>
               <?php endforeach; ?>
             </div>

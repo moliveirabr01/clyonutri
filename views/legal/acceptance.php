@@ -26,7 +26,7 @@ $fmtDate = static function (string $dt): string {
   <meta name="robots" content="noindex">
   <title>Termos atualizados · Clyo Nutri</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <style>
     .acc-wrapper { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-6); background: #FAF9F4; }
@@ -44,7 +44,7 @@ $fmtDate = static function (string $dt): string {
     .acc-logout button { background: none; border: none; padding: 0; color: var(--neutral-gray-700); text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <main class="acc-wrapper" id="conteudo">

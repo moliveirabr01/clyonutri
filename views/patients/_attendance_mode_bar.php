@@ -31,7 +31,7 @@ $stateLabels = \ClyoNutri\Domain\Appointment\CareWorkflow::LABELS;
       <?php endif; ?>
       <ul class="attendance-mode__steps" data-testid="attendance-steps" aria-label="Etapas do atendimento">
         <?php foreach ($flow['steps'] as $s): ?>
-          <li data-step="<?= $e($s['key']) ?>" data-state="<?= $e($s['state']) ?>" class="attendance-mode__step attendance-mode__step--<?= $e($s['state']) ?>"><span aria-hidden="true"><?= ['done' => '✓', 'in_progress' => '✎', 'review' => '!', 'pending' => '○', 'not_applicable' => '–'][$s['state']] ?? '·' ?></span> <?= $e($s['label']) ?>: <?= $e($stateLabels[$s['state']] ?? $s['state']) ?></li>
+          <li data-step="<?= $e($s['key']) ?>" data-state="<?= $e($s['state']) ?>" class="attendance-mode__step attendance-mode__step--<?= $e($s['state']) ?>"><span aria-hidden="true"><?= ['done' => '✓', 'in_progress' => '…', 'review' => '!', 'pending' => '○', 'not_applicable' => '–'][$s['state']] ?? '·' ?></span> <?= $e($s['label']) ?>: <?= $e($stateLabels[$s['state']] ?? $s['state']) ?></li>
         <?php endforeach; ?>
       </ul>
     <?php endif; ?>

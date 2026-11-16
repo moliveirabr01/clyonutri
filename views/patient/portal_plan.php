@@ -12,7 +12,7 @@ if (!empty($plan['published_at'])) {
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Meu plano alimentar · Clyo Nutri</title>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/patient-self-service.css?v=1">
   <link rel="stylesheet" href="/assets/css/patient-portal-v54-57.css?v=v54-57">

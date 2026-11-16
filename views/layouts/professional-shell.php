@@ -16,17 +16,17 @@ if ($shellFirstName === '') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($title ?? 'Clyo Nutri') ?> — Sistema do Nutricionista</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-journeys.css?v=v54-47">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-53">
   <link rel="stylesheet" href="/assets/css/ux-v54-52.css?v=v54-54">
-  <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-57">
+  <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-66">
   <?php if (!empty($dashboardV5456Styles)): ?><link rel="stylesheet" href="/assets/css/dashboard-v54-56.css?v=v54-56"><?php endif; ?>
-  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-65">
+  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-66">
 </head>
 <?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) {} ?>
 <body class="cn58" data-session-ttl="<?= (int)$shellSessionTtl ?>">

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recuperar Acesso · Clyo Nutri</title>
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <style>
     .auth-wrapper {
@@ -77,7 +77,7 @@
       text-decoration: underline;
     }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <div class="auth-wrapper">

@@ -189,10 +189,10 @@ class RecipeController
               <div class="card" style="display: flex; flex-direction: column; padding: 0; overflow: hidden; margin-bottom: 0;">
                 <div style="padding: var(--space-5); border-bottom: 1px solid var(--neutral-gray-200);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                    <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid var(--botanical-sage-200, #D3E5D5); padding: 2px 8px; border-radius: var(--radius-pill);">
+                    <span style="font-size: var(--font-size-caption, 0.75rem); font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid var(--botanical-sage-200, #D3E5D5); padding: 2px 8px; border-radius: var(--radius-pill);">
                       <?= htmlspecialchars($r['meal_type'] ?: $r['category']) ?>
                     </span>
-                    <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; color: var(--neutral-gray-500);">
+                    <span style="font-size: var(--font-size-caption, 0.75rem); font-weight: 600; text-transform: uppercase; color: var(--neutral-gray-500);">
                       <?= htmlspecialchars(\ClyoNutri\Core\I18n\LabelMap::recipeDifficulty($r['difficulty'] ?? null)) ?>
                     </span>
                   </div>
@@ -212,19 +212,19 @@ class RecipeController
                 <div style="background: var(--neutral-warm-50); padding: var(--space-3) var(--space-4); display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; border-bottom: 1px solid var(--neutral-gray-200);">
                   <div>
                     <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= (int)round((float)$r['energy_kcal_per_serving']) ?></span>
-                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">kcal</span>
+                    <span style="font-size: var(--font-size-caption, 0.75rem); text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">kcal</span>
                   </div>
                   <div>
                     <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['protein_g_per_serving'], 1) ?>g</span>
-                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Prot</span>
+                    <span style="font-size: var(--font-size-caption, 0.75rem); text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Prot</span>
                   </div>
                   <div>
                     <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['carbs_g_per_serving'], 1) ?>g</span>
-                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Carb</span>
+                    <span style="font-size: var(--font-size-caption, 0.75rem); text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Carb</span>
                   </div>
                   <div>
                     <span style="display: block; font-size: 1rem; font-weight: 700; color: var(--brand-navy-900);"><?= round((float)$r['fat_g_per_serving'], 1) ?>g</span>
-                    <span style="font-size: 0.68rem; text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Gord</span>
+                    <span style="font-size: var(--font-size-caption, 0.75rem); text-transform: uppercase; color: var(--neutral-gray-500); font-weight: 600;">Gord</span>
                   </div>
                 </div>
 
@@ -242,7 +242,7 @@ class RecipeController
                   <?php if (!empty($alList)): ?>
                     <div style="display: flex; gap: var(--space-1); flex-wrap: wrap;">
                       <?php foreach ($alList as $alg): ?>
-                        <span style="font-size: 0.7rem; background: var(--semantic-error-light); color: var(--semantic-error); padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                        <span style="font-size: var(--font-size-caption, 0.75rem); background: var(--semantic-error-light); color: var(--semantic-error); padding: 2px 6px; border-radius: 4px; font-weight: 600;">
                           <?= htmlspecialchars($alg) ?>
                         </span>
                       <?php endforeach; ?>
@@ -591,7 +591,7 @@ class RecipeController
               <div id="stepsContainer" style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 8px;">
                   <input type="text" name="steps[]" placeholder="Passo 1: Em uma tigela, misture os ingredientes até homogenizar..." required style="padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>×</button>
                 </div>
               </div>
             </div>
@@ -645,7 +645,7 @@ class RecipeController
                       <label class="form-label" for="rc-unit-${i}">Medida</label>
                       <select id="rc-unit-${i}" name="ingredients[${i}][measure_unit]" class="form-control"><?= UnitCheckView::unitOptions() ?></select>
                   </div>
-                  <button type="button" class="btn recipe-ingredient-row__remove" aria-label="Remover ingrediente" data-remove-parent>✕</button>
+                  <button type="button" class="btn recipe-ingredient-row__remove" aria-label="Remover ingrediente" data-remove-parent>×</button>
                   <div class="recipe-ingredient-row__check"><?= str_replace(['__ID__', '__NAME__'], ['rc-confirm-${i}', 'ingredients[${i}][confirm_estimated]'], UnitCheckView::block('__ID__', '__NAME__')) ?></div>
               `;
               row.setAttribute('data-unit-scope', '');
@@ -663,7 +663,7 @@ class RecipeController
               row.style.cssText = 'display: flex; gap: 8px;';
               row.innerHTML = `
                   <input type="text" name="steps[]" placeholder="Passo ${stepNum}: ..." required style="padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.9rem; flex: 1; font-family: var(--font-body);">
-                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>✕</button>
+                  <button type="button" class="btn" style="background: var(--semantic-error-light); color: var(--semantic-error); border: none; min-height: 38px; padding: 0 12px;" data-remove-parent>×</button>
               `;
               container.appendChild(row);
           }

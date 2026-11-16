@@ -585,6 +585,7 @@ class ChatController
     </style>
 
     <?php if ($chatFlash): ?><p role="alert" class="card" data-testid="chat-flash" style="border-left: 4px solid var(--semantic-warning, #946200);"><?= htmlspecialchars($chatFlash) ?></p><?php endif; ?>
+    <h1 class="sr-only">Conversas</h1><?php /* v54.66: toda tela logada tem H1 (DS); o chat mostra só os títulos dos painéis */ ?>
     <!-- Layout de Comunicação Segura -->
     <div class="chat-layout">
         <!-- Lista de Conversas -->

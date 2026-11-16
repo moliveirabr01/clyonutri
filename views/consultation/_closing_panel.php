@@ -135,7 +135,7 @@ $nextTodayApp = $stNextToday->fetch(\PDO::FETCH_ASSOC) ?: null;
       <?php if ($existingFollowUp): ?>
         <p class="op-message op-message--success u-text-compact u-mb-2" data-testid="closing-followup-scheduled">
           <strong>Retorno agendado:</strong> <?= $eClose(date('d/m/Y \à\s H:i', strtotime((string)$existingFollowUp['scheduled_at']))) ?>.
-          <a href="/agenda?view=day&amp;date=<?= $eClose(substr((string)$existingFollowUp['scheduled_at'], 0, 10)) ?>" class="u-ml-1">Ver na agenda</a>
+          <a href="/agenda?view=day&amp;date=<?= $eClose(substr((string)$existingFollowUp['scheduled_at'], 0, 10)) ?>" class="u-ml-1 u-link">Ver na agenda</a>
         </p>
       <?php endif; ?>
 

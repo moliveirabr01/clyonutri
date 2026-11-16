@@ -34,7 +34,7 @@
 }
 
 /* v54.57 (UX-121): links isolados que viram bloco (itens de flex, breadcrumb, estado do rascunho) com alvo ≥ 24 px — WCAG 2.5.8 */
-.card__header > a,.op-breadcrumb > a,a[data-resume],.u-flex > a.u-text-compact{min-height:24px;line-height:1.5rem}
+.card__header > a,.op-breadcrumb > a,a[data-resume],.u-flex > a.u-text-compact:not(.btn){min-height:24px;line-height:1.5rem}
 /* v54.57 (UX-122): indicador de foco visível em campos de data e hora (Chromium não mostrava contorno) */
 input[type="date"]:focus-visible,input[type="time"]:focus-visible,input[type="datetime-local"]:focus-visible,
 input[type="date"]:focus-within,input[type="time"]:focus-within,input[type="datetime-local"]:focus-within{outline:2px solid var(--botanical-green-600,#39734A);outline-offset:2px}

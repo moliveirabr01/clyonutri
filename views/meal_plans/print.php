@@ -13,7 +13,7 @@ $n = static fn(float $v, int $d = 0) => number_format($v, $d, ',', '.');
   <title>Plano alimentar — <?= $e($doc['patient']['name'] ?? 'paciente a definir') ?></title>
   <link rel="stylesheet" href="/assets/css/prontuario-impressao.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/plano-impressao.css?v=botanical-v54-9">
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
 <div class="pi-toolbar" role="region" aria-label="Opções de impressão">

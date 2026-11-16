@@ -25,10 +25,10 @@ $brandName = !empty($clinicName) ? ('Teleconsulta · ' . $clinicName) : 'Telecon
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title><?= $e($title) ?> · ClyoNutri</title>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/teleconsulta.css?v=v54-27">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body class="tc-page">
   <?php require __DIR__ . '/partials/icons.php'; ?>

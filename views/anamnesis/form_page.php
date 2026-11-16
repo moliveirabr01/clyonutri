@@ -108,7 +108,7 @@ foreach ($history as $h) {
     <?php if ($compareData['v1_meta']['version'] === $compareData['v2_meta']['version']): ?><p class="op-message op-message--info" role="status">Você selecionou a mesma versão nos dois lados. Escolha versões diferentes para revisar mudanças.</p><?php endif; ?>
     <div class="cr-card__head">
       <h3>Comparativo de Versões: v<?= (int)$compareData['v1_meta']['version'] ?> vs v<?= (int)$compareData['v2_meta']['version'] ?></h3>
-      <a href="/pacientes/<?= $pid ?>/anamnese" class="cr-link">Fechar comparador ✕</a>
+      <a href="/pacientes/<?= $pid ?>/anamnese" class="cr-link">Fechar comparador ×</a>
     </div>
     <div class="cr-scroll">
       <table class="table an-table">

@@ -9,7 +9,7 @@ body.cn58 { background: var(--neutral-gray-50, #F8FAFC); }
 .cn58 #clinical-navigation { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--botanical-sage-300) transparent; gap: 0; }
 .cn58 .cn58-nav-sections, .cn58 .cn58-nav-account { flex-shrink: 0; }
 .cn58 .cn58-nav-group { padding: 4px 0 12px; }
-.cn58 .app-nav__group-label { margin: 8px 12px 6px; padding: 0; color: var(--botanical-sage-200); font-size: .6875rem; letter-spacing: .09em; font-weight: 600; }
+.cn58 .app-nav__group-label { margin: 8px 12px 6px; padding: 0; color: var(--botanical-sage-200); font-size: var(--font-size-caption, .75rem); letter-spacing: .09em; font-weight: 600; }
 .cn58 details.cn58-nav-collapsible > summary.app-nav__group-toggle { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; padding: 8px 12px; margin: 2px 0; border-radius: 9px; min-height: 38px; user-select: none; }
 .cn58 details.cn58-nav-collapsible > summary.app-nav__group-toggle::-webkit-details-marker { display: none; }
 .cn58 details.cn58-nav-collapsible > summary.app-nav__group-toggle:hover { background: rgba(255,255,255,.09); color: var(--neutral-white); }
@@ -122,8 +122,8 @@ body.cn58 { background: var(--neutral-gray-50, #F8FAFC); }
    alvos continuam acima de 24 px (WCAG 2.5.8). O celular mantém 44 px. */
 @media (min-width: 1025px) and (max-height: 900px) {
   .cn58 .app-sidebar__logo { padding-bottom: 8px; margin-bottom: 4px; }
-  .cn58 .cn58-nav-group { padding: 2px 0 6px; }
-  .cn58 .app-nav__group-label { margin: 6px 12px 3px; }
+  .cn58 .cn58-nav-group { padding: 2px 0 4px; }
+  .cn58 .app-nav__group-label { margin: 5px 12px 2px; }
   .cn58 .app-nav__item { min-height: 32px; padding: 5px 12px; margin: 1px 0; }
   .cn58 .cn58-nav-account { padding-top: 4px; margin-top: 2px; }
   .cn58 .cn58-nav-help, .cn58 .cn58-nav-logout { min-height: 32px; padding: 5px 12px; }

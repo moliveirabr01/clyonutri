@@ -35,10 +35,10 @@ $title = 'Transcrição da consulta';
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="<?= (($mode ?? "") === "portal") ? "same-origin" : "no-referrer" ?>">
   <title><?= $e($title) ?> · Clyo Nutri</title>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/teleconsulta.css?v=v54-27">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body class="tc-page">
   <header class="tc-header"><p class="tc-brand">Clyo Nutri · Aceite do paciente</p></header>

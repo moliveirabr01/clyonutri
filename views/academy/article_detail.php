@@ -94,7 +94,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
   <!-- Ficha Crítica PICO (Evidence Desk) se existir -->
   <?php if ($evidenceSheet): ?>
     <?php $certainty = \ClyoNutri\Domain\Academy\AcademyEvidenceDeskService::certaintyBadge($evidenceSheet['evidence_certainty'] ?? ''); ?>
-    <div class="card" style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid #D0D5DD; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(16,24,40,0.05);">
+    <div class="card" style="padding: 24px; background: #fff; border-radius: 12px; border: 1px solid var(--neutral-gray-300, #D1D5DB); margin-bottom: 24px; box-shadow: 0 1px 3px rgba(16,24,40,0.05);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div>
           <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--brand-copper-600, #E04F16); letter-spacing: 0.5px;">Evidence Desk</span>
@@ -170,7 +170,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">Padrão ABNT</span>
-          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid var(--neutral-gray-300, #D1D5DB); background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['abnt']) ?></span>
         </div>
         <div style="padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.88rem; color: #1D2939; font-family: monospace; border: 1px solid #EAECF0;">
@@ -181,7 +181,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">Padrão Vancouver</span>
-          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid var(--neutral-gray-300, #D1D5DB); background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['vancouver']) ?></span>
         </div>
         <div style="padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.88rem; color: #1D2939; font-family: monospace; border: 1px solid #EAECF0;">
@@ -192,7 +192,7 @@ $designLabel = \ClyoNutri\Domain\Academy\AcademyArticleService::studyDesignLabel
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.8rem; font-weight: 700; color: #475467; text-transform: uppercase;">BibTeX</span>
-          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid #D0D5DD; background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
+          <button type="button" data-copy style="font-size: 0.75rem; padding: 2px 8px; border: 1px solid var(--neutral-gray-300, #D1D5DB); background: #fff; border-radius: 4px; cursor: pointer;">Copiar</button>
           <span style="display:none;"><?= htmlspecialchars($citations['bibtex']) ?></span>
         </div>
         <pre style="margin: 0; padding: 10px 14px; background: #F9FAFB; border-radius: 6px; font-size: 0.82rem; color: #1D2939; border: 1px solid #EAECF0; overflow-x: auto;"><?= htmlspecialchars($citations['bibtex']) ?></pre>

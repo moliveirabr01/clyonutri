@@ -211,7 +211,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
       color: var(--semantic-success-text, #0A5F63);
     }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <header class="booking-header">

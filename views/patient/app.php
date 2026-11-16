@@ -13,7 +13,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal do Paciente · Clyo Nutri</title>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <style>
     :root {
       /* Clinical Botanical (NI2-25) com o contraste da NI2-140 (A8): copper-600 só em texto e link, ação em verde. Os nomes --brand-* são legados e ficam só por
@@ -217,7 +217,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
     }
   </style>
 <script src="/assets/js/validacao-ptbr.js" defer></script>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
 

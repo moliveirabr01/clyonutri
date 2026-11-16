@@ -78,7 +78,7 @@ $statusLabels = ['active' => 'Ativa', 'achieved' => 'Atingida', 'cancelled' => '
   <input id="goal-date" name="target_date" type="date" class="form-control">
   <label for="goal-message" class="form-label">Mensagem para a paciente (opcional)</label>
   <textarea id="goal-message" name="message_for_patient" class="form-control" maxlength="500" rows="2"></textarea>
-  <p class="cn-profile-note"><small>A paciente vê a meta e os registros mais recentes. O app não calcula "quanto falta" nem sugere mudanças no tratamento.</small></p>
+  <p class="cn-profile-note">A paciente vê a meta e os registros mais recentes. O app não calcula "quanto falta" nem sugere mudanças no tratamento.</p>
   <button type="submit" class="btn btn-secondary">Criar meta</button>
   </fieldset>
 </form>

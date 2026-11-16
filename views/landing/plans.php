@@ -17,7 +17,7 @@
   <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl ?? \ClyoNutri\Core\Security\ContactInfo::url('/planos')) ?>">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/landing-premium.css?v=botanical-v54-9">
   <style>
     .plans-hero {
@@ -179,7 +179,7 @@
       margin: 0;
     }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <!-- Header -->

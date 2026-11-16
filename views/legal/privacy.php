@@ -8,7 +8,7 @@
   <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Diretrizes de proteção de dados, privacidade e segurança da informação em conformidade com a LGPD.') ?>">
   <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl ?? \ClyoNutri\Core\Security\ContactInfo::url('/privacidade')) ?>">
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
+  <link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">
   <link rel="stylesheet" href="/assets/css/landing-premium.css?v=botanical-v54-9">
   <style>
     .legal-page {
@@ -66,7 +66,7 @@
       margin-bottom: 16px;
     }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">
 </head>
 <body>
   <!-- Header -->

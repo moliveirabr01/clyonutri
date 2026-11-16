@@ -39,7 +39,7 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappMsg}" . (!empty($pa
     <div class="card u-p-6 u-accent u-accent-semantic-error u-bg-neutral-white u-radius-card u-shadow-md u-mb-6">
       <div class="u-flex u-gap-4 u-items-start">
         <div class="ds-icon-badge ds-icon-badge--error u-text-h3">
-          ✕
+          ×
         </div>
         <div>
           <h2 class="u-text-card-title u-font-semibold u-color-semantic-error-strong u-mt-0 u-mb-2 u-mx-0">Não foi possível gerar o convite</h2>

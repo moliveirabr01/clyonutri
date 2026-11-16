@@ -154,11 +154,11 @@ final class ErrorPage
     {
         return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . htmlspecialchars($heading, ENT_QUOTES, 'UTF-8') . ' · Clyo Nutri</title>'
-            . '<link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">'
+            . '<link rel="stylesheet" href="/assets/css/fonts.css?v=v54-66">'
             . '<link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">'
-            . '<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">'
+            . '<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-66">'
             . '<link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-47">'
-            . '<link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-57">'
+            . '<link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-66">'
             . '</head><body class="error-standalone"><header class="error-standalone__header"><a href="/"><img src="/assets/clyonutri-logo-dark.svg?v=botanical-v54-9" alt="Clyo Nutri" width="160" height="40"></a></header>'
             . '<main id="conteudo" class="error-standalone__main">' . $body . '</main></body></html>';
     }

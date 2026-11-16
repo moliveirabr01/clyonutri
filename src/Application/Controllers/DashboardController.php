@@ -706,7 +706,7 @@ class DashboardController
           <div class="cn-dialog__panel modal-dialog u-maxw-prose">
             <div class="modal-header">
               <h3>Nova avaliação antropométrica</h3>
-              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">×</button>
             </div>
             <?php /* NI2-602: id do paciente lido de $profile, não de $p (views incluídas acima podem reaproveitar nomes). */ $anthroPatientId = (int)$profile['patient']['id']; ?>
             <?= \ClyoNutri\Application\View\ClinicalContext::render(Connection::getInstance(),$anthroPatientId) ?>
@@ -1192,7 +1192,7 @@ class DashboardController
           <div class="cn-dialog__panel modal-dialog u-maxw-prose">
             <div class="modal-header">
               <h3>Nova avaliação antropométrica unificada</h3>
-              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">✕</button>
+              <button type="button" data-dialog-close class="modal-close" data-call="closeAnthroModal" aria-label="Fechar modal">×</button>
             </div>
             <?= \ClyoNutri\Application\View\ClinicalContext::render(Connection::getInstance(),(int)$patient['id']) ?>
             <form method="POST" action="/pacientes/<?= $patient['id'] ?>/antropometria" data-testid="unified-anthropometry-form">
@@ -3105,7 +3105,7 @@ class DashboardController
         <div id="card-novo-agendamento" data-dialog="inline" class="card u-accent-top u-accent-brand-copper-500 u-mb-6<?= $openNew ? '' : ' u-hidden' ?>">
           <div class="card__header">
             <h3>Agendar nova consulta</h3>
-            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" class="u-bg-none u-border-0 u-text-h3 u-pointer">✕</button>
+            <button type="button" data-dialog-close aria-label="Fechar agendamento" data-hide="card-novo-agendamento" class="u-bg-none u-border-0 u-text-h3 u-pointer">×</button>
           </div>
           <?php if ($agendaRecovered): ?>
             <div class="op-message op-message--error u-mt-3" role="alert" data-testid="agenda-form-error">
@@ -3282,7 +3282,7 @@ class DashboardController
                             <?php /* Menu de Estados da Consulta ("Mais ações ▾") */ ?>
                             <?php if ($a['status'] === 'scheduled' || $a['status'] === 'confirmed'): ?>
                               <details class="agenda-actions-dropdown u-inline-block u-relative" data-more-actions>
-                                <summary class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch u-pointer u-list-none" data-testid="agenda-more-actions">Mais ações ▾</summary>
+                                <summary class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch u-pointer u-list-none" data-testid="agenda-more-actions">Mais ações <?= \ClyoNutri\Application\View\Icon::svg('chevron-down', 14) ?></summary>
                                 <div class="agenda-actions-menu ds-menu-panel" data-more-actions-menu role="menu">
                                   <a href="/agenda/<?= (int)$a['id'] ?>/reagendar" class="agenda-menu-item u-minh-touch u-flex u-items-center u-py-1 u-px-3 u-text-caption u-color-neutral-ink-900 u-no-underline" data-testid="agenda-reschedule">Reagendar</a>
                                   <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-m-0" data-confirm="Deseja marcar como Não Compareceu?">
@@ -3805,7 +3805,7 @@ class DashboardController
             <?php endif; ?>
 
             <details class="plan-actions-dropdown u-inline-block u-relative">
-              <summary class="btn btn-outline u-text-compact u-pointer u-list-none" data-testid="plan-more-actions">Mais ações ▾</summary>
+              <summary class="btn btn-outline u-text-compact u-pointer u-list-none" data-testid="plan-more-actions">Mais ações <?= \ClyoNutri\Application\View\Icon::svg('chevron-down', 14) ?></summary>
               <div class="plan-actions-menu ds-menu-panel ds-menu-panel--wide">
                 <?php if ($planHasPatient): ?>
                   <a class="plan-menu-item u-minh-touch u-flex u-items-center u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" href="/pacientes/<?= (int)$plan['patient_id'] ?>/prescricoes?plano=<?= (int)$planId ?>">Manipulados e suplementação</a>
@@ -4160,7 +4160,7 @@ class DashboardController
                               </button>
                               <form method="POST" action="/planos/<?= $planId ?>/itens/<?= $it['id'] ?>/remover" class="u-inline" data-confirm="Remover este alimento?" data-live-plan>
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
-                                <button type="submit" class="u-color-semantic-error u-minw-touch u-minh-touch u-bg-none u-border-0 u-pointer u-text-compact">✕</button>
+                                <button type="submit" class="u-color-semantic-error u-minw-touch u-minh-touch u-bg-none u-border-0 u-pointer u-text-compact">×</button>
                               </form>
                             <?php endif; ?>
                           </td>

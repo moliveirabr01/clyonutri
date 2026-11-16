@@ -4,7 +4,7 @@ use ClyoNutri\Domain\Materials\MaterialService as M;
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $back = '/materiais' . ($target ? '?para=' . (int)$target['id'] : '');
 ?>
-<link rel="stylesheet" href="/assets/css/materials.css?v=v54-21">
+<link rel="stylesheet" href="/assets/css/materials.css?v=v54-66">
 <div class="mat">
   <div class="mat-head">
     <div>

@@ -164,7 +164,7 @@ $dayViewHtml = ob_get_clean();
 
 check(str_contains($dayViewHtml, 'class="table agenda-day-table"'), "Tabela da visão diária possui classe agenda-day-table");
 check(str_contains($dayViewHtml, 'data-testid="agenda-more-actions"'), "Linha da consulta possui botão de menu 'Mais ações ▾'");
-check(str_contains($dayViewHtml, 'Mais ações ▾'), "Texto 'Mais ações ▾' visível");
+check(str_contains($dayViewHtml, 'Mais ações <svg'), "Texto 'Mais ações' com ícone de seta (v54.66: Lucide no lugar do ▾) visível");
 check(str_contains($dayViewHtml, 'data-testid="agenda-reschedule"'), "Ação secundária Reagendar está preservada dentro do dropdown");
 check(str_contains($dayViewHtml, 'Não compareceu'), "Ação secundária Não compareceu está preservada dentro do dropdown");
 check(str_contains($dayViewHtml, 'Cancelar'), "Ação secundária Cancelar está preservada dentro do dropdown");

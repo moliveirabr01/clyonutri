@@ -5,8 +5,8 @@ namespace ClyoNutri\Core\Release;
 /** Artifact consistency, not a signature or a production acceptance. */
 final class BuildIdentity
 {
-    public const PACKAGE_VERSION = 'v54.65';
-    public const UI_VERSION = 'v54.65';
+    public const PACKAGE_VERSION = 'v54.66';
+    public const UI_VERSION = 'v54.66';
     public const SCOPE = 'runtime-sha256-v1';
     private const DIRS = ['src','views','public','config','database','bin','app','routes','bootstrap','vendor'];
     private const FILES = ['.htaccess','index.php','composer.json','composer.lock'];
