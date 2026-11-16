@@ -3403,7 +3403,7 @@ class DashboardController
           </div>
         </div>
 
-        <script src="/assets/js/agenda-form.js?v=v54-30" defer></script>
+        <script src="/assets/js/agenda-form.js?v=v54-64" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
@@ -4626,7 +4626,7 @@ class DashboardController
 
         <?php endif; ?>
 
-        <script src="/assets/js/food-picker.js?v=v54-30" defer></script>
+        <script src="/assets/js/food-picker.js?v=v54-64" defer></script>
         <script src="/assets/js/unit-check.js?v=v54-63" defer></script>
         <script src="/assets/js/quick-plan.js?v=v54-57" defer></script>
         <script src="/assets/js/plan-live.js?v=v54-63" defer></script>

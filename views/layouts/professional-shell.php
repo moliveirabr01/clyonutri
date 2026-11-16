@@ -26,7 +26,7 @@ if ($shellFirstName === '') {
   <link rel="stylesheet" href="/assets/css/ux-v54-52.css?v=v54-54">
   <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-57">
   <?php if (!empty($dashboardV5456Styles)): ?><link rel="stylesheet" href="/assets/css/dashboard-v54-56.css?v=v54-56"><?php endif; ?>
-  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-58">
+  <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-64">
 </head>
 <?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) {} ?>
 <body class="cn58" data-session-ttl="<?= (int)$shellSessionTtl ?>">
@@ -87,8 +87,8 @@ if ($shellFirstName === '') {
 <script src="/assets/js/session-timeout.js?v=v54-30" defer></script>
 <script src="/assets/js/avaliacao-confirmacoes.js?v=v54-63" defer></script>
 <script src="/assets/js/clinical-context.js?v=v54-26" defer></script>
-<script src="/assets/js/operational-ui.js?v=v54-57" defer></script>
-<script src="/assets/js/workflow-drafts.js?v=v54-57" defer></script>
-<script src="/assets/js/navigation-v54-58.js?v=v54-58" defer></script>
+<script src="/assets/js/operational-ui.js?v=v54-64" defer></script>
+<script src="/assets/js/workflow-drafts.js?v=v54-64" defer></script>
+<script src="/assets/js/navigation-v54-58.js?v=v54-64" defer></script>
 </body>
 </html>

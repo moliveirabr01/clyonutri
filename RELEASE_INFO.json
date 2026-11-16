@@ -7,20 +7,26 @@
     "prepared_date": "2026-11-15",
     "production_deployed": false,
     "jira_updated": false,
-    "issue": "Hotfix do menu lateral (v54.62/NI2-854): \"Indicadores\" apontava para /indicadores, rota inexistente (404 em produção); \"Modelos de plano\" apontava para /planos/modelos (403) em vez de /modelos.",
+    "issue": "Hotfix do menu lateral (v54.62/NI2-854): \"Indicadores\" apontava para /indicadores, rota inexistente (404 em produção); \"Modelos de plano\" apontava para /planos/modelos (403) em vez de /modelos. Também: 7 arquivos CSS/JS alterados na v54.62 sem trocar o ?v= (o navegador seguia com a versão antiga em cache; no menu, os grupos recolhíveis apareciam com seta dupla e quebrada).",
     "base_version": "v54.63",
     "production_version": "v54.63",
     "schema_changes": "Nenhuma.",
     "summary": [
         "Menu Gestão sem o item \"Indicadores\" (não existe página de indicadores para o profissional).",
         "\"Modelos de plano\" aponta para /modelos e fica destacado no menu nessa página.",
-        "Verificação: 74 links internos das telas principais, todos sem 4xx; /modelos 200."
+        "Verificação: 74 links internos das telas principais, todos sem 4xx; /modelos 200.",
+        "Cache bust ?v=v54-64 em workspace-v54-58.css, navigation-v54-58.js, food-picker.js, agenda-form.js, consulta-rascunho.js, operational-ui.js e workflow-drafts.js (alterados na v54.62 sem bump). Conferido arquivo a arquivo contra o build v54.60: nenhum outro CSS/JS alterado ficou sem bump."
     ],
     "package": {
         "file": "clyonutri-v54-64-hotfix-hostgator.zip",
         "type": "parcial: só os arquivos alterados sobre a v54.63",
         "files": [
             "views/layouts/_professional_navigation.php",
+            "views/layouts/professional-shell.php",
+            "views/layouts/admin-shell.php",
+            "views/consultation/room.php",
+            "src/Application/Controllers/DashboardController.php",
+            "src/Application/Controllers/RecipeController.php",
             "src/Core/Release/BuildIdentity.php",
             "config/build-manifest.json",
             "RELEASE_INFO.json",

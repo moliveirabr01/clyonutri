@@ -668,7 +668,7 @@ class RecipeController
               container.appendChild(row);
           }
         </script>
-        <script src="/assets/js/food-picker.js?v=v54-44" defer></script>
+        <script src="/assets/js/food-picker.js?v=v54-64" defer></script>
         <script src="/assets/js/unit-check.js?v=v54-63" defer></script>
         <?php
         $content = ob_get_clean();

@@ -164,7 +164,7 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
       <?php if (($app['status'] ?? '') === 'completed'): ?>
         <?php $closingApp = $app; require __DIR__ . '/_closing_panel.php'; ?>
       <?php endif; ?>
-      <script src="/assets/js/consulta-rascunho.js?v=v54-18" defer></script>
+      <script src="/assets/js/consulta-rascunho.js?v=v54-64" defer></script>
       <?php else: ?>
       <?php if ($err !== ''): ?>
         <div class="op-message op-message--error" role="alert" data-testid="consult-submit-error" data-error="<?= htmlspecialchars($err) ?>">
@@ -248,7 +248,7 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
         <summary class="u-font-semibold u-pointer">Fechamento da consulta (agendar retorno e entregar plano)</summary>
         <?php $closingApp = $app; require __DIR__ . '/_closing_panel.php'; ?>
       </details>
-      <script src="/assets/js/consulta-rascunho.js?v=v54-18" defer></script>
+      <script src="/assets/js/consulta-rascunho.js?v=v54-64" defer></script>
       <?php endif; ?>
     </section>
 
