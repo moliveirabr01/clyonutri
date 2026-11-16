@@ -12,10 +12,10 @@ SET NAMES utf8mb4;
 -- 089 · Asaas (checkout, clientes, webhooks, recibos). No banco de produção de 15/11/2026 as tabelas já existem,
 -- mas a migration não estava registrada. Registra só se as 4 tabelas existirem; não cria nada.
 -- ------------------------------------------------------------------------------
+SET @asaas := (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN ('asaas_customers', 'asaas_checkouts', 'asaas_webhook_events', 'asaas_payment_receipts'));
 INSERT IGNORE INTO migrations (migration, executed_at)
-SELECT '2026_11_05_000089_asaas_billing_checkout', NOW() FROM DUAL
-WHERE (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME IN ('asaas_customers', 'asaas_checkouts', 'asaas_webhook_events', 'asaas_payment_receipts')) = 4;
+SELECT '2026_11_05_000089_asaas_billing_checkout', NOW() FROM DUAL WHERE @asaas = 4;
 
 -- ------------------------------------------------------------------------------
 -- 091 · production_events / production_alerts (v54.52, NI2-767)
@@ -238,13 +238,8 @@ CREATE TABLE IF NOT EXISTS consultation_ai_consent_requests (
     KEY idx_ai_consent_req_appt (clinic_id, appointment_id, patient_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Verificação (precisa devolver 3 linhas: os 3 índices). Se devolver menos, a tabela
--- já existia sem os índices: NÃO ignore; crie o que faltar com ALTER TABLE ... ADD ... e confira de novo.
-SELECT DISTINCT INDEX_NAME
-FROM information_schema.STATISTICS
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME = 'consultation_ai_consent_requests'
-  AND INDEX_NAME IN ('uq_ai_consent_req_token', 'uq_ai_consent_req_revoke_token', 'idx_ai_consent_req_appt');
+-- Verificação dos 3 índices: fica na atualizacao-v54-63-verificacao.sql (V3). Aqui não há SELECT direto no
+-- information_schema, porque no phpMyAdmin ele muda o banco das consultas seguintes (erro #1109).
 
 -- Registro da migration (para o Migrator não tentar rodar de novo; mesmo padrão do SQL manual da v54.60).
 INSERT IGNORE INTO migrations (migration, executed_at) VALUES ('2026_11_13_000093_create_transcription_consent_requests', NOW());

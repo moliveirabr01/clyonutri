@@ -39,13 +39,15 @@ No phpMyAdmin, com o banco `maic6824_Clyonutri2` selecionado, abra a aba **Impor
 
 Confira o resultado:
 - **P1:** MySQL 5.7.x.
-- **P3:** `consultation_ai_consent_requests = 0`. As outras tabelas devem ser 1.
-- **P4:** 4 linhas. **Se faltar alguma, pare.**
+- **P3:** uma linha; `consultation_ai_consent_requests = 0` e as outras colunas iguais a 1.
+- **P4:** `colunas_necessarias = 4`. **Se vier menos, pare.**
 - **P5:** anote os números.
 - **P6:** `0` e `0`. **Se vier diferente de zero, pare e avise:** a v54.62 teria rodado neste banco.
 
 ### 4. Atualização do banco
 Importe `database/manual/atualizacao-v54-63-completa.sql` da mesma forma.
+
+Pode colar o conteúdo na aba **SQL** em vez de importar; o resultado é o mesmo. Os scripts não fazem `SELECT` direto no `information_schema` (no phpMyAdmin isso troca o banco das consultas seguintes e dá o erro #1109).
 
 O script:
 - registra a 089 e a 092, que já estavam aplicadas mas não registradas;

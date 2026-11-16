@@ -10,14 +10,16 @@ WHERE migration IN ('2026_11_07_000091_create_production_events_table', '2026_11
   '2026_11_15_000095_reteste_ux_catalog_cleanup');
 
 -- V2. Tabelas novas (esperado: 7)
-SELECT COUNT(*) AS tabelas_ok FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN
+SET @tabelas := (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN
  ('production_events', 'production_alerts', 'consultation_ai_consents', 'consultation_transcription_sessions',
-  'consultation_transcription_segments', 'consultation_evolution_drafts', 'consultation_ai_consent_requests');
+  'consultation_transcription_segments', 'consultation_evolution_drafts', 'consultation_ai_consent_requests'));
+SELECT @tabelas AS tabelas_ok;
 
 -- V3. Índices do consentimento (esperado: 3)
-SELECT COUNT(DISTINCT INDEX_NAME) AS indices_consentimento FROM information_schema.STATISTICS
+SET @indices := (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS
 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'consultation_ai_consent_requests'
-  AND INDEX_NAME IN ('uq_ai_consent_req_token', 'uq_ai_consent_req_revoke_token', 'idx_ai_consent_req_appt');
+  AND INDEX_NAME IN ('uq_ai_consent_req_token', 'uq_ai_consent_req_revoke_token', 'idx_ai_consent_req_appt'));
+SELECT @indices AS indices_consentimento;
 
 -- V4. Medidas estimadas (esperado: centenas; compare medidas_total com o P5 do preflight)
 SELECT COUNT(*) AS medidas_total,
