@@ -28,6 +28,11 @@ RESULTS="$OUT/results.tsv"; : > "$RESULTS"
 # NI2-727: token local aleatório para o webhook de TESTE do cenário p5448. Não é chave de API; não é impresso nem gravado.
 E2E_ASAAS_TOKEN="${E2E_ASAAS_TOKEN:-$(php -r 'echo bin2hex(random_bytes(24));' 2>/dev/null || echo '')}"
 export E2E_ASAAS_TOKEN
+if [ -d "/Users/moliveira/Caply_Space/node_modules" ]; then
+  export NODE_PATH="/Users/moliveira/Caply_Space/node_modules:$ROOT/tests/homologation/node_modules${NODE_PATH:+:$NODE_PATH}"
+elif [ -d "$ROOT/tests/homologation/node_modules" ]; then
+  export NODE_PATH="$ROOT/tests/homologation/node_modules${NODE_PATH:+:$NODE_PATH}"
+fi
 record() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" >> "$RESULTS"; } # tipo nome status pass fail
 known_fail() { grep -E "^$1[[:space:]]+[0-9]+" "$KNOWN" 2>/dev/null | awk '{print $2}'; }
 
@@ -64,6 +69,7 @@ SCENARIOS=(
   "p5457|p5457.js|jornadas|1"
   "ni2815|ni2815.js|ni2815|1"
   "ni2830|ni2830.js|ni2830|1"
+  "ni2844|ni2844.js|ni2844|1"
 )
 
 run_php() {
@@ -120,7 +126,11 @@ run_browser() {
     spid=$!
     for _ in $(seq 1 50); do php -r "exit(@fsockopen('127.0.0.1',$port)?0:1);" && break; sleep 0.1; done
     args=("http://127.0.0.1:$port"); [ "$needdb" = 1 ] && args+=("$db")
-    ( cd "$ROOT/tests/e2e/scenarios" && E2E_SQ="$SQ" E2E_OUT="$OUT" E2E_ASAAS_TOKEN="${E2E_ASAAS_TOKEN:-}" timeout 300 node "$file" "${args[@]}" ) > "$OUT/browser-$name.log" 2>&1; rc=$?
+    if command -v timeout >/dev/null 2>&1; then
+      ( cd "$ROOT/tests/e2e/scenarios" && E2E_SQ="$SQ" E2E_OUT="$OUT" E2E_ASAAS_TOKEN="${E2E_ASAAS_TOKEN:-}" timeout 300 node "$file" "${args[@]}" ) > "$OUT/browser-$name.log" 2>&1; rc=$?
+    else
+      ( cd "$ROOT/tests/e2e/scenarios" && E2E_SQ="$SQ" E2E_OUT="$OUT" E2E_ASAAS_TOKEN="${E2E_ASAAS_TOKEN:-}" node "$file" "${args[@]}" ) > "$OUT/browser-$name.log" 2>&1; rc=$?
+    fi
     kill "$spid" 2>/dev/null; wait "$spid" 2>/dev/null
     p="$(grep -c '  PASS  ' "$OUT/browser-$name.log")"; f="$(grep -c '  FAIL  ' "$OUT/browser-$name.log")"
     # exceção não tratada ou saída diferente de zero nunca conta como OK (ex.: TimeoutError no meio do roteiro)

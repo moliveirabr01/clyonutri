@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-11-04T23:31:54.693Z",
+  "timestamp": "2026-11-14T18:40:15.556Z",
   "runtime": "v26.7.0",
   "transport": "actual TCP HTTP; production front controller; compiled mobile API; dedicated SQLite; synthetic fixtures",
   "checks": [
     {
-      "name": "Command failed: php tests/support/ni2_294_fixture.php prepare\nPHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1070\nStack trace:\n#0 /Users/moliveira/Nutri_II/tests/support/ni2_294_fixture.php(27): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n#1 {main}\n  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1070\n",
+      "name": "Command failed: php tests/support/ni2_294_fixture.php prepare\nPHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071\nStack trace:\n#0 /Users/moliveira/Nutri_II/tests/support/ni2_294_fixture.php(27): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n#1 {main}\n  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071\n",
       "status": "FAIL"
     }
   ]

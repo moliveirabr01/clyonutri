@@ -1,14 +1,48 @@
 (() => {
  'use strict';
+ const WF_STORAGE_PREFIX = 'cn_wf_draft:';
+ const WF_MAX_AGE_MS = 15 * 60 * 1000;
  document.querySelectorAll('form[data-workflow-draft]').forEach(form=>{
   const attendance=new URL(form.action,location.href).searchParams.get('atendimento');
   function carryAttendance(value){const url=new URL(value,location.href);if(attendance&&url.origin===location.origin)url.searchParams.set('atendimento',attendance);return url.pathname+url.search+url.hash;}
   const buttonDefaults=[...form.querySelectorAll('button[type=submit],button:not([type])')].map(b=>({b,disabled:b.disabled,label:b.textContent}));
   let timer,saving=null,pending=null,blocked=false,serial=0,submitted=false;
+  const storageKey = WF_STORAGE_PREFIX + (form.dataset.workflowDraft || location.pathname);
   const retry=document.createElement('button');retry.type='button';retry.className='op-button op-button--secondary';retry.textContent='Tentar confirmar o mesmo salvamento';retry.hidden=true;
   const message=document.createElement('p');message.className='op-error';message.setAttribute('role','alert');message.hidden=true;
   const state=form.querySelector('[data-workflow-state]');state.after(message,retry);
   function say(key,text){window.ClyoWorkflow?.set(form,key);if(text){message.textContent=text;message.hidden=false;}}
+  function backupFormLocally(){
+   try{
+    const entries=[];
+    for(const [k,v] of payload().entries()){if(k!=='_csrf_token'&&typeof v==='string')entries.push([k,v]);}
+    sessionStorage.setItem(storageKey,JSON.stringify({savedAt:Date.now(),revision:form.dataset.revision||'',entries}));
+   }catch(_){}
+  }
+  function clearLocalBackup(){try{sessionStorage.removeItem(storageKey);}catch(_){}}
+  function restoreLocalBackupIfPresent(){
+   try{
+    const raw=sessionStorage.getItem(storageKey);if(!raw)return;
+    const parsed=JSON.parse(raw);
+    if(!parsed||typeof parsed.savedAt!=='number'||(Date.now()-parsed.savedAt)>WF_MAX_AGE_MS||!Array.isArray(parsed.entries)){clearLocalBackup();return;}
+    let restoredAny=false;
+    for(const [k,v] of parsed.entries){
+     const el=form.elements[k];if(!el)continue;
+     if(el.type==='checkbox'||el.type==='radio'){if(el.value===v&&!el.checked){el.checked=true;restoredAny=true;}}
+     else if(typeof el.value==='string'&&el.value!==v){el.value=v;restoredAny=true;el.dispatchEvent(new Event('change',{bubbles:true}));}
+    }
+    if(restoredAny){
+     const banner=document.createElement('p');
+     banner.className='op-message op-message--info';
+     banner.setAttribute('role','status');
+     banner.setAttribute('data-testid','draft-recovered-banner');
+     banner.textContent='Rascunho recuperado após reconexão. Salvando automaticamente…';
+     state.after(banner);
+     say('editing');
+     timer=setTimeout(save,400);
+    }else{clearLocalBackup();}
+   }catch(_){}
+  }
   // v54.25 NI2-220 (B3): erros por campo devolvidos pelo servidor (422 field_errors) ficam junto do campo.
   function markFields(errs){
    form.querySelectorAll('[data-wf-field-error]').forEach(n=>n.remove());
@@ -35,7 +69,7 @@
     let j;try{j=await r.json();}catch(_){throw Error('O servidor não confirmou. Somente o último rascunho confirmado pode ser retomado.');}
     if(!r.ok){
      if(r.status===409){blocked=true;say('conflict',j.error+' Use “Retomar o salvo” para comparar. O que está nesta tela ainda não foi salvo.');pending=null;}
-     else if([401,403].includes(r.status)){blocked=true;say('expired','Entre novamente para retomar o último rascunho confirmado. As alterações desta tela não têm salvamento confirmado. ');{/* v54.57 (UX-113): o login volta para esta mesma tela (caminho interno revalidado no servidor) */const a=document.createElement('a');a.href='/login?error=session_expired&voltar='+encodeURIComponent(location.pathname+location.search);a.textContent='Entrar novamente';a.dataset.testid='relogin-link';message.append(a);}pending=null;}
+     else if([401,403].includes(r.status)){blocked=true;backupFormLocally();say('expired','Entre novamente para retomar o último rascunho confirmado. As alterações desta tela não têm salvamento confirmado. ');{/* v54.57 (UX-113): o login volta para esta mesma tela (caminho interno revalidado no servidor) */const a=document.createElement('a');a.href='/login?error=session_expired&voltar='+encodeURIComponent(location.pathname+location.search);a.textContent='Entrar novamente';a.dataset.testid='relogin-link';message.append(a);}pending=null;}
      else if(r.status<500){say('editing',j.error||'Confira os campos. O preenchimento permanece nesta tela.');pending=null;const f=markFields(j.field_errors);if(f&&typeof f.focus==='function')f.focus();}
      else throw Error(j.error||'Sem confirmação do salvamento.');
      return false;
@@ -47,18 +81,21 @@
      form.dataset.workflowDraft='/api/workflow/exam/'+j.workflow.id;form.action=j.workflow.resume_url;
      history.replaceState(null,'',j.workflow.resume_url);state.querySelector('[data-resume]').href=j.workflow.resume_url;
     }
-    if(fingerprint(payload())===op.hash){window.ClyoForms?.saved(form);window.ClyoWorkflow?.set(form,'saved',j.workflow.saved_at);}else{say('editing');timer=setTimeout(save,600);}
+    if(fingerprint(payload())===op.hash){clearLocalBackup();window.ClyoForms?.saved(form);window.ClyoWorkflow?.set(form,'saved',j.workflow.saved_at);}else{say('editing');timer=setTimeout(save,600);}
     return true;
-   }catch(e){say('error',(window.ClyoWorkflow?.netMessage?.(e)??e.message)+' Você pode repetir a mesma tentativa sem duplicar a gravação.');retry.hidden=false;return false;}
+   }catch(e){backupFormLocally();say('error',(window.ClyoWorkflow?.netMessage?.(e)??e.message)+' Você pode repetir a mesma tentativa sem duplicar a gravação.');retry.hidden=false;return false;}
    finally{saving=null;buttonDefaults.forEach(({b,disabled,label})=>{b.disabled=disabled;b.removeAttribute('aria-busy');b.textContent=label;});}})();return saving;
   }
-  function change(e){if(e.target.matches('input[type=search],[data-transient],#exam-category'))return;serial++;say('editing');if(!blocked&&!pending){clearTimeout(timer);timer=setTimeout(save,1200);}}
+  function change(e){if(e.target.matches('input[type=search],[data-transient],#exam-category'))return;serial++;backupFormLocally();say('editing');if(!blocked&&!pending){clearTimeout(timer);timer=setTimeout(save,1200);}}
   form.addEventListener('input',change);form.addEventListener('change',change);
   retry.addEventListener('click',()=>save());
+  window.addEventListener('online',()=>{if(!blocked&&!saving&&(pending||window.ClyoForms?.isDirty(form))){clearTimeout(timer);timer=setTimeout(save,300);}});
+  restoreLocalBackupIfPresent();
   form.addEventListener('submit',async e=>{
    if(submitted)return;e.preventDefault();const button=e.submitter;
    if(!(await save()))return;
    if(saving||pending||window.ClyoForms?.isDirty(form)){if(!(await save()))return;}
+   clearLocalBackup();
    if(form.id==='exam-request-form'){const url=new URL(form.action,location.href);url.pathname=url.pathname.replace(/\/editar$/,'');location.assign(url.href);return;}
    if(button?.value==='draft'){const url=new URL(location.href);['error','msg','ref'].forEach(k=>url.searchParams.delete(k));url.searchParams.set('success','rascunho_salvo');location.assign(carryAttendance(url.href));return;}
    submitted=true;form.requestSubmit(button||undefined);

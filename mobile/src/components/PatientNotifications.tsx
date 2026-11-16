@@ -78,6 +78,10 @@ export default function PatientNotifications({ active }: { active: boolean }) {
     void save({ checkin_reminder: { time: checkinTime } }, `Lembrete de check-in às ${checkinTime}.`);
   };
 
+  const checkinCategory = prefs?.categories.find(c => c.category === 'checkin');
+  const emailCheckin = !!checkinCategory?.email_enabled;
+  const pushCheckin = !!(prefs?.push_available && checkinCategory?.push_enabled);
+
   return (
     <View>
       <View style={s.card}>
@@ -130,6 +134,9 @@ export default function PatientNotifications({ active }: { active: boolean }) {
                 <Switch accessibilityLabel="Ligar lembrete de check-in" value={prefs.checkin_reminder.enabled} disabled={busy}
                   onValueChange={(v) => save({ checkin_reminder: { enabled: v, time: checkinTime } }, v ? `Lembrete de check-in ligado, às ${checkinTime}.` : 'Lembrete de check-in desligado.')} />
               </View>
+              <Text accessibilityLiveRegion="polite" style={s.helper}>{!prefs.checkin_reminder.enabled ? 'Lembrete desligado.' : emailCheckin || pushCheckin ? `Canal habilitado: ${[emailCheckin && 'e-mail', pushCheckin && 'celular (depende da permissão do aparelho)'].filter(Boolean).join(' e ')}.` : 'Sem canal externo habilitado: o lembrete ficará apenas nos avisos do app.'}</Text>
+              {prefs.checkin_reminder.enabled && !emailCheckin && !pushCheckin && checkinCategory && <TouchableOpacity accessibilityRole="button" style={s.button} disabled={busy} onPress={() => save({ categories: { [checkinCategory.category]: { email_enabled: true } } }, 'E-mail de check-in habilitado.')}><Text style={s.buttonText}>Habilitar e-mail de check-in</Text></TouchableOpacity>}
+              <Text style={s.helper}>Se o horário cair no silêncio, o lembrete de check-in fica só nos avisos do app. Não é enviado depois. Se você já fez o check-in, não há lembrete.</Text>
               <View style={s.row}>
                 <Text style={s.body}>Horário</Text>
                 <TextInput accessibilityLabel="Horário do lembrete de check-in (HH:MM)" style={s.input} value={checkinTime} onChangeText={setCheckinTime} maxLength={5} keyboardType="numbers-and-punctuation" />

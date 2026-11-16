@@ -212,7 +212,7 @@ $push = $calls[0]['payload'][0] ?? [];
 // O banco de teste é compartilhado na suíte: o drain também entrega avisos pendentes de outros testes; procura o e-mail desta fixture.
 $mail = array_values(array_filter($mailer->sent, fn($m) => $m->subject === 'Lembrete de check-in'))[0] ?? null;
 $all = json_encode([$e, $push, $mail ? [$mail->subject, $mail->textBody, $mail->htmlBody] : null], JSON_UNESCAPED_UNICODE);
-check('C5', 'Lembrete com texto neutro', $e['title'] === 'Lembrete de check-in' && $e['body'] === 'Quando puder, registre seu check-in de hoje no app ClyoNutri. Leva menos de um minuto.' && $e['link'] === '/');
+check('C5', 'Lembrete com texto neutro', $e['title'] === 'Lembrete de check-in' && $e['body'] === 'Quando puder, registre seu check-in de hoje no app Clyo Nutri. Leva menos de um minuto.' && $e['link'] === '/');
 check('C5', 'Push sai com texto curto e categoria checkin (o app abre em Hoje)', ($push['body'] ?? '') === 'Quando puder, registre seu check-in de hoje no app.' && ($push['data']['category'] ?? '') === 'checkin'
     && dst($db, $e['id'], 'push') === 'sent:', $push);
 check('C5', 'E-mail (ligado pela Ana) sai com o mesmo texto neutro', $mail && $mail->subject === 'Lembrete de check-in' && dst($db, $e['id'], 'email') === 'sent:');
@@ -273,7 +273,7 @@ check('C8', 'Cada check-in novo vira um aviso para o profissional responsável',
     && (int)one($db, "SELECT COUNT(*) FROM notification_events WHERE event_type = 'checkin.submitted' AND link = ?", ['/pacientes/' . $caio]) === 0, $r['submitted']);
 $eA = ev($db, $cA, 'checkin.submitted', $profA);
 check('C8', 'Aviso para a Nutri a (vínculo ativo), com link para o Perfil 360 da paciente', count($eA) === 1 && $eA[0]['link'] === '/pacientes/' . $ana && $eA[0]['recipient_type'] === 'professional'
-    && $eA[0]['title'] === 'Check-in recebido' && $eA[0]['body'] === 'Um novo check-in foi enviado. Entre no ClyoNutri para ver.');
+    && $eA[0]['title'] === 'Check-in recebido' && $eA[0]['body'] === 'Um novo check-in foi enviado. Entre no Clyo Nutri para ver.');
 check('C8', 'Sem vínculo, vai para quem publicou o plano mais recente', count(ev($db, $cA, 'checkin.submitted', $profA2, '/pacientes/' . $bia)) === 1);
 check('C8', 'Outra clínica: só o profissional de lá recebe', count(ev($db, $cB, 'checkin.submitted', $profB, '/pacientes/' . $beto)) === 1
     && ev($db, $cA, 'checkin.submitted', $profB) === [] && ev($db, $cB, 'checkin.submitted', $profA) === []);

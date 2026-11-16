@@ -326,6 +326,12 @@ class DashboardController
             <strong>Atenção:</strong> a evolução foi registrada, mas o peso e a cintura informados não puderam ser salvos na avaliação antropométrica. Confira em Antropometria e registre de novo, se precisar.
           </div>
         <?php endif; ?>
+        <?php if (($_GET['success'] ?? '') === 'consulta_concluida' || !empty($_GET['consulta'])): ?>
+          <?php
+            $closingReturnTo = '/pacientes/' . (int)$id . '?success=consulta_concluida' . (!empty($_GET['consulta']) ? '&consulta=' . (int)$_GET['consulta'] : '');
+            require __DIR__ . '/../../../views/consultation/_closing_panel.php';
+          ?>
+        <?php endif; ?>
 
         <p class="patient-back"><a href="/pacientes">← Pacientes</a></p>
         <?php
@@ -712,11 +718,11 @@ class DashboardController
                 <div class="u-grid u-cols-2 u-gap-4">
                   <div class="form-group">
                     <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
-                    <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+                    <input type="text" inputmode="decimal" data-decimal-field="weight" data-min="10" data-max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72,5" required autofocus>
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
-                    <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required<?= \ClyoNutri\Application\View\LastHeight::attrs($anthroPatientId) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint($anthroPatientId) ?>
+                    <input type="text" inputmode="decimal" data-decimal-field="height" data-min="0.45" data-max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 170 (ou 1,70)" required<?= \ClyoNutri\Application\View\LastHeight::attrs($anthroPatientId) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint($anthroPatientId) ?>
                   </div>
                 </div>
 
@@ -729,34 +735,34 @@ class DashboardController
                 <div class="u-grid u-cols-3 u-gap-3">
                   <div class="form-group">
                     <label class="form-label" for="ant_waist">Cintura (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_waist" name="waist_cm" class="form-control" placeholder="Ex: 82,0">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_hip">Quadril (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_hip" name="hip_cm" class="form-control" placeholder="Ex: 98.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_hip" name="hip_cm" class="form-control" placeholder="Ex: 98,0">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_neck">Pescoço (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_neck" name="neck_cm" class="form-control" placeholder="Ex: 38.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_neck" name="neck_cm" class="form-control" placeholder="Ex: 38,0">
                   </div>
                 </div>
 
                 <div class="u-grid u-cols-4 u-gap-3">
                   <div class="form-group">
                     <label class="form-label" for="ant_arm">Braço (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32.5">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_arm" name="arm_cm" class="form-control" placeholder="Ex: 32,5">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_chest">Tórax (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_chest" name="chest_cm" class="form-control" placeholder="Ex: 96.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_chest" name="chest_cm" class="form-control" placeholder="Ex: 96,0">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_thigh">Coxa (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_thigh" name="thigh_cm" class="form-control" placeholder="Ex: 55.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_thigh" name="thigh_cm" class="form-control" placeholder="Ex: 55,0">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_calf">Panturrilha (cm)</label>
-                    <input type="number" step="0.1" min="10" max="250" id="ant_calf" name="calf_cm" class="form-control" placeholder="Ex: 37.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_calf" name="calf_cm" class="form-control" placeholder="Ex: 37,0">
                   </div>
                 </div>
 
@@ -764,11 +770,11 @@ class DashboardController
                 <div class="u-grid u-cols-2 u-gap-4">
                   <div class="form-group">
                     <label class="form-label" for="ant_fat">% Gordura corporal</label>
-                    <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
+                    <input type="text" inputmode="decimal" data-decimal-field="pct" data-min="1" data-max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18,5">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="ant_muscle">% Massa muscular</label>
-                    <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                    <input type="text" inputmode="decimal" data-decimal-field="pct" data-min="5" data-max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42,0">
                   </div>
                 </div>
 
@@ -1207,11 +1213,11 @@ class DashboardController
                   <div class="u-grid u-cols-2 u-gap-4">
                     <div class="form-group">
                       <label class="form-label" for="ant_weight">Peso corporal (kg) *</label>
-                      <input type="number" step="0.1" min="10" max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72.5" required autofocus>
+                      <input type="text" inputmode="decimal" data-decimal-field="weight" data-min="10" data-max="400" id="ant_weight" name="weight_kg" class="form-control" placeholder="Ex: 72,5" required autofocus>
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_height">Altura (cm ou m) *</label>
-                      <input type="number" step="any" min="0.5" max="260" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 175 (ou 1,75)" required<?= \ClyoNutri\Application\View\LastHeight::attrs((int)$patient['id']) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint((int)$patient['id']) ?>
+                      <input type="text" inputmode="decimal" data-decimal-field="height" data-min="0.45" data-max="250" id="ant_height" name="height_cm" class="form-control" placeholder="Ex: 170 (ou 1,70)" required<?= \ClyoNutri\Application\View\LastHeight::attrs((int)$patient['id']) /* v54.57 (UX-114) */ ?>><?= \ClyoNutri\Application\View\LastHeight::hint((int)$patient['id']) ?>
                     </div>
                   </div>
 
@@ -1240,7 +1246,7 @@ class DashboardController
                     <?php foreach (\ClyoNutri\Domain\Anthropometry\AnthropometryService::CIRCUMFERENCE_FIELDS as $cField => $cLabel): ?>
                       <div class="form-group u-mb-1">
                         <label class="form-label" for="ant_<?= $cField ?>"><?= htmlspecialchars($cLabel) ?> (cm)</label>
-                        <input type="number" step="0.1" min="10" max="250" id="ant_<?= $cField ?>" name="<?= $cField ?>" class="form-control" placeholder="cm">
+                        <input type="text" inputmode="decimal" data-decimal-field="cm" data-min="10" data-max="250" id="ant_<?= $cField ?>" name="<?= $cField ?>" class="form-control" placeholder="cm">
                       </div>
                     <?php endforeach; ?>
                   </div>
@@ -1269,7 +1275,7 @@ class DashboardController
                     <?php foreach (\ClyoNutri\Domain\Anthropometry\SkinfoldProtocolCatalog::SITES as $siteCode => $siteMeta): ?>
                       <div class="form-group u-mb-1">
                         <label class="form-label" for="ant_sf_<?= $siteCode ?>"><?= htmlspecialchars($siteMeta['label']) ?> (mm)</label>
-                        <input type="number" step="0.1" min="1" max="80" id="ant_sf_<?= $siteCode ?>" name="readings[<?= $siteCode ?>][]" class="form-control" placeholder="mm">
+                        <input type="text" inputmode="decimal" data-decimal-field="mm" data-min="1" data-max="80" id="ant_sf_<?= $siteCode ?>" name="readings[<?= $siteCode ?>][]" class="form-control" placeholder="mm">
                       </div>
                     <?php endforeach; ?>
                   </div>
@@ -1294,27 +1300,27 @@ class DashboardController
                   <div class="u-grid u-cols-3 u-gap-3">
                     <div class="form-group">
                       <label class="form-label" for="ant_fat">% Gordura corporal</label>
-                      <input type="number" step="0.1" min="1" max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18.5">
+                      <input type="text" inputmode="decimal" data-decimal-field="pct" data-min="1" data-max="75" id="ant_fat" name="body_fat_pct" class="form-control" placeholder="Ex: 18,5">
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_muscle">% Massa muscular</label>
-                      <input type="number" step="0.1" min="5" max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42.0">
+                      <input type="text" inputmode="decimal" data-decimal-field="pct" data-min="5" data-max="85" id="ant_muscle" name="muscle_mass_pct" class="form-control" placeholder="Ex: 42,0">
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_visceral">Gordura visceral (nível)</label>
-                      <input type="number" step="0.5" min="1" max="60" id="ant_visceral" name="visceral_fat_level" class="form-control" placeholder="Ex: 6">
+                      <input type="text" inputmode="decimal" data-decimal-field="number" data-min="1" data-max="60" id="ant_visceral" name="visceral_fat_level" class="form-control" placeholder="Ex: 6">
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_tbw">% Água corporal total</label>
-                      <input type="number" step="0.1" min="20" max="85" id="ant_tbw" name="total_body_water_pct" class="form-control" placeholder="Ex: 55.2">
+                      <input type="text" inputmode="decimal" data-decimal-field="pct" data-min="20" data-max="85" id="ant_tbw" name="total_body_water_pct" class="form-control" placeholder="Ex: 55,2">
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_bone">Massa óssea (kg)</label>
-                      <input type="number" step="0.1" min="0.5" max="15" id="ant_bone" name="bone_mass_kg" class="form-control" placeholder="Ex: 2.8">
+                      <input type="text" inputmode="decimal" data-decimal-field="weight" data-min="0.5" data-max="15" id="ant_bone" name="bone_mass_kg" class="form-control" placeholder="Ex: 2,8">
                     </div>
                     <div class="form-group">
                       <label class="form-label" for="ant_phase">Ângulo de fase (°)</label>
-                      <input type="number" step="0.1" min="1" max="15" id="ant_phase" name="phase_angle_deg" class="form-control" placeholder="Ex: 6.4">
+                      <input type="text" inputmode="decimal" data-decimal-field="number" data-min="1" data-max="15" id="ant_phase" name="phase_angle_deg" class="form-control" placeholder="Ex: 6,4">
                     </div>
                   </div>
                 </div>
@@ -1981,18 +1987,22 @@ class DashboardController
     private const SEM_CRN_MSG = \ClyoNutri\Domain\Clinical\ClinicalAuthor::SEM_CRN_MSG;
 
     /** NI2-707: próximo horário livre (jornada, feriados, ocupação e intervalos) nos próximos 60 dias, formato Y-m-dTH:i. */
-    private function nextValidSlot(int $duration): ?string
+    private function nextValidSlot(int $duration, ?string $fromDate = null): ?string
     {
         try {
             $svc = new AppointmentService();
             $prof = $this->getActiveProfessionalId();
             $tz = new \DateTimeZone(getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo');
             $now = new \DateTimeImmutable('now', $tz);
+            $todayStr = $now->format('Y-m-d');
+            $base = ($fromDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) && $fromDate >= $todayStr)
+                ? new \DateTimeImmutable($fromDate, $tz)
+                : $now;
             for ($i = 0; $i < 60; $i++) {
-                $d = $now->modify("+{$i} days")->format('Y-m-d');
+                $d = $base->modify("+{$i} days")->format('Y-m-d');
                 $prev = $svc->availabilityPreview($prof, $d, max(15, min(240, $duration ?: 60)));
                 foreach ($prev['times'] ?? [] as $t) {
-                    if ($i === 0 && $t <= $now->format('H:i')) continue;
+                    if ($d === $todayStr && $t <= $now->format('H:i')) continue;
                     return $d . 'T' . $t;
                 }
             }
@@ -2753,7 +2763,56 @@ class DashboardController
             error_log('[consulta] rascunho não apagado: ' . get_class($e));
         }
 
-        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&hash=" . substr($result['record_hash'], 0, 8) . ($measuresWarning ? '&aviso=medidas' : '')));
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /pacientes/{$app['patient_id']}?success=consulta_concluida&consulta={$id}&hash=" . substr($result['record_hash'], 0, 8) . ($measuresWarning ? '&aviso=medidas' : '')));
+        exit;
+    }
+
+    /**
+     * NI2-849 (UX-005): Agendamento de retorno em 1 clique no painel de fechamento da consulta.
+     */
+    public function scheduleFollowUpFromClosing(array $params): void
+    {
+        $id = (int)($params['id'] ?? 0);
+        $returnTo = is_string($_POST['return_to'] ?? null) ? trim($_POST['return_to']) : '';
+        if ($returnTo === '' || !str_starts_with($returnTo, '/') || str_starts_with($returnTo, '//')) {
+            $returnTo = $id > 0 ? "/consulta/{$id}" : '/agenda';
+        }
+        $token = $_POST['_csrf_token'] ?? '';
+        if (!Csrf::validate($token)) {
+            $_SESSION['closing_followup_error'][$id] = 'Sessão expirada (CSRF). Recarregue a página e tente novamente.';
+            header('Location: ' . $returnTo);
+            exit;
+        }
+        $service = new AppointmentService();
+        $app = $service->getAppointment($id);
+        if (!$app) {
+            header('Location: /agenda');
+            exit;
+        }
+        $scheduledRaw = is_string($_POST['scheduled_at'] ?? null) ? trim($_POST['scheduled_at']) : '';
+        $_SESSION['closing_followup_input'][$id] = $scheduledRaw;
+        $duration = max(15, min(240, (int)($_POST['duration_minutes'] ?? $app['duration_minutes'] ?? 60)));
+        $allowConflict = !empty($_POST['allow_conflict']);
+        $allowSameDay = !empty($_POST['allow_same_day']);
+
+        try {
+            $res = $service->schedule(
+                (int)$app['patient_id'],
+                (int)$app['professional_id'],
+                $scheduledRaw,
+                'follow_up',
+                $duration,
+                'Retorno agendado no fechamento da consulta #' . $id,
+                $allowConflict,
+                (int)TenantContext::getUserId()
+            );
+            unset($_SESSION['closing_followup_input'][$id]);
+            $_SESSION['closing_followup_feedback'][$id] = 'Retorno agendado para ' . date('d/m/Y \à\s H:i', strtotime((string)$res['scheduled_at'])) . ' (Retorno / acompanhamento).';
+        } catch (\Throwable $e) {
+            $_SESSION['closing_followup_error'][$id] = $this->userFacingError('consulta.retorno', $e);
+        }
+
+        header('Location: ' . $returnTo);
         exit;
     }
 
@@ -3039,8 +3098,8 @@ class DashboardController
               $hadVisit->execute([(int)TenantContext::getClinicId(), $prefillPatient]);
               if ((int)$hadVisit->fetchColumn() > 0) { $newType = 'follow_up'; }
           }
-          if ($returnToPatient && !$agendaRecovered && !isset($_GET['time'])) {
-              $suggestedSlot = $this->nextValidSlot((int)$defaultDuration);
+          if (!$agendaRecovered && !isset($_GET['time'])) {
+              $suggestedSlot = $this->nextValidSlot((int)$defaultDuration, isset($_GET['date']) ? $currentDate : null);
               if ($suggestedSlot) { $newScheduled = $suggestedSlot; }
           } ?>
         <div id="card-novo-agendamento" data-dialog="inline" class="card u-accent-top u-accent-brand-copper-500 u-mb-6<?= $openNew ? '' : ' u-hidden' ?>">
@@ -3058,14 +3117,14 @@ class DashboardController
             <?php if ($returnToPatient): ?><input type="hidden" name="return_to" value="patient"><?php endif; ?>
             <?php if ($suggestedSlot): ?><p class="op-message op-message--info u-mb-3" data-testid="agenda-suggested-slot">Sugerido o próximo horário livre: <?= date('d/m/Y \\à\\s H:i', strtotime(str_replace('T', ' ', $suggestedSlot))) ?>. Ajuste se preferir.</p><?php endif; ?>
             <div class="u-grid u-cols-auto-md u-gap-4 u-mb-4">
-              <div class="u-relative">
+              <div class="u-relative" data-testid="agenda-patient-combobox">
                 <div class="u-flex u-justify-between u-items-baseline u-mb-1">
                   <label for="appointment-patient-search" class="u-font-semibold u-text-compact">Paciente *</label>
                   <button type="button" id="btn-inline-new-patient" class="btn-link u-text-compact u-color-botanical-copper-600 u-bg-none u-border-0 u-pointer u-underline u-p-0" data-call="openPatientModal">+ novo paciente</button>
                 </div>
-                <input type="text" id="appointment-patient-search" placeholder="Digite para buscar paciente (mín. 3 letras)..." autocomplete="off" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-mb-1" aria-autocomplete="list" aria-controls="appointment-patient-matches">
+                <input type="text" id="appointment-patient-search" placeholder="Digite ou selecione o paciente..." autocomplete="off" class="form-control u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input" aria-autocomplete="list" aria-controls="appointment-patient-matches">
                 <div id="appointment-patient-matches" role="listbox" class="ds-combobox-list u-hidden"></div>
-                <label for="dc11-patient_id" class="visually-hidden">Paciente selecionado (obrigatório)</label><select id="dc11-patient_id" name="patient_id" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                <label for="dc11-patient_id" class="visually-hidden">Paciente selecionado (obrigatório)</label><select id="dc11-patient_id" name="patient_id" required tabindex="-1" class="visually-hidden">
                   <option value="">Selecione o paciente...</option>
                   <?php foreach ($patients as $pt): ?>
                     <option value="<?= $pt['id'] ?>"<?= ((int)$pt['id'] === $prefillPatient) ? ' selected' : '' ?>><?= htmlspecialchars($pt['name']) ?></option>
@@ -3201,11 +3260,19 @@ class DashboardController
                                 <input type="hidden" name="status" value="confirmed">
                                 <button type="submit" class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch">Confirmar</button>
                               </form>
-                              <!-- Iniciar -->
-                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch">Iniciar</a>
+                              <!-- Iniciar em 1 clique (UX-011 / NI2-855) -->
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
+                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="status" value="in_progress">
+                                <button type="submit" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch" data-testid="agenda-start-appointment">Iniciar</button>
+                              </form>
                             <?php elseif ($a['status'] === 'confirmed'): ?>
-                              <!-- Iniciar -->
-                              <a href="/consulta/<?= $a['id'] ?>" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch">Iniciar atendimento</a>
+                              <!-- Iniciar em 1 clique (UX-011 / NI2-855) -->
+                              <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
+                                <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="status" value="in_progress">
+                                <button type="submit" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch" data-testid="agenda-start-appointment">Iniciar atendimento</button>
+                              </form>
                             <?php elseif ($a['status'] === 'in_progress'): ?>
                               <a href="/consulta/<?= $a['id'] ?>" class="btn btn-accent u-text-caption u-py-1 u-px-2 u-minh-touch">Continuar atendimento</a>
                             <?php elseif ($a['status'] === 'completed'): ?>
@@ -3957,7 +4024,7 @@ class DashboardController
         <!-- Refeições e Alimentos -->
         <div class="u-flex u-justify-between u-items-center u-mb-4">
           <h2 class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-m-0">Refeições do Dia</h2>
-          <?php if ($isDraft): ?>
+          <?php if ($isDraft && !empty($plan['meals'])): ?>
             <button class="btn btn-sm btn-outline" data-show="modal-add-meal">
               + Adicionar Refeição
             </button>
@@ -4038,7 +4105,15 @@ class DashboardController
                 <?php else: ?>
                   <table class="meal-plan-items u-w-full u-collapse u-text-compact">
                      <tbody>
+                      <?php $seenFoodsInMeal = []; ?>
                       <?php foreach ($m['items'] as $it): ?>
+                        <?php
+                          $itFoodId = (int)($it['food_id'] ?? 0);
+                          $firstFoodItemId = $seenFoodsInMeal[$itFoodId] ?? null;
+                          if ($itFoodId > 0 && $firstFoodItemId === null) {
+                              $seenFoodsInMeal[$itFoodId] = (int)$it['id'];
+                          }
+                        ?>
                         <tr data-plan-item="<?= (int)$it['id'] ?>" class="u-border-b u-bc-neutral-gray-100">
                           <td class="u-py-3 u-px-5 u-w-40">
                             <strong class="u-color-botanical-forest-900"><?= htmlspecialchars($it['food_name']) ?></strong>
@@ -4090,6 +4165,18 @@ class DashboardController
                             <?php endif; ?>
                           </td>
                         </tr>
+                        <?php if ($isDraft && $canEditItems && $firstFoodItemId !== null && $firstFoodItemId !== (int)$it['id']): ?>
+                        <tr data-testid="duplicate-food-notice" class="u-bg-botanical-cream-50 u-border-b">
+                          <td colspan="4" class="u-py-2 u-px-5 u-text-compact">
+                            <span><strong><?= htmlspecialchars((string)$it['food_name']) ?></strong> já existe na refeição — somar quantidades?</span>
+                            <form method="POST" action="/planos/<?= (int)$planId ?>/itens/<?= (int)$it['id'] ?>/somar" data-live-plan class="u-inline u-ml-2">
+                              <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                              <input type="hidden" name="target_item_id" value="<?= (int)$firstFoodItemId ?>">
+                              <button type="submit" class="btn btn-sm btn-outline u-py-0 u-px-2 u-text-caption" data-testid="merge-duplicate-food-btn">Somar quantidades</button>
+                            </form>
+                          </td>
+                        </tr>
+                        <?php endif; ?>
 
                         <?php if ($isDraft && $canEditItems): ?>
                         <tr><td colspan="4" class="u-py-3 u-px-4">
@@ -4201,6 +4288,33 @@ class DashboardController
                       <?php endforeach; ?>
                     </tbody>
                   </table>
+                <?php endif; ?>
+                <?php if ($isDraft && $canEditItems): ?>
+                  <form id="meal-inline-add-<?= (int)$m['id'] ?>" method="POST" action="/planos/<?= (int)$planId ?>/itens" data-meal-inline-add data-live-plan data-unit-scope class="u-py-3 u-px-5 u-bg-neutral-gray-50 u-border-t u-text-compact" data-testid="meal-inline-add-<?= (int)$m['id'] ?>">
+                    <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="meal_id" value="<?= (int)$m['id'] ?>">
+                    <input type="hidden" name="enforce_allergen_gate" value="1">
+                    <div class="op-form-grid u-items-end">
+                      <div data-food-picker data-plan-id="<?= (int)$planId ?>">
+                        <label for="meal-food-query-<?= (int)$m['id'] ?>">Adicionar alimento em <?= htmlspecialchars((string)$m['name']) ?></label>
+                        <input type="search" id="meal-food-query-<?= (int)$m['id'] ?>" data-food-query data-transient maxlength="80" placeholder="Buscar alimento (ex.: pão francês, ovo, arroz) e Enter">
+                        <p class="op-message op-message--info u-sr-only" role="status" aria-live="polite">Escolha um alimento do catálogo.</p>
+                        <label for="meal-food-select-<?= (int)$m['id'] ?>" data-food-results-label>Alimento selecionado</label>
+                        <select id="meal-food-select-<?= (int)$m['id'] ?>" name="food_id" required><option value="">Selecione um alimento</option></select>
+                        <button type="button" data-food-next hidden>Mais resultados</button>
+                        <button type="button" data-food-retry hidden>Tentar novamente</button>
+                      </div>
+                      <label>Quantidade
+                        <input id="meal-food-amount-<?= (int)$m['id'] ?>" name="amount" type="number" step="any" min="0.01" value="1" required>
+                      </label>
+                      <label>Medida
+                        <select id="meal-food-unit-<?= (int)$m['id'] ?>" name="measure_unit" required><?= \ClyoNutri\Application\Controllers\UnitCheckView::unitOptions() ?></select>
+                      </label>
+                      <button type="submit" class="btn btn-sm btn-primary">+ Incluir</button>
+                    </div>
+                    <div data-allergen-item-alert hidden></div>
+                    <?= \ClyoNutri\Application\Controllers\UnitCheckView::block('meal-inline-confirm-' . (int)$m['id']) ?>
+                  </form>
                 <?php endif; ?>
               </div>
             </div>
@@ -4821,6 +4935,55 @@ class DashboardController
         exit;
     }
 
+    public function mergeDuplicatePlanItem(array $params): void
+    {
+        if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
+            $this->denyPrescription();
+            return;
+        }
+        $planId = (int)($params['id'] ?? 0);
+        $sourceId = (int)($params['itemId'] ?? 0);
+        $targetId = (int)($_POST['target_item_id'] ?? 0);
+        $db = \ClyoNutri\Core\Database\Connection::getInstance();
+        $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
+
+        try {
+            $st = $db->prepare('SELECT i.id, i.meal_id, i.food_id, i.amount, i.measure_unit, i.weight_grams, i.notes FROM meal_plan_items i JOIN meal_plan_meals m ON m.id = i.meal_id WHERE i.id = ? AND m.meal_plan_id = ?');
+            $st->execute([$sourceId, $planId]);
+            $src = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$src) {
+                throw new \InvalidArgumentException('Item duplicado não encontrado neste plano.');
+            }
+            if ($targetId <= 0) {
+                $tSt = $db->prepare('SELECT id, meal_id, food_id, amount, measure_unit, weight_grams, notes FROM meal_plan_items WHERE meal_id = ? AND food_id = ? AND id <> ? ORDER BY id ASC LIMIT 1');
+                $tSt->execute([(int)$src['meal_id'], (int)$src['food_id'], $sourceId]);
+                $tgt = $tSt->fetch(\PDO::FETCH_ASSOC);
+            } else {
+                $st->execute([$targetId, $planId]);
+                $tgt = $st->fetch(\PDO::FETCH_ASSOC);
+            }
+            if (!$tgt || (int)$tgt['id'] === $sourceId) {
+                throw new \InvalidArgumentException('Item principal para soma não encontrado.');
+            }
+            $sameUnit = \ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter::sameUnit((string)$tgt['measure_unit'], (string)$src['measure_unit']);
+            if ($sameUnit) {
+                $newAmt = round((float)$tgt['amount'] + (float)$src['amount'], 2);
+                $newUnit = (string)$tgt['measure_unit'];
+            } else {
+                $newAmt = round((float)($tgt['weight_grams'] ?? $tgt['amount']) + (float)($src['weight_grams'] ?? $src['amount']), 2);
+                $newUnit = 'g';
+            }
+            $service->updateItem((int)$tgt['id'], $newAmt, $newUnit, $tgt['notes'] ?: $src['notes'] ?: null, null, $planId, true);
+            $service->deleteItem($sourceId);
+            $_SESSION['feedback_message'] = 'Quantidades somadas em um único item da refeição.';
+        } catch (\Throwable $e) {
+            $_SESSION['error_message'] = 'Erro ao somar quantidades: ' . $this->userFacingError('Erro ao somar quantidades', $e);
+        }
+
+        header(\ClyoNutri\Application\View\AttendanceContext::location("Location: /planos/{$planId}"));
+        exit;
+    }
+
     public function addSubstitutionToPlanItem(array $params): void
     {
         if ($this->prescriberProfessionalId(\ClyoNutri\Core\Database\Connection::getInstance()) === null) {
@@ -5141,9 +5304,6 @@ class DashboardController
               Os recebíveis financeiros representam honorários de consultas clínicas e planos de acompanhamento nutricional. Eles são gerados a partir dos agendamentos na agenda ou registrados manualmente aqui para qualquer paciente da sua clínica.
             </p>
             <div class="u-flex u-justify-center u-items-center u-gap-3 u-wrap u-mb-8">
-              <button type="button" class="btn btn-primary" data-show="modal-novo-recebivel">
-                + Novo Lançamento Financeiro
-              </button>
               <a href="/agenda" class="btn btn-outline u-no-underline">
                 Ver agenda de atendimentos &rarr;
               </a>
@@ -5688,6 +5848,26 @@ class DashboardController
         $draftTotals = $draftSummary->totals($clinicId);
         $draftPatientsCount = $draftTotals['patients'];
         $draftPlansTotal = $draftTotals['draft_plans'];
+        $totalPlansStmt = $db->prepare('SELECT COUNT(*) FROM meal_plans WHERE clinic_id = ?');
+        $totalPlansStmt->execute([$clinicId]);
+        $totalPlansCount = (int)$totalPlansStmt->fetchColumn();
+
+        // NI2-854 (UX-014): consulta em andamento para o card "Continuar de onde parou" no topo do painel
+        $inProgressApp = null;
+        try {
+            $ipStmt = $db->prepare("
+                SELECT a.id, a.patient_id, a.scheduled_at, p.name AS patient_name
+                FROM appointments a
+                JOIN patients p ON p.id = a.patient_id AND p.clinic_id = a.clinic_id
+                WHERE a.clinic_id = ? AND a.status = 'in_progress'
+                ORDER BY a.scheduled_at DESC, a.id DESC
+                LIMIT 1
+            ");
+            $ipStmt->execute([$clinicId]);
+            $inProgressApp = $ipStmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            $inProgressApp = null;
+        }
 
         // NI2-610: rascunhos de anamnese e de exames e o agendamento online pendente entram na mesma lista,
         // ordenada por prioridade (perigo, aviso, informação).
@@ -5705,13 +5885,16 @@ class DashboardController
         $userId = (int)($_SESSION['user_id'] ?? 0);
         $onboardingProgress = null;
         $onboardingDone = 0;
+        $onboardingTotal = 3;
         $onboardingPct = 0;
         if ($userId > 0 && $clinicId > 0) {
             $onboardingService = new OnboardingService($db);
             $onboardingProgress = $onboardingService->getOrCreateProgress($userId, $clinicId);
-            // "N/5" e "% concluído" derivam da mesma fonte: passos efetivamente concluídos.
-            $onboardingDone = min(self::ONBOARDING_TOTAL_STEPS, count(array_unique((array)($onboardingProgress['completed_steps'] ?? []))));
-            $onboardingPct = (int)round($onboardingDone / self::ONBOARDING_TOTAL_STEPS * 100);
+            // NI2-850 (UX-006): mesma fonte de verdade (3 passos) no onboarding e no painel.
+            $wiz = OnboardingService::wizardSummary($onboardingProgress);
+            $onboardingDone = $wiz['done'];
+            $onboardingTotal = $wiz['total'];
+            $onboardingPct = $wiz['pct'];
         }
         // NI2-625: ativação conferida no banco. Aparece enquanto falta item obrigatório; se faltam só primeiros
         // passos, aparece nos 30 dias depois do onboarding (quem não usa plano alimentar não fica com aviso eterno).
@@ -5823,6 +6006,18 @@ class DashboardController
           </div>
         <?php endif; ?>
 
+        <?php if ($inProgressApp): ?>
+          <div class="op-message op-message--info card dashboard-banner" role="status" data-testid="dash-continue-card">
+            <div class="dashboard-banner__body">
+              <div>
+                <div class="dashboard-banner__title">Continuar de onde parou · Consulta #<?= (int)$inProgressApp['id'] ?> com <?= htmlspecialchars((string)$inProgressApp['patient_name']) ?></div>
+                <div class="dashboard-banner__text">Atendimento em andamento (<?= htmlspecialchars(substr((string)$inProgressApp['scheduled_at'], 11, 5)) ?>). Retome o registro da evolução ou as etapas clínicas.</div>
+              </div>
+            </div>
+            <a href="/consulta/<?= (int)$inProgressApp['id'] ?>" class="btn btn-primary dashboard-banner__cta" data-testid="dash-continue-cta">Retomar consulta <?= $arrowIcon ?></a>
+          </div>
+        <?php endif; ?>
+
         <?php if (!empty($_GET['onboarding']) && $_GET['onboarding'] === 'concluido' && (!$activation || $activation['ready'])): ?>
           <div class="op-message op-message--info card dashboard-banner dashboard-banner--success" role="status">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -5845,16 +6040,16 @@ class DashboardController
         <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed'] && $activation && $activation['ready']): ?>
           <?php /* v54.57 (UX-109): com a prontidão completa, as preferências são opcionais: linha discreta, sem CTA de destaque e sem "% concluído" competindo com o checklist */ ?>
           <p class="dash-optional" data-testid="onboarding-banner" data-variant="optional">
-            <span>Personalize suas preferências (opcional) · <span data-testid="onboarding-steps"><?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?></span> revisadas<span class="sr-only"> (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>%)</span></span>
+            <span>Personalize suas preferências (opcional) · <span data-testid="onboarding-steps"><?= $onboardingDone ?> de <?= $onboardingTotal ?></span> revisadas<span class="sr-only"> (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>%)</span></span>
             <a href="/onboarding" class="dash-optional__link">Revisar preferências</a>
           </p>
         <?php elseif ($onboardingProgress && !$onboardingProgress['is_completed']): ?>
           <div class="card dashboard-banner dashboard-banner--onboarding" data-testid="onboarding-banner">
             <div class="dashboard-banner__body">
-              <div class="dashboard-banner__step tabular-nums" aria-hidden="true" data-testid="onboarding-steps"><?= $onboardingDone ?>/<?= self::ONBOARDING_TOTAL_STEPS ?></div>
+              <div class="dashboard-banner__step tabular-nums" aria-hidden="true" data-testid="onboarding-steps"><?= $onboardingDone ?>/<?= $onboardingTotal ?></div>
               <div>
                 <div class="dashboard-banner__title">
-                  Preferências revisadas (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>% concluído<span class="sr-only">, <?= $onboardingDone ?> de <?= self::ONBOARDING_TOTAL_STEPS ?> passos</span>)
+                  Preferências revisadas (<span data-testid="onboarding-pct"><?= $onboardingPct ?></span>% concluído<span class="sr-only">, <?= $onboardingDone ?> de <?= $onboardingTotal ?> passos</span>)
                 </div>
                 <div class="dashboard-banner__text">
                   Revise estas preferências quando desejar. Este roteiro não determina se o consultório está pronto para atender.
@@ -5905,6 +6100,8 @@ class DashboardController
             <div class="dash-kpi__foot">
               <?php if ($draftPlansTotal > 0): ?>
                 <span class="dash-kpi__note"><span data-testid="draft-plans-total"><?= $draftPlansTotal ?></span> em rascunho · <a href="/planos?status=draft">Ver rascunhos</a></span>
+              <?php elseif ($totalPlansCount === 0): ?>
+                <span class="dash-trend dash-trend--neutral" data-testid="dash-drafts-empty">nenhum plano criado</span>
               <?php else: ?>
                 <span class="dash-trend dash-trend--ok">todos publicados</span>
               <?php endif; ?>
@@ -6172,7 +6369,18 @@ class DashboardController
               </thead>
               <tbody id="patient-list">
                 <?php if (empty($patients)): ?>
-                  <tr id="patient-list-empty"><td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6"><?= $query !== '' || $statusFilter !== '' ? 'Nenhum paciente encontrado para estes filtros.' : 'Nenhum paciente cadastrado nesta clínica.' ?></td></tr>
+                  <tr id="patient-list-empty">
+                    <td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6">
+                      <span><?= $query !== '' || $statusFilter !== '' ? 'Nenhum paciente encontrado para estes filtros.' : 'Nenhum paciente cadastrado nesta clínica.' ?></span>
+                      <?php if ($query !== ''): ?>
+                        <div class="u-mt-3">
+                          <button type="button" class="btn btn-primary btn-sm" data-testid="patients-empty-register-cta" data-prefill-patient-name="<?= htmlspecialchars($query, ENT_QUOTES) ?>">
+                            Cadastrar «<?= htmlspecialchars($query) ?>»
+                          </button>
+                        </div>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
                 <?php else: ?>
                   <?php foreach ($patients as $p): ?>
                     <tr data-patient-row>
@@ -6191,7 +6399,16 @@ class DashboardController
                     </tr>
                   <?php endforeach; ?>
                 <?php endif; ?>
-                <tr id="patient-search-empty" hidden><td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6">Nenhum paciente encontrado para esta busca.</td></tr>
+                <tr id="patient-search-empty" hidden>
+                  <td colspan="5" class="u-text-center u-color-neutral-gray-500 u-p-6">
+                    <span>Nenhum paciente encontrado para esta busca.</span>
+                    <div class="u-mt-3">
+                      <button type="button" class="btn btn-primary btn-sm" id="patient-search-empty-cta" data-testid="patients-empty-register-cta" data-prefill-patient-name="<?= htmlspecialchars($query, ENT_QUOTES) ?>">
+                        Cadastrar «<span data-empty-search-term><?= htmlspecialchars($query) ?></span>»
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -6220,7 +6437,12 @@ class DashboardController
 
           if (searchInput && totalRows > 0) {
             searchInput.addEventListener('input', function() {
-              var term = (searchInput.value || '').trim().toLowerCase();
+              var rawTerm = (searchInput.value || '').trim();
+              var term = rawTerm.toLowerCase();
+              var emptyCta = document.getElementById('patient-search-empty-cta');
+              var emptyTermSpan = emptyMsg ? emptyMsg.querySelector('[data-empty-search-term]') : null;
+              if (emptyCta) emptyCta.setAttribute('data-prefill-patient-name', rawTerm);
+              if (emptyTermSpan) emptyTermSpan.textContent = rawTerm;
               if (term.length >= 3) {
                 var visibleCount = 0;
                 patientRows.forEach(function(row) {
@@ -6323,16 +6545,25 @@ class DashboardController
         </div>
 
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
-          function openPatientModal() {
+          function openPatientModal(prefillName) {
             document.getElementById('patientModal').classList.add('active');
-            document.getElementById('p_name').focus();
+            var nameInput = document.getElementById('p_name');
+            if (typeof prefillName === 'string' && prefillName.trim() !== '' && nameInput) {
+              nameInput.value = prefillName.trim();
+            }
+            if (nameInput) nameInput.focus();
           }
           function closePatientModal() {
             document.getElementById('patientModal').classList.remove('active');
           }
+          document.querySelectorAll('[data-prefill-patient-name]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              openPatientModal(btn.getAttribute('data-prefill-patient-name') || '');
+            });
+          });
           const patientForm = <?= json_encode($patientForm, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
           Object.entries(patientForm).forEach(([key,value]) => { const input=document.querySelector('#patientModal [name="'+key+'"]'); if(input)input.value=value; });
-          <?php if ($patientError || ($_GET['novo'] ?? '') === '1'): ?>openPatientModal();<?php endif; ?>
+          <?php if ($patientError || ($_GET['novo'] ?? '') === '1'): ?>openPatientModal(<?= json_encode($query, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);<?php endif; ?>
         </script>
         <?php
         $content = ob_get_clean();

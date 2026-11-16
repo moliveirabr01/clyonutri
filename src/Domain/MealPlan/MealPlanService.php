@@ -72,6 +72,7 @@ class MealPlanService
 
         $this->db->beginTransaction();
         try {
+            $nowLocal = date('Y-m-d H:i:s');
             $stmt = $this->db->prepare("
                 INSERT INTO meal_plans (
                     clinic_id, patient_id, professional_id, title, notes,
@@ -80,7 +81,7 @@ class MealPlanService
                 ) VALUES (
                     :clinic_id, :patient_id, :professional_id, :title, :notes,
                     'draft', 1, :parent_plan_id, 0.0,
-                    0.0, 0.0, 0.0, 0.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    0.0, 0.0, 0.0, 0.0, :now_c, :now_u
                 )
             ");
             $stmt->execute([
@@ -90,6 +91,8 @@ class MealPlanService
                 'title' => $cleanTitle,
                 'notes' => $notes !== null ? trim($notes) : null,
                 'parent_plan_id' => $parentPlanId,
+                'now_c' => $nowLocal,
+                'now_u' => $nowLocal,
             ]);
             $planId = (int)$this->db->lastInsertId();
 
@@ -923,10 +926,12 @@ class MealPlanService
             $alerts[] = [
                 'type' => 'MEALS_COUNT',
                 'severity' => 'HIGH',
-                'message' => "O plano tem {$mealsCount} refeição(ões); o padrão é ao menos 3.",
+                'message' => $mealsCount === 1
+                    ? 'O plano tem 1 refeição; o padrão é ao menos 3.'
+                    : "O plano tem {$mealsCount} refeições; o padrão é ao menos 3.",
             ];
         }
-        $labels = ['energy' => ['energia', 'kcal'], 'protein' => ['proteína', 'g'], 'carbohydrate' => ['carboidrato', 'g'], 'lipid' => ['lipídio', 'g']];
+        $labels = ['energy' => ['A energia', 'kcal'], 'protein' => ['A proteína', 'g'], 'carbohydrate' => ['O carboidrato', 'g'], 'lipid' => ['O lipídio', 'g']];
         foreach ($labels as $key => [$label, $unit]) {
             $row = $comparison[$key] ?? null;
             if (!is_array($row) || (float)$row['target'] <= 0) {
@@ -942,7 +947,7 @@ class MealPlanService
                 'nutrient' => $key,
                 'ratio_pct' => $ratio,
                 'message' => sprintf(
-                    'A %s do plano está %s da meta: %s%% (%s %s de %s %s).',
+                    '%s do plano está %s da meta: %s%% (%s %s de %s %s).',
                     $label,
                     $ratio < 80.0 ? 'abaixo' : 'acima',
                     number_format($ratio, 1, ',', '.'),
@@ -1003,10 +1008,10 @@ class MealPlanService
             // Primeira escrita: draft -> published. Se outra requisição já publicou ou mudou o status, para aqui.
             $claim = $this->db->prepare("
                 UPDATE meal_plans
-                SET status = 'published', published_at = :published_at, updated_at = CURRENT_TIMESTAMP
+                SET status = 'published', published_at = :published_at, updated_at = :updated_at
                 WHERE id = :id AND clinic_id = :clinic_id AND status = 'draft'
             ");
-            $claim->execute(['published_at' => $publishedAt, 'id' => $planId, 'clinic_id' => $clinicId]);
+            $claim->execute(['published_at' => $publishedAt, 'updated_at' => $publishedAt, 'id' => $planId, 'clinic_id' => $clinicId]);
             if ($claim->rowCount() !== 1) {
                 $st = $this->db->prepare("SELECT status FROM meal_plans WHERE id = :id AND clinic_id = :c");
                 $st->execute(['id' => $planId, 'c' => $clinicId]);
@@ -1299,8 +1304,8 @@ class MealPlanService
         if (($plan['status'] ?? '') !== 'draft') {
             throw new InvalidArgumentException('Só rascunhos mudam de método. Crie uma nova versão para alterar um plano publicado.');
         }
-        $this->db->prepare('UPDATE meal_plans SET plan_method = :m, updated_at = CURRENT_TIMESTAMP WHERE id = :id AND clinic_id = :c')
-            ->execute(['m' => $method, 'id' => $planId, 'c' => $clinicId]);
+        $this->db->prepare('UPDATE meal_plans SET plan_method = :m, updated_at = :u WHERE id = :id AND clinic_id = :c')
+            ->execute(['m' => $method, 'u' => date('Y-m-d H:i:s'), 'id' => $planId, 'c' => $clinicId]);
         (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('MEAL_PLAN_METHOD_SET', 'meal_plans', (string)$planId, ['method' => $method]);
     }
 
@@ -1324,9 +1329,9 @@ class MealPlanService
         if (!empty($plan['patient_id'])) {
             throw new InvalidArgumentException('Este plano já tem paciente vinculado. Para outro paciente, duplique o plano.');
         }
-        $st = $this->db->prepare("UPDATE meal_plans SET patient_id = :p, updated_at = CURRENT_TIMESTAMP
+        $st = $this->db->prepare("UPDATE meal_plans SET patient_id = :p, updated_at = :u
             WHERE id = :id AND clinic_id = :c AND status = 'draft' AND patient_id IS NULL");
-        $st->execute(['p' => $patientId, 'id' => $planId, 'c' => $clinicId]);
+        $st->execute(['p' => $patientId, 'u' => date('Y-m-d H:i:s'), 'id' => $planId, 'c' => $clinicId]);
         if ($st->rowCount() !== 1) {
             throw new RuntimeException('O plano mudou durante a atribuição. Recarregue e tente novamente.');
         }
@@ -1444,7 +1449,7 @@ class MealPlanService
                 carbohydrate_g = :carb,
                 lipid_g = :lip,
                 fiber_g = :fib,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = :now_u
             WHERE id = :id AND status = 'draft'
         ");
         $up->execute([
@@ -1453,6 +1458,7 @@ class MealPlanService
             'carb' => $carb,
             'lip' => $lip,
             'fib' => $fib,
+            'now_u' => date('Y-m-d H:i:s'),
             'id' => $planId,
         ]);
 
@@ -1547,9 +1553,9 @@ class MealPlanService
                 $isDraft = $guard->fetchColumn() === 'draft';
             } else {
                 // SQLite: a primeira escrita obtém o lock de escrita do banco; changes() conta as linhas casadas.
-                $guard = $this->db->prepare("UPDATE meal_plans SET updated_at = CURRENT_TIMESTAMP
+                $guard = $this->db->prepare("UPDATE meal_plans SET updated_at = :now_u
                     WHERE id = :id AND clinic_id = :clinic_id AND status = 'draft'");
-                $guard->execute(['id' => $planId, 'clinic_id' => TenantContext::getClinicId()]);
+                $guard->execute(['now_u' => date('Y-m-d H:i:s'), 'id' => $planId, 'clinic_id' => TenantContext::getClinicId()]);
                 $isDraft = $guard->rowCount() === 1;
             }
             if (!$isDraft) {

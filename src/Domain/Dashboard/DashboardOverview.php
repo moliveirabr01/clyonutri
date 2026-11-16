@@ -52,10 +52,10 @@ final class DashboardOverview
         return self::WEEKDAYS[(int)$d->format('N')] . ', ' . (int)$d->format('j') . ' de ' . self::MONTHS[(int)$d->format('n')] . ' de ' . $d->format('Y');
     }
 
-    /** Primeiro nome em caixa de título; vazio quando não há nome (a saudação fica sem vocativo). */
+    /** Primeiro nome em caixa de título, sem tratamento ("Dra. Helena Prado" -> "Helena"); vazio quando não há nome. */
     public static function firstName(?string $name): string
     {
-        $name = trim((string)$name);
+        $name = trim((string)preg_replace('/^\s*(?:(?:dr\.?a?\.?|nutri?\.?|prof\.?a?\.?|sr\.?a?\.?)\s+)+/iu', '', (string)$name));
         if ($name === '') return '';
         $first = (string)(preg_split('/\s+/u', $name)[0] ?? '');
         return mb_convert_case(mb_strtolower($first, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
@@ -156,13 +156,18 @@ final class DashboardOverview
             $byDay[substr((string)$row['scheduled_at'], 0, 10)][] = $row;
             $total++;
         }
+        $satKey = $monday->modify('+5 days')->format('Y-m-d');
+        $sunKey = $monday->modify('+6 days')->format('Y-m-d');
+        $showSunday = !empty($byDay[$sunKey]) || $sunKey === $today;
+        $showSaturday = !empty($byDay[$satKey]) || $satKey === $today || $showSunday;
         $days = [];
         for ($i = 0; $i < 7; $i++) {
             $d = $monday->modify("+{$i} days");
             $key = $d->format('Y-m-d');
             $items = $byDay[$key] ?? [];
             $isToday = $key === $today;
-            if ($i >= 5 && !$items && !$isToday) continue;
+            if ($i === 5 && !$showSaturday) continue;
+            if ($i === 6 && !$showSunday) continue;
             $days[] = [
                 'date' => $key,
                 'weekday' => self::WEEKDAYS_SHORT[(int)$d->format('N')],

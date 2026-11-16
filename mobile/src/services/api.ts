@@ -182,6 +182,40 @@ export interface ActiveMealPlan {
   meals: MealPlanMeal[];
 }
 
+export interface ShoppingListItem {
+  key: string;
+  food_id: number | null;
+  name: string;
+  category: string;
+  aisle: string;
+  amount: number;
+  daily: number;
+  unit: string;
+  is_checked: boolean;
+  recipes_source?: string[];
+  meals_source?: string[];
+  is_substituted?: boolean;
+  has_allergen_conflict?: boolean;
+  allergen_warning?: string | null;
+}
+
+export interface ShoppingListData {
+  plan_id: number;
+  plan_title: string;
+  patient_id: number;
+  version: number;
+  days: number;
+  generated_at: string;
+  total_items_count: number;
+  allergens_and_restrictions?: {
+    has_conflicts: boolean;
+    conflicts_count: number;
+    conflicts: Array<{ food_name?: string; allergen?: string; message?: string }>;
+  };
+  aisles: Record<string, ShoppingListItem[]>;
+  items: ShoppingListItem[];
+}
+
 export interface AppointmentActionState { allowed: boolean; reason: string | null; deadline_iso?: string }
 export interface RescheduleRequest {
   id: number; appointment_id: number;
@@ -649,6 +683,15 @@ export const ApiService = {
 
   async getRecipe(id: number, prescriptionId?: number): Promise<PatientRecipeDetails> {
     const response = await request<{ data: PatientRecipeDetails }>('/api/v1/patient/recipes/' + id + (prescriptionId === undefined ? '' : '?prescription_id=' + prescriptionId));
+    return response.data;
+  },
+
+  async getShoppingList(days = 7): Promise<ShoppingListData> {
+    const safeDays = Math.max(1, Math.min(90, Math.round(days)));
+    const response = await request<{ data: ShoppingListData }>(`/api/v1/patient/shopping-list?days=${safeDays}`);
+    if (!response?.data || typeof response.data.plan_id !== 'number' || !Array.isArray(response.data.items)) {
+      throw new ApiError('Resposta da lista de compras inválida. Tente novamente.', 200, 'invalid');
+    }
     return response.data;
   },
 

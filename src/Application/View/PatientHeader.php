@@ -79,11 +79,14 @@ final class PatientHeader
                 }
             }
             $csrfToken = Csrf::token();
-            if ($mode === 'context') { // NI2-623/629: só etapas e contexto (ex.: a própria tela da consulta)
+            if ($mode === 'context') { // NI2-623/629/848: barra de etapas única no topo + contexto clínico na sala da consulta
                 $pid = $patientId;
                 ob_start();
                 echo '<div class="patient-context-only" data-testid="patient-context-only">';
                 require __DIR__ . '/../../../views/patients/_allergy_badge.php';
+                if (!empty($careStep['appointment'])) {
+                    echo AttendanceContext::stepsNav($careStep['appointment']);
+                }
                 echo '<details class="ux52-context-tools"><summary>Contexto clínico e etapas do atendimento</summary>';
                 if (!empty($careFlow)) {
                     require __DIR__ . '/../../../views/patients/_care_workflow.php';
@@ -100,15 +103,12 @@ final class PatientHeader
             ob_start();
             require __DIR__ . '/../../../views/patients/_profile_header.php';
             echo '<div class="ux52-clinical-tools">';
-            if (in_array($careStep['state'] ?? '', ['continue','selected'], true) && !empty($careStep['appointment'])) {
-                echo '<a class="btn btn-secondary btn-sm" data-testid="attendance-hub" href="/consulta/'.(int)$careStep['appointment']['id'].'">Voltar ao atendimento #'.(int)$careStep['appointment']['id'].'</a>';
-            }
             echo '<details class="ux52-context-tools"><summary>Contexto clínico e etapas</summary>';
             if (!empty($careFlow)) {
                 require __DIR__ . '/../../../views/patients/_care_workflow.php';
-                // The visible return link above is unique; secondary tools are inside the disclosure.
-                ob_start(); require __DIR__ . '/../../../views/patients/_attendance_mode_bar.php';
-                echo str_replace('data-testid="attendance-hub"', 'data-testid="attendance-hub-secondary"', (string)ob_get_clean());
+                require __DIR__ . '/../../../views/patients/_attendance_mode_bar.php';
+            } elseif (in_array($careStep['state'] ?? '', ['continue','selected'], true) && !empty($careStep['appointment'])) {
+                echo '<a class="btn btn-secondary btn-sm" data-testid="attendance-hub" href="/consulta/'.(int)$careStep['appointment']['id'].'">Voltar ao atendimento #'.(int)$careStep['appointment']['id'].'</a>';
             }
             echo ClinicalContext::renderData($db,$context);
             echo '</details></div>';

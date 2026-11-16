@@ -82,11 +82,28 @@
     function choose(food) {
       if (!foods.some(item => String(item.id) === String(food.id))) { foods.push(food); select.add(new Option(food.name, food.id)); }
       select.value = String(food.id); validate(); render();
+      const form = box.closest?.('form');
+      if (form && form.hasAttribute('data-meal-inline-add') && food.default_prescription) {
+        const amtInput = form.querySelector('[name="amount"]');
+        const unitSelect = form.querySelector('[name="measure_unit"]');
+        const dp = food.default_prescription;
+        if (amtInput && (!amtInput.dataset.userEdited || amtInput.value === '')) {
+          amtInput.value = String(dp.amount || 1);
+        }
+        if (unitSelect && dp.unit) {
+          if (unitSelect.tagName === 'SELECT') {
+            if (![...unitSelect.options].some(o => o.value === dp.unit)) {
+              unitSelect.prepend(new Option(dp.unit + (dp.grams ? ' (' + fmt(dp.grams) + ' g)' : ''), dp.unit));
+            }
+          }
+          unitSelect.value = dp.unit;
+        }
+      }
       select.dispatchEvent(new Event('change', { bubbles: true })); // NI2-74: unit-check.js confere a unidade do alimento
       chosen.textContent = 'Selecionado: ' + food.name + ' (' + refOf(food) + ')'; chosen.hidden = false;
       updateAllergenBox(food);
       // NI2-519 (v42): avisa a tela (plan-live.js) da energia por 100 g do alimento escolhido.
-      box.dispatchEvent(new CustomEvent('clyo:food-chosen', { bubbles: true, detail: { id: food.id, name: food.name, energy_kcal: Number(food.energy_kcal), allergen_alert: food.allergen_alert || null } }));
+      box.dispatchEvent(new CustomEvent('clyo:food-chosen', { bubbles: true, detail: { id: food.id, name: food.name, energy_kcal: Number(food.energy_kcal), allergen_alert: food.allergen_alert || null, default_prescription: food.default_prescription || null } }));
     }
     // NI2-519 (v43): sugestões de troca escolhem o alimento pelo mesmo caminho do clique no resultado.
     box.addEventListener('clyo:choose-food', ev => { if (ev.detail && ev.detail.id) choose(ev.detail); });
@@ -121,6 +138,14 @@
       const portion = document.createElement('span'); portion.className = 'food-result__portion';
       portion.textContent = (food.portion && food.portion.label) || 'Valores por 100 g';
       const parts = [name, badge];
+      // NI2-846 (UX-002): destaca a parte/variação anatômica (ex.: peito, coração, coxa) junto ao preparo
+      if (food.part_highlight) {
+        const partBadge = document.createElement('span');
+        partBadge.className = 'food-result__badge food-result__badge--part';
+        partBadge.dataset.testid = 'food-part-badge';
+        partBadge.textContent = 'Parte: ' + food.part_highlight;
+        parts.push(partBadge);
+      }
       // NI2-520 (v42): forma de preparo (cru, cozido, grelhado...) visível no resultado, quando o nome do catálogo informa.
       // NI2-520 (v43): sem preparo no nome, o resultado diz isso em vez de omitir (evita confundir cru e cozido).
       const prepText = food.preparation || food.preparation_label || '';
@@ -227,7 +252,16 @@
     const resultButtons = () => [...results.querySelectorAll('button')];
     input.addEventListener('keydown', event => {
       const first = resultButtons()[0];
-      if (event.key === 'ArrowDown' && first) { event.preventDefault(); first.focus(); }
+      if (event.key === 'ArrowDown' && first) { event.preventDefault(); first.focus(); return; }
+      const form = box.closest?.('form');
+      if (event.key === 'Enter' && form && form.hasAttribute('data-meal-inline-add') && !select.value && foods.length > 0) {
+        event.preventDefault();
+        recordSelection(foods[0]);
+        choose(foods[0]);
+        if (!foods[0].allergen_alert || foods[0].allergen_alert.status !== 'conflict') {
+          form.requestSubmit();
+        }
+      }
     });
     results.addEventListener('keydown', event => {
       if (event.key === 'Escape') { input.focus(); return; }
@@ -241,6 +275,9 @@
   }
   window.ClyoFoodPicker = { init: initFoodPicker };
   document.querySelectorAll('[data-food-picker]').forEach(initFoodPicker);
+  document.addEventListener('clyo:forms-updated', () => {
+    document.querySelectorAll('[data-food-picker]').forEach(initFoodPicker);
+  });
   // NI2-417 (UX-05): os diálogos de alimento usam o componente compartilhado (clinical-journeys.js)
   window.openFoodDialog = id => {
     const modal = window.ClyoDialog ? window.ClyoDialog.open(id) : document.getElementById(id);

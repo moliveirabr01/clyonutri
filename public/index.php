@@ -672,6 +672,7 @@ $router->post('/agenda/{id}/confirmacao-autorizada', $requireAuth([$dashCtrl, 's
 
 $router->get('/consulta/{id}', $requireAuth([$dashCtrl, 'consultationRoom']));
 $router->post('/consulta/{id}/concluir', $requireAuth([$dashCtrl, 'completeConsultation']));
+$router->post('/consulta/{id}/retorno', $requireAuth([$dashCtrl, 'scheduleFollowUpFromClosing'])); // NI2-849 (UX-005)
 $router->get('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftGet']));   // UX-03 (v14)
 $router->post('/consulta/{id}/rascunho', $requireAuth([$dashCtrl, 'consultationDraftSave'])); // UX-03 (v14)
 
@@ -739,6 +740,7 @@ $router->post('/planos/{id}/refeicoes/{mealId}/remover', $requireAuth([$dashCtrl
 $router->post('/planos/{id}/itens', $requireAuth([$dashCtrl, 'addItemToPlanMeal']));
 $router->post('/planos/{id}/itens/{itemId}/editar', $requireAuth([$dashCtrl, 'updatePlanItem']));
 $router->post('/planos/{id}/itens/{itemId}/remover', $requireAuth([$dashCtrl, 'deleteItemFromPlanMeal']));
+$router->post('/planos/{id}/itens/{itemId}/somar', $requireAuth([$dashCtrl, 'mergeDuplicatePlanItem']));
 $dietaryCtrl = new \ClyoNutri\Application\Controllers\DietarySuggestionController($db);
 $router->get('/planos/{id}/sugestoes-dieteticas', $requireAuth([$dietaryCtrl,'page']));
 $router->post('/planos/{id}/sugestoes-dieteticas', $requireAuth([$dietaryCtrl,'page']));

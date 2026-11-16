@@ -392,7 +392,8 @@ foreach ($history as $h) {
   <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
   (() => {
     const form = document.getElementById('anamnesis-form'); if (!form) return;
-    const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status'), initial = status.textContent.trim();
+    const progress = document.getElementById('anamnesis-progress'), status = document.getElementById('anamnesis-save-status');
+    let lastSavedText = status.textContent.trim();
 
     const toggleBox = (selectId, boxId, showValues) => {
       const sel = document.getElementById(selectId), box = document.getElementById(boxId);
@@ -438,8 +439,21 @@ foreach ($history as $h) {
       });
       progress.textContent = filled + ' de ' + links.length + ' seções estruturadas preenchidas.';
       const dirty = window.ClyoForms ? window.ClyoForms.isDirty(form) : false;
-      status.textContent = dirty ? 'Alterações não salvas. ' + initial : initial;
+      status.textContent = dirty ? 'Em edição — alterações não salvas.' : lastSavedText;
     };
+
+    form.addEventListener('clyo:workflow-state', e => {
+      const st = e.detail && e.detail.state;
+      const at = e.detail && e.detail.saved_at;
+      if (st === 'saved') {
+        lastSavedText = at ? ('Salvo como rascunho em ' + at + '.') : 'Salvo como rascunho.';
+        status.textContent = lastSavedText;
+      } else if (st === 'saving') {
+        status.textContent = 'Salvando rascunho…';
+      } else if (st === 'editing') {
+        status.textContent = 'Em edição — alterações não salvas.';
+      }
+    });
 
     form.addEventListener('input', update); form.addEventListener('change', update); update();
     window.addEventListener('load', update);

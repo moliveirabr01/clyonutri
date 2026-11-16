@@ -19,6 +19,7 @@ import NextAppointmentCard from '../components/NextAppointmentCard';
 import DailyCheckinCard from '../components/DailyCheckinCard';
 import PatientChat from '../components/PatientChat';
 import PatientNotifications from '../components/PatientNotifications';
+import PatientShoppingList from '../components/PatientShoppingList';
 import { setupPushNotifications, onPushOpened } from '../services/pushNotifications';
 import BrandLogo from '../components/BrandLogo';
 import PatientOverview from '../components/PatientOverview';
@@ -26,7 +27,7 @@ import Feather from '@expo/vector-icons/Feather';
 import HydrationHistory from '../components/HydrationHistory';
 import { HydrationQueue, QueuedHydration, memoryStorage, webStorage } from '../services/hydrationQueue';
 import { patientTokens as t } from '../theme/patient';
-import { announce, useAnnounce } from '../utils/a11y';
+import { announce, useAnnounce, radioKeyboardProps } from '../utils/a11y';
 import {
   ApiService,
   ApiError,
@@ -55,7 +56,7 @@ function ResourceNotice({ state, retry, name }: { state: ResourceState; retry: (
     {state.loading && <ActivityIndicator accessibilityLabel={`Atualizando ${name}`} />}
     {state.updatedAt && <Text style={{ color: t.muted }} accessibilityLiveRegion="polite">{state.error ? 'Dados desatualizados. ' : ''}Última atualização: {state.updatedAt}</Text>}
     {state.error && <Text style={{ color: t.error }} accessibilityRole="alert" accessibilityLiveRegion="assertive">{state.error}</Text>}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${state.error ? 'Tentar novamente' : 'Atualizar'} ${name}`} onPress={retry} disabled={state.loading} accessibilityState={{ busy: state.loading, disabled: state.loading }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{state.error ? 'Tentar novamente' : 'Atualizar'}</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${state.error ? 'Tentar novamente' : 'Atualizar'} ${name}`} onPress={retry} disabled={state.loading} accessibilityState={{ busy: state.loading, disabled: state.loading }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy, textDecorationLine: 'underline', fontWeight: '600' }}>{state.error ? 'Tentar novamente' : 'Atualizar'}</Text></TouchableOpacity>
   </View>;
 }
 
@@ -63,6 +64,17 @@ export type NavigationTab = 'Hoje' | 'Plano' | 'Diario' | 'Chat' | 'Evolucao' | 
 
 export default function PatientHomeScreen({ session, onLogout }: { session: PatientAuthData; onLogout: () => void }) {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('Hoje');
+  const sectionScroll = useRef<ScrollView>(null);
+  const sectionHeading = useRef<any>(null);
+  // Cada troca abre no início; rascunhos continuam no estado da tela.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      sectionScroll.current?.scrollTo({ y: 0, animated: false });
+      if (Platform.OS === 'web') sectionHeading.current?.focus?.({ preventScroll: true });
+      announce(`Seção ${tabLabels[currentTab]}`);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentTab]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [isOffline, setIsOffline] = useState<boolean>(false);
@@ -122,6 +134,8 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
   const [mealDraft, setMealDraft] = useState<{ name: string; planned: string } | null>(null);
   const [mealMode, setMealMode] = useState<'planned' | 'different'>('planned');
   const [mealDescription, setMealDescription] = useState('');
+  const mealDraftCache = useRef<Record<string, { mode: 'planned' | 'different'; description: string }>>({});
+  const mealRegisterButtons = useRef<Record<string, any>>({});
   const [mealFeedback, setMealFeedback] = useState<string | null>(null);
   const [mealError, setMealError] = useState<string | null>(null);
   const [recipeDetailState, setRecipeDetailState] = useState<ResourceState>(initialResource);
@@ -388,6 +402,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
         idempotency_key: pending.key,
       });
       delete pendingMealWrites.current[mealName];
+      delete mealDraftCache.current[mealName];
       setDiaryEntries(prev => {
         if (prev.some(e => e.id === entry.id)) return prev;
         return [entry, ...prev];
@@ -402,6 +417,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       } else if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
         // O servidor recusou o conteúdo (validação, chave reutilizada): reenviar o mesmo registro nunca vai funcionar.
         delete pendingMealWrites.current[mealName];
+      delete mealDraftCache.current[mealName];
         setMealError(`${err.message} Revise e registre de novo.`);
       } else if (err instanceof ApiError && err.status === 429) {
         setMealError('Você fez muitos registros em pouco tempo. Aguarde um minuto e toque em confirmar de novo; seus dados foram preservados.');
@@ -475,12 +491,14 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
       )}
 
       <ScrollView
+        ref={sectionScroll}
         role="main"
         contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[t.navy]} tintColor={t.navy} />
         }
       >
+        <Text ref={sectionHeading} accessibilityRole="header" {...(Platform.OS === 'web' ? { tabIndex: -1 } as any : {})} style={styles.sectionTitle}>{tabLabels[currentTab]}</Text>
         {currentTab === 'Hoje' && (
           <>
             <PatientOverview name={patientName} hasPlan={!!activePlan} meals={activePlan?.meals?.length ?? 0} waterMl={waterMl} waterGoal={waterGoal} onPlan={() => setCurrentTab('Plano')} />
@@ -527,9 +545,9 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   {diaryEntries.filter(entry => entry.meal_name === meal.name && isMealToday(entry.consumed_at)).slice(0, 1).map(entry => <Text key={entry.id} style={[styles.helperText, { color: t.success }]}>Consumo registrado em {displayLocalDateTime(entry.consumed_at)}</Text>)}
             {mealDraft?.name === meal.name && <View style={styles.card}>
               <Text style={styles.cardTitle}>Registrar {mealDraft.name}</Text>
-              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar.</Text>
-              <View accessibilityRole="radiogroup">
-                {(['planned', 'different'] as const).map(mode => <TouchableOpacity key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
+              <Text style={styles.helperText}>O que você consumiu? O registro só será enviado ao confirmar. Ao cancelar, o texto fica guardado nesta tela até você sair ou atualizar.</Text>
+              <View accessibilityRole="radiogroup" accessibilityLabel="Como foi o consumo">
+                {(['planned', 'different'] as const).map(mode => <TouchableOpacity {...radioKeyboardProps(() => setMealMode(mode), registeringMeal !== null || !!mealError)} key={mode} accessibilityRole="radio" aria-checked={mealMode === mode} accessibilityState={{ checked: mealMode === mode }} disabled={registeringMeal !== null || !!mealError} onPress={() => setMealMode(mode)} style={[styles.navyButton, { marginTop: 8, backgroundColor: mealMode === mode ? t.navy : t.background }]}>
                   <Text style={{ color: mealMode === mode ? t.white : t.navy }}>{mode === 'planned' ? 'Conforme o plano' : 'Comi diferente'}</Text>
                 </TouchableOpacity>)}
               </View>
@@ -541,16 +559,23 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null || (mealMode === 'different' && !mealDescription.trim())} style={[styles.navyButton, { marginTop: 12 }]} onPress={() => handleRegisterMeal(mealDraft.name, mealMode === 'planned' ? `Conforme o plano: ${mealDraft.planned}` : `Comi diferente: ${mealDescription.trim()}`)}>
                 <Text style={styles.navyButtonText}>{registeringMeal ? 'Salvando...' : mealError ? 'Tentar confirmar registro' : 'Confirmar consumo'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => setMealDraft(null)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" disabled={registeringMeal !== null} onPress={() => {
+                mealDraftCache.current[mealDraft.name] = { mode: mealMode, description: mealDescription };
+                const name = mealDraft.name;
+                setMealDraft(null);
+                requestAnimationFrame(() => mealRegisterButtons.current[name]?.focus?.({ preventScroll: true }));
+              }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: t.navy }}>{mealError ? 'Voltar e confirmar depois' : 'Cancelar'}</Text></TouchableOpacity>
             </View>}
                   <View style={styles.actionRow}>
                     <TouchableOpacity
+                      ref={node => { mealRegisterButtons.current[meal.name] = node; }}
                       style={[styles.registerMealButton, registeringMeal === meal.name && styles.registerMealButtonDisabled]}
                       onPress={() => {
                         const pending = pendingMealWrites.current[meal.name];
+                        const cached = mealDraftCache.current[meal.name];
                         setMealDraft({ name: meal.name, planned: meal.items.map(item => `${item.quantity} ${item.unit} de ${item.food_name}`).join('; ') });
-                        setMealMode(pending?.description.startsWith('Comi diferente:') ? 'different' : 'planned');
-                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') || '');
+                        setMealMode(pending ? pending.description.startsWith('Comi diferente:') ? 'different' : 'planned' : cached?.mode ?? 'planned');
+                        setMealDescription(pending?.description.replace(/^Comi diferente: /, '') ?? cached?.description ?? '');
                         setMealError(pending ? 'Este consumo aguarda confirmação. Tente salvar novamente sem alterar os dados.' : null);
                       }}
                       disabled={registeringMeal !== null || mealDraft !== null}
@@ -736,13 +761,13 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               <Text style={styles.mealItem}>{Number(recipe.prescribed_servings).toLocaleString('pt-BR')} porção(ões) • {Number(recipe.scaled_energy_kcal).toLocaleString('pt-BR')} kcal</Text>
               {recipe.recipe_summary && <Text style={styles.helperText}>{recipe.recipe_summary}</Text>}
               {recipe.instructions_override && <Text style={styles.mealItem}>Orientação do nutricionista: {recipe.instructions_override}</Text>}
-              {!(selectedPrescription === recipe.id && recipeUnavailable) && <TouchableOpacity accessibilityRole="button" disabled={recipeDetailState.loading} style={styles.retryButton} onPress={() => openRecipe(recipe)}>
+              {!(selectedPrescription === recipe.id && recipeUnavailable) && <TouchableOpacity accessibilityRole="button" disabled={recipeDetailState.loading} style={[styles.navyButton, recipeDetailState.loading && { opacity: 0.6 }]} onPress={() => openRecipe(recipe)}>
                 <Text style={styles.retryButtonText}>Ver ingredientes e preparo</Text>
               </TouchableOpacity>}
               {selectedPrescription === recipe.id && <>
                 {recipeDetailState.loading && <ActivityIndicator accessibilityLabel="Carregando receita" />}
                 {recipeDetailState.error && <>
-                  <Text accessibilityRole="alert" style={{ color: t.error }}>{recipeDetailState.error}{!recipeUnavailable ? ' Tente abrir novamente.' : ''}</Text>
+                  <Text accessibilityRole="alert" style={{ color: t.error }}>{recipeUnavailable ? 'A versão desta prescrição não tem conteúdo completo disponível. Peça ao nutricionista que revise a prescrição no chat.' : recipeDetailState.error + ' Tente abrir novamente.'}</Text>
                   {recipeUnavailable && <TouchableOpacity accessibilityRole="button" style={styles.navyButton} onPress={() => { setChatInputText(`Olá! A receita “${recipe.recipe_title}” está indisponível no aplicativo. Pode disponibilizar uma nova prescrição?`); setCurrentTab('Chat'); }}><Text style={styles.navyButtonText}>Solicitar nova prescrição no chat</Text></TouchableOpacity>}
                 </>}
                 {recipeDetails && <>
@@ -770,6 +795,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               </>}
             </View>)}
 
+            <PatientShoppingList patientId={session.patient.id} active={currentTab === 'Plano'} />
 
           </View>
         )}
@@ -786,9 +812,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                   <Text style={styles.cardTitle}>
                     {entry.meal_name} • {displayLocalDateTime(entry.consumed_at)}
                   </Text>
-                  {entry.description && (
-                    <Text style={styles.mealItem}>{entry.description}</Text>
-                  )}
+                  <Text style={styles.mealItem}>{!entry.description || ['Consumo registrado via aplicativo móvel', 'Consumo informado pelo paciente'].includes(entry.description.trim().replace(/\.$/, '')) ? 'Este registro antigo não informa alimentos ou quantidades.' : entry.description}</Text>
                   {entry.feedback_from_professional && (
                     <View style={styles.feedbackBox}>
                       <Text style={styles.feedbackTitle}>Retorno do nutricionista:</Text>
@@ -928,7 +952,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[styles.copperButton, { marginTop: 16 }]}
+                style={[styles.secondaryAction, { marginTop: 16 }, loggingOut && { opacity: 0.6 }]}
                 onPress={async () => {
                   setLoggingOut(true);
                   setLogoutError(null);
@@ -942,7 +966,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
                 accessibilityRole="button"
                 disabled={loggingOut}
               >
-                <Text style={styles.copperButtonText}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar sessão'}</Text>
+                <Text style={{ color: t.navy, fontWeight: '600' }}>{loggingOut ? 'Encerrando sessão...' : 'Encerrar sessão'}</Text>
               </TouchableOpacity>
             </View>
 
@@ -1083,6 +1107,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '500',
   },
+  secondaryAction: { borderWidth: 1, borderColor: t.inputBorder, borderRadius: t.buttonRadius, minHeight: t.touch, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center' },
   retryButton: {
     backgroundColor: t.error,
     paddingVertical: 6,

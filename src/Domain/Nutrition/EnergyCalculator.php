@@ -111,7 +111,11 @@ final class EnergyCalculator
             $tmb = 500.0 + 22.0 * $ffm;
             $equation = sprintf('500 + 22 x %s kg de massa livre de gordura', self::fmt($ffm));
         } else {
-            $height = self::number($in['height_cm'] ?? null, 'altura', 40.0, 250.0);
+            $rawHeight = self::parse($in['height_cm'] ?? null, 'altura');
+            if ($rawHeight > 0.0 && $rawHeight <= 3.0) {
+                $rawHeight = round($rawHeight * 100.0, 1);
+            }
+            $height = self::number($rawHeight, 'altura', 40.0, 250.0);
             if ($age === null) {
                 throw new InvalidArgumentException('Informe a idade.');
             }

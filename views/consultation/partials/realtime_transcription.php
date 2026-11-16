@@ -29,12 +29,12 @@
   <!-- 1. ACEITE DO PACIENTE (NI2-830 / SEC-001): quem aceita é o paciente; o profissional só pede -->
   <div id="stt-consent-panel" class="op-message op-message--info u-mt-3" role="region" aria-labelledby="stt-consent-title">
     <strong id="stt-consent-title">Aceite do paciente para a transcrição desta consulta (LGPD)</strong>
-    <p class="u-text-compact u-mt-1">
-      O aceite é feito pelo próprio paciente, no aparelho dele (link de uso único ou QR) ou no portal do paciente. Você não consegue aceitar por ele.
-      Sem aceite válido para esta consulta, nenhum áudio é captado. O texto que o paciente lê é a versão <strong><?= htmlspecialchars(\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::VERSION) ?></strong>.
-    </p>
-    <details class="u-mt-1">
-      <summary class="u-text-compact">Ver o texto que o paciente vai ler</summary>
+    <details class="u-mt-1" data-testid="stt-lgpd-details">
+      <summary class="u-text-compact u-pointer">Regras de aceite LGPD e texto que o paciente vai ler (<?= htmlspecialchars(\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::VERSION) ?>)</summary>
+      <p class="u-text-compact u-mt-1">
+        O aceite é feito pelo próprio paciente, no aparelho dele (link de uso único ou QR) ou no portal do paciente. Você não consegue aceitar por ele.
+        Sem aceite válido para esta consulta, nenhum áudio é captado. O texto que o paciente lê é a versão <strong><?= htmlspecialchars(\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::VERSION) ?></strong>.
+      </p>
       <dl class="u-text-compact">
 <?php foreach (\ClyoNutri\Domain\Clinical\RealtimeTranscription\TranscriptionConsentTerms::sections() as $__t => $__b): ?>
         <dt class="u-font-bold"><?= htmlspecialchars($__t) ?></dt>

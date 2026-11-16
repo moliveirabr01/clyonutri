@@ -52,4 +52,17 @@
   });
   mobile.addEventListener('change', () => close(false));
   addEventListener('pagehide', () => close(false));
+
+  // v54.62 (NI2-854 / UX-015): grupos recolhíveis (Biblioteca nutricional, Gestão) com estado lembrado na sessão.
+  panel.querySelectorAll('details.cn58-nav-collapsible[data-nav-group]').forEach(det => {
+    const key = 'cn_nav_group:' + (det.getAttribute('data-nav-group') || '');
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (saved === '1') det.open = true;
+      else if (saved === '0' && !det.querySelector('.app-nav__item.active')) det.open = false;
+    } catch (_) {}
+    det.addEventListener('toggle', () => {
+      try { sessionStorage.setItem(key, det.open ? '1' : '0'); } catch (_) {}
+    });
+  });
 })();

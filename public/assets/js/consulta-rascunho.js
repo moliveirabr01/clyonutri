@@ -110,11 +110,25 @@
         clearLocalBackup();
         return;
       }
-      var restore=document.createElement('button');restore.type='button';restore.className='op-button op-button--secondary';restore.textContent='Restaurar e tentar salvar cópia local não confirmada';
-      var note=document.createElement('p');note.className='op-help';note.textContent='A tela mostra o último rascunho confirmado pelo servidor. Há também uma cópia temporária local, sem confirmação de salvamento.';
-      restore.addEventListener('click',function(){names.forEach(function(n){var el=form.elements[n];if(el&&typeof saved.values[n]==='string')el.value=saved.values[n];});dirty=true;say('Em edição — cópia local ainda não confirmada.','warn','editing');restore.remove();note.remove();timer=setTimeout(save,400);});
-      statusEl.after(note,restore);
-
+      names.forEach(function (n) {
+        var el = form.elements[n];
+        if (el && typeof saved.values[n] === 'string') {
+          el.value = saved.values[n];
+        }
+      });
+      dirty = true;
+      say('Rascunho recuperado após reconexão — sincronizando…', 'info', 'salvando');
+      if (statusEl && typeof statusEl.after === 'function' && typeof document.createElement === 'function') {
+        var note = document.createElement('p');
+        note.className = 'op-message op-message--info';
+        if (note.setAttribute) {
+          note.setAttribute('role', 'status');
+          note.setAttribute('data-testid', 'draft-recovered-banner');
+        }
+        note.textContent = 'Rascunho recuperado após reconexão. Sincronizando com o servidor…';
+        statusEl.after(note);
+      }
+      timer = setTimeout(save, 500);
     } catch (e) {}
   }
 
@@ -213,6 +227,13 @@
   names.forEach(function (n) { var el = form.elements[n]; if (el) el.addEventListener('input', schedule); });
 
   restorePendingLocalBackupIfSafe();
+
+  window.addEventListener('online', function () {
+    if (dirty && !saving && !inConflict) {
+      clearTimeout(timer);
+      timer = setTimeout(save, 300);
+    }
+  });
 
   window.addEventListener('beforeunload', function (ev) { if (!submitting && (dirty || saving)) { ev.preventDefault(); ev.returnValue = ''; } });
   form.addEventListener('submit', function (ev) {

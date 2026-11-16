@@ -761,10 +761,13 @@ class AnthropometryService
         return date('Y-m-d H:i:s', $ts);
     }
 
-    private function validateCircumference(?float $val, string $fieldName): ?float
+    private function validateCircumference(mixed $val, string $fieldName): ?float
     {
         if ($val === null || $val === '' || (is_string($val) && trim($val) === '')) {
             return null;
+        }
+        if (!is_numeric($val)) {
+            throw new InvalidAnthropometricDataException("Circunferência de {$fieldName} inválida: informe um número em cm (ex.: 82,5).");
         }
         $num = (float)$val;
         if ($num <= 0) {
@@ -776,10 +779,13 @@ class AnthropometryService
         return round($num, 2);
     }
 
-    private function validatePercentage(?float $val, string $fieldName, float $min, float $max): ?float
+    private function validatePercentage(mixed $val, string $fieldName, float $min, float $max): ?float
     {
         if ($val === null || $val === '' || (is_string($val) && trim($val) === '')) {
             return null;
+        }
+        if (!is_numeric($val)) {
+            throw new InvalidAnthropometricDataException("{$fieldName} inválido: informe um número percentual (ex.: 18,5).");
         }
         $num = (float)$val;
         if ($num <= 0) {
@@ -791,10 +797,13 @@ class AnthropometryService
         return round($num, 2);
     }
 
-    private function validateRange(?float $val, string $fieldName, float $min, float $max): ?float
+    private function validateRange(mixed $val, string $fieldName, float $min, float $max): ?float
     {
         if ($val === null || $val === '' || (is_string($val) && trim($val) === '')) {
             return null;
+        }
+        if (!is_numeric($val)) {
+            throw new InvalidAnthropometricDataException("{$fieldName} inválido: informe um número entre {$min} e {$max}.");
         }
         $num = (float)$val;
         if ($num <= 0) {

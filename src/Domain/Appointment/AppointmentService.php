@@ -1262,6 +1262,101 @@ class AppointmentService
     }
 
     /**
+     * NI2-849 (UX-005): sugere horário para retorno (+30 dias no mesmo horário da consulta concluída).
+     * Se cair fora do expediente, em bloqueio/feriado ou em conflito de agenda, avança automaticamente
+     * para o horário válido mais próximo e explica o motivo.
+     *
+     * @return array{scheduled_at:string, requested_at:string, adjusted:bool, reason:?string, alternatives:list<string>}
+     */
+    public function suggestFollowUpSlot(int $professionalId, string $baseScheduledAt, int $duration = 60, int $daysAhead = 30): array
+    {
+        $duration = max(15, min(240, $duration ?: 60));
+        $tz = new \DateTimeZone(getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo');
+        try {
+            $baseDt = new DateTimeImmutable($baseScheduledAt !== '' ? $baseScheduledAt : 'now', $tz);
+        } catch (\Throwable) {
+            $baseDt = new DateTimeImmutable('now', $tz);
+        }
+        $nowDt = new DateTimeImmutable('now', $tz);
+        if ($baseDt < $nowDt) {
+            $baseDt = $nowDt->setTime((int)$baseDt->format('H'), (int)$baseDt->format('i'));
+        }
+        $targetDt = $baseDt->modify("+{$daysAhead} days");
+        $targetDate = $targetDt->format('Y-m-d');
+        $prefTime = $targetDt->format('H:i');
+        if ($prefTime === '00:00') {
+            $prefTime = '09:00';
+        }
+        $requestedIso = $targetDate . 'T' . $prefTime;
+
+        try {
+            $initial = $this->availabilityPreview($professionalId, $targetDate, $duration, $prefTime);
+            if ($initial['selected_available'] === true) {
+                $alts = [];
+                foreach ($initial['times'] ?? [] as $t) {
+                    if ($t !== $prefTime) {
+                        $alts[] = $targetDate . 'T' . $t;
+                        if (count($alts) >= 3) {
+                            break;
+                        }
+                    }
+                }
+                return [
+                    'scheduled_at' => $requestedIso,
+                    'requested_at' => $requestedIso,
+                    'adjusted' => false,
+                    'reason' => null,
+                    'alternatives' => $alts,
+                ];
+            }
+
+            $reason = $initial['selected_reason'] ?? $initial['message'] ?? 'Horário indisponível na data inicial (+30 dias).';
+            $chosen = null;
+            $alternatives = [];
+
+            for ($offset = 0; $offset <= 21; $offset++) {
+                $candDate = $targetDt->modify("+{$offset} days")->format('Y-m-d');
+                $candPrev = $this->availabilityPreview($professionalId, $candDate, $duration, $prefTime);
+                if ($candPrev['selected_available'] === true) {
+                    $slotIso = $candDate . 'T' . $prefTime;
+                    if ($chosen === null) {
+                        $chosen = $slotIso;
+                    } elseif (count($alternatives) < 3) {
+                        $alternatives[] = $slotIso;
+                    }
+                }
+                foreach ($candPrev['times'] ?? [] as $t) {
+                    $slotIso = $candDate . 'T' . $t;
+                    if ($chosen === null) {
+                        $chosen = $slotIso;
+                    } elseif ($slotIso !== $chosen && !in_array($slotIso, $alternatives, true) && count($alternatives) < 3) {
+                        $alternatives[] = $slotIso;
+                    }
+                }
+                if ($chosen !== null && count($alternatives) >= 3) {
+                    break;
+                }
+            }
+
+            return [
+                'scheduled_at' => $chosen ?? $requestedIso,
+                'requested_at' => $requestedIso,
+                'adjusted' => $chosen !== null && $chosen !== $requestedIso,
+                'reason' => $reason,
+                'alternatives' => $alternatives,
+            ];
+        } catch (\Throwable) {
+            return [
+                'scheduled_at' => $requestedIso,
+                'requested_at' => $requestedIso,
+                'adjusted' => false,
+                'reason' => null,
+                'alternatives' => [],
+            ];
+        }
+    }
+
+    /**
      * Saved preferences for the professional in the current clinic.
      * NI2-584: leitura pura. Contas antigas (só working_days) NÃO são convertidas aqui: o horário sugerido
      * (08–18) só vale depois que a nutricionista confirma em Configurações.

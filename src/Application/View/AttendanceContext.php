@@ -149,22 +149,37 @@ final class AttendanceContext
             .'<a data-testid="attendance-hub" class="attendance-bar__hub" href="/consulta/'.$id.'">Voltar ao atendimento #'.$id.'</a></div>';
     }
 
-    /** Etapas do atendimento (estado real do CareProgress) com link direto; vazio se a consulta não estiver aberta. */
+    /** Etapas do atendimento (estado real do CareProgress + Evolução e Fechamento) com link direto. */
     public static function stepsNav(array $a): string
     {
-        if (!self::$db || !in_array((string)($a['status']??''),['in_progress','scheduled','confirmed'],true)) return '';
+        $status=(string)($a['status']??'');
+        $db=self::$db??\ClyoNutri\Core\Database\Connection::getInstance();
+        if (!in_array($status,['in_progress','scheduled','confirmed','completed'],true)) return '';
         $e=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
+        $aid=(int)$a['id'];
         try {
-            $snap=(new \ClyoNutri\Domain\Appointment\CareProgress(self::$db))->snapshot((int)TenantContext::getClinicId(),(int)$a['patient_id'],(int)$a['id']);
+            $snap=(new \ClyoNutri\Domain\Appointment\CareProgress($db))->snapshot((int)TenantContext::getClinicId(),(int)$a['patient_id'],$aid);
         } catch (\Throwable $x) { return ''; }
         $current=(string)parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);
+        $isConsultRoom=($current==='/consulta/'.$aid);
+        if (!$isConsultRoom && $status==='completed') return '';
+        $evolState=$status==='completed'?'done':($status==='in_progress'?'in_progress':'pending');
+        $closeState=$status==='completed'?'done':'pending';
+        $allSteps=array_merge($snap['steps'],[
+            ['key'=>'evolucao','label'=>'Evolução','state'=>$evolState,'url'=>'/consulta/'.$aid.'#cr-evol-title'],
+            ['key'=>'fechamento','label'=>'Fechamento','state'=>$closeState,'url'=>'/consulta/'.$aid.'#consultation-closing-panel'],
+        ]);
+        $stateWords=['done'=>'concluída','in_progress'=>'em rascunho','review'=>'revisar','pending'=>'pendente','not_applicable'=>'dispensada'];
         $chips='';
-        foreach ($snap['steps'] as $st) {
+        foreach ($allSteps as $st) {
             $mark=['done'=>'✓ ','in_progress'=>'… ','not_applicable'=>'— '][$st['state']]??'';
             $path=(string)parse_url((string)$st['url'],PHP_URL_PATH);
-            $here=$current!=='' && $path===$current && $st['key']!=='revisao';
-            $chips.='<li><a class="attendance-steps__step attendance-steps__step--'.$e($st['state']).'" href="'.$e($st['url']).'" data-step="'.$e($st['key']).'"'.($here?' aria-current="step"':'').'>'
-                .$e($mark.$st['label']).'<span class="sr-only"> — '.$e(\ClyoNutri\Domain\Appointment\CareWorkflow::LABELS[$st['state']]??'').'</span></a></li>';
+            $here=$isConsultRoom
+                ? ($st['key']===(($status==='completed')?'fechamento':'evolucao'))
+                : ($current!=='' && $path===$current && !in_array($st['key'],['revisao','evolucao','fechamento'],true));
+            $word=$stateWords[$st['state']]??'pendente';
+            $chips.='<li><a class="attendance-steps__step attendance-steps__step--'.$e($st['state']).'" href="'.$e($st['url']).'" data-step="'.$e($st['key']).'" data-state="'.$e($st['state']).'"'.($here?' aria-current="step"':'').'>'
+                .$e($mark.$st['label']).'<span class="sr-only"> — '.$e($word).' ('.$e(\ClyoNutri\Domain\Appointment\CareWorkflow::LABELS[$st['state']]??'').')</span></a></li>';
         }
         return $chips===''?'':'<nav class="attendance-steps" aria-label="Etapas deste atendimento" data-testid="attendance-steps"><ol>'.$chips.'</ol></nav>';
     }

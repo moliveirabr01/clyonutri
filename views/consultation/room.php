@@ -52,10 +52,77 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
     <?php if (\ClyoNutri\Domain\Telehealth\TeleconsultationService::isOnlineType($app['type'] ?? null)): /* NI2-221 F19: só consulta online */ ?>
       <a href="/teleconsulta/sessao-agenda/<?= (int)$app['id'] ?>" class="btn btn-primary"><span>Consultório online</span></a>
     <?php endif; ?>
+    <button type="button" class="btn btn-secondary" data-toggle-history-drawer data-testid="toggle-history-drawer" aria-expanded="false" aria-controls="consultation-history-drawer">Histórico clínico</button>
     <a href="/pacientes/<?= $pid ?>" class="cr-profile-link">Ver perfil do paciente</a>
   </div>
 </div>
 <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), $pid, 'atendimento', null, ['state'=>'continue','appointment'=>$app], null, null, false, 'context') // NI2-623/629 ?>
+
+<?php
+$drawerContext = \ClyoNutri\Application\View\ClinicalContext::read(Connection::getInstance(), $pid);
+$drawerSummary = $drawerContext['summary'] ?? [];
+$drawerLastAnthro = $profile['assessments'][0] ?? null;
+$drawerPlan = $profile['meal_plans'][0] ?? null;
+$drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
+?>
+<aside id="consultation-history-drawer" class="card cr-card u-mb-4" data-testid="consultation-history-drawer" aria-label="Histórico clínico do paciente" hidden>
+  <div class="cr-card__head u-flex u-justify-between u-items-center u-wrap u-gap-2">
+    <h3 class="u-m-0">Histórico clínico — <?= htmlspecialchars($app['patient_name']) ?></h3>
+    <button type="button" class="btn btn-secondary btn-sm" data-close-history-drawer data-testid="close-history-drawer">Fechar histórico</button>
+  </div>
+  <div class="u-grid u-cols-auto-md u-gap-4 u-mt-3">
+    <div data-testid="drawer-allergies">
+      <strong>Alergias e restrições</strong>
+      <p class="u-text-compact u-mt-1 u-mb-0">Alergias: <?= htmlspecialchars((string)($drawerSummary['allergy_text'] ?? 'Nenhuma alergia registrada')) ?></p>
+      <p class="u-text-compact u-mt-1 u-mb-0">Restrições: <?= htmlspecialchars((string)($drawerSummary['restriction_text'] ?? 'Nenhuma restrição registrada')) ?></p>
+    </div>
+    <div data-testid="drawer-assessment">
+      <strong>Última avaliação</strong>
+      <?php if ($drawerLastAnthro): ?>
+        <p class="u-text-compact u-mt-1 u-mb-0">Peso <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['weight_kg'] ?? null, 1, 'kg')) ?> · Altura <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['height_cm'] ?? null, 1, 'cm')) ?> · IMC <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['bmi'] ?? null, 2)) ?><?php if (!empty($drawerLastAnthro['waist_cm'])): ?> · Cintura <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['waist_cm'], 1, 'cm')) ?><?php endif; ?> (<?= date('d/m/Y', strtotime((string)$drawerLastAnthro['assessed_at'])) ?>)</p>
+      <?php else: ?>
+        <p class="u-text-compact u-mt-1 u-mb-0">Nenhuma avaliação registrada.</p>
+      <?php endif; ?>
+    </div>
+    <div data-testid="drawer-plan">
+      <strong>Plano alimentar</strong>
+      <?php if ($drawerPlan): ?>
+        <p class="u-text-compact u-mt-1 u-mb-0"><?= htmlspecialchars((string)$drawerPlan['title']) ?> (v<?= (int)$drawerPlan['version'] ?> · <?= htmlspecialchars(LabelMap::mealPlanStatus($drawerPlan['status'] ?? '')) ?>) · <a href="/planos/<?= (int)$drawerPlan['id'] ?>?atendimento=<?= (int)$id ?>">Abrir plano</a></p>
+      <?php else: ?>
+        <p class="u-text-compact u-mt-1 u-mb-0">Nenhum plano alimentar prescrito.</p>
+      <?php endif; ?>
+    </div>
+    <div data-testid="drawer-evolutions">
+      <strong>Evoluções anteriores</strong>
+      <?php if (empty($drawerRecords)): ?>
+        <p class="u-text-compact u-mt-1 u-mb-0">Nenhuma evolução anterior registrada no prontuário.</p>
+      <?php else: ?>
+        <ul class="u-m-0 u-pl-4 u-text-compact">
+          <?php foreach ($drawerRecords as $rec):
+            $recJson = is_string($rec['content_json'] ?? null) ? json_decode($rec['content_json'], true) : null;
+            $recText = is_array($recJson) ? (string)($recJson['evolution_summary'] ?? $recJson['notes'] ?? '') : (string)($rec['content_json'] ?? '');
+          ?>
+            <li><strong><?= date('d/m/Y', strtotime((string)$rec['created_at'])) ?>:</strong> <?= htmlspecialchars(mb_strimwidth(trim($recText), 0, 120, '…')) ?></li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+    </div>
+  </div>
+</aside>
+<script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
+(function () {
+  var toggleBtn = document.querySelector('[data-toggle-history-drawer]');
+  var closeBtn = document.querySelector('[data-close-history-drawer]');
+  var drawer = document.getElementById('consultation-history-drawer');
+  if (!toggleBtn || !drawer) return;
+  function setOpen(open) {
+    drawer.hidden = !open;
+    toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  toggleBtn.addEventListener('click', function () { setOpen(drawer.hidden); });
+  if (closeBtn) closeBtn.addEventListener('click', function () { setOpen(false); toggleBtn.focus(); });
+})();
+</script>
 
 <details class="ux52-exam-context"><summary>Exames desta consulta</summary><?php $examPatientId=$pid;$examAppointmentId=(int)$id;require __DIR__.'/../patients/partials/exam_context.php'; ?></details>
 <div class="consultation-room-layout">
@@ -87,6 +154,9 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
       </section>
       <?php elseif (!$inProgress): ?>
       <p class="cr-closed" data-testid="consult-closed" data-draft-scope="<?= htmlspecialchars($draftScope) ?>">Consulta com status <strong><?= htmlspecialchars(LabelMap::appointmentStatus($app['status'])) ?></strong>; não há anotações em andamento.</p>
+      <?php if (($app['status'] ?? '') === 'completed'): ?>
+        <?php $closingApp = $app; require __DIR__ . '/_closing_panel.php'; ?>
+      <?php endif; ?>
       <script src="/assets/js/consulta-rascunho.js?v=v54-18" defer></script>
       <?php else: ?>
       <?php if ($err !== ''): ?>
@@ -95,8 +165,6 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
           <?php if ($err === 'falha' && $errorRef): ?><span class="cr-caption"> Código para o suporte: <?= htmlspecialchars($errorRef) ?>.</span><?php endif; ?>
         </div>
       <?php endif; ?>
-
-      <?php require __DIR__ . '/partials/realtime_transcription.php'; ?>
 
       <form action="/consulta/<?= (int)$app['id'] ?>/concluir" method="POST" data-no-dirty data-consult-draft
             data-draft-url="/consulta/<?= (int)$app['id'] ?>/rascunho" data-draft-scope="<?= htmlspecialchars($draftScope) ?>"<?= $draftRecoveredFromPost ? ' data-draft-recovered="1"' : '' ?> data-draft-version="<?= (int)$draft['version'] ?>" data-csrf="<?= htmlspecialchars($csrfToken) ?>">
@@ -108,17 +176,30 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
           <textarea class="form-control" id="evolution_summary" name="evolution_summary" rows="8" required placeholder="Tópicos abordados: anamnese alimentar, queixas gastrointestinais, rotina, metas acordadas e ajustes na prescrição"><?= htmlspecialchars((string)($draft['evolution_summary'] ?? '')) ?></textarea>
         </div>
 
-        <div class="cr-anthro">
-          <h4>Atualização antropométrica desta consulta (opcional)</h4>
+        <div class="cr-anthro" data-testid="consult-anthro-box">
+          <div class="u-flex u-justify-between u-items-center u-wrap u-gap-2 u-mb-2">
+            <h4 class="u-m-0">Medidas antropométricas desta consulta</h4>
+            <a href="/pacientes/<?= $pid ?>/antropometria?atendimento=<?= (int)$id ?>" class="btn btn-secondary btn-sm" data-testid="consult-open-anthropometry">Registrar medidas na Avaliação</a>
+          </div>
+          <?php if ($drawerLastAnthro): ?>
+            <p class="u-text-compact u-color-neutral-gray-600 u-mt-0 u-mb-2" data-testid="consult-latest-anthro-summary">
+              Última avaliação registrada (<?= date('d/m/Y', strtotime((string)$drawerLastAnthro['assessed_at'])) ?>):
+              <strong>Peso <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['weight_kg'] ?? null, 1, 'kg')) ?></strong> ·
+              <strong>Altura <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['height_cm'] ?? null, 1, 'cm')) ?></strong> ·
+              <strong>IMC <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['bmi'] ?? null, 2)) ?></strong><?php if (!empty($drawerLastAnthro['waist_cm'])): ?> · <strong>Cintura <?= htmlspecialchars(LabelMap::num($drawerLastAnthro['waist_cm'], 1, 'cm')) ?></strong><?php endif; ?>.
+            </p>
+          <?php else: ?>
+            <p class="u-text-compact u-color-neutral-gray-600 u-mt-0 u-mb-2" data-testid="consult-latest-anthro-summary">Nenhuma avaliação registrada ainda. Use <strong>Registrar medidas na Avaliação</strong> para lançar peso, altura e circunferências completas.</p>
+          <?php endif; ?>
           <div class="cn-form-grid">
             <div>
               <label for="dc9-weight_kg" class="cr-label">Peso Atual (kg)</label>
-              <input class="form-control" id="dc9-weight_kg" type="number" inputmode="decimal" step="0.1" min="<?= AppointmentService::CONSULT_WEIGHT_RANGE[0] ?>" max="<?= AppointmentService::CONSULT_WEIGHT_RANGE[1] ?>" name="weight_kg" value="<?= htmlspecialchars((string)($draft['weight_kg'] ?? '')) ?>" placeholder="Ex.: 68,5"<?= $fieldAttr('weight_kg') ?>>
+              <input class="form-control" id="dc9-weight_kg" type="text" inputmode="decimal" data-decimal-field="weight_kg" data-min="<?= AppointmentService::CONSULT_WEIGHT_RANGE[0] ?>" data-max="<?= AppointmentService::CONSULT_WEIGHT_RANGE[1] ?>" name="weight_kg" value="<?= htmlspecialchars((string)($draft['weight_kg'] ?? '')) ?>" placeholder="Ex.: 68,5"<?= $fieldAttr('weight_kg') ?>>
               <?= $fieldMsg('weight_kg') ?>
             </div>
             <div>
               <label for="dc10-waist_cm" class="cr-label">Circunf. Cintura (cm)</label>
-              <input class="form-control" id="dc10-waist_cm" type="number" inputmode="decimal" step="0.5" min="<?= AppointmentService::CONSULT_WAIST_RANGE[0] ?>" max="<?= AppointmentService::CONSULT_WAIST_RANGE[1] ?>" name="waist_cm" value="<?= htmlspecialchars((string)($draft['waist_cm'] ?? '')) ?>" placeholder="Ex.: 78,0"<?= $fieldAttr('waist_cm') ?>>
+              <input class="form-control" id="dc10-waist_cm" type="text" inputmode="decimal" data-decimal-field="waist_cm" data-min="<?= AppointmentService::CONSULT_WAIST_RANGE[0] ?>" data-max="<?= AppointmentService::CONSULT_WAIST_RANGE[1] ?>" name="waist_cm" value="<?= htmlspecialchars((string)($draft['waist_cm'] ?? '')) ?>" placeholder="Ex.: 78,0"<?= $fieldAttr('waist_cm') ?>>
               <?= $fieldMsg('waist_cm') ?>
             </div>
           </div>
@@ -146,6 +227,13 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
           </button>
         </div>
       </form>
+
+      <?php require __DIR__ . '/partials/realtime_transcription.php'; ?>
+
+      <details class="card cr-card u-mt-4" data-testid="consult-closing-preview">
+        <summary class="u-font-semibold u-pointer">Fechamento da consulta (agendar retorno e entregar plano)</summary>
+        <?php $closingApp = $app; require __DIR__ . '/_closing_panel.php'; ?>
+      </details>
       <script src="/assets/js/consulta-rascunho.js?v=v54-18" defer></script>
       <?php endif; ?>
     </section>

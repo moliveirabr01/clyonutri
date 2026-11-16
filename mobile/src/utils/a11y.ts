@@ -12,3 +12,28 @@ export function announce(message: string | null | undefined): void {
 export function useAnnounce(message: string | null | undefined): void {
   useEffect(() => { announce(message); }, [message]);
 }
+
+// React Native Web activates radio Touchables with Enter, but does not implement
+// Space or arrow navigation. Keep native touch behavior and complete web keyboard semantics.
+export function radioKeyboardProps(onSelect: () => void, disabled = false): object {
+  if (Platform.OS !== 'web') return {};
+  return {
+    onKeyDownCapture: (event: any) => {
+      if (disabled) return;
+      if (event.key === ' ') {
+        event.preventDefault();
+        onSelect();
+      } else if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)) {
+        const group = event.currentTarget.closest('[role="radiogroup"]');
+        const options: HTMLElement[] = Array.from(group?.querySelectorAll('[role="radio"]:not([aria-disabled="true"])') ?? []);
+        const index = options.indexOf(event.currentTarget);
+        if (index < 0 || !options.length) return;
+        event.preventDefault();
+        const offset = ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1;
+        const next = options[(index + offset + options.length) % options.length];
+        next.focus();
+        next.click();
+      }
+    },
+  };
+}

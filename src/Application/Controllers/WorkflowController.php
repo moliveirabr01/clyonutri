@@ -18,7 +18,7 @@ final class WorkflowController
     public function mutate(array $params): void {$this->handle($params,true);}
     private function handle(array $params,bool $write): void
     {
-        header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');
+        if(!headers_sent()){header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');}
         $kind=(string)($params['kind']??'');$id=(int)($params['id']??0);$patient=(int)($_POST['patient_id']??$_GET['patient_id']??0);
         try{
             $ws=new WorkflowWrites($this->db);
@@ -43,11 +43,11 @@ final class WorkflowController
                 throw new \InvalidArgumentException('Recurso inválido.');
             });
             echo json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
-        }catch(WorkflowConflict $e){http_response_code(409);echo json_encode(['status'=>'conflict','error'=>$e->getMessage()]);}
-        catch(\ClyoNutri\Core\Security\TenantSecurityException $e){http_response_code(404);echo json_encode(['error'=>'Registro não encontrado.']);}
-        catch(\ClyoNutri\Domain\Clinical\ClinicalInputException $e){http_response_code(422);echo json_encode(['error'=>$e->getMessage(),'field_errors'=>$e->fieldErrors()],JSON_UNESCAPED_UNICODE);}
-        catch(\DomainException|\InvalidArgumentException $e){http_response_code(422);echo json_encode(['error'=>$e->getMessage()]);}
-        catch(\Throwable $e){error_log('Workflow write failed: '.get_class($e).' '.basename($e->getFile()).':'.$e->getLine());http_response_code(503);echo json_encode(['error'=>'Não foi possível confirmar o salvamento. Confira o estado salvo antes de repetir.']);}
+        }catch(WorkflowConflict $e){if(!headers_sent())http_response_code(409);echo json_encode(['status'=>'conflict','error'=>$e->getMessage()]);}
+        catch(\ClyoNutri\Core\Security\TenantSecurityException $e){if(!headers_sent())http_response_code(404);echo json_encode(['error'=>'Registro não encontrado.']);}
+        catch(\ClyoNutri\Domain\Clinical\ClinicalInputException $e){if(!headers_sent())http_response_code(422);echo json_encode(['error'=>$e->getMessage(),'field_errors'=>$e->fieldErrors()],JSON_UNESCAPED_UNICODE);}
+        catch(\DomainException|\InvalidArgumentException $e){if(!headers_sent())http_response_code(422);echo json_encode(['error'=>$e->getMessage()]);}
+        catch(\Throwable $e){error_log('Workflow write failed: '.get_class($e).' '.basename($e->getFile()).':'.$e->getLine());if(!headers_sent())http_response_code(503);echo json_encode(['error'=>'Não foi possível confirmar o salvamento. Confira o estado salvo antes de repetir.']);}
     }
     private function planOperation(int $plan,array $p): array
     {
@@ -61,8 +61,44 @@ final class WorkflowController
         }
         if($action==='item'){
             $amount=$str($p['amount']??'');if(!is_numeric($amount)||!is_finite((float)$amount))throw new \InvalidArgumentException('Quantidade inválida.');
-            $item=$s->addItem($meal,(int)($p['food_id']??0),(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
-            return ['resource_id'=>$plan,'item_id'=>$item,'meal_id'=>$meal];
+            $foodId=(int)($p['food_id']??0);
+            $prevSt=$this->db->prepare('SELECT id, amount, measure_unit FROM meal_plan_items WHERE meal_id=? AND food_id=? ORDER BY id ASC LIMIT 1');
+            $prevSt->execute([$meal,$foodId]);
+            $prevRow=$prevSt->fetch(PDO::FETCH_ASSOC)?:null;
+            $item=$s->addItem($meal,$foodId,(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
+            $res=['resource_id'=>$plan,'item_id'=>$item,'meal_id'=>$meal];
+            if($prevRow){
+                $res['duplicate_in_meal']=['existing_item_id'=>(int)$prevRow['id'],'new_item_id'=>$item,'food_id'=>$foodId,'meal_id'=>$meal,'message'=>'Já existe na refeição — somar quantidades?'];
+            }
+            return $res;
+        }
+        if($action==='merge_duplicate'){
+            $sourceId=(int)($p['item_id']??0);
+            $targetId=(int)($p['target_item_id']??0);
+            $st=$this->db->prepare('SELECT i.id, i.meal_id, i.food_id, i.amount, i.measure_unit, i.weight_grams, i.notes FROM meal_plan_items i JOIN meal_plan_meals m ON m.id=i.meal_id WHERE i.id=? AND m.meal_plan_id=?');
+            $st->execute([$sourceId,$plan]);
+            $src=$st->fetch(PDO::FETCH_ASSOC);
+            if(!$src)throw new \InvalidArgumentException('Item duplicado não encontrado neste plano.');
+            if($targetId<=0){
+                $tSt=$this->db->prepare('SELECT id, meal_id, food_id, amount, measure_unit, weight_grams, notes FROM meal_plan_items WHERE meal_id=? AND food_id=? AND id<>? ORDER BY id ASC LIMIT 1');
+                $tSt->execute([(int)$src['meal_id'],(int)$src['food_id'],$sourceId]);
+                $tgt=$tSt->fetch(PDO::FETCH_ASSOC);
+            }else{
+                $st->execute([$targetId,$plan]);
+                $tgt=$st->fetch(PDO::FETCH_ASSOC);
+            }
+            if(!$tgt||((int)$tgt['id']===$sourceId))throw new \InvalidArgumentException('Item principal para soma não encontrado.');
+            $sameUnit=\ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter::sameUnit((string)$tgt['measure_unit'],(string)$src['measure_unit']);
+            if($sameUnit){
+                $newAmt=round((float)$tgt['amount']+(float)$src['amount'],2);
+                $newUnit=(string)$tgt['measure_unit'];
+            }else{
+                $newAmt=round((float)($tgt['weight_grams']??$tgt['amount'])+(float)($src['weight_grams']??$src['amount']),2);
+                $newUnit='g';
+            }
+            $s->updateItem((int)$tgt['id'],$newAmt,$newUnit,$tgt['notes']?:$src['notes']?:null,null,$plan,true);
+            $s->deleteItem($sourceId);
+            return ['resource_id'=>$plan,'merged_into'=>(int)$tgt['id']];
         }
         if($action==='remove'){
             $item=(int)($p['item_id']??0);$st=$this->db->prepare('SELECT i.id FROM meal_plan_items i JOIN meal_plan_meals m ON m.id=i.meal_id WHERE i.id=? AND m.meal_plan_id=?');$st->execute([$item,$plan]);

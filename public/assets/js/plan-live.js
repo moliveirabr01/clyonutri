@@ -51,10 +51,10 @@
   const attempts=new WeakMap();
   const mapOperation=(form,body)=>{
     const path=new URL(form.action).pathname;
-    const match=path.match(/^\/planos\/(\d+)\/(refeicoes|itens|substituicoes)(?:\/(\d+)\/(editar|remover))?$/);if(!match)return null;
+    const match=path.match(/^\/planos\/(\d+)\/(refeicoes|itens|substituicoes)(?:\/(\d+)\/(editar|remover|somar))?$/);if(!match)return null;
     const [,plan,section,id,verb]=match;
     const key=section==='refeicoes'?'meal':section==='itens'?'item':'substitution';
-    body.set('action',verb==='editar'?'edit_'+key:verb==='remover'?(key==='item'?'remove':'remove_'+key):key==='substitution'?'add_substitution':key);
+    body.set('action',verb==='somar'?'merge_duplicate':verb==='editar'?'edit_'+key:verb==='remover'?(key==='item'?'remove':'remove_'+key):key==='substitution'?'add_substitution':key);
     if(id)body.set(key==='meal'?'meal_id':key==='item'?'item_id':'sub_id',id);
     return '/api/workflow/plan/'+plan;
   };
@@ -81,6 +81,10 @@
       swap(doc);window.scrollTo(0,scrollY);
       if(dialog&&document.contains(form)){window.ClyoForms?.discard(form);window.ClyoDialog?.close(dialog);}
       if(form.isConnected)window.ClyoForms?.saved(form);
+      else if(form.id&&document.getElementById(form.id)){
+        const freshInline=document.getElementById(form.id);
+        freshInline.querySelector('[data-food-query], input:not([type=hidden])')?.focus();
+      }
       else {const fresh=[...document.forms].find(f=>f.action===form.action);if(fresh){let node=fresh.parentElement;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}const target=fresh.elements[focusedName]||fresh.querySelector('input:not([type=hidden]),button');target?.focus();}else root.querySelector('input:not([type=hidden])')?.focus();}
       const freshRoot=doc.querySelector('[data-quick-plan]');if(freshRoot){root.dataset.revision=freshRoot.dataset.revision;for(const selector of ['#quick-meal-select','[data-copy-meals]']){const local=root.querySelector(selector),fresh=freshRoot.querySelector(selector),value=local.value;local.replaceChildren(...[...fresh.options].map(o=>o.cloneNode(true)));local.value=value;}}
       window.ClyoWorkflow?.set(root,window.ClyoForms?.dirtyForms().some(f=>root.contains(f))?'editing':'saved',j.workflow.saved_at);announce('Salvo como rascunho.');

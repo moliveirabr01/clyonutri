@@ -1,12 +1,14 @@
 (() => {
  'use strict';
  const labels={not_started:'Não iniciado',editing:'Em edição — alterações não salvas',saving:'Salvando…',saved:'Salvo como rascunho',review:'Em revisão',completed:'Concluído',published:'Publicado',issued:'Emitido — sem assinatura digital',conflict:'Conflito de edição — nada foi sobrescrito',error:'Não foi possível confirmar o salvamento',expired:'Sessão expirada — salvamento não confirmado'};
- function set(root,key,at){const el=root?.matches?.('[data-workflow-state]')?root:root?.querySelector?.('[data-workflow-state]');if(!el)return;el.dataset.state=key;el.querySelector('[data-state-label]').textContent=labels[key]||key;if(at!==undefined&&el.querySelector('[data-state-time]'))el.querySelector('[data-state-time]').textContent=at?' · '+at:'';}
+ function set(root,key,at){const el=root?.matches?.('[data-workflow-state]')?root:root?.querySelector?.('[data-workflow-state]');if(!el)return;el.dataset.state=key;el.querySelector('[data-state-label]').textContent=labels[key]||key;if(at!==undefined&&el.querySelector('[data-state-time]'))el.querySelector('[data-state-time]').textContent=at?' · '+at:'';try{root?.dispatchEvent?.(new CustomEvent('clyo:workflow-state',{detail:{state:key,saved_at:at},bubbles:true}));}catch(_){}}
  // v54.57 (UX-112): falha de rede do fetch (TypeError: "Failed to fetch", "NetworkError…", "Load failed") vira mensagem em pt-BR.
  function netMessage(e){const m=String(e&&e.message||'');if(/failed to fetch|networkerror|load failed|network request failed/i.test(m)||navigator.onLine===false)return 'Sem conexão com a internet. O que você digitou continua nesta tela; tente de novo quando a conexão voltar.';return m||'Não foi possível concluir. Tente novamente.';}
  window.ClyoWorkflow={set,labels,netMessage};
  document.querySelectorAll('form').forEach(form=>{if(form.querySelector('[data-workflow-state]')&&window.ClyoForms?.isDirty(form))set(form,'editing');});
- document.addEventListener('input',e=>{const form=e.target.closest('form');if(!form||e.target.matches('input[type=search],[data-transient]'))return;const root=form.closest('[data-quick-plan]')||form;if(root.querySelector('[data-workflow-state]'))set(root,'editing');});
+ const markFormEditing=e=>{const form=e.target.closest?.('form');if(!form||e.target.matches('input[type=search],[data-transient]'))return;const root=form.closest('[data-quick-plan]')||form;if(root.querySelector('[data-workflow-state]'))set(root,'editing');};
+ document.addEventListener('input',markFormEditing);
+ document.addEventListener('change',markFormEditing);
  // Native disclosures also work after an authorized partial refresh.
  const mounted=new WeakSet();
  const selector='details.plan-actions-dropdown,details[data-op-menu]';

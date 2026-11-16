@@ -22,6 +22,17 @@ const invitation=await api('/api/v1/professional/patients/1/app-invitation',{},p
 const patient=await api('/api/v1/auth/patient-onboarding/complete',{invitation_code:invitation.data.invitation_code,name:'Paciente teste',email:'recipes-patient@example.test',phone:'21911112222',password:'AppTeste@2026',password_confirmation:'AppTeste@2026'});assert.equal(patient.status,200);
 const list=await api('/api/v1/patient/recipes',null,patient.data.token);assert.equal(list.status,200);assert.equal(list.data.data.length,1);assert.equal(Number(list.data.data[0].recipe_id),recipe.id);assert.equal(list.data.data[0].instructions_override,'Consumir após o treino.');assert.equal(Number(list.data.data[0].prescribed_servings),1.5);
 const details=await api('/api/v1/patient/recipes/'+recipe.id,null,patient.data.token);assert.equal(details.status,200);assert.equal(details.data.data.ingredients.length,3);assert.ok(details.data.data.instructions);
+// Exercise the same explicit prescription route used by the app, including immutable history.
+const prescriptionId=Number(list.data.data[0].id);
+const historicalPath='/api/v1/patient/recipes/'+recipe.id+'?prescription_id='+prescriptionId;
+const historical=await api(historicalPath,null,patient.data.token);
+assert.equal(historical.status,200);assert.equal(historical.data.data.ingredients.length,3);
+assert.equal((await api(historicalPath,null,'expired-token')).status,401);
+assert.equal((await api('/api/v1/patient/recipes/'+recipe.id+'?prescription_id=999999',null,patient.data.token)).status,404);
+sql('UPDATE recipe_versions SET payload_json=\'{}\' WHERE recipe_id='+recipe.id);
+const unavailable=await api(historicalPath,null,patient.data.token);
+assert.equal(unavailable.status,404);assert.equal(unavailable.data.code,'prescription_content_unavailable');
+console.log('PASS explicit prescription: full historical content, expired session, invalid prescription and incomplete snapshot refused');
 assert.equal((await api('/api/v1/patient/recipes/'+examples[1].id,null,patient.data.token)).status,404);
 sql('UPDATE recipe_prescriptions SET patient_id=2 WHERE recipe_id='+recipe.id);
 assert.equal((await api('/api/v1/patient/recipes/'+recipe.id,null,patient.data.token)).status,404);

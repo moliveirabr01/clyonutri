@@ -177,12 +177,16 @@ final class EnergyTargetService
         ], $weight);
 
         $dec = static fn($v) => $v === null || $v === '' ? null : (float)str_replace(',', '.', (string)$v);
+        $normHeight = $dec($core['height_cm']);
+        if ($normHeight !== null && $normHeight > 0.0 && $normHeight <= 3.0) {
+            $normHeight = round($normHeight * 100.0, 1);
+        }
         $factor = (float)str_replace(',', '.', (string)$factorRaw);
         $presetKey = number_format($factor, 2, '.', '');
         $activityLabel = EnergyCalculator::ACTIVITY_PRESETS[$presetKey] ?? ('Fator informado pelo profissional (' . number_format($factor, 2, ',', '') . ')');
         $same = $suggest['source_text'] !== ''
             && ($suggest['weight_kg'] === null || abs((float)$suggest['weight_kg'] - $weight) < 0.005)
-            && ($suggest['height_cm'] === null || $needsFfm || abs((float)$suggest['height_cm'] - (float)$dec($core['height_cm'])) < 0.05)
+            && ($suggest['height_cm'] === null || $needsFfm || abs((float)$suggest['height_cm'] - (float)$normHeight) < 0.05)
             && ($suggest['age_years'] === null || $needsFfm || (int)$suggest['age_years'] === (int)$dec($core['age_years']))
             && ($suggest['sex'] === null || $needsFfm || $suggest['sex'] === $sexVal);
         $source = $same
@@ -199,7 +203,7 @@ final class EnergyTargetService
         $params = [
             'formula' => $formula, 'fv' => EnergyCalculator::FORMULA_VERSION, 'sex' => $sexVal,
             'age' => $needsFfm ? null : $dec($core['age_years']), 'w' => $weight,
-            'h' => $needsFfm ? null : $dec($core['height_cm']), 'ffm' => $needsFfm ? $dec($core['ffm_kg']) : null,
+            'h' => $needsFfm ? null : $normHeight, 'ffm' => $needsFfm ? $dec($core['ffm_kg']) : null,
             'src' => mb_substr($source, 0, 255), 'af' => $factor, 'al' => mb_substr($activityLabel, 0, 80),
             'goal' => $goal, 'gn' => $goalNote !== '' ? $goalNote : null, 'am' => $adjMode,
             'av' => $dec($core['adjust_value']) ?? 0.0,

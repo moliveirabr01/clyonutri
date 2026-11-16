@@ -25,7 +25,7 @@ if($mode==='prepare') {
   $service->createPlan($i,$i,"Plano sintético $i",null,[['name'=>'Almoço','time_of_day'=>'12:00','items'=>[['food_id'=>101,'amount'=>100,'measure_unit'=>'g','notes'=>'Orientação inicial','substitutions'=>[['food_id'=>102,'amount'=>150,'measure_unit'=>'g','notes'=>'Alternativa preservada']]]]]]);
  }
  TenantContext::set(1,['id'=>1]); (new MealPlanService($db))->createPlan(1,1,'Plano vazio');
- $db->exec("UPDATE clinic_members SET role='owner' WHERE user_id=1; INSERT INTO consent_terms(id,version,title,purpose_code,term_text,is_active) VALUES(1,'TEST-1','Termo sintético','clinical_care','Texto somente para teste de manifestação. Não utilizar em produção.',1); INSERT INTO foods(id,clinic_id,name,energy_kcal) VALUES(103,NULL,'Maçã sintética',52),(104,2,'Exclusivo da clínica 2',90);");
+ $db->exec("UPDATE clinic_members SET role='owner' WHERE user_id=1; INSERT INTO consent_terms(version,title,purpose_code,term_text,is_active) VALUES('TEST-1','Termo sintético','clinical_care','Texto somente para teste de manifestação. Não utilizar em produção.',1); INSERT INTO foods(id,clinic_id,name,energy_kcal) VALUES(103,NULL,'Maçã sintética',52),(104,2,'Exclusivo da clínica 2',90);");
  for($j=200;$j<260;$j++) $db->prepare('INSERT INTO foods(id,name,energy_kcal) VALUES(?,?,100)')->execute([$j,'Alimento sintético '.$j]);
  echo json_encode(['plan'=>1,'item'=>1,'other_plan'=>2,'other_item'=>2]);
 } elseif($mode==='inspect') {

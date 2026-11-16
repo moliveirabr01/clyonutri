@@ -42,7 +42,7 @@ if ($mode === 'prepare') {
         TenantContext::set($clinic, ['id' => $user, 'role' => 'nutritionist']);
         $svc = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
         $plan = $svc->createPlan($patient, $user, $title, null, [['name' => 'Almoço', 'time_of_day' => '12:00', 'items' => [['food_id' => 1, 'amount' => 100, 'measure_unit' => 'g']]]]);
-        $svc->publishPlan((int)$plan['id']);
+        $svc->publishPlan((int)$plan['id'], false, false, null, true, 'Plano sintético isolado para testar avisos, sem uso clínico.');
     }
     // Avisos da caixa web do profissional 1: um com link interno, um com link externo (não pode redirecionar), um do profissional 2.
     $ev = $db->prepare("INSERT INTO notification_events(clinic_id,event_type,category,recipient_type,recipient_id,title,body,link,critical,dedupe_key,created_at) VALUES(?,?,?,?,?,?,?,?,0,?,?)");

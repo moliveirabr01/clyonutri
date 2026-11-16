@@ -37,11 +37,11 @@
       searchInput.setAttribute('aria-activedescendant',options[active].id);
       options[active].scrollIntoView({block:'nearest'});
     };
-    const render=()=>{
+    const render=(forceOpen=false)=>{
       active=-1;searchInput.removeAttribute('aria-activedescendant');matchesBox.replaceChildren();
       const query=norm(searchInput.value.trim());
-      if(query.length<3){close();status.textContent='Digite ao menos três letras para buscar.';return;}
-      found=all.filter(person=>norm(person.name).includes(query)).slice(0,10);
+      if(!forceOpen&&query.length<1){close();status.textContent='Digite para buscar ou use a seta para baixo para listar pacientes.';return;}
+      found=(query.length?all.filter(person=>norm(person.name).includes(query)):all).slice(0,10);
       found.forEach((person,i)=>{
         const item=document.createElement('div');item.className='patient-match-option';item.id=matchesBox.id+'-option-'+i;item.setAttribute('role','option');item.setAttribute('aria-selected','false');item.textContent=person.name;
         item.addEventListener('pointerdown',e=>e.preventDefault());
@@ -49,17 +49,18 @@
       });
       status.textContent=found.length?found.length+' paciente(s) encontrado(s). Use as setas e Enter para selecionar.':'Nenhum paciente encontrado. Use o botão novo paciente ou a lista de pacientes.';
       if(!found.length){close();return;}
+      matchesBox.classList.remove('u-hidden');
       matchesBox.style.display='block';searchInput.setAttribute('aria-expanded','true');
     };
     if(select.value)searchInput.value=select.options[select.selectedIndex].text.trim();
     select.addEventListener('change',()=>{const option=select.options[select.selectedIndex];if(option?.value)searchInput.value=option.text.trim();});
-    searchInput.addEventListener('input',()=>{const previous=select.value;select.value='';if(previous)select.dispatchEvent(new Event('change',{bubbles:true}));render();});
+    searchInput.addEventListener('input',()=>{const previous=select.value;select.value='';if(previous)select.dispatchEvent(new Event('change',{bubbles:true}));render(false);});
     searchInput.addEventListener('keydown',e=>{
       const open=searchInput.getAttribute('aria-expanded')==='true';
       if(e.key==='ArrowDown'||e.key==='ArrowUp'){
-        if(!open)render();if(!found.length||searchInput.getAttribute('aria-expanded')!=='true')return;
+        if(!open)render(true);if(!found.length||searchInput.getAttribute('aria-expanded')!=='true')return;
         e.preventDefault();highlight(active<0?(e.key==='ArrowDown'?0:found.length-1):active+(e.key==='ArrowDown'?1:-1));
-      }else if(e.key==='Enter'&&open&&active>=0){e.preventDefault();choose(found[active]);}
+      }else if(e.key==='Enter'&&open&&(active>=0||found.length===1)){e.preventDefault();choose(found[active>=0?active:0]);}
       else if(e.key==='Escape'&&open){e.preventDefault();e.stopPropagation();close();}
       else if(e.key==='Tab')close();
     });

@@ -120,7 +120,7 @@
           <input type="text" id="clinic_name" name="clinic_name" class="form-control" placeholder="Clínica Nutrição Integrada" required value="<?= htmlspecialchars($old['clinic_name'] ?? '') ?>">
         </div>
 
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-4);">
+        <div style="display: grid; grid-template-columns: 1fr 1.35fr; gap: var(--space-4);">
           <div class="form-group">
             <label class="form-label" for="crn">Número do CRN *</label>
             <input type="text" id="crn" name="crn" class="form-control" placeholder="12345" required value="<?= htmlspecialchars($old['crn'] ?? '') ?>">
@@ -150,7 +150,7 @@
 
         <div class="form-group">
           <label class="form-label" for="password">Criar senha de acesso (mínimo de 8 caracteres) *</label>
-          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••••••" minlength="8" autocomplete="new-password" data-password-toggle required>
+          <input type="password" id="password" name="password" class="form-control" placeholder="Mínimo de 8 caracteres" minlength="8" autocomplete="new-password" data-password-toggle required>
         </div>
 
         <div class="form-group" style="margin-top: var(--space-4);">
@@ -165,8 +165,8 @@
           <input type="hidden" name="privacy_version" value="<?= htmlspecialchars(\ClyoNutri\Domain\Legal\LegalDocuments::PRIVACY_VERSION) ?>">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);">
-          <span>Criar consultório e ativar onboarding</span>
+        <button type="submit" class="btn btn-primary" style="width: 100%; min-height: 48px; margin-top: var(--space-4);" data-testid="register-submit-btn">
+          <span>Criar meu consultório</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </button>
       </form>

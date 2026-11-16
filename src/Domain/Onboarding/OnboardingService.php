@@ -79,10 +79,10 @@ class OnboardingService
         try {
             switch ($step) {
                 case 1:
-                    // Passo 1: Boas-vindas, plano SaaS e objetivos do consultório.
+                    // Passo 1 (NI2-850 / UX-006): Foco clínico e preferências iniciais, sem exigir escolha de plano pago no trial.
                     $subscriptions = new SubscriptionService($this->db);
                     $planCode = trim((string)($data['plan_code'] ?? ''));
-                    if ($planCode !== '' || $subscriptions->canChooseOnboardingPlan($clinicId, $userId)) {
+                    if ($planCode !== '') {
                         $subscriptions->chooseOnboardingPlan($clinicId, $userId, $planCode);
                     }
                     $focusList = is_array($data['focus_objectives'] ?? null)
@@ -92,6 +92,8 @@ class OnboardingService
                     $focusPayload = [
                         'focus_objectives' => !empty($focusList) ? $focusList : ['Nutrição Clínica'],
                         'plan_code' => $planCode,
+                        'monthly_patients_goal' => isset($data['monthly_patients_goal']) ? (int)$data['monthly_patients_goal'] : 20,
+                        'clinical_experience_years' => isset($data['clinical_experience_years']) ? (int)$data['clinical_experience_years'] : 1,
                         'answered_at' => date('c'),
                     ];
 
@@ -374,6 +376,36 @@ class OnboardingService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row ?: null;
+    }
+
+    /**
+     * NI2-850 (UX-006): Resumo unificado em 3 passos (1. Como você atende, 2. Primeiro paciente, 3. Pronto para atender),
+     * usado como fonte única de verdade na barra do onboarding e no painel.
+     *
+     * @return array{done: int, total: int, pct: int, step_states: array<int, bool>}
+     */
+    public static function wizardSummary(array $progress): array
+    {
+        $completed = array_map('intval', (array)($progress['completed_steps'] ?? []));
+        $isCompleted = !empty($progress['is_completed']);
+        $step1Done = $isCompleted || in_array(1, $completed, true) || in_array(3, $completed, true);
+        $step2Done = $isCompleted || in_array(4, $completed, true);
+        $step3Done = $isCompleted || in_array(5, $completed, true);
+        $done = ($step1Done ? 1 : 0) + ($step2Done ? 1 : 0) + ($step3Done ? 1 : 0);
+        $total = 3;
+        return [
+            'done' => $done,
+            'total' => $total,
+            'completed_steps' => $done,
+            'total_steps' => $total,
+            'pct' => (int)round($done * 100 / $total),
+            'progress_pct' => (int)round($done * 100 / $total),
+            'step_states' => [
+                1 => $step1Done,
+                2 => $step2Done,
+                3 => $step3Done,
+            ],
+        ];
     }
 
     /**

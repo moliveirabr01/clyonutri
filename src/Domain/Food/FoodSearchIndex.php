@@ -41,6 +41,85 @@ final class FoodSearchIndex
         ['tangerina', 'mexerica', 'bergamota'],
     ];
 
+    /** Flexões de gênero e grafia equivalentes na busca SQL (sem poluir o rótulo de sinônimo regional). */
+    private const MORPH_VARIANTS = [
+        ['moido', 'moida'],
+        ['cozido', 'cozida'],
+        ['grelhado', 'grelhada'],
+        ['assado', 'assada'],
+        ['frito', 'frita'],
+        ['cru', 'crua'],
+        ['refogado', 'refogada'],
+        ['desfiado', 'desfiada'],
+        ['mozarela', 'mussarela', 'mucarela'],
+    ];
+
+    /** Conectivos ignorados na quebra em termos quando há palavras principais na busca. */
+    private const STOP_WORDS = ['de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'ao', 'aos', 'a', 'e', 'o'];
+
+    /**
+     * NI2-846 (UX-002): partes anatômicas / cortes exibidos como destaque rápido no resultado da busca.
+     */
+    private const PART_HIGHLIGHTS = [
+        'coracao' => 'coração',
+        'figado' => 'fígado',
+        'moela' => 'moela',
+        'lingua' => 'língua',
+        'miudos' => 'miúdos',
+        'miudo' => 'miúdos',
+        'bucho' => 'bucho',
+        'tripa' => 'tripa',
+        'dobradinha' => 'dobradinha',
+        'pescoco' => 'pescoço',
+        'cabeca' => 'cabeça',
+        'rabo' => 'rabo',
+        'orelha' => 'orelha',
+        'rim' => 'rim',
+        'tutano' => 'tutano',
+        'peito' => 'peito',
+        'file' => 'filé',
+        'sobrecoxa' => 'sobrecoxa',
+        'coxa' => 'coxa',
+        'asa' => 'asa',
+        'patinho' => 'patinho',
+        'acem' => 'acém',
+        'alcatra' => 'alcatra',
+        'mignon' => 'filé mignon',
+        'musculo' => 'músculo',
+        'costela' => 'costela',
+        'lombo' => 'lombo',
+        'pernil' => 'pernil',
+        'clara' => 'clara',
+        'gema' => 'gema',
+    ];
+
+    /**
+     * NI2-846 (UX-002): miúdos, partes secundárias e derivados processados que só sobem ao topo
+     * quando o nutricionista digita explicitamente o termo correspondente.
+     */
+    public const SECONDARY_PARTS = [
+        'coracao', 'figado', 'moela', 'lingua', 'miudo', 'miudos', 'bucho', 'tripa',
+        'dobradinha', 'pescoco', 'cabeca', 'rabo', 'orelha', 'rim', 'tutano', 'asa',
+        'gema', 'linguica', 'coxinha', 'empada', 'pastel', 'salpicao', 'estrogonofe',
+        'mortadela', 'salsicha', 'almondega', 'charque', 'caldo', 'milanesa',
+        'condensado', 'achocolatado', 'dende', 'pure', 'extrato', 'calda', 'doce',
+        'pacoca', 'moleque', 'broto', 'tropeiro', 'baiao',
+    ];
+
+    /**
+     * NI2-846: retorna o destaque de parte/corte do alimento ("coração", "peito", "coxa", etc.) ou null.
+     */
+    public static function detectPartHighlight(string $name): ?string
+    {
+        $words = explode(' ', self::normalize($name));
+        foreach ($words as $w) {
+            if (isset(self::PART_HIGHLIGHTS[$w])) {
+                return self::PART_HIGHLIGHTS[$w];
+            }
+        }
+        return null;
+    }
+
     /** Grafia para mostrar os termos normalizados dos sinônimos (só os que têm acento). */
     private const SYNONYM_DISPLAY = ['abobora' => 'abóbora'];
 
@@ -87,6 +166,21 @@ final class FoodSearchIndex
         return [$term];
     }
 
+    /** @return list<string> o termo, sinônimos regionais (se habilitado) e flexões morfológicas. */
+    public static function matchVariantsOf(string $term, bool $useSynonyms): array
+    {
+        $base = $useSynonyms ? self::synonymsOf($term) : [$term];
+        $out = $base;
+        foreach ($base as $b) {
+            foreach (self::MORPH_VARIANTS as $group) {
+                if (in_array($b, $group, true)) {
+                    $out = array_merge($out, $group);
+                }
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
     /** Texto normalizado, sem espaços nas pontas: "Feijão, carioca (cozido)" → "feijao carioca cozido". */
     public static function normalize(string $text): string
     {
@@ -103,16 +197,22 @@ final class FoodSearchIndex
 
     /**
      * Termos da busca: até 6, sem repetição. Plural simples vira singular ("ovos" → "ovo") para casar com os dois.
+     * Preposições ("de", "do", "da") são ignoradas quando há termos substantivos na busca.
      * @return list<string>
      */
     public static function terms(string $query): array
     {
-        $out = [];
+        $raw = [];
         foreach (explode(' ', self::normalize($query)) as $t) {
             if ($t === '') {
                 continue;
             }
-            $t = self::singular($t);
+            $raw[] = self::singular($t);
+        }
+        $nonStop = array_values(array_filter($raw, static fn(string $w): bool => !in_array($w, self::STOP_WORDS, true)));
+        $source = $nonStop !== [] ? $nonStop : $raw;
+        $out = [];
+        foreach ($source as $t) {
             $out[$t] = true;
             if (count($out) >= self::MAX_TERMS) {
                 break;
@@ -257,7 +357,7 @@ final class FoodSearchIndex
         $startsW = [];
         $startsV = [];
         foreach ($terms as $i => $t) {
-            $alts = $useSynonyms ? self::synonymsOf($t) : [$t];
+            $alts = self::matchVariantsOf($t, $useSynonyms);
             $or = [];
             $orW = [];
             $orV = [];
@@ -284,14 +384,79 @@ final class FoodSearchIndex
             $op["fs_prefix{$n}"] = ' ' . $esc($phrase) . '%';
         }
         $first = [];
-        foreach (($useSynonyms ? self::synonymsOf($terms[0]) : [$terms[0]]) as $k => $alt) {
+        foreach (self::matchVariantsOf($terms[0], $useSynonyms) as $k => $alt) {
             $first[] = "{$column} LIKE :fs_first{$k} ESCAPE '!'";
             $op["fs_first{$k}"] = ' ' . $esc($alt) . '%';
         }
-        $order = 'CASE WHEN ' . self::any($exact) . ' THEN 0 WHEN ' . self::any($prefix) . ' THEN 1 WHEN ' . self::any($first)
+
+        // NI2-846 (UX-002): penaliza miúdos/partes secundárias e derivados quando não foram digitados na busca
+        $secConds = [];
+        $secIdx = 0;
+        foreach (self::SECONDARY_PARTS as $secWord) {
+            if (!in_array($secWord, $terms, true)) {
+                $secConds[] = "{$column} LIKE :fs_sec{$secIdx}";
+                $op["fs_sec{$secIdx}"] = '% ' . $secWord . ' %';
+                $secIdx++;
+            }
+        }
+        // Quando busca "pao" sem "queijo", "Pão, de queijo" fica abaixo de pães convencionais
+        if (in_array('pao', $terms, true) && !in_array('queijo', $terms, true)) {
+            $secConds[] = "{$column} LIKE :fs_sec_paoq";
+            $op['fs_sec_paoq'] = '% queijo %';
+        }
+        // Quando busca "leite" sem "coco"/"cabra"/"po", prioriza leite fluido de vaca
+        if (in_array('leite', $terms, true) && !in_array('coco', $terms, true) && !in_array('cabra', $terms, true) && !in_array('po', $terms, true)) {
+            $secConds[] = "{$column} LIKE :fs_sec_leite_coco";
+            $op['fs_sec_leite_coco'] = '% coco %';
+            $secConds[] = "{$column} LIKE :fs_sec_leite_cabra";
+            $op['fs_sec_leite_cabra'] = '% cabra %';
+            $secConds[] = "{$column} LIKE :fs_sec_leite_po";
+            $op['fs_sec_leite_po'] = '% po %';
+        }
+        // Quando busca fruta in natura sem "suco", suco fica depois da fruta
+        if (!in_array('suco', $terms, true)) {
+            $secConds[] = "{$column} LIKE :fs_sec_suco";
+            $op['fs_sec_suco'] = '% suco %';
+        }
+        // Quando busca carne/ave/peixe sem pedir "pele", prioriza cortes sem pele
+        if (!in_array('pele', $terms, true)) {
+            $secConds[] = "{$column} LIKE :fs_sec_com_pele";
+            $op['fs_sec_com_pele'] = '% com pele %';
+        }
+        $secondaryPenalty = $secConds !== [] ? 'CASE WHEN ' . self::any($secConds) . ' THEN 1 ELSE 0 END, ' : '';
+
+        // NI2-846 (UX-002): prioridade para cortes/variedades de consumo clínico cotidiano
+        $stapleConds = [];
+        if (in_array('frango', $terms, true) && !array_intersect($terms, ['coxa', 'sobrecoxa', 'asa', 'coracao', 'figado', 'inteiro', 'caipira'])) {
+            $stapleConds[] = "{$column} LIKE '% peito %'";
+            $stapleConds[] = "{$column} LIKE '% file %'";
+        }
+        if (in_array('pao', $terms, true) && !array_intersect($terms, ['queijo', 'aveia', 'soja', 'milho', 'gluten'])) {
+            $stapleConds[] = "{$column} LIKE '% frances %'";
+            $stapleConds[] = "{$column} LIKE '% trigo forma %'";
+        }
+        if (in_array('feijao', $terms, true) && !array_intersect($terms, ['preto', 'fradinho', 'jalo', 'roxo', 'rajado', 'rosinha', 'broto'])) {
+            $stapleConds[] = "{$column} LIKE '% carioca %'";
+            $stapleConds[] = "{$column} LIKE '% preto %'";
+        }
+        if (in_array('queijo', $terms, true) && !array_intersect($terms, ['prato', 'ricota', 'parmesao', 'petit', 'requeijao', 'tofu'])) {
+            $stapleConds[] = "{$column} LIKE '% minas frescal %'";
+            $stapleConds[] = "{$column} LIKE '% mozarela %'";
+        }
+        if (in_array('azeite', $terms, true) && !in_array('dende', $terms, true)) {
+            $stapleConds[] = "{$column} LIKE '% oliva %'";
+        }
+        if (in_array('tomate', $terms, true) && !array_intersect($terms, ['molho', 'extrato', 'pure'])) {
+            $stapleConds[] = "{$column} LIKE '% salada %'";
+            $stapleConds[] = "{$column} LIKE '% semente cru %'";
+        }
+        $stapleBoost = $stapleConds !== [] ? 'CASE WHEN ' . self::any($stapleConds) . ' THEN 0 ELSE 1 END, ' : '';
+
+        $groupCase = 'CASE WHEN ' . self::any($exact) . ' THEN 0 WHEN ' . self::any($prefix) . ' THEN 1 WHEN ' . self::any($first)
             . ' AND ' . implode(' AND ', $startsW) . ' THEN 2 WHEN ' . implode(' AND ', $startsV) . ' THEN 3 ELSE 4 END, ';
         $intent = '';
-        if ($intentOn && !self::queryHasPreparation($terms)) {
+        $skipReadyIntent = (bool)array_intersect($terms, ['pao', 'queijo', 'leite', 'iogurte', 'aveia', 'azeite', 'manteiga', 'banana', 'maca', 'mamao', 'laranja', 'abacate', 'alface', 'tomate']);
+        if ($intentOn && !$skipReadyIntent && !self::queryHasPreparation($terms)) {
             $ready = [];
             foreach (self::READY_PREPARATIONS as $k => $w) {
                 $ready[] = "{$column} LIKE :fs_ready{$k}";
@@ -299,7 +464,7 @@ final class FoodSearchIndex
             }
             $intent = 'CASE WHEN ' . self::any($ready) . ' THEN 0 ELSE 1 END, ';
         }
-        $order .= "{$favorite}{$intent}{$tieBreak}{$len}({$nameColumn}) ASC, {$nameColumn} ASC";
+        $order = "{$secondaryPenalty}{$favorite}{$stapleBoost}{$groupCase}{$intent}{$tieBreak}{$len}({$nameColumn}) ASC, {$nameColumn} ASC";
         return ['where' => '(' . implode(' AND ', $where) . ')', 'order' => $order, 'where_params' => $wp, 'order_params' => $op];
     }
 

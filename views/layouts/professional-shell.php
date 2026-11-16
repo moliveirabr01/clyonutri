@@ -1,8 +1,11 @@
 <?php
 $professionalViewContext=\ClyoNutri\Core\Auth\ProfessionalViewContext::resolve();
 $clinicName=$professionalViewContext['clinicName'];$userName=$professionalViewContext['userName'];
-// NI2-616: no topo, o nome completo aparece uma vez (consultório); a saudação usa só o primeiro nome.
-$shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n==='')return 'Nutricionista';$first=preg_split('/\s+/u',$n)[0];return mb_convert_case(mb_strtolower($first,'UTF-8'),MB_CASE_TITLE,'UTF-8');})($userName??null);
+// NI2-616 / NI2-855 (UX-007): no topo, o nome completo aparece uma vez (consultório); a saudação usa só o primeiro nome sem tratamento ("Dra. Helena" -> "Helena").
+$shellFirstName = \ClyoNutri\Domain\Dashboard\DashboardOverview::firstName($userName ?? null);
+if ($shellFirstName === '') {
+    $shellFirstName = 'Nutricionista';
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -79,6 +82,7 @@ $shellFirstName=(static function(?string $n):string{$n=trim((string)$n);if($n===
 <script type="application/json" id="clinical-form-recovery"><?= json_encode($recovery,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR) ?></script>
 <?php endif; ?>
 <script src="/assets/js/validacao-ptbr.js" defer></script>
+<script src="/assets/js/decimal-input.js?v=v54-62" defer></script>
 <script src="/assets/js/clinical-journeys.js?v=v54-58" defer></script>
 <script src="/assets/js/session-timeout.js?v=v54-30" defer></script>
 <script src="/assets/js/avaliacao-confirmacoes.js?v=v54-54" defer></script>

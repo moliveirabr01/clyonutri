@@ -112,6 +112,8 @@ $router->post('/agenda/{id}/editar', [DashboardController::class, 'editAppointme
 $router->post('/agenda/{id}/status', [DashboardController::class, 'updateAppointmentStatus'])->name('agenda.status');
 $router->get('/consulta/{id}', [DashboardController::class, 'consultationRoom'])->name('consultation.room');
 $router->post('/consulta/{id}/concluir', [DashboardController::class, 'completeConsultation'])->name('consultation.complete');
+$router->post('/consulta/{id}/retorno', [DashboardController::class, 'scheduleFollowUpFromClosing'])->name('consultation.followup');
+$router->post('/planos/{id}/itens/{itemId}/somar', [DashboardController::class, 'mergeDuplicatePlanItem'])->name('meal_plans.items.merge');
 
 // NI2-820: Transcrição Nutricional em Tempo Real
 $router->post('/api/consulta/{id}/transcription/consent', [\ClyoNutri\Application\Controllers\RealtimeTranscriptionController::class, 'grantConsent'])->name('transcription.consent');

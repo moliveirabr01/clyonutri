@@ -68,6 +68,9 @@ class HouseholdMeasureConverter
     public function __construct(?PDO $db = null)
     {
         $this->db = $db;
+        if ($this->db !== null) {
+            self::ensureCommonMeasures($this->db);
+        }
     }
 
     /** "Colheres de Sopa" → "colher de sopa"; "Xícaras" → "xicara"; "Unidade média" → "unidade media". */
@@ -325,5 +328,243 @@ class HouseholdMeasureConverter
     private static function fmt(float $v): string
     {
         return rtrim(rtrim(number_format($v, 2, ',', '.'), '0'), ',');
+    }
+
+    /** @var array<int, int> */
+    private static array $seededConnections = [];
+
+    /**
+     * NI2-845 (UX-001): garante medidas caseiras padrão (IBGE/TACO/Pinheiro) para os alimentos mais frequentes
+     * do catálogo TACO (pão francês, queijos, carnes/frango/peixes, arroz, feijão, frutas, ovos, laticínios,
+     * tubérculos, verduras, aveia, azeite, oleaginosas), evitando bloqueio por falta de medida cadastrada.
+     */
+    public static function ensureCommonMeasures(PDO $db): int
+    {
+        $connId = spl_object_id($db);
+        try {
+            $foodCount = (int)$db->query("SELECT COUNT(*) FROM foods")->fetchColumn();
+        } catch (\Throwable) {
+            return 0;
+        }
+        if (isset(self::$seededConnections[$connId]) && self::$seededConnections[$connId] === $foodCount && $foodCount > 0) {
+            return 0;
+        }
+
+        try {
+            // Garante o item canônico TACO 410 ("Frango, peito, sem pele, grelhado") se só existir "Peito de frango grelhado"
+            $chkFrango = $db->prepare("SELECT id FROM foods WHERE name = 'Frango, peito, sem pele, grelhado' AND clinic_id IS NULL LIMIT 1");
+            $chkFrango->execute();
+            if (!$chkFrango->fetchColumn()) {
+                $hasSearchText = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'foods', 'search_text');
+                $hasPrep = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'foods', 'preparation');
+                if ($hasSearchText && $hasPrep) {
+                    $insF = $db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, is_custom, search_text, preparation)
+                        VALUES (NULL, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 'TACO', 159.0, 32.0, 0.0, 2.5, 0.0, 100.0, 'g', 0, ' frango peito sem pele grelhado ', 'Grelhado')");
+                    $insF->execute();
+                } else {
+                    $insF = $db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, is_custom)
+                        VALUES (NULL, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 'TACO', 159.0, 32.0, 0.0, 2.5, 0.0, 100.0, 'g', 0)");
+                    $insF->execute();
+                }
+            }
+
+            $existingCount = (int)$db->query('SELECT COUNT(*) FROM food_household_measures')->fetchColumn();
+            if ($existingCount >= 250) {
+                return 0;
+            }
+
+            $isMysql = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
+            $insertIgnore = $isMysql ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
+            $ins = $db->prepare("{$insertIgnore} INTO food_household_measures (food_id, measure_name, grams_equivalent) VALUES (:fid, :name, :g)");
+
+            $foods = $db->query("SELECT id, name, category, search_text FROM foods WHERE clinic_id IS NULL AND COALESCE(category, '') <> 'TESTE'")->fetchAll(PDO::FETCH_ASSOC);
+            $added = 0;
+            $ownTx = !$db->inTransaction();
+            if ($ownTx) {
+                $db->beginTransaction();
+            }
+            try {
+                foreach ($foods as $f) {
+                    $fid = (int)$f['id'];
+                    $norm = ' ' . FoodSearchIndex::normalize((string)$f['name']) . ' ';
+                    $measures = self::inferCommonMeasuresForNormalizedName($norm);
+                    foreach ($measures as [$mName, $grams]) {
+                        $ins->execute(['fid' => $fid, 'name' => $mName, 'g' => $grams]);
+                        $added += $ins->rowCount();
+                    }
+                }
+                if ($ownTx && $db->inTransaction()) {
+                    $db->commit();
+                }
+            } catch (\Throwable $txErr) {
+                if ($ownTx && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+                throw $txErr;
+            }
+            self::$seededConnections[$connId] = (int)$db->query("SELECT COUNT(*) FROM foods")->fetchColumn();
+            return $added;
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * @return list<array{0:string, 1:float}>
+     */
+    public static function inferCommonMeasuresForNormalizedName(string $norm): array
+    {
+        if (str_contains($norm, ' pao ')) {
+            if (str_contains($norm, ' queijo ')) {
+                return [['unidade', 40.0], ['porção', 80.0]];
+            }
+            if (str_contains($norm, ' frances ')) {
+                return [['unidade', 50.0], ['fatia', 25.0]];
+            }
+            return [['fatia', 25.0], ['unidade', 50.0]];
+        }
+        if (str_contains($norm, ' torrada ')) {
+            return [['unidade', 10.0], ['fatia', 10.0], ['porção', 30.0]];
+        }
+        if (str_contains($norm, ' biscoito ') || str_contains($norm, ' bolacha ')) {
+            return [['unidade', 7.0], ['porção', 30.0]];
+        }
+        if (str_contains($norm, ' queijo ')) {
+            if (str_contains($norm, ' requeijao ')) {
+                return [['colher de sopa', 30.0], ['colher de sobremesa', 15.0], ['porção', 30.0]];
+            }
+            return [['fatia', 30.0], ['porção', 30.0], ['colher de sopa', 25.0], ['unidade', 30.0]];
+        }
+        if (str_contains($norm, ' requeijao ')) {
+            return [['colher de sopa', 30.0], ['colher de sobremesa', 15.0]];
+        }
+        if (str_contains($norm, ' arroz ')) {
+            return [['colher de sopa', 25.0], ['escumadeira', 85.0], ['concha', 100.0], ['porção', 100.0]];
+        }
+        if (str_contains($norm, ' feijao ') || str_contains($norm, ' lentilha ') || str_contains($norm, ' bico ') || str_contains($norm, ' ervilha ')) {
+            return [['concha', 86.0], ['colher de sopa', 25.0], ['porção', 86.0]];
+        }
+        if (str_contains($norm, ' aveia ') || str_contains($norm, ' granola ') || str_contains($norm, ' quinoa ') || str_contains($norm, ' farinha ') || str_contains($norm, ' fuba ')) {
+            return [['colher de sopa', 15.0], ['xícara', 90.0], ['colher de sobremesa', 10.0], ['porção', 30.0]];
+        }
+        if (str_contains($norm, ' macarrao ')) {
+            return [['pegador', 100.0], ['escumadeira', 90.0], ['porção', 100.0], ['xícara', 100.0]];
+        }
+        if (str_contains($norm, ' frango ') || str_contains($norm, ' peru ')) {
+            if (str_contains($norm, ' coracao ')) {
+                return [['unidade', 10.0], ['porção', 80.0], ['colher de sopa', 25.0]];
+            }
+            return [['filé', 100.0], ['unidade', 100.0], ['porção', 100.0], ['colher de sopa', 25.0]];
+        }
+        if (str_contains($norm, ' carne ') || str_contains($norm, ' patinho ') || str_contains($norm, ' acem ') || str_contains($norm, ' alcatra ') || str_contains($norm, ' mignon ') || str_contains($norm, ' contra file ') || str_contains($norm, ' porco ') || str_contains($norm, ' bovina ')) {
+            return [['bife', 100.0], ['porção', 100.0], ['unidade', 100.0], ['colher de sopa', 25.0], ['fatia', 80.0]];
+        }
+        if (str_contains($norm, ' salmao ') || str_contains($norm, ' tilapia ') || str_contains($norm, ' merluza ') || str_contains($norm, ' pescada ') || str_contains($norm, ' cacao ') || str_contains($norm, ' bacalhau ') || str_contains($norm, ' peixe ') || str_contains($norm, ' pintado ')) {
+            return [['filé', 120.0], ['posta', 120.0], ['unidade', 100.0], ['porção', 100.0]];
+        }
+        if (str_contains($norm, ' atum ') || str_contains($norm, ' sardinha ')) {
+            return [['colher de sopa', 20.0], ['porção', 80.0], ['unidade', 40.0]];
+        }
+        if (str_contains($norm, ' ovo ')) {
+            return [['unidade', 50.0], ['colher de sopa', 25.0], ['porção', 50.0]];
+        }
+        if (str_contains($norm, ' leite ')) {
+            if (str_contains($norm, ' po ')) {
+                return [['colher de sopa', 15.0], ['colher de sobremesa', 10.0]];
+            }
+            return [['copo', 200.0], ['xícara', 200.0], ['colher de sopa', 15.0]];
+        }
+        if (str_contains($norm, ' iogurte ') || str_contains($norm, ' coalhada ')) {
+            return [['unidade', 170.0], ['copo', 200.0], ['xícara', 200.0], ['colher de sopa', 25.0]];
+        }
+        if (str_contains($norm, ' manteiga ') || str_contains($norm, ' margarina ')) {
+            return [['colher de chá', 5.0], ['colher de sopa', 12.0], ['porção', 10.0]];
+        }
+        if (str_contains($norm, ' azeite ') || str_contains($norm, ' oleo ')) {
+            return [['colher de sopa', 13.0], ['colher de sobremesa', 8.0], ['colher de chá', 4.0]];
+        }
+        if (str_contains($norm, ' mamao ') || str_contains($norm, ' melao ') || str_contains($norm, ' melancia ') || str_contains($norm, ' abacaxi ')) {
+            return [['fatia', 100.0], ['xícara', 140.0], ['unidade', 250.0], ['porção', 100.0]];
+        }
+        if (str_contains($norm, ' abacate ')) {
+            return [['colher de sopa', 30.0], ['fatia', 80.0], ['porção', 100.0], ['unidade', 200.0]];
+        }
+        if (str_contains($norm, ' morango ') || str_contains($norm, ' uva ') || str_contains($norm, ' acerola ') || str_contains($norm, ' ameixa ')) {
+            return [['xícara', 120.0], ['porção', 100.0], ['unidade', 15.0]];
+        }
+        if (str_contains($norm, ' banana ') || str_contains($norm, ' maca ') || str_contains($norm, ' pera ') || str_contains($norm, ' laranja ') || str_contains($norm, ' tangerina ') || str_contains($norm, ' mexerica ') || str_contains($norm, ' manga ') || str_contains($norm, ' goiaba ') || str_contains($norm, ' kiwi ') || str_contains($norm, ' pessego ') || str_contains($norm, ' caqui ') || str_contains($norm, ' limao ') || str_contains($norm, ' maracuja ') || str_contains($norm, ' caju ')) {
+            return [['unidade', 100.0], ['fatia', 40.0], ['xícara', 140.0], ['porção', 100.0]];
+        }
+        if (str_contains($norm, ' batata ') || str_contains($norm, ' mandioca ') || str_contains($norm, ' inhame ') || str_contains($norm, ' cara ') || str_contains($norm, ' abobora ')) {
+            return [['colher de sopa', 30.0], ['unidade', 100.0], ['fatia', 60.0], ['porção', 100.0]];
+        }
+        if (str_contains($norm, ' alface ') || str_contains($norm, ' rucula ') || str_contains($norm, ' agriao ') || str_contains($norm, ' couve ') || str_contains($norm, ' espinafre ') || str_contains($norm, ' repolho ') || str_contains($norm, ' acelga ') || str_contains($norm, ' chicoria ') || str_contains($norm, ' almeirao ')) {
+            return [['porção', 50.0], ['colher de sopa', 15.0], ['xícara', 40.0], ['unidade', 10.0]];
+        }
+        if (str_contains($norm, ' tomate ') || str_contains($norm, ' pepino ') || str_contains($norm, ' cenoura ') || str_contains($norm, ' beterraba ') || str_contains($norm, ' chuchu ') || str_contains($norm, ' abobrinha ') || str_contains($norm, ' berinjela ') || str_contains($norm, ' brocolis ') || str_contains($norm, ' vagem ') || str_contains($norm, ' quiabo ') || str_contains($norm, ' cebola ') || str_contains($norm, ' pimentao ')) {
+            return [['colher de sopa', 25.0], ['fatia', 20.0], ['unidade', 100.0], ['xícara', 100.0], ['porção', 80.0]];
+        }
+        if (str_contains($norm, ' castanha ') || str_contains($norm, ' amendoa ') || str_contains($norm, ' noz ') || str_contains($norm, ' amendoim ')) {
+            return [['unidade', 5.0], ['colher de sopa', 15.0], ['porção', 30.0]];
+        }
+        if (str_contains($norm, ' linhaca ') || str_contains($norm, ' gergelim ') || str_contains($norm, ' chia ')) {
+            return [['colher de sopa', 12.0], ['colher de chá', 5.0], ['porção', 12.0]];
+        }
+        if (str_contains($norm, ' cafe ') || str_contains($norm, ' cha ')) {
+            return [['xícara', 100.0], ['copo', 200.0]];
+        }
+        return [];
+    }
+
+    /**
+     * NI2-845 (UX-001): sugere quantidade e medida padrão para prescrição rápida do alimento:
+     * 1) última medida/quantidade usada pela clínica para este alimento;
+     * 2) medida caseira primária do alimento (ex.: 1 unidade, 1 fatia, 4 colheres de sopa, 1 concha);
+     * 3) fallback em 100 g.
+     *
+     * @return array{amount:float, unit:string, grams:float, origin:string}
+     */
+    public function defaultPrescriptionForFood(int $foodId, ?array $food = null, ?int $clinicId = null): array
+    {
+        $cid = $clinicId ?? (TenantContext::hasClinic() ? (int)TenantContext::getClinicId() : 0);
+        if ($cid > 0 && $this->db !== null && $foodId > 0) {
+            try {
+                $st = $this->db->prepare('SELECT mi.amount, mi.measure_unit, mi.weight_grams FROM meal_plan_items mi JOIN meal_plan_meals mm ON mm.id = mi.meal_id JOIN meal_plans mp ON mp.id = mm.meal_plan_id WHERE mp.clinic_id = ? AND mi.food_id = ? ORDER BY mi.id DESC LIMIT 1');
+                $st->execute([$cid, $foodId]);
+                $last = $st->fetch(PDO::FETCH_ASSOC);
+                if ($last && (float)$last['amount'] > 0 && trim((string)$last['measure_unit']) !== '') {
+                    return [
+                        'amount' => round((float)$last['amount'], 2),
+                        'unit' => trim((string)$last['measure_unit']),
+                        'grams' => round((float)($last['weight_grams'] ?? 100.0), 1),
+                        'origin' => 'clinic_history',
+                    ];
+                }
+            } catch (\Throwable) {
+            }
+        }
+        $measures = $this->exactMeasuresForFood($foodId, $food);
+        if ($measures !== []) {
+            $primary = $measures[0];
+            $normName = ' ' . FoodSearchIndex::normalize((string)($food['name'] ?? '')) . ' ';
+            $defaultAmount = 1.0;
+            if (str_contains($normName, ' arroz ') && self::normalizeUnit($primary['name']) === 'colher de sopa') {
+                $defaultAmount = 4.0;
+            } elseif (str_contains($normName, ' aveia ') && self::normalizeUnit($primary['name']) === 'colher de sopa') {
+                $defaultAmount = 2.0;
+            }
+            return [
+                'amount' => $defaultAmount,
+                'unit' => (string)$primary['name'],
+                'grams' => round($defaultAmount * (float)$primary['grams'], 1),
+                'origin' => (string)($primary['origin'] ?? $primary['source'] ?? 'food_measure'),
+            ];
+        }
+        return [
+            'amount' => 100.0,
+            'unit' => 'g',
+            'grams' => 100.0,
+            'origin' => 'mass',
+        ];
     }
 }

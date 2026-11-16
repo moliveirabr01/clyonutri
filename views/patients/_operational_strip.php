@@ -9,8 +9,15 @@ $stepApp = $careStep['appointment'] ?? null;
 $stepState = (string)($careStep['state'] ?? 'none');
 $allergyLabel = (string)($clinicalSummary['allergy_label'] ?? 'Alergias não avaliadas');
 $allergyExtra = !empty($clinicalSummary['allergies']) ? ': ' . (string)$clinicalSummary['allergies'] : '';
+$planStatusPt = match ($activePlan['status'] ?? '') {
+    'active' => 'vigente',
+    'published' => 'publicado',
+    'draft' => 'rascunho',
+    'archived' => 'arquivado',
+    default => mb_strtolower(\ClyoNutri\Core\I18n\LabelMap::mealPlanStatus((string)($activePlan['status'] ?? '')), 'UTF-8'),
+};
 $planLabel = $activePlan
-    ? ((string)($activePlan['title'] ?? 'Plano') . ' · ' . (($activePlan['status'] ?? '') === 'active' ? 'vigente' : (($activePlan['status'] ?? '') === 'draft' ? 'rascunho' : (string)($activePlan['status'] ?? ''))))
+    ? ((string)($activePlan['title'] ?? 'Plano') . ' · ' . $planStatusPt)
     : 'Nenhum plano vigente';
 $nextLabel = match ($stepState) {
     'continue' => 'Em andamento · ' . date('d/m/Y H:i', strtotime((string)$stepApp['scheduled_at'])),

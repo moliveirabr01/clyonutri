@@ -84,14 +84,31 @@ class OnboardingController
         $firstPatient = $progress['first_patient_id'] ? $this->onboardingService->getFirstPatient($auth['userId'], $auth['clinicId']) : null;
 
         // NI2-625: ativação conferida no banco (perfil, horários, link, primeiro paciente, consulta e plano).
-        // Substitui o "90%" fixo da NI2-603: o percentual e o "pronto para atender" vêm do checklist.
         $activation = (new \ClyoNutri\Domain\Onboarding\ActivationChecklist($this->db))->forUser((int)$auth['clinicId'], (int)$auth['userId']);
         $bookingState = $activation['booking_state'];
-        $progress['progress_pct'] = $activation['pct']; // a barra "Progresso de Ativação" mostra o que está feito de fato
 
-        $subscriptions = new SubscriptionService($this->db);
-        $canChoosePlan = $step === 1 && $subscriptions->canChooseOnboardingPlan($auth['clinicId'], $auth['userId']);
-        $availablePlans = $canChoosePlan ? $subscriptions->getOnboardingPlans() : [];
+        // NI2-850 (UX-006): fonte única de verdade (3 passos) para barra de progresso e contadores,
+        // mantendo teto do checklist quando há item obrigatório pendente no passo final.
+        $wizardSummary = OnboardingService::wizardSummary($progress);
+        $progress['progress_pct'] = (!$activation['ready'] && $step === 5)
+            ? (int)$activation['pct']
+            : (int)$wizardSummary['pct'];
+
+        // Buscar dados atuais do profissional no banco (pré-preenchidos no cadastro /register)
+        $pStmt = $this->db->prepare("SELECT * FROM professionals WHERE user_id = :uid LIMIT 1");
+        $pStmt->execute(['uid' => $auth['userId']]);
+        $profCurrent = $pStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $hasPrefilledCrn = trim((string)($profCurrent['crn'] ?? '')) !== '' && trim((string)($profCurrent['crn_region'] ?? '')) !== '';
+
+        // Se o usuário caiu em ?passo=2 ou ?passo=3 sem querystring explícita e já tem CRN no cadastro, redireciona ao fluxo de 3 passos
+        if (!isset($_GET['passo']) && in_array($step, [2, 3], true) && $hasPrefilledCrn) {
+            $step = in_array(3, $progress['completed_steps'] ?? [], true) ? 4 : 1;
+        }
+
+        $firstNameClean = \ClyoNutri\Domain\Dashboard\DashboardOverview::firstName($auth['userName']);
+        if ($firstNameClean === '') {
+            $firstNameClean = 'Nutricionista';
+        }
 
         $title = 'Configurar consultório';
         $activeNav = 'dashboard';
@@ -99,20 +116,22 @@ class OnboardingController
         $userName = $auth['userName'];
         $csrfToken = Csrf::token();
 
+        $visualStep = $step <= 3 ? 1 : ($step === 4 ? 2 : 3);
+
         ob_start();
         ?>
-        <div style="max-width: 960px; margin: 0 auto;">
+        <div style="max-width: 960px; margin: 0 auto;" data-testid="onboarding-wizard-3steps">
           <!-- Cabeçalho do Onboarding -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: 12px;">
             <div>
               <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; background: var(--neutral-warm-50); color: var(--brand-copper-600); border: 1px solid var(--botanical-sage-200, #D3E5D5); padding: 2px 8px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 6px;">
                 Ativação do Consultório
               </span>
-              <h1 style="font-family: var(--font-editorial); font-size: 1.85rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                Bem-vindo ao Clyo Nutri, <?= htmlspecialchars(explode(' ', $auth['userName'])[0]) ?>!
+              <h1 style="font-family: var(--font-editorial); font-size: 1.85rem; color: var(--brand-navy-900); margin-bottom: 4px;" data-testid="onboarding-welcome-title">
+                Bem-vindo(a) ao Clyo Nutri, <?= htmlspecialchars($firstNameClean) ?>!
               </h1>
               <p style="color: var(--neutral-gray-500); margin: 0; font-size: 0.95rem;">
-                Configure seu consultório em 5 passos rápidos para começar seus atendimentos com segurança e conformidade.
+                Configure sua rotina de atendimento em 3 passos rápidos para começar seus atendimentos com tranquilidade.
               </p>
             </div>
             <div>
@@ -122,37 +141,36 @@ class OnboardingController
             </div>
           </div>
 
-          <p class="op-message op-message--info" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong>. As preferências podem ser revisadas independentemente deste estado.</p>
-          <!-- Barra de Progresso e Stepper Visual (Design System) -->
+          <p class="op-message op-message--info" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong>. Suas preferências de rotina podem ser ajustadas a qualquer momento.</p>
+          <!-- Barra de Progresso e Stepper Visual de 3 Passos (NI2-850 / UX-006) -->
           <div class="card" style="padding: var(--space-5); margin-bottom: var(--space-6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
-              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);">Checklist de prontidão (não é o roteiro de preferências)</span>
-              <span style="font-size: 0.85rem; font-weight: 700; color: var(--brand-copper-600);"><?= (int)$progress['progress_pct'] ?>% Concluído</span>
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);" data-testid="onboarding-wizard-count">Progresso de Ativação · Passo <?= $visualStep ?> de 3 · <?= (int)$wizardSummary['done'] ?> de <?= (int)$wizardSummary['total'] ?> concluído(s)</span>
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--brand-copper-600);" data-testid="onboarding-progress-pct"><?= (int)$progress['progress_pct'] ?>% Concluído</span>
             </div>
             <!-- Progress Bar -->
             <div style="height: 8px; background: var(--neutral-gray-200); border-radius: var(--radius-pill); overflow: hidden; margin-bottom: var(--space-5);">
               <div style="height: 100%; width: <?= (int)$progress['progress_pct'] ?>%; background: var(--brand-copper-500); transition: width 300ms ease;"></div>
             </div>
 
-            <!-- Stepper com 5 Etapas -->
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;">
+            <!-- Stepper com 3 Etapas -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;" data-testid="onboarding-stepper">
               <?php
               $stepsInfo = [
-                  1 => ['title' => 'Boas-vindas', 'desc' => 'Foco clínico'],
-                  2 => ['title' => 'Profissional', 'desc' => 'CRN & Registro'],
-                  3 => ['title' => 'Atendimento', 'desc' => 'Preferências'],
-                  4 => ['title' => '1º Paciente', 'desc' => 'Opcional'],
-                  5 => ['title' => 'Ativação', 'desc' => 'Pronto para uso'],
+                  1 => ['title' => 'Como você atende', 'desc' => 'Foco, agenda e valores', 'target_step' => 1, 'done' => $wizardSummary['step_states'][1]],
+                  2 => ['title' => 'Primeiro paciente', 'desc' => 'Opcional', 'target_step' => 4, 'done' => $wizardSummary['step_states'][2]],
+                  3 => ['title' => 'Pronto para atender', 'desc' => 'Checklist do consultório', 'target_step' => 5, 'done' => $wizardSummary['step_states'][3]],
               ];
               ?>
-              <?php foreach ($stepsInfo as $sNum => $sInfo): ?>
+              <?php foreach ($stepsInfo as $vNum => $sInfo): ?>
                 <?php
-                $isCompleted = in_array($sNum, $progress['completed_steps'], true);
-                $isCurrent = ($step === $sNum);
+                $isCompleted = (bool)$sInfo['done'];
+                $isCurrent = ($visualStep === $vNum);
+                $canNavigate = $isCompleted || $vNum <= $visualStep;
                 ?>
-                <a href="<?= ($isCompleted || $sNum <= $progress['current_step']) ? '/onboarding?passo=' . $sNum : '#' ?>" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; cursor: <?= ($isCompleted || $sNum <= $progress['current_step']) ? 'pointer' : 'default' ?>;">
+                <a href="<?= $canNavigate ? '/onboarding?passo=' . (int)$sInfo['target_step'] : '#' ?>" data-testid="onboarding-step-link-<?= $vNum ?>" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; cursor: <?= $canNavigate ? 'pointer' : 'default' ?>;">
                   <div style="width: 32px; height: 32px; border-radius: var(--radius-pill); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; <?= $isCurrent ? 'background: var(--brand-navy-900); color: #fff; box-shadow: 0 0 0 3px rgba(239, 143, 79, 0.4);' : ($isCompleted ? 'background: var(--semantic-success); color: #fff;' : 'background: var(--neutral-gray-200); color: var(--neutral-gray-500);') ?>">
-                    <?= $isCompleted ? '✓' : $sNum ?>
+                    <?= $isCompleted ? '✓' : $vNum ?>
                   </div>
                   <strong style="font-size: 0.8rem; color: <?= $isCurrent ? 'var(--brand-navy-900)' : 'var(--neutral-gray-500)' ?>; display: block; line-height: 1.2;">
                     <?= $sInfo['title'] ?>
@@ -170,34 +188,67 @@ class OnboardingController
               <input type="hidden" name="step" value="<?= $step ?>">
 
               <?php if ($step === 1): ?>
-                <?php if ($canChoosePlan): ?>
-                  <fieldset style="border: 0; padding: 0; margin: 0 0 var(--space-6);">
-                    <legend style="font-family: var(--font-editorial); font-size: 1.4rem;">Escolha seu plano Clyo Nutri</legend>
-                    <p id="onboarding-plan-help">Escolha o plano para seu período de teste. Esta seleção não inicia cobrança nem renova o prazo de avaliação.</p>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
-                      <?php foreach ($availablePlans as $plan): ?>
-                        <label style="display: block; padding: 16px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-card); cursor: pointer;">
-                          <input type="radio" name="plan_code" value="<?= htmlspecialchars($plan['code'], ENT_QUOTES, 'UTF-8') ?>" required aria-describedby="onboarding-plan-help" <?= ($progress['focus_objectives']['plan_code'] ?? '') === $plan['code'] ? 'checked' : '' ?>>
-                          <strong><?= htmlspecialchars($plan['name'], ENT_QUOTES, 'UTF-8') ?></strong>
-                          <p>R$ <?= number_format((int)$plan['price_cents'] / 100, 2, ',', '.') ?> / <?= $plan['billing_cycle'] === 'yearly' ? 'ano' : 'mês' ?></p>
-                          <p><?= (int)$plan['max_patients'] === 0 ? 'Pacientes ilimitados' : (int)$plan['max_patients'] . ' pacientes' ?><br>
-                          <?= (int)$plan['max_professionals'] === 0 ? 'Profissionais ilimitados' : (int)$plan['max_professionals'] . ' profissional(is)' ?><br>
-                          <?= number_format((int)$plan['storage_mb'] / 1024, 0, ',', '.') ?> GB de armazenamento</p>
-                        </label>
-                      <?php endforeach; ?>
-                    </div>
-                    <?php if (!$availablePlans): ?><p role="alert">Nenhum plano disponível. Entre em contato com o suporte para continuar.</p><?php endif; ?>
-                  </fieldset>
-                <?php endif; ?>
-                <!-- PASSO 1: Boas-vindas & Objetivos -->
+                <input type="hidden" name="combined_wizard" value="1">
+                <div class="op-message op-message--info u-mb-5" data-testid="onboarding-trial-notice">
+                  <strong>Período de avaliação gratuito ativo:</strong> você não precisa escolher plano pago nem informar cartão agora. Quando quiser consultar planos, acesse <a href="/configuracoes/assinatura">Configurações → Assinatura</a>.
+                </div>
+
+                <!-- PASSO 1 de 3: Como você atende (Foco + CRN validado no cadastro + Preferências) -->
                 <div style="margin-bottom: var(--space-5);">
                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                    Passo 1 de 5: Qual é o foco principal dos seus atendimentos?
+                    Passo 1 de 3: Como você atende?
                   </h3>
                   <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">
-                    Personalizaremos as calculadoras, templates de planos alimentares e referências clínicas de acordo com seu público.
+                    Personalize o foco clínico, a duração padrão das consultas e os dias de atendimento.
                   </p>
                 </div>
+
+                <?php if ($hasPrefilledCrn): ?>
+                  <div class="u-bg-neutral-gray-50 u-border u-radius-input u-py-3 u-px-4 u-mb-5" data-testid="onboarding-crn-prefilled">
+                    <div class="u-flex u-justify-between u-items-center u-wrap u-gap-2">
+                      <div>
+                        <strong class="u-color-botanical-forest-900 u-text-compact">✓ Registro profissional já informado no cadastro:</strong>
+                        <span class="badge badge-success u-ml-1"><?= htmlspecialchars($profCurrent['crn_region'] . ' ' . $profCurrent['crn']) ?></span>
+                      </div>
+                      <details class="u-text-compact">
+                        <summary class="u-pointer u-color-botanical-copper-600 u-font-semibold">Editar CRN ou especialidade</summary>
+                        <div class="u-grid u-cols-3 u-gap-3 u-mt-3">
+                          <div>
+                            <label for="ob3-crn" class="form-label">Número do CRN</label>
+                            <input id="ob3-crn" type="text" name="crn" value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" class="form-control">
+                          </div>
+                          <div>
+                            <label for="ob4-crn_region" class="form-label">Região do CRN</label>
+                            <select id="ob4-crn_region" name="crn_region" class="form-control">
+                              <?php for ($r = 1; $r <= 11; $r++): ?>
+                                <option value="CRN-<?= $r ?>" <?= (($profCurrent['crn_region'] ?? 'CRN-3') === "CRN-{$r}") ? 'selected' : '' ?>>CRN-<?= $r ?></option>
+                              <?php endfor; ?>
+                            </select>
+                          </div>
+                          <div>
+                            <label for="ob5-specialty" class="form-label">Especialidade principal</label>
+                            <input id="ob5-specialty" type="text" name="specialty" value="<?= htmlspecialchars($profCurrent['specialty'] ?? 'Nutricionista clínico') ?>" class="form-control">
+                          </div>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                <?php else: ?>
+                  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4);">
+                    <div>
+                      <label for="ob3-crn" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Número de Registro CRN *</label>
+                      <input id="ob3-crn" type="text" name="crn" required value="<?= htmlspecialchars($profCurrent['crn'] ?? '') ?>" placeholder="Ex: 12345" class="form-control">
+                    </div>
+                    <div>
+                      <label for="ob4-crn_region" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Região do CRN *</label>
+                      <select id="ob4-crn_region" name="crn_region" required class="form-control">
+                        <?php for ($r = 1; $r <= 11; $r++): ?>
+                          <option value="CRN-<?= $r ?>" <?= (($profCurrent['crn_region'] ?? 'CRN-3') === "CRN-{$r}") ? 'selected' : '' ?>>CRN-<?= $r ?></option>
+                        <?php endfor; ?>
+                      </select>
+                    </div>
+                  </div>
+                <?php endif; ?>
 
                 <div style="margin-bottom: var(--space-5);">
                   <p id="ob-grupo-1" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Áreas de especialidade / atuação (selecione uma ou mais):</p>
@@ -220,6 +271,56 @@ class OnboardingController
                           <strong style="font-size: 0.88rem; color: var(--brand-navy-900); display: block;"><?= htmlspecialchars($fName) ?></strong>
                           <span style="font-size: 0.78rem; color: var(--neutral-gray-500);"><?= htmlspecialchars($fDesc) ?></span>
                         </div>
+                      </label>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+
+                <?php
+                $savedPref = $progress['practice_preferences'] ?? [];
+                $currentModalities = $savedPref['modalities'] ?? ['presencial', 'online'];
+                $currentDays = $savedPref['working_days'] ?? ['seg', 'ter', 'qua', 'qui', 'sex'];
+                ?>
+                <div style="margin-bottom: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--neutral-gray-200);">
+                  <p id="ob-grupo-2" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Modalidades de atendimento:</p>
+                  <div role="group" aria-labelledby="ob-grupo-2" style="display: flex; gap: var(--space-4); flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                      <input type="checkbox" name="modalities[]" value="presencial" <?= in_array('presencial', $currentModalities, true) ? 'checked' : '' ?>>
+                      Consultório presencial
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                      <input type="checkbox" name="modalities[]" value="online" <?= in_array('online', $currentModalities, true) ? 'checked' : '' ?>>
+                      Teleconsulta / online
+                    </label>
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5);">
+                  <div>
+                    <label for="ob7-default_duration_minutes" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Duração padrão da consulta</label>
+                    <select id="ob7-default_duration_minutes" name="default_duration_minutes" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); background: #fff; font-family: var(--font-body); font-size: 0.95rem;">
+                      <option value="30" <?= (($savedPref['default_duration_minutes'] ?? 60) === 30) ? 'selected' : '' ?>>30 minutos (Retorno rápido)</option>
+                      <option value="45" <?= (($savedPref['default_duration_minutes'] ?? 60) === 45) ? 'selected' : '' ?>>45 minutos</option>
+                      <option value="60" <?= (($savedPref['default_duration_minutes'] ?? 60) === 60) ? 'selected' : '' ?>>60 minutos (Recomendado para 1ª consulta)</option>
+                      <option value="90" <?= (($savedPref['default_duration_minutes'] ?? 60) === 90) ? 'selected' : '' ?>>90 minutos (Consulta aprofundada)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="ob8-default_price" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: 6px;">Valor médio da consulta (R$)</label>
+                    <input id="ob8-default_price" type="text" inputmode="decimal" data-decimal-field="price" data-min="0" data-max="10000" name="default_price" value="<?= htmlspecialchars((string)($savedPref['default_price'] ?? '250.00')) ?>" placeholder="250,00" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-input, #828B9B); border-radius: var(--radius-input); font-size: 0.95rem; font-family: var(--font-body);">
+                  </div>
+                </div>
+
+                <div style="margin-bottom: var(--space-6);">
+                  <p id="ob-grupo-3" style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900); margin-bottom: var(--space-2);">Dias de atendimento na semana:</p>
+                  <div role="group" aria-labelledby="ob-grupo-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <?php
+                    $weekDays = ['seg' => 'Segunda', 'ter' => 'Terça', 'qua' => 'Quarta', 'qui' => 'Quinta', 'sex' => 'Sexta', 'sab' => 'Sábado'];
+                    ?>
+                    <?php foreach ($weekDays as $wKey => $wLabel): ?>
+                      <label style="padding: 8px 14px; border: 1px solid var(--neutral-gray-300); border-radius: var(--radius-input); background: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                        <input type="checkbox" name="working_days[]" value="<?= $wKey ?>" <?= in_array($wKey, $currentDays, true) ? 'checked' : '' ?>>
+                        <?= $wLabel ?>
                       </label>
                     <?php endforeach; ?>
                   </div>
@@ -329,10 +430,10 @@ class OnboardingController
                 </div>
 
               <?php elseif ($step === 4): ?>
-                <!-- PASSO 4: Criação do Primeiro Paciente Real -->
+                <!-- PASSO 2 de 3 (etapa 4): Criação do Primeiro Paciente Real -->
                 <div style="margin-bottom: var(--space-5);">
                   <h3 style="font-family: var(--font-editorial); font-size: 1.4rem; color: var(--brand-navy-900); margin-bottom: 4px;">
-                    Passo 4 de 5: Primeiro paciente (opcional)
+                    Passo 2 de 3: Primeiro paciente (opcional)
                   </h3>
                   <p style="color: var(--neutral-gray-500); font-size: 0.9rem;">
                     Você pode cadastrar seu primeiro paciente agora ou escolher “Cadastrar paciente depois” para continuar. O cadastro ficará disponível na área Pacientes.
@@ -395,7 +496,11 @@ class OnboardingController
 
                 <?php $term = $this->db->query("SELECT * FROM consent_terms WHERE purpose_code='clinical_care' AND is_active=1 ORDER BY id DESC LIMIT 1")->fetch(); require __DIR__ . '/../../../views/patients/consent-choice.php'; ?>
               <?php elseif ($step === 5): ?>
-                <!-- PASSO 5: Orientação Contextual & Ativação Concluída -->
+                <!-- PASSO 3 de 3 (etapa 5): Orientação Contextual & Ativação Concluída -->
+                <?php
+                $applicableItems = array_values(array_filter($activation['items'], static fn($i) => $i['state'] !== 'not_applicable'));
+                $notApplicableItems = array_values(array_filter($activation['items'], static fn($i) => $i['state'] === 'not_applicable'));
+                ?>
                 <div style="text-align: center; padding: var(--space-4) 0 var(--space-6);">
                   <?php if ($activation['ready']): ?><div style="width: 64px; height: 64px; border-radius: var(--radius-pill); background: var(--semantic-success-light); color: var(--semantic-success); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4);" aria-hidden="true"><?= \ClyoNutri\Application\View\Icon::svg('circle-check', 32) ?></div><?php endif; ?>
                   <?php $pendReq = array_values(array_filter($activation['items'], static fn($i) => $i['required'] && $i['state'] === 'pending')); ?>
@@ -403,10 +508,10 @@ class OnboardingController
                     <?= $activation['ready'] ? 'Consultório pronto para atender.' : 'Quase pronto: ' . (count($pendReq) === 1 ? 'falta 1 item obrigatório.' : 'faltam ' . count($pendReq) . ' itens obrigatórios.') ?>
                   </h2>
                   <p style="color: var(--neutral-gray-600, #475467); font-size: 1rem; max-width: 620px; margin: 0 auto var(--space-5);">
-                    Conferido agora no sistema: <strong data-testid="activation-count"><?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></strong> itens feitos. Os três últimos são primeiros passos: não impedem começar.
+                    Conferido agora no sistema: <strong data-testid="activation-count"><?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></strong> itens aplicáveis feitos. Os três últimos são primeiros passos: não impedem começar.
                   </p>
                   <ol class="activation-list" data-testid="activation-checklist">
-                    <?php foreach ($activation['items'] as $it): $stLabel = ['done' => 'Feito', 'pending' => $it['required'] ? 'Pendente' : 'A fazer', 'attention' => 'Feito, com aviso', 'not_applicable' => 'Não se aplica'][$it['state']]; ?>
+                    <?php foreach ($applicableItems as $it): $stLabel = ['done' => 'Feito', 'pending' => $it['required'] ? 'Pendente' : 'A fazer', 'attention' => 'Feito, com aviso', 'not_applicable' => 'Não se aplica'][$it['state']]; ?>
                       <li class="activation-item activation-item--<?= htmlspecialchars($it['state']) ?>" data-testid="activation-<?= htmlspecialchars($it['key']) ?>" data-state="<?= htmlspecialchars($it['state']) ?>">
                         <span class="activation-item__mark" aria-hidden="true"><?= \ClyoNutri\Application\View\Icon::svg($it['state'] === 'done' ? 'circle-check' : ($it['state'] === 'attention' ? 'triangle-alert' : ($it['state'] === 'not_applicable' ? 'minus' : 'circle')), 18) ?></span>
                         <span class="activation-item__body">
@@ -420,6 +525,26 @@ class OnboardingController
                       </li>
                     <?php endforeach; ?>
                   </ol>
+                  <?php if ($notApplicableItems !== []): ?>
+                    <details class="u-mt-4" style="max-width: 620px; margin: 16px auto 0; text-align: left;" data-testid="activation-optional-disabled">
+                      <summary class="u-pointer u-text-compact u-color-neutral-gray-600 u-font-semibold">Recursos opcionais desativados (<?= count($notApplicableItems) ?> — fora da contagem de <?= (int)$activation['applicable'] ?> itens)</summary>
+                      <ul class="activation-list u-mt-2">
+                        <?php foreach ($notApplicableItems as $it): ?>
+                          <li class="activation-item activation-item--not_applicable" data-testid="activation-<?= htmlspecialchars($it['key']) ?>" data-state="not_applicable">
+                            <span class="activation-item__mark" aria-hidden="true"><?= \ClyoNutri\Application\View\Icon::svg('minus', 18) ?></span>
+                            <span class="activation-item__body">
+                              <strong><?= htmlspecialchars($it['label']) ?></strong>
+                              <span class="activation-item__state">Não se aplica</span>
+                              <span class="activation-item__detail"><?= htmlspecialchars($it['detail']) ?></span>
+                            </span>
+                            <?php if ($it['action_url']): ?>
+                              <a class="btn btn-secondary btn-sm" href="<?= htmlspecialchars($it['action_url']) ?>"<?= $it['key'] === 'hours' ? ' data-testid="onboarding-booking-activate"' : '' ?>><?= htmlspecialchars((string)$it['action_label']) ?></a>
+                            <?php endif; ?>
+                          </li>
+                        <?php endforeach; ?>
+                      </ul>
+                    </details>
+                  <?php endif; ?>
 
                   <?php if ($firstPatient): ?>
                     <p style="max-width: 620px; margin: var(--space-4) auto 0; text-align: left;">Primeiro paciente vinculado: <a href="/pacientes/<?= (int)$firstPatient['id'] ?>"><?= htmlspecialchars($firstPatient['name']) ?></a>.</p>
@@ -432,7 +557,8 @@ class OnboardingController
               <div class="onboarding-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); border-top: 1px solid var(--neutral-gray-200); padding-top: var(--space-5);">
                 <div>
                   <?php if ($step > 1): ?>
-                    <a href="/onboarding?passo=<?= $step - 1 ?>" class="btn btn-secondary">
+                    <?php $prevStepTarget = ($step === 4) ? 1 : ($step - 1); ?>
+                    <a href="/onboarding?passo=<?= $prevStepTarget ?>" class="btn btn-secondary">
                       ← Passo Anterior
                     </a>
                   <?php endif; ?>
@@ -440,7 +566,7 @@ class OnboardingController
 
                 <div style="display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;">
                   <?php if ($step === 4): ?>
-                    <button type="submit" name="skip_patient" value="1" formnovalidate class="btn btn-secondary">Cadastrar paciente depois</button>
+                    <button type="submit" name="skip_patient" value="1" formnovalidate class="btn btn-secondary" data-testid="onboarding-skip-patient">Cadastrar paciente depois</button>
                   <?php else: ?>
                   <a href="/dashboard" style="color: var(--neutral-gray-500); text-decoration: none; font-size: 0.85rem;">
                     Pular por enquanto
@@ -480,6 +606,31 @@ class OnboardingController
         try {
             $updated = $this->onboardingService->saveStep($auth['userId'], $auth['clinicId'], $step, $_POST);
 
+            // NI2-850 (UX-006): No fluxo enxuto de 3 passos, o Passo 1 ("Como você atende") já traz o CRN do cadastro
+            // e as preferências de atendimento, avançando diretamente para o Passo 2 de 3 (?passo=4, Primeiro paciente).
+            if ($step === 1 && !empty($_POST['combined_wizard'])) {
+                $pStmt = $this->db->prepare("SELECT crn, crn_region, specialty, bio FROM professionals WHERE user_id = :uid LIMIT 1");
+                $pStmt->execute(['uid' => $auth['userId']]);
+                $profRow = $pStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $crnVal = trim((string)($_POST['crn'] ?? ($profRow['crn'] ?? '')));
+                $regVal = trim((string)($_POST['crn_region'] ?? ($profRow['crn_region'] ?? 'CRN-3')));
+                $specVal = trim((string)($_POST['specialty'] ?? ($profRow['specialty'] ?? 'Nutrição Clínica Geral')));
+                $bioVal = trim((string)($_POST['bio'] ?? ($profRow['bio'] ?? '')));
+                if ($crnVal !== '') {
+                    $this->onboardingService->saveStep($auth['userId'], $auth['clinicId'], 2, [
+                        'crn' => $crnVal,
+                        'crn_region' => $regVal !== '' ? $regVal : 'CRN-3',
+                        'specialty' => $specVal !== '' ? $specVal : 'Nutrição Clínica Geral',
+                        'bio' => $bioVal,
+                    ]);
+                }
+                $updated = $this->onboardingService->saveStep($auth['userId'], $auth['clinicId'], 3, $_POST);
+                if (!headers_sent()) {
+                    header('Location: /onboarding?passo=4');
+                }
+                exit;
+            }
+
             if ($step >= 5 || $updated['is_completed']) {
                 if (!headers_sent()) {
                     header('Location: /dashboard?onboarding=concluido');
@@ -511,11 +662,13 @@ class OnboardingController
         $auth = $this->getAuthInfo();
 
         $progress = $this->onboardingService->getOrCreateProgress($auth['userId'], $auth['clinicId']);
+        $wizardSummary = OnboardingService::wizardSummary($progress);
         echo json_encode([
             'is_completed' => $progress['is_completed'],
             'current_step' => $progress['current_step'],
             'completed_steps' => $progress['completed_steps'],
             'progress_pct' => $progress['progress_pct'],
+            'wizard' => $wizardSummary,
             'activation' => (new \ClyoNutri\Domain\Onboarding\ActivationChecklist($this->db))->forUser((int)$auth['clinicId'], (int)$auth['userId']), // NI2-625
         ]);
     }

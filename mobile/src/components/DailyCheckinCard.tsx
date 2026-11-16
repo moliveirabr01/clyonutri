@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ApiError, ApiService, DailyCheckin } from '../services/api';
+import { useAnnounce, radioKeyboardProps } from '../utils/a11y';
 import { patientTokens as t } from '../theme/patient';
 
 const ADHERENCE = [
@@ -28,6 +29,10 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
+  const firstAnswer = useRef<any>(null);
+  const [adherenceError, setAdherenceError] = useState(false);
+  useAnnounce(adherenceError ? 'Escolha quanto do plano você seguiu hoje.' : message?.text);
+
   useEffect(() => {
     setSaved(checkin ?? null);
     if (checkin) {
@@ -42,7 +47,8 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
   const submit = async () => {
     if (busy) return;
     if (adherence === null) {
-      setMessage({ kind: 'error', text: 'Escolha quanto do plano você seguiu hoje.' });
+      setAdherenceError(true);
+      firstAnswer.current?.focus?.();
       return;
     }
     setBusy(true);
@@ -61,7 +67,7 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
   };
 
   const chip = (selected: boolean, label: string, onPress: () => void, a11y: string, key: string | number) => (
-    <TouchableOpacity key={key} style={[styles.chip, selected && styles.chipOn]} onPress={() => { if (message?.kind === 'error') setMessage(null); onPress(); }} disabled={busy}
+    <TouchableOpacity {...radioKeyboardProps(() => { if (message?.kind === 'error') setMessage(null); onPress(); }, busy)} ref={a11y === 'Quase nada do plano' ? firstAnswer : undefined} key={key} style={[styles.chip, selected && styles.chipOn]} onPress={() => { if (message?.kind === 'error') setMessage(null); onPress(); }} disabled={busy}
       accessibilityRole="radio" aria-checked={selected} accessibilityState={{ checked: selected, disabled: busy }} accessibilityLabel={a11y}>
       <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
     </TouchableOpacity>
@@ -85,9 +91,10 @@ export default function DailyCheckinCard({ checkin, onSaved }: { checkin: DailyC
       ) : (
         <>
           <Text style={styles.label} nativeID="checkin-adherence">Quanto do plano você seguiu hoje?</Text>
-          <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabelledBy="checkin-adherence">
-            {ADHERENCE.map((a) => chip(adherence === a.value, a.label, () => setAdherence(a.value), `${a.label} do plano`, a.value))}
+          <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabelledBy="checkin-adherence" aria-describedby={adherenceError ? 'checkin-adherence-error' : undefined}>
+            {ADHERENCE.map((a) => chip(adherence === a.value, a.label, () => { setAdherence(a.value); setAdherenceError(false); }, `${a.label} do plano`, a.value))}
           </View>
+          {adherenceError && <Text nativeID="checkin-adherence-error" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.bannerErrorText}>Escolha quanto do plano você seguiu hoje.</Text>}
           <Text style={styles.label} nativeID="checkin-energy">Energia (opcional)</Text>
           <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabelledBy="checkin-energy">
             {LEVELS.map((v) => chip(energy === v, String(v), () => setEnergy(energy === v ? null : v), `Energia ${v} de 5`, v))}

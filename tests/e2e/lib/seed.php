@@ -242,6 +242,19 @@ switch ($scenario) {
         $ins->execute([2, $pC, 2, $when]); $apC = (int)$pdo->lastInsertId();  // clínica B
         file_put_contents($db . '.ids', json_encode(['reception' => $rid, 'patientA' => 2, 'patientB' => 1, 'patientC' => $pC, 'apptA1' => $apA1, 'apptB1' => $apB1, 'apptA2' => $apA2, 'apptC' => $apC]));
         break;
+    case 'ni2844': // v54.62 NI2-844: auditoria UX 360° (UX-001..UX-019) — catálogo TACO completo + medidas caseiras padrão + Dra. Helena Prado + clínica B para teste de isolamento
+        \ClyoNutri\Core\Database\Connection::setInstance($pdo);
+        \ClyoNutri\Core\Auth\TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist']);
+        (new \ClyoNutri\Domain\Food\FoodCatalogService($pdo))->seedTacoReference();
+        (new \ClyoNutri\Domain\Food\TacoCatalogImporter($pdo))->run();
+        \ClyoNutri\Domain\Nutrition\HouseholdMeasureConverter::ensureCommonMeasures($pdo);
+        $pdo->exec("UPDATE users SET name='Dra. Helena Prado' WHERE id=1");
+        $pdo->exec("UPDATE professionals SET crn='45890', crn_region='CRN-3', specialty='Nutrição Clínica' WHERE user_id=1");
+        $pdo->exec("DELETE FROM onboarding_progress WHERE user_id=1");
+        $pdo->prepare("INSERT INTO patients (clinic_id, uuid, name, birth_date, gender, status) VALUES (2, ?, 'Paciente Outra Clinica 844', '1991-01-01', 'female', 'active')")->execute([bin2hex(random_bytes(8))]);
+        $pB = (int)$pdo->lastInsertId();
+        file_put_contents($db . '.ids', json_encode(['patientB' => $pB]));
+        break;
     default:
         fwrite(STDERR, "cenário desconhecido: $scenario\n"); exit(2);
 }

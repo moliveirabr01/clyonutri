@@ -237,7 +237,7 @@ check('S6', 'Mensagem nova: no app (sent), e-mail na hora (sent), push bloqueado
 check('S6', 'Histórico do chat (chat_notifications_log) continua sendo gravado', (int)one($db, 'SELECT COUNT(*) FROM chat_notifications_log WHERE message_id = 9001') === 3);
 check('S6', 'O aviso entra na caixa do profissional com link para a conversa', one($db, "SELECT link FROM notification_events WHERE recipient_type = 'professional' AND recipient_id = ? AND dedupe_key = 'chat.message:9001'", [$profA]) === '/chat/' . $conv);
 $mm = end($mailer->sent);
-check('S6', 'E-mail do chat sem conteúdo e com o aviso de urgência', $mm->subject === 'Nova mensagem no ClyoNutri' && str_contains($mm->textBody, \ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE));
+check('S6', 'E-mail do chat sem conteúdo e com o aviso de urgência', $mm->subject === 'Nova mensagem no Clyo Nutri' && str_contains($mm->textBody, \ClyoNutri\Domain\Chat\ChatSettingsService::EMERGENCY_NOTICE));
 $res = $chat->notifyNewMessage($cA, $conv, 9002, 'professional', $profA);
 check('S6', 'Segunda mensagem em 30 min: e-mail pulado (recent_email)', ($res['email']['status'] ?? '') === 'skipped' && $res['email']['reason'] === 'recent_email', $res);
 check('S6', 'Repetir a mesma mensagem não gera novo aviso', $chat->notifyNewMessage($cA, $conv, 9002, 'professional', $profA) === []
@@ -281,9 +281,10 @@ try {
     $planId = (int)$db->lastInsertId();
     $db->prepare("INSERT INTO meal_plan_meals (meal_plan_id, name, time_of_day, ordering) VALUES (?, 'Café TESTE', '08:00', 1)")->execute([$planId]);
     $mealId = (int)$db->lastInsertId();
-    $foodId = (int)one($db, 'SELECT id FROM foods ORDER BY id LIMIT 1');
+    $db->exec("INSERT INTO foods(name,energy_kcal) VALUES('Alimento sintético NI2-95',100)");
+    $foodId = (int)$db->lastInsertId();
     $db->prepare('INSERT INTO meal_plan_items (meal_id, food_id, amount, measure_unit, weight_grams) VALUES (?, ?, 100, "g", 100)')->execute([$mealId, $foodId]);
-    (new \ClyoNutri\Domain\MealPlan\MealPlanService($db))->publishPlan($planId, true, false, 'Teste sintético NI2-95 sem alergia');
+    (new \ClyoNutri\Domain\MealPlan\MealPlanService($db))->publishPlan($planId, true, false, 'Teste sintético NI2-95 sem alergia', true, 'Plano sintético isolado para teste de avisos, sem uso clínico.');
     $planOk = (int)one($db, "SELECT COUNT(*) FROM notification_events WHERE event_type = 'meal_plan.published' AND recipient_id = ? AND dedupe_key LIKE ?", [$bia, "meal_plan.published:{$planId}:v%"]) === 1;
     check('S8', 'Publicar o plano cria o aviso para a paciente', $planOk);
 } catch (Throwable $ex) {

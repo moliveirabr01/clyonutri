@@ -6,6 +6,7 @@ const { spawn, execFileSync } = require('node:child_process');
 const { mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const net = require('node:net');
+const assert = require('node:assert/strict');
 
 const root = resolve(process.env.APP_ROOT || join(__dirname, '..'));
 const dir = mkdtempSync('/tmp/ni2-95-');
@@ -129,17 +130,23 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     const web = async (method, path, form) => {
       const res = await fetch(B + path, { method, redirect: 'manual', headers: { Cookie: cookie, ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) }, body: form ? new URLSearchParams(form).toString() : undefined });
       for (const c of (res.headers.getSetCookie ? res.headers.getSetCookie() : [])) { const kv = c.split(';')[0]; if (kv.startsWith('PHPSESSID=')) cookie = kv; }
-      return { status: res.status, location: res.headers.get('location') || '', text: await res.text() };
+      const response = { status: res.status, location: res.headers.get('location') || '', text: await res.text() };
+      // Settings now use POST/Redirect/GET; preserve and verify the redirect as well as the destination.
+      if (method === 'POST' && path === '/configuracoes' && response.status === 302) {
+        assert.match(response.location, /^\/configuracoes\?tab=paciente-app&saved=[a-zA-Z0-9_-]+&secao=(notifications|reminders)#task-\1$/);
+        return { ...(await web('GET', response.location)), redirectStatus: response.status, savedLocation: response.location };
+      }
+      return response;
     };
     const csrf = (html) => (html.match(/name="_csrf_token" value="([^"]+)"/) || [])[1] || '';
     let w = await web('GET', '/login');
     w = await web('POST', '/login', { _csrf_token: csrf(w.text), email: 'nutri95a@example.test', password: 'Equipe@2026' });
-    w = await web('GET', '/configuracoes');
+    w = await web('GET', '/configuracoes?tab=paciente-app');
     check('web', 'Configurações mostram "Seus avisos" com e-mail do chat ligado por padrão', w.status === 200 && /data-testid="notification-settings"/.test(w.text)
       && /name="notify_chat_email" value="1" checked/.test(w.text), w.status + ' ' + w.location);
     check('web', 'Configurações mostram o e-mail de check-in recebido ligado por padrão (no máximo um por dia)', /name="notify_checkin_email" value="1" checked/.test(w.text) && /no máximo um por dia/.test(w.text) && !/uma paciente enviar/.test(w.text));
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'notifications', quiet_enabled: '1', quiet_start: '20:00', quiet_end: '08:00' });
-    check('web', 'Desligar e-mail do chat e ligar silêncio 20:00–08:00', w.status === 200 && /Avisos atualizados/.test(w.text)
+    check('web', 'Desligar e-mail do chat e ligar silêncio 20:00–08:00', w.status === 200 && w.redirectStatus === 302 && /Avisos atualizados/.test(w.text)
       && Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'chat'")) === 0
       && one("SELECT start_time || '-' || end_time || '-' || enabled AS q FROM notification_quiet_hours WHERE recipient_type = 'professional' AND recipient_id = 1") === '20:00-08:00-1', w.status);
     check('web', 'Desmarcar o check-in desliga só o e-mail de check-in recebido (opt-out)', Number(one("SELECT email_enabled FROM notification_preferences WHERE recipient_type = 'professional' AND recipient_id = 1 AND category = 'checkin'")) === 0
@@ -152,10 +159,10 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     check('web', 'Mudança do profissional fica na auditoria', Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'NOTIFICATION_PREFERENCES_UPDATED' AND resource = 'professionals'")) === 1);
 
     // ------------------------------------------------------------ web: lembrete de consulta (Configurações)
-    w = await web('GET', '/configuracoes');
+    w = await web('GET', '/configuracoes?tab=paciente-app');
     check('lembrete', 'Configurações mostram o lembrete de consulta (24 h padrão)', w.status === 200 && /data-testid="reminder-settings"/.test(w.text) && /name="reminder_clinic_hours"/.test(w.text) && /24 h/.test(w.text), w.status);
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_clinic_hours: '6', reminder_own_hours: '2' });
-    check('lembrete', 'Gestão salva 6 h para a clínica e 2 h para as próprias consultas', w.status === 200 && /Lembrete de consulta atualizado/.test(w.text)
+    check('lembrete', 'Gestão salva 6 h para a clínica e 2 h para as próprias consultas', w.status === 200 && w.redirectStatus === 302 && /Lembrete de consulta atualizado/.test(w.text)
       && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 0')) === 6
       && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 2, w.status);
     check('lembrete', 'Mudança do lembrete fica na auditoria', Number(one("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'APPOINTMENT_REMINDER_SETTINGS_UPDATED'")) === 1);
@@ -166,11 +173,11 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
         && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 2, w.status);
     }
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_own_hours: '' });
-    check('lembrete', 'Apagar o próprio volta a seguir a clínica (6 h)', w.status === 200 && Number(one('SELECT COUNT(*) AS n FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 0 && /6 h/.test(w.text), w.status);
+    check('lembrete', 'Apagar o próprio volta a seguir a clínica (6 h)', w.status === 200 && w.redirectStatus === 302 && Number(one('SELECT COUNT(*) AS n FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 1')) === 0 && /6 h/.test(w.text), w.status);
 
     // ------------------------------------------------------------ web: caixa de avisos do profissional
     w = await web('GET', '/avisos');
-    check('avisos', 'Caixa de avisos web abre com os avisos do profissional e o contador no menu', w.status === 200 && (w.text.match(/action="\/avisos\/\d+\/lida"/g) || []).length === 2 && /Avisos <strong class="badge"[^>]*>\(2\)/.test(w.text), w.status);
+    check('avisos', 'Caixa de avisos web abre com os avisos do profissional e o contador no menu', w.status === 200 && (w.text.match(/action="\/avisos\/\d+\/lida"/g) || []).length === 2 && /data-testid="nav-notices-count"[^>]*>2<\/span>/.test(w.text), w.status);
     const ints = sql("SELECT id, dedupe_key FROM notification_events WHERE dedupe_key LIKE 'web95:%'");
     const idOf = (k) => ints.find((x) => x.dedupe_key === k).id;
     w = await web('POST', `/avisos/${idOf('web95:outro')}/lida`, { _csrf_token: csrf((await web('GET', '/avisos')).text), abrir: '1' });
@@ -182,17 +189,17 @@ const LEAK = /(SQLSTATE|PDOException|Stack trace|\.php(:| on line)|Uncaught|Fata
     w = await web('POST', '/avisos/lidas', { _csrf_token: 'errado' });
     check('avisos', 'Sem CSRF válido não marca nada', w.status !== 303);
     w = await web('GET', '/avisos');
-    check('avisos', 'Sem avisos novos o contador some', w.status === 200 && !/Avisos <strong class="badge"/.test(w.text), w.status);
+    check('avisos', 'Sem avisos novos o contador some', w.status === 200 && !/data-testid="nav-notices-count"/.test(w.text), w.status);
 
     cookie = '';
     w = await web('GET', '/login');
     w = await web('POST', '/login', { _csrf_token: csrf(w.text), email: 'nutri95c@example.test', password: 'Equipe@2026' });
-    w = await web('GET', '/configuracoes');
+    w = await web('GET', '/configuracoes?tab=paciente-app');
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_clinic_hours: '4' });
     check('lembrete', 'Profissional que não é da gestão não muda o padrão da clínica', w.status === 409 && /gestão do consultório/.test(w.text)
       && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 0')) === 6, w.status);
     w = await web('POST', '/configuracoes', { _csrf_token: csrf(w.text), section: 'reminders', reminder_own_hours: '3' });
-    check('lembrete', 'Mas ajusta o lembrete das próprias consultas', w.status === 200 && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 3')) === 3, w.status);
+    check('lembrete', 'Mas ajusta o lembrete das próprias consultas', w.status === 200 && w.redirectStatus === 302 && Number(one('SELECT lead_hours AS h FROM notification_reminder_settings WHERE clinic_id = 1 AND professional_id = 3')) === 3, w.status);
     w = await web('GET', '/avisos');
     check('avisos', 'Caixa de outro profissional da mesma clínica vem vazia', w.status === 200 && !/action="\/avisos\/\d+\/lida"/.test(w.text), w.status);
 

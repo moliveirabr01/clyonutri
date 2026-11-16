@@ -28,7 +28,7 @@ final class RoleNav
             return ClinicalAuthorization::allowsWeb($actor, $m[1], 'GET') ? $m[0] : '';
         }, $html);
         // grupo recolhível que ficou só com o título
-        $html = (string)preg_replace('~<details\b[^>]*>\s*<summary>[^<]*</summary>\s*(?:<\?php[^>]*\?>\s*)*</details>~s', '', $html);
+        $html = (string)preg_replace('~<details\b[^>]*>\s*<summary\b[^>]*>.*?</summary>\s*(?:<\?php[^>]*\?>\s*)*</details>~s', '', $html);
         return $html;
     }
 
