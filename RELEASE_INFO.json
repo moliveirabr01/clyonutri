@@ -3,7 +3,7 @@
     "title": "ClyoNutri II",
     "version": "v54.63",
     "ui_version": "v54.63",
-    "status": "CANDIDATE_LOCAL_VALIDATION",
+    "status": "PACKAGED_HOSTGATOR_PENDING_DEPLOY",
     "prepared_date": "2026-11-15",
     "production_deployed": false,
     "jira_updated": false,
@@ -169,5 +169,41 @@
                 }
             }
         }
+    },
+    "package": {
+        "file": "clyonutri-v54-63-hostgator.zip",
+        "readme": "LEIA-ME-HOSTGATOR-v54-63.md",
+        "base_build": "release/clyonutri-v54-60-deploy.zip (último build entregue)",
+        "source_branch": "feat/reteste-ux-v54-63",
+        "source_is_committed_release": true,
+        "corrections": [],
+        "base_build_check": "Build v54.60 comparado arquivo a arquivo com o git: 78 arquivos diferentes são versões de commits anteriores (7d3a3f4/dcfb6ee) e 2 (public/index.php, routes/web.php) são subconjuntos do código atual. Nenhuma correção existe só no build.",
+        "excluded": [
+            ".env",
+            ".git",
+            "tests/",
+            "docs/",
+            "mobile/",
+            "scripts/",
+            "database/scripts/",
+            "artisan",
+            "storage/* (só estrutura)",
+            "*.log",
+            "*.sqlite"
+        ],
+        "manifest_note": "O config/build-manifest.json do pacote é gerado sobre o conteúdo do zip (sem database/scripts); o do repositório inclui database/scripts.",
+        "sql": [
+            "database/manual/atualizacao-v54-63-preflight.sql",
+            "database/manual/atualizacao-v54-63-completa.sql",
+            "database/manual/atualizacao-v54-63-verificacao.sql"
+        ],
+        "sql_validation": "MariaDB 10.11 local: banco simulando a v54.60 e cópia da estrutura de produção (dump maic6824_Clyonutri2 de 15/11/2026, só estrutura + foods/food_household_measures/migrations), duas execuções seguidas sem erro; esquema final igual ao do bin/migrate.php. Não executado em MySQL 5.7 real.",
+        "production_db_findings": [
+            "093 ausente (consultation_ai_consent_requests)",
+            "094/095 ausentes (7 medidas caseiras para 608 alimentos)",
+            "089 e 092 aplicadas sem registro em migrations",
+            "091 aplicada e registrada",
+            "divergências antigas fora do escopo: patient_documents.updated_at e patient_self_metrics.updated_at ausentes; índices ausentes em asaas_checkouts, asaas_payment_receipts, foods.clinic_id, patient_documents"
+        ]
     }
 }
