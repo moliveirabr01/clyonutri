@@ -102,7 +102,11 @@
         if (!data.ok) { setState(data.message, false, true, null); return; }
         if (data.needs_confirmation) { setState(data.message, true, false, data.nutrition || null); return; }
         const origin = data.source === 'mass' ? '' : ' (' + (data.source_label || (data.source === 'food_serving' ? 'porção cadastrada do alimento' : 'medida cadastrada para o alimento')) + ')';
-        setState('= ' + fmt(data.grams) + ' g' + origin, false, false, data.nutrition || null);
+        // Reteste UX v54.62 (R-001): porção acima de 1 kg ou 1.000 kcal pede conferência antes de incluir (não bloqueia).
+        const big = Number(data.grams) > 1000 || Number(data.nutrition && data.nutrition.energy_kcal) > 1000;
+        setState('= ' + fmt(data.grams) + ' g' + origin + (big ? '. Confira a quantidade: porção maior que o comum para uma refeição.' : ''), false, false, data.nutrition || null);
+        box.classList.toggle('unit-check--warn', big);
+        box.toggleAttribute('data-unit-check-big', big);
       } catch (e) {
         if (e.name !== 'AbortError' && mySeq === seq) setState('', false, false, null); // o servidor confere ao salvar
       }

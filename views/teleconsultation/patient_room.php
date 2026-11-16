@@ -12,7 +12,7 @@ $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/teleconsulta.css?v=v54-27">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body class="tc-room tc-room--patient" data-tc-csrf="<?= $e($csrf) ?>">
 <?php require __DIR__ . '/partials/icons.php'; ?>

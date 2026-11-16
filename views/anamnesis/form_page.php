@@ -452,6 +452,11 @@ foreach ($history as $h) {
         status.textContent = 'Salvando rascunho…';
       } else if (st === 'editing') {
         status.textContent = 'Em edição — alterações não salvas.';
+      } else if (st === 'expired') {
+        // Reteste UX v54.62 (UX-009): na falha, o rodapé repete o estado do topo em vez de ficar em "Salvando…".
+        status.textContent = 'Sessão expirada: o texto fica guardado neste navegador por até 15 minutos. Entre de novo para salvar.';
+      } else if (st === 'error' || st === 'conflict' || st === 'offline') {
+        status.textContent = st === 'conflict' ? 'Outra aba salvou antes: confira o salvo antes de continuar.' : 'Não foi possível confirmar o salvamento. O texto continua aqui e será reenviado.';
       }
     });
 

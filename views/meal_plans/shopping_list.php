@@ -16,7 +16,7 @@ $recipes = $list['linked_recipes'] ?? [];
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=v54-17">
   <link rel="stylesheet" href="/assets/css/shopping-list.css?v=v54-44">
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-44">
 <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-44">
 </head>

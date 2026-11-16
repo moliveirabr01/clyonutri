@@ -781,7 +781,7 @@
     .admin-form input[type=file] { font-size: .85rem; font-weight: 400; }
     .admin-form :is(input, select, textarea):focus-visible, .admin-inline-form :is(input, select, textarea):focus-visible { outline: 2px solid var(--admin-green-600); outline-offset: 2px; border-color: var(--admin-green-600); }
   </style>
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body>
   <a class="skip-link skip-admin-content" href="#admin-main-content">Pular para o conteúdo principal</a>

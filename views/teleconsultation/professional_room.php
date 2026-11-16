@@ -19,7 +19,7 @@ $scheduledLabel = !empty($session['scheduled_at']) ? date('d/m/Y \à\s H:i', str
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/teleconsulta.css?v=v54-27">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body class="tc-room tc-room--pro" data-tc-session="<?= $sid ?>" data-tc-csrf="<?= $e($csrf) ?>" data-tc-status="<?= $e($status) ?>" data-tc-opens-at="<?= $e($clock['join_opens_at_utc'] ?? '') ?>" data-tc-server-now="<?= $e($clock['server_now_utc'] ?? '') ?>" data-tc-opens-label="<?= $e($clock['opens_label'] ?? '') ?>" data-tc-is-open="<?= !empty($clock['is_open']) ? '1' : '0' ?>">
 <?php require __DIR__ . '/partials/icons.php'; ?>

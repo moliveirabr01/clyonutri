@@ -67,7 +67,7 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
 ?>
 <aside id="consultation-history-drawer" class="card cr-card u-mb-4" data-testid="consultation-history-drawer" aria-label="Histórico clínico do paciente" hidden>
   <div class="cr-card__head u-flex u-justify-between u-items-center u-wrap u-gap-2">
-    <h3 class="u-m-0">Histórico clínico — <?= htmlspecialchars($app['patient_name']) ?></h3>
+    <h3 class="u-m-0" id="consultation-history-title" tabindex="-1">Histórico clínico — <?= htmlspecialchars($app['patient_name']) ?></h3>
     <button type="button" class="btn btn-secondary btn-sm" data-close-history-drawer data-testid="close-history-drawer">Fechar histórico</button>
   </div>
   <div class="u-grid u-cols-auto-md u-gap-4 u-mt-3">
@@ -115,12 +115,19 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
   var closeBtn = document.querySelector('[data-close-history-drawer]');
   var drawer = document.getElementById('consultation-history-drawer');
   if (!toggleBtn || !drawer) return;
-  function setOpen(open) {
+  var title = document.getElementById('consultation-history-title');
+  // Reteste UX v54.62 (R-008): ao abrir, o foco vai para o título da gaveta; Esc fecha e devolve o foco ao botão.
+  function setOpen(open, restoreFocus) {
     drawer.hidden = !open;
     toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && title) title.focus();
+    if (!open && restoreFocus) toggleBtn.focus();
   }
-  toggleBtn.addEventListener('click', function () { setOpen(drawer.hidden); });
-  if (closeBtn) closeBtn.addEventListener('click', function () { setOpen(false); toggleBtn.focus(); });
+  toggleBtn.addEventListener('click', function () { setOpen(drawer.hidden, false); });
+  if (closeBtn) closeBtn.addEventListener('click', function () { setOpen(false, true); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && !drawer.hidden) { ev.preventDefault(); setOpen(false, true); }
+  });
 })();
 </script>
 
@@ -191,7 +198,13 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
           <?php else: ?>
             <p class="u-text-compact u-color-neutral-gray-600 u-mt-0 u-mb-2" data-testid="consult-latest-anthro-summary">Nenhuma avaliação registrada ainda. Use <strong>Registrar medidas na Avaliação</strong> para lançar peso, altura e circunferências completas.</p>
           <?php endif; ?>
-          <div class="cn-form-grid">
+          <?php /* Reteste UX v54.62 (UX-016): a porta principal é a Avaliação; peso e cintura rápidos ficam recolhidos
+                   (abertos quando já há valor no rascunho ou erro), para não haver duas entradas iguais em destaque. */
+          $quickAnthroOpen = trim((string)($draft['weight_kg'] ?? '')) !== '' || trim((string)($draft['waist_cm'] ?? '')) !== ''
+              || trim($fieldMsg('weight_kg') . $fieldMsg('waist_cm')) !== ''; ?>
+          <details class="cr-anthro__quick" data-testid="consult-quick-anthro"<?= $quickAnthroOpen ? ' open' : '' ?>>
+          <summary class="u-text-compact">Só peso e cintura nesta evolução (sem avaliação completa)</summary>
+          <div class="cn-form-grid u-mt-2">
             <div>
               <label for="dc9-weight_kg" class="cr-label">Peso Atual (kg)</label>
               <input class="form-control" id="dc9-weight_kg" type="text" inputmode="decimal" data-decimal-field="weight_kg" data-min="<?= AppointmentService::CONSULT_WEIGHT_RANGE[0] ?>" data-max="<?= AppointmentService::CONSULT_WEIGHT_RANGE[1] ?>" name="weight_kg" value="<?= htmlspecialchars((string)($draft['weight_kg'] ?? '')) ?>" placeholder="Ex.: 68,5"<?= $fieldAttr('weight_kg') ?>>
@@ -204,6 +217,7 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
             </div>
           </div>
           <span class="cr-help">Peso entre <?= AppointmentService::CONSULT_WEIGHT_RANGE[0] ?> e <?= AppointmentService::CONSULT_WEIGHT_RANGE[1] ?> kg; cintura entre <?= AppointmentService::CONSULT_WAIST_RANGE[0] ?> e <?= AppointmentService::CONSULT_WAIST_RANGE[1] ?> cm.</span>
+          </details>
         </div>
 
         <?php $pendingReview = $pendingReview ?? []; if ($pendingReview !== []): ?>

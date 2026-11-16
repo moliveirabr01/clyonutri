@@ -20,7 +20,7 @@ $topics = \ClyoNutri\Application\Controllers\BookingController::DIRECTORY_TOPICS
   <link rel="preload" href="/assets/fonts/inter-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
   <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-53">

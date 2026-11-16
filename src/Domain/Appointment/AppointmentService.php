@@ -1371,7 +1371,7 @@ class AppointmentService
         $prefs = $this->practicePreferences($professionalId);
         $calendar = new \ClyoNutri\Domain\Booking\BookingCalendarService($this->db);
         if (!$calendar->allows(TenantContext::getClinicId(), $professionalId, $scheduledAt, $duration, $prefs['weekly_availability'] ?? [], array_key_exists('weekly_availability', $prefs))) {
-            throw new InvalidArgumentException($calendar->blockingReason(TenantContext::getClinicId(), $professionalId, $scheduledAt, $duration) ?? 'Esse horário não respeita a jornada ou os intervalos entre consultas. Confira a disponibilidade em Configurações.');
+            throw new InvalidArgumentException($calendar->blockingReason(TenantContext::getClinicId(), $professionalId, $scheduledAt, $duration) ?? 'Esse horário não respeita a jornada ou os intervalos entre consultas. O encaixe vale só dentro da jornada; para atender fora dela, ajuste a disponibilidade em Configurações.');
         }
     }
 

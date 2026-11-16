@@ -141,7 +141,7 @@ class OnboardingController
             </div>
           </div>
 
-          <p class="op-message op-message--info" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong>. Suas preferências de rotina podem ser ajustadas a qualquer momento.</p>
+          <p class="op-message op-message--info" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>"><?php /* Reteste UX v54.62 (UX-006): sem jargão ("requisitos aplicáveis") e sem parecer contradizer a barra de 0%. */ ?><?= $activation['ready'] ? '<strong>Você já pode atender.</strong> O cadastro obrigatório está completo; os passos abaixo deixam a rotina do seu jeito e podem ser ajustados depois.' : '<strong>Falta pouco para atender.</strong> Complete o cadastro obrigatório indicado no último passo.' ?></p>
           <!-- Barra de Progresso e Stepper Visual de 3 Passos (NI2-850 / UX-006) -->
           <div class="card" style="padding: var(--space-5); margin-bottom: var(--space-6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
@@ -508,7 +508,7 @@ class OnboardingController
                     <?= $activation['ready'] ? 'Consultório pronto para atender.' : 'Quase pronto: ' . (count($pendReq) === 1 ? 'falta 1 item obrigatório.' : 'faltam ' . count($pendReq) . ' itens obrigatórios.') ?>
                   </h2>
                   <p style="color: var(--neutral-gray-600, #475467); font-size: 1rem; max-width: 620px; margin: 0 auto var(--space-5);">
-                    Conferido agora no sistema: <strong data-testid="activation-count"><?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></strong> itens aplicáveis feitos. Os três últimos são primeiros passos: não impedem começar.
+                    <?php $firstSteps = count(array_filter($applicableItems, static fn($i) => empty($i['required']))); ?>Itens do consultório: <strong data-testid="activation-count"><?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></strong> feitos.<?php if ($firstSteps > 0): ?> <?= $firstSteps === 1 ? 'O item marcado como primeiro passo não impede' : 'Os ' . $firstSteps . ' itens marcados como primeiro passo não impedem' ?> começar.<?php endif; ?>
                   </p>
                   <ol class="activation-list" data-testid="activation-checklist">
                     <?php foreach ($applicableItems as $it): $stLabel = ['done' => 'Feito', 'pending' => $it['required'] ? 'Pendente' : 'A fazer', 'attention' => 'Feito, com aviso', 'not_applicable' => 'Não se aplica'][$it['state']]; ?>

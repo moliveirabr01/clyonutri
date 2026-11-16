@@ -158,6 +158,16 @@ final class EnergyTargetService
         }
         $factorRaw = ($in['activity_factor'] ?? '') !== '' ? $in['activity_factor'] : ($in['activity_preset'] ?? '');
         $adjMode = (string)($in['adjust_mode'] ?? 'kcal');
+        // Reteste UX v54.62 (R-006): "Redução de peso" ou "Ganho" com ajuste 0 gravava VET = GET com o rótulo do objetivo.
+        // O sistema não inventa o déficit/superávit; pede que o nutricionista informe o ajuste no sentido do objetivo.
+        $adjRaw = trim(str_replace(',', '.', (string)($in['adjust_value'] ?? '0')));
+        $adjNum = is_numeric($adjRaw) ? (float)$adjRaw : 0.0;
+        if ($goal === 'loss' && $adjNum >= 0) {
+            throw new InvalidArgumentException('Para redução de peso, informe o ajuste do GET com valor negativo (em kcal ou % do GET). Com ajuste 0 o VET fica igual ao GET.');
+        }
+        if ($goal === 'gain' && $adjNum <= 0) {
+            throw new InvalidArgumentException('Para ganho de peso ou de massa, informe o ajuste do GET com valor positivo (em kcal ou % do GET). Com ajuste 0 o VET fica igual ao GET.');
+        }
 
         $suggest = $this->suggestInputs($planId);
         $ageYears = ($in['age_years'] ?? '') !== '' ? $in['age_years'] : ($suggest['age_years'] ?? null);

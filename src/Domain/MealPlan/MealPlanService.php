@@ -1492,8 +1492,8 @@ class MealPlanService
      */
     public static function normalizeAmount(mixed $amount): float
     {
-        $v = is_numeric($amount) ? (float)$amount : NAN;
-        return is_finite($v) ? round($v, 2) : -1.0;
+        $v = \ClyoNutri\Domain\Nutrition\QuantityInput::parse($amount);
+        return $v !== null ? round($v, 2) : -1.0;
     }
 
     /** Colunas nutricionais + peso persistidos em meal_plan_items / meal_plan_substitutions. */

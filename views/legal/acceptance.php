@@ -44,7 +44,7 @@ $fmtDate = static function (string $dt): string {
     .acc-logout button { background: none; border: none; padding: 0; color: var(--neutral-gray-700); text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body>
   <main class="acc-wrapper" id="conteudo">

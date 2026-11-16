@@ -81,7 +81,7 @@
     .password-toggle:focus-visible { outline: 3px solid var(--brand-copper-600, #B04A1B); outline-offset: 2px; }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body>
   <div class="auth-wrapper">

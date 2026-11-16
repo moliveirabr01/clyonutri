@@ -16,7 +16,7 @@ $rid = (int)$request['id'];
   <title>Solicitação de exames <?= $e($doc['request_number']) ?> — <?= $e($doc['patient']['name']) ?></title>
   <link rel="stylesheet" href="/assets/css/prontuario-impressao.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/exame-documento.css?v=botanical-20261029a">
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body class="exd-print">
 <div class="pi-toolbar" role="region" aria-label="Opções de impressão">

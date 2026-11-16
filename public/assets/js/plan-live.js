@@ -87,7 +87,16 @@
       }
       else {const fresh=[...document.forms].find(f=>f.action===form.action);if(fresh){let node=fresh.parentElement;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}const target=fresh.elements[focusedName]||fresh.querySelector('input:not([type=hidden]),button');target?.focus();}else root.querySelector('input:not([type=hidden])')?.focus();}
       const freshRoot=doc.querySelector('[data-quick-plan]');if(freshRoot){root.dataset.revision=freshRoot.dataset.revision;for(const selector of ['#quick-meal-select','[data-copy-meals]']){const local=root.querySelector(selector),fresh=freshRoot.querySelector(selector),value=local.value;local.replaceChildren(...[...fresh.options].map(o=>o.cloneNode(true)));local.value=value;}}
-      window.ClyoWorkflow?.set(root,window.ClyoForms?.dirtyForms().some(f=>root.contains(f))?'editing':'saved',j.workflow.saved_at);announce('Salvo como rascunho.');
+      window.ClyoWorkflow?.set(root,window.ClyoForms?.dirtyForms().some(f=>root.contains(f))?'editing':'saved',j.workflow.saved_at);
+      // Reteste UX v54.62 (R-001/R-005): mostra, junto da refeição, o alimento que entrou e avisa porção implausível.
+      const target=(form.id&&document.getElementById(form.id))||(form.isConnected?form:null);
+      if(target&&(j.feedback||j.warning)){
+        target.querySelectorAll('[data-live-feedback]').forEach(n=>n.remove());
+        const add=(text,kind)=>{const p=document.createElement('p');p.setAttribute('data-live-feedback',kind);p.setAttribute('data-testid','plan-live-feedback-'+kind);p.setAttribute('role',kind==='warning'?'alert':'status');p.className='op-message op-message--'+(kind==='warning'?'warning':'info')+' u-mb-2';p.textContent=text;target.prepend(p);};
+        if(j.warning)add(j.warning,'warning');
+        if(j.feedback)add(j.feedback,'ok');
+      }
+      announce(j.warning?j.warning:(j.feedback||'Salvo como rascunho.'));
     }catch(err){showFormError(form,window.ClyoWorkflow?.netMessage?.(err)??err.message);if(confirmed){root.dataset.needsReload='1';window.ClyoWorkflow?.set(root,'saved');}}finally{restoreButtons(form);}
   });
 

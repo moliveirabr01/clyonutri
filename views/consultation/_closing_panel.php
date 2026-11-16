@@ -116,7 +116,7 @@ $nextTodayApp = $stNextToday->fetch(\PDO::FETCH_ASSOC) ?: null;
     </div>
   </div>
 
-  <?php if ($closingFeedback): ?>
+  <?php if ($closingFeedback && !$existingFollowUp): /* R-003: com retorno marcado, a confirmação com link já aparece no card 1 */ ?>
     <div class="op-message op-message--success u-mb-3" role="status" data-testid="closing-followup-feedback">
       <?= $eClose($closingFeedback) ?>
     </div>
@@ -139,11 +139,17 @@ $nextTodayApp = $stNextToday->fetch(\PDO::FETCH_ASSOC) ?: null;
         </p>
       <?php endif; ?>
 
-      <?php if ($followUpSuggest['adjusted'] && $followUpSuggest['reason']): ?>
+      <?php /* Reteste UX v54.62 (R-003): com retorno já marcado, o painel só confirma. A sugestão recalculada colidia
+               com o próprio retorno e dizia "caiu indisponível" logo após o sucesso. Outro horário fica em "Marcar outro retorno". */ ?>
+      <?php if ($existingFollowUp): ?>
+      <details class="u-mt-2" data-testid="closing-followup-more">
+        <summary class="u-text-compact">Marcar outro retorno</summary>
+      <?php endif; ?>
+      <?php if (!$existingFollowUp && $followUpSuggest['adjusted'] && $followUpSuggest['reason']): ?>
         <p class="op-message op-message--info u-text-compact u-mb-2" role="status" data-testid="closing-followup-adjusted">
           O retorno em +30 dias (<?= $eClose(date('d/m/Y H:i', strtotime(str_replace('T', ' ', $followUpSuggest['requested_at'])))) ?>) caiu indisponível (<?= $eClose($followUpSuggest['reason']) ?>). Sugerimos o próximo horário livre: <strong><?= $eClose(date('d/m/Y \à\s H:i', strtotime(str_replace('T', ' ', $followUpSuggest['scheduled_at'])))) ?></strong>.
         </p>
-      <?php else: ?>
+      <?php elseif (!$existingFollowUp): ?>
         <p class="u-text-compact u-color-neutral-gray-600 u-mt-0 u-mb-2">Sugerido para <strong>+30 dias</strong> no mesmo horário. Ajuste se desejar e confirme em 1 clique.</p>
       <?php endif; ?>
 
@@ -166,6 +172,9 @@ $nextTodayApp = $stNextToday->fetch(\PDO::FETCH_ASSOC) ?: null;
             </button>
           <?php endforeach; ?>
         </div>
+      <?php endif; ?>
+      <?php if ($existingFollowUp): ?>
+      </details>
       <?php endif; ?>
     </div>
 

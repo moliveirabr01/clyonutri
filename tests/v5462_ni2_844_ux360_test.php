@@ -190,7 +190,7 @@ $checkFoods = [
     'Ovo de galinha cozido' => 'unidade',
     'Arroz integral cozido' => 'colher de sopa',
     'Feijão carioca cozido' => 'concha',
-    'Frango, peito, sem pele, grelhado' => 'filé',
+    'Peito de frango grelhado' => 'filé', // v54.63 (R-004): a cópia interna saiu da busca; o item é o TACO 410
     'Azeite de oliva extravirgem' => 'colher de sopa',
 ];
 foreach ($checkFoods as $fname => $expectedMeasure) {

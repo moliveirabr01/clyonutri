@@ -60,13 +60,22 @@ final class WorkflowController
             if(!$st->fetchColumn())throw new \InvalidArgumentException('Refeição não encontrada neste plano.');
         }
         if($action==='item'){
-            $amount=$str($p['amount']??'');if(!is_numeric($amount)||!is_finite((float)$amount))throw new \InvalidArgumentException('Quantidade inválida.');
+            $amount=\ClyoNutri\Domain\Nutrition\QuantityInput::parse($str($p['amount']??''));if($amount===null)throw new \InvalidArgumentException('Quantidade inválida. Use números como 1,5 ou 100.');
             $foodId=(int)($p['food_id']??0);
             $prevSt=$this->db->prepare('SELECT id, amount, measure_unit FROM meal_plan_items WHERE meal_id=? AND food_id=? ORDER BY id ASC LIMIT 1');
             $prevSt->execute([$meal,$foodId]);
             $prevRow=$prevSt->fetch(PDO::FETCH_ASSOC)?:null;
-            $item=$s->addItem($meal,$foodId,(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
+            $item=$s->addItem($meal,$foodId,$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
             $res=['resource_id'=>$plan,'item_id'=>$item,'meal_id'=>$meal];
+            // Reteste UX v54.62 (R-001/R-005): confirma qual alimento entrou e com quanto; avisa porção implausível.
+            $infoSt=$this->db->prepare('SELECT f.name AS food_name, m.name AS meal_name, i.amount, i.measure_unit, i.weight_grams, i.energy_kcal FROM meal_plan_items i JOIN foods f ON f.id=i.food_id JOIN meal_plan_meals m ON m.id=i.meal_id WHERE i.id=?');
+            $infoSt->execute([$item]);
+            if($info=$infoSt->fetch(PDO::FETCH_ASSOC)){
+                $grams=$info['weight_grams']!==null?(float)$info['weight_grams']:null;
+                $res['feedback']=sprintf('Incluído em %s: %s (%s %s%s).',$info['meal_name'],$info['food_name'],\ClyoNutri\Domain\Nutrition\QuantityInput::format((float)$info['amount']),\ClyoNutri\Domain\Nutrition\QuantityInput::unitLabel((float)$info['amount'],(string)$info['measure_unit']),$grams!==null&&$info['measure_unit']!=='g'?', ≈ '.number_format($grams,0,',','.').' g':'');
+                $warn=\ClyoNutri\Domain\Nutrition\QuantityInput::plausibilityWarning((string)$info['food_name'],(float)$info['amount'],(string)$info['measure_unit'],$grams,$info['energy_kcal']!==null?(float)$info['energy_kcal']:null);
+                if($warn!==null)$res['warning']=$warn;
+            }
             if($prevRow){
                 $res['duplicate_in_meal']=['existing_item_id'=>(int)$prevRow['id'],'new_item_id'=>$item,'food_id'=>$foodId,'meal_id'=>$meal,'message'=>'Já existe na refeição — somar quantidades?'];
             }
@@ -106,9 +115,9 @@ final class WorkflowController
         }
         if(in_array($action,['edit_item','add_substitution'],true)){
             $item=(int)($p['item_id']??0);$st=$this->db->prepare('SELECT i.id FROM meal_plan_items i JOIN meal_plan_meals m ON m.id=i.meal_id WHERE i.id=? AND m.meal_plan_id=?');$st->execute([$item,$plan]);if(!$st->fetchColumn())throw new \InvalidArgumentException('Item não encontrado neste plano.');
-            $amount=$str($p['amount']??'');if(!is_numeric($amount)||!is_finite((float)$amount))throw new \InvalidArgumentException('Quantidade inválida.');
-            if($action==='edit_item')$s->updateItem($item,(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,null,$plan,!empty($p['confirm_estimated']));
-            else $s->addSubstitution($item,(int)($p['food_id']??0),(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
+            $amount=\ClyoNutri\Domain\Nutrition\QuantityInput::parse($str($p['amount']??''));if($amount===null)throw new \InvalidArgumentException('Quantidade inválida. Use números como 1,5 ou 100.');
+            if($action==='edit_item')$s->updateItem($item,$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,null,$plan,!empty($p['confirm_estimated']));
+            else $s->addSubstitution($item,(int)($p['food_id']??0),$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,!empty($p['confirm_estimated']),true,!empty($p['confirm_allergen_conflict']),$str($p['allergen_ack_reason']??'')?:null);
             return ['resource_id'=>$plan];
         }
         if(in_array($action,['edit_meal','remove_meal'],true)){
@@ -119,8 +128,8 @@ final class WorkflowController
         if(in_array($action,['edit_substitution','remove_substitution'],true)){
             $sub=(int)($p['sub_id']??0);$st=$this->db->prepare('SELECT s.id FROM meal_plan_substitutions s JOIN meal_plan_items i ON i.id=s.item_id JOIN meal_plan_meals m ON m.id=i.meal_id WHERE s.id=? AND m.meal_plan_id=?');$st->execute([$sub,$plan]);if(!$st->fetchColumn())throw new \InvalidArgumentException('Substituição não encontrada neste plano.');
             if($action==='edit_substitution'){
-                $amount=$str($p['amount']??'');if(!is_numeric($amount)||!is_finite((float)$amount))throw new \InvalidArgumentException('Quantidade inválida.');
-                $s->updateSubstitution($sub,(float)$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,$plan,!empty($p['confirm_estimated']));
+                $amount=\ClyoNutri\Domain\Nutrition\QuantityInput::parse($str($p['amount']??''));if($amount===null)throw new \InvalidArgumentException('Quantidade inválida. Use números como 1,5 ou 100.');
+                $s->updateSubstitution($sub,$amount,$str($p['measure_unit']??'g'),$str($p['notes']??'')?:null,$plan,!empty($p['confirm_estimated']));
             }else $s->deleteSubstitution($sub);
             return ['resource_id'=>$plan];
         }

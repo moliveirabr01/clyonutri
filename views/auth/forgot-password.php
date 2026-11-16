@@ -77,7 +77,7 @@
       text-decoration: underline;
     }
   </style>
-<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body>
   <div class="auth-wrapper">

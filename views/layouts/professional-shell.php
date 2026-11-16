@@ -19,7 +19,7 @@ if ($shellFirstName === '') {
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-journeys.css?v=v54-47">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
   <link rel="stylesheet" href="/assets/css/ds-components.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-53">
@@ -82,10 +82,10 @@ if ($shellFirstName === '') {
 <script type="application/json" id="clinical-form-recovery"><?= json_encode($recovery,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR) ?></script>
 <?php endif; ?>
 <script src="/assets/js/validacao-ptbr.js" defer></script>
-<script src="/assets/js/decimal-input.js?v=v54-62" defer></script>
+<script src="/assets/js/decimal-input.js?v=v54-63" defer></script>
 <script src="/assets/js/clinical-journeys.js?v=v54-58" defer></script>
 <script src="/assets/js/session-timeout.js?v=v54-30" defer></script>
-<script src="/assets/js/avaliacao-confirmacoes.js?v=v54-54" defer></script>
+<script src="/assets/js/avaliacao-confirmacoes.js?v=v54-63" defer></script>
 <script src="/assets/js/clinical-context.js?v=v54-26" defer></script>
 <script src="/assets/js/operational-ui.js?v=v54-57" defer></script>
 <script src="/assets/js/workflow-drafts.js?v=v54-57" defer></script>

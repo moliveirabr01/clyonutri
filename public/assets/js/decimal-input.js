@@ -76,6 +76,15 @@
       };
     }
 
+    // Reteste UX v54.62 (R-001): quantidade de alimento no plano ("1,5 unidade", "0,25 xícara").
+    if (kind === 'quantity') {
+      if (!(num > 0)) {
+        return { valid: false, error: 'Informe uma quantidade maior que zero (ex.: 1,5).' };
+      }
+      const txt = (Math.round(num * 100) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+      return { valid: true, text: `Interpretado: ${txt}` };
+    }
+
     const minAttr = el.getAttribute('data-min') ?? el.getAttribute('min');
     const maxAttr = el.getAttribute('data-max') ?? el.getAttribute('max');
     const min = minAttr !== null && minAttr !== '' ? Number(minAttr) : null;

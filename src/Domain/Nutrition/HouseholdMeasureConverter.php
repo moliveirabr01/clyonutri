@@ -29,6 +29,8 @@ class HouseholdMeasureConverter
     public const SOURCE_FOOD_MEASURE = 'food_measure';
     public const SOURCE_FOOD_SERVING = 'food_serving';
     public const SOURCE_GENERIC = 'generic';
+    /** R-004 (reteste v54.62): origem das medidas semeadas por inferência de nome (não são dado do TACO). */
+    public const ESTIMATED_SOURCE = 'Estimativa ClyoNutri (revisar)';
 
     /** Massa: conversão exata. */
     private const MASS = ['g' => 1.0, 'grama' => 1.0, 'gr' => 1.0, 'mg' => 0.001, 'miligrama' => 0.001, 'kg' => 1000.0, 'quilo' => 1000.0, 'quilograma' => 1000.0];
@@ -188,7 +190,9 @@ class HouseholdMeasureConverter
         $sourceText = trim($sourceText);
         return match ($origin) {
             'clinic' => 'medida da clínica' . ($sourceText !== '' ? ' · fonte: ' . $sourceText : ''),
-            'global' => 'medida da base geral do sistema',
+            'global' => $sourceText === self::ESTIMATED_SOURCE
+                ? 'estimativa da base geral, confira o peso'
+                : 'medida da base geral do sistema' . ($sourceText !== '' ? ' · fonte: ' . $sourceText : ''),
             default => 'porção do cadastro do alimento',
         };
     }
@@ -282,7 +286,9 @@ class HouseholdMeasureConverter
                     // tabela ainda não criada (migração 61 pendente): segue só com a base global
                 }
             }
-            $st = $this->db->prepare('SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY id');
+            $st = $this->db->prepare(\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'food_household_measures', 'source')
+                ? 'SELECT measure_name, grams_equivalent, source FROM food_household_measures WHERE food_id = ? ORDER BY id'
+                : 'SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY id');
             $st->execute([$foodId]);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 $rows[] = $r + ['origin' => 'global'];
@@ -351,22 +357,9 @@ class HouseholdMeasureConverter
         }
 
         try {
-            // Garante o item canônico TACO 410 ("Frango, peito, sem pele, grelhado") se só existir "Peito de frango grelhado"
-            $chkFrango = $db->prepare("SELECT id FROM foods WHERE name = 'Frango, peito, sem pele, grelhado' AND clinic_id IS NULL LIMIT 1");
-            $chkFrango->execute();
-            if (!$chkFrango->fetchColumn()) {
-                $hasSearchText = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'foods', 'search_text');
-                $hasPrep = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'foods', 'preparation');
-                if ($hasSearchText && $hasPrep) {
-                    $insF = $db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, is_custom, search_text, preparation)
-                        VALUES (NULL, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 'TACO', 159.0, 32.0, 0.0, 2.5, 0.0, 100.0, 'g', 0, ' frango peito sem pele grelhado ', 'Grelhado')");
-                    $insF->execute();
-                } else {
-                    $insF = $db->prepare("INSERT INTO foods (clinic_id, name, category, source, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, serving_size_g, serving_unit, is_custom)
-                        VALUES (NULL, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 'TACO', 159.0, 32.0, 0.0, 2.5, 0.0, 100.0, 'g', 0)");
-                    $insF->execute();
-                }
-            }
+            // Reteste UX v54.62 (R-004): não cria mais "Frango, peito, sem pele, grelhado" como cadastro interno.
+            // O item do TACO 410 já existe ("Peito de frango grelhado"); a cópia aparecia com selo TACO, sem nº TACO
+            // e com fibra 0 em vez de "não analisada". A migration 95 tira da busca a cópia criada pela v54.62.
 
             $existingCount = (int)$db->query('SELECT COUNT(*) FROM food_household_measures')->fetchColumn();
             if ($existingCount >= 250) {
@@ -375,7 +368,11 @@ class HouseholdMeasureConverter
 
             $isMysql = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
             $insertIgnore = $isMysql ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
-            $ins = $db->prepare("{$insertIgnore} INTO food_household_measures (food_id, measure_name, grams_equivalent) VALUES (:fid, :name, :g)");
+            // R-004: a medida estimada registra a origem, e a tela mostra "estimativa da base geral (confira)".
+            $hasSource = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, 'food_household_measures', 'source');
+            $ins = $hasSource
+                ? $db->prepare("{$insertIgnore} INTO food_household_measures (food_id, measure_name, grams_equivalent, source, source_version) VALUES (:fid, :name, :g, '" . self::ESTIMATED_SOURCE . "', 'v54.63')")
+                : $db->prepare("{$insertIgnore} INTO food_household_measures (food_id, measure_name, grams_equivalent) VALUES (:fid, :name, :g)");
 
             $foods = $db->query("SELECT id, name, category, search_text FROM foods WHERE clinic_id IS NULL AND COALESCE(category, '') <> 'TESTE'")->fetchAll(PDO::FETCH_ASSOC);
             $added = 0;
@@ -414,6 +411,12 @@ class HouseholdMeasureConverter
      */
     public static function inferCommonMeasuresForNormalizedName(string $norm): array
     {
+        // R-004: medida de alimento pronto (concha, escumadeira, pegador, colher de arroz cozido) não serve para o
+        // grão, a leguminosa ou a massa crus. Sem medida, o item cru fica em gramas, que é o seguro.
+        if (preg_match('/ (cru|crua|crus|cruas) /', $norm)
+            && preg_match('/ (arroz|feijao|lentilha|bico|ervilha|macarrao|quinoa|soja) /', $norm)) {
+            return [];
+        }
         if (str_contains($norm, ' pao ')) {
             if (str_contains($norm, ' queijo ')) {
                 return [['unidade', 40.0], ['porção', 80.0]];

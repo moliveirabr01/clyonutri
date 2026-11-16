@@ -18,7 +18,7 @@ $opensText = $opensDay !== '' ? ('dia ' . $opensDay . ' às ' . $opensLabel) : (
   <link rel="stylesheet" href="/assets/css/fonts.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/clinical-botanical.css?v=botanical-v54-9">
   <link rel="stylesheet" href="/assets/css/teleconsulta.css?v=v54-27">
-  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-30">
+  <link rel="stylesheet" href="/assets/css/operational-ui.css?v=v54-63">
 </head>
 <body class="tc-page" data-tc-csrf="<?= $e($csrf) ?>" data-tc-term-id="<?= (int)$term['id'] ?>" data-tc-opens-at="<?= $e($clock['join_opens_at_utc'] ?? '') ?>" data-tc-server-now="<?= $e($clock['server_now_utc'] ?? '') ?>" data-tc-opens-label="<?= $e($opensText) ?>">
 <?php require __DIR__ . '/partials/icons.php'; ?>

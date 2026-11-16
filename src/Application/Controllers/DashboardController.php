@@ -2199,7 +2199,7 @@ class DashboardController
             </div>
             <p class="u-text-compact u-color-neutral-gray-500">A consulta continua a mesma (mesmo paciente, tipo, histórico e vínculos). Se for teleconsulta, o convite anterior deixa de valer e um novo convite deve ser enviado ao paciente.</p>
             <div class="u-flex u-justify-between u-items-center u-border-t u-pt-3">
-              <label class="u-flex u-items-center u-gap-2 u-text-compact u-color-neutral-gray-500"><input type="checkbox" name="allow_conflict" value="1"> Permitir sobreposição de horário (encaixe)</label>
+              <label class="u-flex u-items-center u-gap-2 u-text-compact u-color-neutral-gray-500"><input type="checkbox" name="allow_conflict" value="1"> Permitir encaixe sobre outra consulta (dentro da jornada)</label>
               <div class="u-flex u-gap-2">
                 <a href="<?= htmlspecialchars($backUrl) ?>" class="btn btn-secondary">Cancelar</a>
                 <button type="submit" class="btn btn-primary" data-testid="reschedule-submit">Confirmar reagendamento</button>
@@ -3165,7 +3165,7 @@ class DashboardController
               <div class="u-flex u-flex-col u-gap-1">
                 <label class="u-flex u-items-center u-gap-2 u-text-compact u-color-neutral-gray-500 u-pointer">
                   <input type="checkbox" name="allow_conflict" value="1">
-                  <span>Permitir sobreposição de horário (encaixe)</span>
+                  <span>Permitir encaixe sobre outra consulta (dentro da jornada)</span>
                 </label>
                 <?php $sameDayVisible = !empty($agendaRecovered['same_day']) || !empty($rv['allow_same_day']); ?>
                 <label id="label-allow-same-day" class="u-items-center u-gap-2 u-text-compact u-color-semantic-warning-strong u-pointer <?= $sameDayVisible ? 'u-flex' : 'u-hidden' ?>">
@@ -4130,7 +4130,7 @@ class DashboardController
                             <?php endif; ?>
                           </td>
                           <td class="u-py-3 u-px-5 u-font-semibold u-color-neutral-gray-700 u-w-20">
-                            <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($it['amount']) ?> <?= htmlspecialchars($it['measure_unit']) ?>
+                            <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($it['amount']) ?> <?= htmlspecialchars(\ClyoNutri\Domain\Nutrition\QuantityInput::unitLabel((float)$it['amount'], (string)$it['measure_unit'])) ?>
                             <?php
                               $itUnit = trim((string)$it['measure_unit']);
                               $itIsG = (bool)preg_match('/^(g|gramas?)$/i', $itUnit);
@@ -4186,7 +4186,7 @@ class DashboardController
                               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                               <input type="hidden" name="revision" value="<?= MealPlanService::itemRevision($it) ?>">
                               <div class="u-grid u-cols-auto-sm u-gap-3">
-                                <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="number" min="0.01" step="0.01" required value="<?= htmlspecialchars((string)(float)$it['amount'], ENT_QUOTES) ?>"></div>
+                                <div class="form-group"><label class="form-label" for="item-amount-<?= (int)$it['id'] ?>">Quantidade</label><input class="form-control" id="item-amount-<?= (int)$it['id'] ?>" name="amount" type="text" inputmode="decimal" autocomplete="off" data-decimal-field="quantity" required value="<?= htmlspecialchars(\ClyoNutri\Domain\Nutrition\QuantityInput::format((float)$it['amount']), ENT_QUOTES) ?>"></div>
                                 <div class="form-group"><label class="form-label" for="item-unit-<?= (int)$it['id'] ?>">Unidade ou medida caseira</label><input class="form-control" id="item-unit-<?= (int)$it['id'] ?>" name="measure_unit" required value="<?= htmlspecialchars($it['measure_unit'], ENT_QUOTES) ?>"></div>
                               </div>
                               <div class="form-group"><label class="form-label" for="item-notes-<?= (int)$it['id'] ?>">Orientação</label><textarea class="form-control" id="item-notes-<?= (int)$it['id'] ?>" name="notes"><?= htmlspecialchars($it['notes'] ?? '', ENT_QUOTES) ?></textarea></div>
@@ -4212,7 +4212,7 @@ class DashboardController
                                 <?php endif; ?>
                               </td>
                               <td class="u-py-2 u-px-5 u-text-compact u-color-neutral-gray-700">
-                                <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($sub['amount']) ?> <?= htmlspecialchars($sub['measure_unit']) ?>
+                                <?= \ClyoNutri\Domain\Nutrition\QuantityFormatter::amount($sub['amount']) ?> <?= htmlspecialchars(\ClyoNutri\Domain\Nutrition\QuantityInput::unitLabel((float)$sub['amount'], (string)$sub['measure_unit'])) ?>
                                 <?php
                                   $subUnit = trim((string)$sub['measure_unit']);
                                   $subIsG = (bool)preg_match('/^(g|gramas?)$/i', $subUnit);
@@ -4257,7 +4257,7 @@ class DashboardController
                                       <div class="u-grid u-cols-2 u-gap-2 u-mb-1">
                                         <div>
                                           <label class="form-label u-text-caption" for="sub-amount-<?= (int)$sub['id'] ?>">Quantidade</label>
-                                          <input class="form-control" id="sub-amount-<?= (int)$sub['id'] ?>" name="amount" type="number" min="0.01" step="0.01" required value="<?= htmlspecialchars((string)(float)$sub['amount'], ENT_QUOTES) ?>">
+                                          <input class="form-control" id="sub-amount-<?= (int)$sub['id'] ?>" name="amount" type="text" inputmode="decimal" autocomplete="off" data-decimal-field="quantity" required value="<?= htmlspecialchars(\ClyoNutri\Domain\Nutrition\QuantityInput::format((float)$sub['amount']), ENT_QUOTES) ?>">
                                         </div>
                                         <div>
                                           <label class="form-label u-text-caption" for="sub-unit-<?= (int)$sub['id'] ?>">Unidade</label>
@@ -4305,7 +4305,7 @@ class DashboardController
                         <button type="button" data-food-retry hidden>Tentar novamente</button>
                       </div>
                       <label>Quantidade
-                        <input id="meal-food-amount-<?= (int)$m['id'] ?>" name="amount" type="number" step="any" min="0.01" value="1" required>
+                        <input id="meal-food-amount-<?= (int)$m['id'] ?>" name="amount" type="text" inputmode="decimal" autocomplete="off" data-decimal-field="quantity" value="1" required>
                       </label>
                       <label>Medida
                         <select id="meal-food-unit-<?= (int)$m['id'] ?>" name="measure_unit" required><?= \ClyoNutri\Application\Controllers\UnitCheckView::unitOptions() ?></select>
@@ -4400,7 +4400,7 @@ class DashboardController
               <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
                   <label for="dc22-amount" class="u-block u-font-semibold u-mb-1 u-text-compact">Quantidade *</label>
-                  <input id="dc22-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 100" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                  <input id="dc22-amount" type="text" inputmode="decimal" autocomplete="off" data-decimal-field="quantity" name="amount" required placeholder="Ex: 100 ou 1,5" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                 </div>
                 <div>
                   <label for="dc23-measure_unit" class="u-block u-font-semibold u-mb-1 u-text-compact">Unidade de Medida *</label>
@@ -4452,7 +4452,7 @@ class DashboardController
               <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
                   <label for="dc25-amount" class="u-block u-font-semibold u-mb-1 u-text-compact">Quantidade equivalente *</label>
-                  <input id="dc25-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 80" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
+                  <input id="dc25-amount" type="text" inputmode="decimal" autocomplete="off" data-decimal-field="quantity" name="amount" required placeholder="Ex: 80 ou 0,5" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input">
                 </div>
                 <div>
                   <label for="dc26-measure_unit" class="u-block u-font-semibold u-mb-1 u-text-compact">Unidade de Medida *</label>
@@ -4535,7 +4535,7 @@ class DashboardController
             <div data-testid="publication-adequacy-summary" class="u-bg-neutral-gray-50 u-border u-radius-input u-p-3 u-mb-4">
               <div class="u-flex u-justify-between u-items-center u-mb-2">
                 <strong class="u-text-compact u-color-neutral-ink-900">Adequação Nutricional & Estrutura</strong>
-                <span class="u-text-caption u-color-neutral-gray-500"><?= count($plan['meals']) ?> refeição(ões)</span>
+                <span class="u-text-caption u-color-neutral-gray-500"><?= count($plan['meals']) ?> <?= count($plan['meals']) === 1 ? 'refeição' : 'refeições' ?></span>
               </div>
               <div class="u-grid u-cols-auto-sm u-gap-2 u-text-compact">
                 <div>
@@ -4547,7 +4547,7 @@ class DashboardController
                       $adqRatio = $adqTarget > 0 ? round(((float)$plan['daily_energy_kcal'] / $adqTarget) * 100, 1) : 0;
                     ?>
                     <span class="u-block u-text-caption <?= $preview['target_comparison']['energy']['status'] === 'ok' ? 'ds-tone-ok' : 'ds-tone-warn' ?>">
-                      Meta: <?= number_format($adqTarget, 1, ',', '.') ?> kcal (<?= $adqRatio ?>%)
+                      Meta: <?= number_format($adqTarget, 1, ',', '.') ?> kcal (<?= number_format((float)$adqRatio, 1, ',', '.') ?>%)
                     </span>
                   <?php endif; ?>
                 </div>
@@ -4627,9 +4627,9 @@ class DashboardController
         <?php endif; ?>
 
         <script src="/assets/js/food-picker.js?v=v54-30" defer></script>
-        <script src="/assets/js/unit-check.js?v=v54-5" defer></script>
+        <script src="/assets/js/unit-check.js?v=v54-63" defer></script>
         <script src="/assets/js/quick-plan.js?v=v54-57" defer></script>
-        <script src="/assets/js/plan-live.js?v=v54-57" defer></script>
+        <script src="/assets/js/plan-live.js?v=v54-63" defer></script>
         <script nonce="<?= \ClyoNutri\Core\Http\SecurityHeaders::nonce() ?>">
         function openAddItemModal(mealId, mealName) {
           document.getElementById('add-item-meal-id').value = mealId;
@@ -4798,7 +4798,7 @@ class DashboardController
         $planId = (int)($params['id'] ?? 0);
         $mealId = (int)($_POST['meal_id'] ?? 0);
         $foodId = (int)($_POST['food_id'] ?? 0);
-        $amount = (float)($_POST['amount'] ?? 0);
+        $amount = \ClyoNutri\Domain\Nutrition\QuantityInput::parse($_POST['amount'] ?? null) ?? 0.0;
         $unit = trim($_POST['measure_unit'] ?? 'g');
         $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
 
@@ -4806,7 +4806,7 @@ class DashboardController
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $service->addItem(
+            $newItemId = $service->addItem(
                 $mealId,
                 $foodId,
                 $amount,
@@ -4817,7 +4817,23 @@ class DashboardController
                 !empty($_POST['confirm_allergen_conflict']),
                 is_string($_POST['allergen_ack_reason'] ?? null) ? $_POST['allergen_ack_reason'] : null
             );
+            // Reteste UX v54.62 (R-001/R-005): diz qual alimento entrou, em qual refeição e com quanto;
+            // avisa (sem bloquear) quando a porção parece grande demais, típico de vírgula perdida.
             $_SESSION['feedback_message'] = "Alimento adicionado e totais nutricionais recalculados.";
+            $added = $db->prepare('SELECT f.name AS food_name, m.name AS meal_name, i.amount, i.measure_unit, i.weight_grams, i.energy_kcal
+                FROM meal_plan_items i JOIN foods f ON f.id = i.food_id JOIN meal_plan_meals m ON m.id = i.meal_id WHERE i.id = ?');
+            $added->execute([(int)$newItemId]);
+            if ($row = $added->fetch(\PDO::FETCH_ASSOC)) {
+                $qty = \ClyoNutri\Domain\Nutrition\QuantityInput::format((float)$row['amount']);
+                $grams = $row['weight_grams'] !== null ? (float)$row['weight_grams'] : null;
+                $_SESSION['feedback_message'] = sprintf('Incluído em %s: %s (%s %s%s).', $row['meal_name'], $row['food_name'], $qty,
+                    \ClyoNutri\Domain\Nutrition\QuantityInput::unitLabel((float)$row['amount'], (string)$row['measure_unit']), $grams !== null && $row['measure_unit'] !== 'g' ? ', ≈ ' . number_format($grams, 0, ',', '.') . ' g' : '');
+                $warn = \ClyoNutri\Domain\Nutrition\QuantityInput::plausibilityWarning((string)$row['food_name'], (float)$row['amount'],
+                    (string)$row['measure_unit'], $grams, $row['energy_kcal'] !== null ? (float)$row['energy_kcal'] : null);
+                if ($warn !== null) {
+                    $_SESSION['warning_message'] = $warn;
+                }
+            }
         } catch (\Throwable $e) {
             $_SESSION['error_message'] = "Erro ao adicionar alimento: " . $this->userFacingError('Erro ao adicionar alimento', $e);
         }
@@ -4899,9 +4915,10 @@ class DashboardController
             foreach (['amount', 'measure_unit', 'notes', 'revision'] as $field) {
                 if (!isset($_POST[$field]) || !is_string($_POST[$field])) throw new \InvalidArgumentException('Confira os campos do item.');
             }
-            if (!is_numeric($_POST['amount']) || $_POST['revision'] === '') throw new \InvalidArgumentException('Informe uma quantidade válida e recarregue o formulário.');
+            $parsedAmount = \ClyoNutri\Domain\Nutrition\QuantityInput::parse($_POST['amount']);
+            if ($parsedAmount === null || $_POST['revision'] === '') throw new \InvalidArgumentException('Informe uma quantidade válida (ex.: 1,5) e recarregue o formulário.');
             (new MealPlanService($db))->updateItem((int)($params['itemId'] ?? 0),
-                (float)$_POST['amount'], trim($_POST['measure_unit']), trim($_POST['notes']), $_POST['revision'], $planId, !empty($_POST['confirm_estimated']));
+                $parsedAmount, trim($_POST['measure_unit']), trim($_POST['notes']), $_POST['revision'], $planId, !empty($_POST['confirm_estimated']));
             $_SESSION['feedback_message'] = 'Item atualizado e totais nutricionais recalculados. As substituições foram preservadas.';
         } catch (\InvalidArgumentException | \DomainException $e) {
             $_SESSION['error_message'] = $e->getMessage();
@@ -4993,7 +5010,7 @@ class DashboardController
         $planId = (int)($params['id'] ?? 0);
         $itemId = (int)($_POST['item_id'] ?? 0);
         $foodId = (int)($_POST['food_id'] ?? 0);
-        $amount = (float)($_POST['amount'] ?? 0);
+        $amount = \ClyoNutri\Domain\Nutrition\QuantityInput::parse($_POST['amount'] ?? null) ?? 0.0;
         $unit = trim($_POST['measure_unit'] ?? 'g');
         $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : null;
 
@@ -6024,7 +6041,14 @@ class DashboardController
             <div>
               <div class="dashboard-banner__title">Consultório ativado. Já dá para agendar e atender.</div>
               <div class="dashboard-banner__text">Suas preferências profissionais e rotinas clínicas foram salvas. Você já pode cadastrar novos pacientes e iniciar consultas.</div>
+              <?php /* Reteste UX v54.62 (UX-014): logo depois do onboarding, o painel já diz qual é o próximo passo, com o atalho. */
+              $nxDone = $activation['next'] ?? null; if ($nxDone && !empty($nxDone['action_url'])): ?>
+                <div class="dashboard-banner__text u-mt-2" data-testid="dash-next-step">Próximo passo: <strong><?= htmlspecialchars((string)$nxDone['label']) ?></strong>.</div>
+              <?php endif; ?>
             </div>
+            <?php if ($nxDone && !empty($nxDone['action_url'])): ?>
+              <a href="<?= htmlspecialchars((string)$nxDone['action_url']) ?>" class="btn btn-primary dashboard-banner__cta" data-testid="dash-next-step-cta"><?= htmlspecialchars((string)($nxDone['action_label'] ?: 'Continuar')) ?> <?= $arrowIcon ?></a>
+            <?php endif; ?>
           </div>
         <?php elseif ($showActivation && $activation): $nx = $activation['next']; ?>
           <div class="op-message op-message--info card dashboard-banner dashboard-banner--onboarding" data-testid="activation-banner" role="status">
@@ -6066,7 +6090,7 @@ class DashboardController
         <?php if ($activation && !$showActivation): ?>
           <p class="dash-readiness dash-readiness--<?= $activation['ready'] ? 'ok' : 'pending' ?>" role="status" data-testid="practice-readiness" data-ready="<?= $activation['ready'] ? '1' : '0' ?>">
             <span class="dash-readiness__dot" aria-hidden="true"></span>
-            <span>Prontidão para atender: <strong><?= $activation['ready'] ? 'Requisitos aplicáveis atendidos' : 'Há requisitos aplicáveis pendentes' ?></strong> · Checklist <?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></span>
+            <span><strong><?= $activation['ready'] ? 'Você já pode atender' : 'Falta completar o cadastro obrigatório' ?></strong> · Itens do consultório: <?= (int)$activation['done'] ?> de <?= (int)$activation['applicable'] ?></span>
             <a href="/onboarding?passo=5" class="dash-readiness__link">Ver checklist</a>
           </p>
         <?php endif; ?>

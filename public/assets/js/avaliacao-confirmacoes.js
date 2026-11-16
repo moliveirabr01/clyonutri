@@ -33,7 +33,10 @@
     if (/\/antropometria$/.test(action)) {
       var hEl = form.querySelector('[name="height_cm"]');
       var h = hEl ? parse(hEl.value) : NaN;
-      if (h > 0 && h <= 3 && !window.confirm('A altura ' + fmt(h) + ' foi entendida em metros e será salva como ' + fmt(h * 100) + ' cm. Confirmar?')) { ev.preventDefault(); return; }
+      // Reteste UX v54.62 (R-007): com o eco "Interpretado: 1,70 m (170 cm)" visível ao lado do campo (decimal-input.js),
+      // a confirmação nativa é redundante e custa um clique a mais. Sem o eco, a confirmação continua.
+      var echoed = hEl && hEl.nextElementSibling && hEl.nextElementSibling.hasAttribute('data-decimal-echo') && !hEl.nextElementSibling.hidden;
+      if (!echoed && h > 0 && h <= 3 && !window.confirm('A altura ' + fmt(h) + ' foi entendida em metros e será salva como ' + fmt(h * 100) + ' cm. Confirmar?')) { ev.preventDefault(); return; }
       var rel = form.querySelector('input[type="checkbox"][name="is_shared"]');
       if (rel && rel.checked && !window.confirm('Esta avaliação será liberada imediatamente no aplicativo do paciente. Confirmar?')) { ev.preventDefault(); }
     }

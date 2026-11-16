@@ -669,7 +669,7 @@ class RecipeController
           }
         </script>
         <script src="/assets/js/food-picker.js?v=v54-44" defer></script>
-        <script src="/assets/js/unit-check.js?v=v54-5" defer></script>
+        <script src="/assets/js/unit-check.js?v=v54-63" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';

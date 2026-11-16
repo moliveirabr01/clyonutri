@@ -155,7 +155,7 @@ class MealPlanPrintService
         $n = (float)$amount;
         $formatted = fmod($n, 1.0) === 0.0 ? number_format($n, 0, ',', '.') : rtrim(rtrim(number_format($n, 2, ',', '.'), '0'), ',');
         $unitStr = trim((string)$unit);
-        $out = trim($formatted . ' ' . $unitStr);
+        $out = trim($formatted . ' ' . \ClyoNutri\Domain\Nutrition\QuantityInput::unitLabel($n, $unitStr));
         if ((bool)preg_match('/^(g|gramas?)$/i', $unitStr)) {
             return $out;
         }
