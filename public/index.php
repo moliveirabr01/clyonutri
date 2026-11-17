@@ -942,6 +942,10 @@ $router->get('/admin/configuracoes', $requireAuth([$adminCtrl, 'settings']));
 $router->post('/admin/configuracoes', $requireAuth([$adminCtrl, 'saveSettings']));
 // NI2-635: catálogo de protocolos clínicos (governança editorial)
 $router->get('/admin/protocolos', $requireAuth([$adminCtrl, 'protocols']));
+$router->get('/admin/medidas-caseiras', $requireAuth([$adminCtrl, 'householdMeasures'])); // NI2-886
+$router->get('/admin/medidas-caseiras/exportar', $requireAuth([$adminCtrl, 'householdMeasuresExport']));
+$router->get('/admin/medidas-caseiras/sql', $requireAuth([$adminCtrl, 'householdMeasuresSql']));
+$router->post('/admin/medidas-caseiras/acao', $requireAuth([$adminCtrl, 'householdMeasuresAction']));
 $router->post('/admin/protocolos', $requireAuth([$adminCtrl, 'protocolAction']));
 $router->get('/admin/protocolos/{id}', $requireAuth([$adminCtrl, 'protocolDetail']));
 $router->post('/admin/protocolos/{id}/{acao}', $requireAuth([$adminCtrl, 'protocolAction']));

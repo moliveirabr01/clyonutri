@@ -286,11 +286,18 @@ class HouseholdMeasureConverter
                     // tabela ainda não criada (migração 61 pendente): segue só com a base global
                 }
             }
-            $st = $this->db->prepare(\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'food_household_measures', 'source')
-                ? 'SELECT measure_name, grams_equivalent, source FROM food_household_measures WHERE food_id = ? ORDER BY id'
-                : 'SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY id');
+            // NI2-886: medida removida na revisão não é oferecida; a aprovada mostra fonte e revisor.
+            $reviewed = HouseholdMeasureReviewService::ready($this->db);
+            $st = $this->db->prepare($reviewed
+                ? "SELECT measure_name, grams_equivalent, source, review_status, reviewer_name FROM food_household_measures WHERE food_id = ? AND (review_status IS NULL OR review_status <> 'removed') ORDER BY id"
+                : (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'food_household_measures', 'source')
+                    ? 'SELECT measure_name, grams_equivalent, source FROM food_household_measures WHERE food_id = ? ORDER BY id'
+                    : 'SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY id'));
             $st->execute([$foodId]);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (($r['review_status'] ?? null) === 'approved' && trim((string)($r['reviewer_name'] ?? '')) !== '') {
+                    $r['source'] = trim((string)$r['source']) . ' · revisada por ' . trim((string)$r['reviewer_name']);
+                }
                 $rows[] = $r + ['origin' => 'global'];
             }
             $seen = [];

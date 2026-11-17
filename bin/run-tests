@@ -35,6 +35,7 @@ case "$PROFILE" in
       "tests/ni2_882_transcricao_locutor_test.php"
       "tests/ni2_885_cifragem_legado_test.php"
       "tests/ni2_877_integration_check_test.php"
+      "tests/ni2_886_medidas_caseiras_revisao_test.php"
       "tests/v5475_reconciliation_test.php"
       "tests/ni2_894_aviso_agendamento_test.php"
       "tests/ni2_868_870_871_872_regression_test.php"

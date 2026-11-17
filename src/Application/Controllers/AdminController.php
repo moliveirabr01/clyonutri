@@ -1976,6 +1976,123 @@ final class AdminController
         exit;
     }
 
+    /** NI2-886: GET /admin/medidas-caseiras — revisão das medidas caseiras estimadas. */
+    public function householdMeasures(): void
+    {
+        $user = $this->getAuthorizedUser('settings.read');
+        $ready = \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService::ready($this->db);
+        $filters = [
+            'status' => in_array($_GET['situacao'] ?? '', ['pending', 'approved', 'removed', 'all'], true) ? $_GET['situacao'] : 'pending',
+            'group' => is_string($_GET['grupo'] ?? null) ? mb_substr(trim($_GET['grupo']), 0, 100) : '',
+            'q' => is_string($_GET['busca'] ?? null) ? mb_substr(trim($_GET['busca']), 0, 100) : '', // "q" é a busca global do console
+            'order' => ($_GET['ordem'] ?? '') === 'nome' ? 'nome' : 'uso',
+        ];
+        $page = max(1, (int)($_GET['pagina'] ?? 1));
+        $perPage = 50;
+        $stats = $rows = $groups = [];
+        $total = 0;
+        if ($ready) {
+            $svc = new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($this->db);
+            $stats = $svc->stats();
+            $groups = $svc->groups();
+            $total = $svc->count($filters);
+            $rows = $svc->list($filters + ['limit' => $perPage, 'offset' => ($page - 1) * $perPage]);
+        }
+        $canManage = \ClyoNutri\Core\Security\PlatformPolicy::can($user, 'settings.manage');
+        $flash = $this->takeProtocolFlash();
+        $importReport = $_SESSION['measure_import_report'] ?? null;
+        unset($_SESSION['measure_import_report']);
+        $this->render(__DIR__ . '/../../../views/admin/medidas-caseiras.php', compact('ready', 'filters', 'page', 'perPage', 'stats', 'rows', 'groups', 'total', 'canManage', 'flash', 'importReport'),
+            'Medidas caseiras', 'medidas', [['label' => 'Medidas caseiras', 'url' => '']]);
+    }
+
+    /** NI2-886: GET /admin/medidas-caseiras/exportar — CSV para o revisor (sem dados de pacientes). */
+    public function householdMeasuresExport(): void
+    {
+        $this->getAuthorizedUser('settings.read');
+        $svc = new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($this->db);
+        $status = in_array($_GET['situacao'] ?? '', ['pending', 'approved', 'removed', 'all'], true) ? $_GET['situacao'] : 'pending';
+        $csv = $svc->exportCsv(['status' => $status, 'group' => (string)($_GET['grupo'] ?? ''), 'q' => (string)($_GET['busca'] ?? ''), 'order' => 'uso']);
+        $this->auditLogger->log('HOUSEHOLD_MEASURE_CSV_EXPORTED', 'food_household_measure', null, ['situacao' => $status]);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="medidas-caseiras-' . $status . '-' . date('Ymd-Hi') . '.csv"');
+        header('Cache-Control: no-store');
+        echo $csv;
+        exit;
+    }
+
+    /** NI2-886: GET /admin/medidas-caseiras/sql — SQL idempotente (MySQL 5.7) das revisões para produção. */
+    public function householdMeasuresSql(): void
+    {
+        $this->getAuthorizedUser('settings.manage');
+        $sql = (new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($this->db))->productionSql();
+        header('Content-Type: application/sql; charset=utf-8');
+        header('Content-Disposition: attachment; filename="ni2-886-medidas-revisadas-' . date('Ymd-Hi') . '.sql"');
+        header('Cache-Control: no-store');
+        echo $sql;
+        exit;
+    }
+
+    /** NI2-886: POST /admin/medidas-caseiras/acao — aprovar, corrigir, remover, lote, importar CSV. */
+    public function householdMeasuresAction(): void
+    {
+        $user = $this->getAuthorizedUser('settings.manage');
+        $back = '/admin/medidas-caseiras' . (is_string($_POST['_back'] ?? null) && str_starts_with($_POST['_back'], '?') ? $_POST['_back'] : '');
+        if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
+            $this->protocolFlash('error', 'Formulário expirado. Recarregue a página.');
+            header('Location: ' . $back);
+            exit;
+        }
+        $svc = new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($this->db);
+        $uid = (int)$user->getUserId();
+        $name = (string)$user->getName();
+        $s = static fn(string $k): string => is_string($_POST[$k] ?? null) ? trim($_POST[$k]) : '';
+        try {
+            switch ($s('acao')) {
+                case 'aprovar':
+                    $svc->approve((int)$s('id'), $uid, $name, $s('fonte'));
+                    $this->protocolFlash('success', 'Medida aprovada. Ela deixa de aparecer como estimativa.');
+                    break;
+                case 'corrigir':
+                    $g = str_replace(',', '.', $s('gramas'));
+                    if ($g === '' || !is_numeric($g)) {
+                        throw new \InvalidArgumentException('Informe o peso corrigido em gramas.');
+                    }
+                    $r = $svc->approve((int)$s('id'), $uid, $name, $s('fonte'), (float)$g);
+                    $this->protocolFlash('success', sprintf('Medida corrigida de %s g para %s g e aprovada. Planos já publicados não mudam.', rtrim(rtrim(number_format($r['grams_before'], 2, ',', ''), '0'), ','), rtrim(rtrim(number_format($r['grams_after'], 2, ',', ''), '0'), ',')));
+                    break;
+                case 'remover':
+                    $svc->remove((int)$s('id'), $uid, $name, $s('motivo'));
+                    $this->protocolFlash('success', 'Medida removida das opções. Planos que já a usam continuam iguais.');
+                    break;
+                case 'lote':
+                    $ids = array_map('intval', (array)($_POST['ids'] ?? []));
+                    $r = $svc->approveBatch($ids, $uid, $name, $s('fonte_lote'));
+                    $this->protocolFlash($r['errors'] ? 'error' : 'success', \ClyoNutri\Application\View\UserText::count($r['approved'], '{n} medida aprovada.', '{n} medidas aprovadas.', 'Nenhuma medida aprovada.') . ($r['errors'] ? ' Não aprovadas: ' . implode('; ', array_slice($r['errors'], 0, 5)) : ''));
+                    break;
+                case 'importar':
+                    $f = $_FILES['csv'] ?? null;
+                    if (!is_array($f) || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$f['tmp_name'])) {
+                        throw new \InvalidArgumentException('Escolha o arquivo CSV revisado.');
+                    }
+                    if ((int)$f['size'] > 5 * 1024 * 1024) {
+                        throw new \InvalidArgumentException('Arquivo grande demais (máximo 5 MB).');
+                    }
+                    $dry = !empty($_POST['simular']);
+                    $r = $svc->importCsv((string)file_get_contents((string)$f['tmp_name']), $uid, $name, $dry);
+                    $_SESSION['measure_import_report'] = $r;
+                    $this->protocolFlash($r['rejected'] ? 'error' : 'success', ($dry ? 'Simulação: ' : '') . 'linhas ' . ($dry ? 'válidas' : 'aplicadas') . ': ' . $r['applied'] . '; rejeitadas: ' . count($r['rejected']) . '; sem ação: ' . $r['ignored'] . '.');
+                    break;
+                default:
+                    throw new \InvalidArgumentException('Ação desconhecida.');
+            }
+        } catch (\InvalidArgumentException | \DomainException $e) {
+            $this->protocolFlash('error', $e->getMessage());
+        }
+        header('Location: ' . $back);
+        exit;
+    }
+
     private function protocolFlash(string $type, string $text): void
     {
         $_SESSION['protocol_flash'] = ['type' => $type, 'text' => $text];

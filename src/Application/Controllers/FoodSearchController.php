@@ -310,7 +310,8 @@ final class FoodSearchController
                 // migração 61 pendente: só a base global
             }
         }
-        foreach ($db->query("SELECT food_id, measure_name, grams_equivalent FROM food_household_measures WHERE food_id IN ({$in}) ORDER BY food_id, grams_equivalent")->fetchAll(\PDO::FETCH_ASSOC) as $m) {
+        $notRemoved = \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService::ready($db) ? " AND (review_status IS NULL OR review_status <> 'removed')" : ''; // NI2-886
+        foreach ($db->query("SELECT food_id, measure_name, grams_equivalent FROM food_household_measures WHERE food_id IN ({$in}){$notRemoved} ORDER BY food_id, grams_equivalent")->fetchAll(\PDO::FETCH_ASSOC) as $m) {
             $add($m);
         }
         return $out;

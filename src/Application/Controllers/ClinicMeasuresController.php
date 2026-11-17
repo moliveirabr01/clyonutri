@@ -57,7 +57,9 @@ class ClinicMeasuresController
             $st->execute([$foodId, TenantContext::getClinicId()]);
             $selected = $st->fetch(PDO::FETCH_ASSOC) ?: null;
             if ($selected) {
-                $g = $this->db->prepare('SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ? ORDER BY grams_equivalent');
+                $g = $this->db->prepare('SELECT measure_name, grams_equivalent FROM food_household_measures WHERE food_id = ?'
+                    . (\ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService::ready($this->db) ? " AND (review_status IS NULL OR review_status <> 'removed')" : '') // NI2-886
+                    . ' ORDER BY grams_equivalent');
                 $g->execute([$foodId]);
                 $globalMeasures = $g->fetchAll(PDO::FETCH_ASSOC);
                 $clinicOfFood = $svc->list($foodId);
