@@ -133,7 +133,7 @@ T::ok(str_contains($html, 'Nenhuma solicitação de exames vinculada a esta cons
 fwrite(STDOUT, "== Catálogo, exames da clínica e política (NI2-532, NI2-530)\n");
 get();
 [$code, $html] = page(fn() => $catCtl->index());
-T::ok($code === 200 && str_contains($html, 'Catálogo de exames laboratoriais') && str_contains($html, 'Revisão clínica do catálogo pendente'), 'catálogo abre e avisa a revisão clínica pendente');
+T::ok($code === 200 && str_contains($html, 'Catálogo de exames laboratoriais') && str_contains($html, 'data-testid="exam-catalog-review-notice"') && str_contains($html, 'a revisão do nutricionista responsável técnico'), 'catálogo abre e avisa a dona da revisão clínica pendente (texto da NI2-891)');
 T::ok(substr_count($html, 'aria-pressed="true"') === 1, 'mostra o favorito marcado');
 post(['canonical_name' => 'Tomografia de abdome', 'category' => 'Imagem', 'sample_type' => '-', 'nutritional_indication' => 'Avaliar gordura visceral TESTE.', 'declaration' => '1']);
 [$code, $html] = page(fn() => $catCtl->submitCustom());
