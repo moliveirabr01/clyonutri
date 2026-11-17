@@ -3,19 +3,20 @@
   "title": "ClyoNutri II",
   "version": "v54.75",
   "ui_version": "v54.75",
-  "status": "PACKAGED_PENDING_DEPLOY",
+  "status": "IN_PROGRESS_LOCAL",
   "prepared_date": "2026-11-17",
   "production_deployed": false,
   "jira_updated": false,
   "source": "/Users/moliveira/Nutri_II",
   "source_commit": "aff3fb44d605e6329e9dca44b94ae3732d403664",
   "source_dirty": true,
-  "base_version": "v54.74-plus-reconciled-v54.71-fixes",
+  "base_version": "v54.75-plus-reapplied-v54.72-v54.73-ni2-879",
   "upgrade_supported_from": [
     "v54.71",
     "v54.72",
     "v54.73",
-    "v54.74"
+    "v54.74",
+    "v54.75"
   ],
   "schema_changes": "Migration 97: subscription_activation_requests. Execute database/manual/ni2_878_subscription_activation_mysql57.sql only when upgrading an existing installation; never rerun the full installer on production.",
   "summary": [
@@ -60,5 +61,6 @@
     "reconciliation": "17 behavioral checks passed: encryption, LGPD isolation, MFA policies, onboarding and OTP transport fallback (isolated log transport; external SMTP NOT_TESTED)",
     "external_smtp": "NOT_TESTED"
   },
-  "supersedes": "v54.74"
+  "supersedes": "v54.74",
+  "upgrade_notes": "v54.76 em preparação: reaplica as correções da NI2-879 (v54.72/73) perdidas na v54.75. Não instale a v54.75 sobre a v54.72/73."
 }

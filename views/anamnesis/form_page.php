@@ -42,7 +42,7 @@ $showIf = static function (string $field, array $values) use ($answer): string {
     return in_array($answer($field), $values, true) ? '' : ' hidden';
 };
 ?>
-<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-27">
+<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-72">
 <div class="cr" data-testid="anamnese-page">
 <?php if (!empty($_GET['error'])): ?>
   <div class="op-message op-message--error" role="alert" aria-live="assertive" data-testid="anamnese-error">

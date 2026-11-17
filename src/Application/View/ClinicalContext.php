@@ -49,9 +49,10 @@ final class ClinicalContext
             $step=(new \ClyoNutri\Domain\Appointment\AppointmentService($db))->careStepForPatient($patient);
             $app=$step['appointment']??null;
             if($app!==null&&((int)$app['patient_id']!==$patient))$app=null;
-            $st=$db->prepare("SELECT id,scheduled_at FROM appointments WHERE clinic_id=? AND patient_id=? AND status='completed' ORDER BY scheduled_at DESC,id DESC LIMIT 1");
+            $eff=\ClyoNutri\Domain\Appointment\AppointmentService::effectiveAtSql('a'); // NI2-879: data em que a consulta aconteceu
+            $st=$db->prepare("SELECT a.id,a.scheduled_at,{$eff} AS effective_at FROM appointments a WHERE a.clinic_id=? AND a.patient_id=? AND a.status='completed' ORDER BY effective_at DESC,a.id DESC LIMIT 1");
             $st->execute([$clinic,$patient]);$last=$st->fetch(PDO::FETCH_ASSOC)?:null;
-            return ['state'=>$app?(string)$step['state']:'none','appointment'=>$app?['id'=>(int)$app['id'],'scheduled_at'=>(string)$app['scheduled_at']]:null,'last'=>$last?['id'=>(int)$last['id'],'scheduled_at'=>(string)$last['scheduled_at']]:null];
+            return ['state'=>$app?(string)$step['state']:'none','appointment'=>$app?['id'=>(int)$app['id'],'scheduled_at'=>(string)$app['scheduled_at']]:null,'last'=>$last?['id'=>(int)$last['id'],'scheduled_at'=>(string)$last['scheduled_at'],'effective_at'=>(string)($last['effective_at']??$last['scheduled_at'])]:null];
         }catch(\Throwable $e){error_log('CLINICAL_CONTEXT_APPOINTMENT_UNAVAILABLE '.get_class($e));return null;}
     }
     public static function render(PDO $db,int $patient): string

@@ -34,7 +34,7 @@ $fieldMsg = static function (string $f) use ($consultFieldErrors): string {
     return isset($consultFieldErrors[$f]) ? '<span class="cr-field-error" id="err_' . $f . '">' . htmlspecialchars((string)$consultFieldErrors[$f]) . '</span>' : '';
 };
 ?>
-<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-27">
+<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-72">
 <div class="cr" data-testid="consulta-page">
 <div class="cr-head">
   <div>
@@ -149,15 +149,27 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
         <form method="POST" action="/agenda/<?= (int)$app['id'] ?>/status" data-no-dirty>
           <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
           <input type="hidden" name="status" value="in_progress">
-          <?php $isDifferentDay = AppointmentService::isDifferentDay((string)$app['scheduled_at']); ?>
-          <?php if ($isDifferentDay): ?>
+          <?php if (!empty($isDifferentDay)): /* NI2-879 */ ?>
+            <input type="hidden" name="from_room" value="1">
             <p class="op-message op-message--warning" role="alert" data-testid="different-day-start-warning">
-              Esta consulta está agendada para outro dia (<strong><?= date('d/m/Y', strtotime((string)$app['scheduled_at'])) ?></strong>). Escolha como deseja prosseguir hoje:
+              Esta consulta está agendada para <strong><?= date('d/m/Y', strtotime((string)$app['scheduled_at'])) ?></strong>, não para hoje. Escolha como atender agora:
             </p>
-            <div class="u-flex u-flex-col u-gap-2 u-mb-3" role="radiogroup" aria-label="Escolha para atendimento fora do dia agendado">
-              <label class="cr-check"><input type="radio" name="out_of_day_action" value="reschedule_now" required> Remarcar esta consulta para agora</label>
-              <label class="cr-check"><input type="radio" name="out_of_day_action" value="create_today" required> Criar atendimento de hoje e manter o agendamento futuro</label>
-            </div>
+            <?php if (($startIssue ?? '') === 'escolha'): ?>
+              <p class="op-message op-message--error" role="alert" data-testid="different-day-choice-missing">Escolha uma das opções abaixo para iniciar.</p>
+            <?php elseif (($startIssue ?? '') === 'falha'): ?>
+              <p class="op-message op-message--error" role="alert" data-testid="different-day-start-error">Não foi possível iniciar: <?= htmlspecialchars($startFailMsg ?? '') ?></p>
+            <?php endif; ?>
+            <fieldset class="cr-options" data-testid="different-day-options">
+              <legend class="cr-caption">Como atender hoje</legend>
+              <label class="cr-check"><input type="radio" name="out_of_day_action" value="reschedule_now" required<?= ($startIssue ?? '') === 'conflito' ? ' checked' : '' ?>> Remarcar esta consulta para agora</label>
+              <label class="cr-check"><input type="radio" name="out_of_day_action" value="create_today" required> Criar o atendimento de hoje e manter o agendamento de <?= date('d/m', strtotime((string)$app['scheduled_at'])) ?></label>
+            </fieldset>
+            <?php if (($startIssue ?? '') === 'conflito'): ?>
+              <p class="op-message op-message--warning" role="alert" data-testid="different-day-conflict">
+                Agora já existe outra consulta<?= ($startConflictAt ?? '') !== '' ? ' às <strong>' . htmlspecialchars($startConflictAt) . '</strong>' : '' ?>. Para remarcar mesmo assim, confirme o encaixe; ou crie o atendimento de hoje.
+              </p>
+              <label class="cr-check"><input type="checkbox" name="confirm_overbook" value="1"> Confirmo o encaixe sobre a outra consulta</label>
+            <?php endif; ?>
           <?php elseif ($isEarly): ?>
             <p class="op-message op-message--warning" role="alert" data-testid="early-start-warning">Início antecipado: faltam <?= htmlspecialchars(AppointmentService::humanUntil((string)$app['scheduled_at'])) ?> para o horário marcado.</p>
             <label class="cr-check"><input type="checkbox" name="confirm_early" value="1" required> Confirmo que quero iniciar antes do horário agendado</label>

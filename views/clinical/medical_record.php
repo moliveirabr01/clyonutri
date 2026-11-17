@@ -13,7 +13,7 @@ $isValid = !empty($integrity['is_valid']);
 $errorRef = isset($_GET['ref']) && is_string($_GET['ref']) && preg_match('/^[a-f0-9]{12}$/D', $_GET['ref']) ? $_GET['ref'] : null;
 $src = $clinicalSummary['source'] ?? null;
 ?>
-<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-27">
+<link rel="stylesheet" href="/assets/css/clinical-record.css?v=v54-72">
 <div class="cr" data-testid="prontuario-page">
 <?php if (!empty($_GET['error'])): ?>
   <div class="op-message op-message--error" role="alert" data-testid="prontuario-error">

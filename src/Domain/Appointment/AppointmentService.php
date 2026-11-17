@@ -17,6 +17,7 @@ class AppointmentService
 {
     private PDO $db;
     private ClinicCalendar $calendar;
+    private ?DateTimeImmutable $clockNow;
 
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_CONFIRMED = 'confirmed';
@@ -62,6 +63,125 @@ class AppointmentService
     {
         $this->db = $db ?? Connection::getInstance();
         $this->calendar = new ClinicCalendar($now);
+        $this->clockNow = $now;
+    }
+
+    /** NI2-879: "agora" no fuso da clínica (injetável nos testes pelo construtor). */
+    private function nowLocal(): DateTimeImmutable
+    {
+        $tz = new \DateTimeZone(getenv('APP_TIMEZONE') ?: date_default_timezone_get());
+        return $this->clockNow !== null ? $this->clockNow->setTimezone($tz) : new DateTimeImmutable('now', $tz);
+    }
+
+    /** NI2-879: a consulta está marcada para outro dia civil (futuro ou passado) em relação a hoje. */
+    public function isDifferentDay(string $scheduledAt): bool
+    {
+        $ts = strtotime($scheduledAt);
+        return $ts !== false && date('Y-m-d', $ts) !== $this->nowLocal()->format('Y-m-d');
+    }
+
+    /** NI2-879: mensagem única para início ou conclusão de consulta de outro dia sem a escolha da sala. */
+    public static function outOfDayMessage(string $scheduledAt): string
+    {
+        return 'Esta consulta está agendada para ' . date('d/m/Y', (int)strtotime($scheduledAt))
+            . '. Para atender hoje, abra a consulta e escolha entre remarcá-la para agora ou criar o atendimento de hoje mantendo o agendamento.';
+    }
+
+    /**
+     * NI2-879: SQL da data efetiva de uma consulta: quando foi concluída (trilha de status) ou, sem conclusão,
+     * a data agendada. Use nas telas que mostram consultas realizadas. $alias = alias de `appointments`.
+     */
+    public static function effectiveAtSql(string $alias = 'a'): string
+    {
+        $alias = preg_replace('/[^a-z_]/i', '', $alias) ?: 'a';
+        return "COALESCE((SELECT MAX(h.created_at) FROM appointment_status_history h WHERE h.appointment_id = {$alias}.id AND h.to_status = 'completed'), {$alias}.scheduled_at)";
+    }
+
+    /**
+     * NI2-879 (opção 1): remarca para agora a consulta de outro dia e inicia o atendimento.
+     * Não exige jornada (o paciente está presente), mas não sobrepõe outra consulta sem confirmação:
+     * havendo conflito, lança AppointmentConflictException; com $allowOverbook, remarca e audita o encaixe.
+     * Não notifica o paciente. Reenvio do mesmo pedido é inofensivo (devolve a consulta já em andamento).
+     * @return array{id:int, rescheduled:bool, overbooked_appointment_id:?int}
+     */
+    public function rescheduleForNowAndStart(int $appointmentId, ?int $userId = null, bool $allowOverbook = false): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertAppointmentBelongsToClinic($appointmentId, $clinicId, $this->db);
+        $userId ??= TenantContext::getUserId();
+        return $this->atomic(function () use ($clinicId, $appointmentId, $userId, $allowOverbook): array {
+            $app = $this->lockAppointment($appointmentId, $clinicId);
+            if (!$app) {
+                throw new InvalidArgumentException('Consulta não encontrada.');
+            }
+            if ($app['status'] === self::STATUS_IN_PROGRESS) {
+                return ['id' => $appointmentId, 'rescheduled' => false, 'overbooked_appointment_id' => null];
+            }
+            if (!in_array($app['status'], [self::STATUS_SCHEDULED, self::STATUS_CONFIRMED], true)) {
+                throw new InvalidAppointmentTransitionException('Só é possível remarcar para agora uma consulta agendada ou confirmada.');
+            }
+            $now = $this->nowLocal()->format('Y-m-d H:i:00');
+            $duration = max(15, (int)($app['duration_minutes'] ?? 60));
+            $conflict = $this->findConflict($clinicId, (int)$app['professional_id'], $now, $duration, $appointmentId, true, true);
+            if ($conflict !== null && !$allowOverbook) {
+                throw new AppointmentConflictException(
+                    'O horário de agora coincide com outra consulta às ' . date('H:i', (int)strtotime((string)$conflict['scheduled_at'])) . '.',
+                    $conflict
+                );
+            }
+            $original = (string)$app['scheduled_at'];
+            $this->db->prepare('UPDATE appointments SET scheduled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND clinic_id = ?')
+                ->execute([$now, $appointmentId, $clinicId]);
+            $note = 'Remarcada para agora (agendada originalmente para ' . date('d/m/Y H:i', (int)strtotime($original)) . ')'
+                . ($conflict !== null ? '; encaixe autorizado sobre a consulta #' . (int)$conflict['id'] : '') . '.';
+            $this->updateStatusAtomically($appointmentId, self::STATUS_IN_PROGRESS, $note, $userId);
+            (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_RESCHEDULED_TO_NOW', 'appointments', (string)$appointmentId, [
+                'original_scheduled_at' => $original,
+                'new_scheduled_at' => $now,
+                'overbooked_appointment_id' => $conflict !== null ? (int)$conflict['id'] : null,
+            ]);
+            if ($conflict !== null) {
+                (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_OVERBOOK_AUTHORIZED', 'appointments', (string)$appointmentId, [
+                    'overbooked_appointment_id' => (int)$conflict['id'],
+                    'scheduled_at' => $now,
+                    'professional_id' => (int)$app['professional_id'],
+                ]);
+            }
+            return ['id' => $appointmentId, 'rescheduled' => true, 'overbooked_appointment_id' => $conflict !== null ? (int)$conflict['id'] : null];
+        });
+    }
+
+    /**
+     * NI2-879 (opção 2): abre o atendimento de hoje e mantém intacto o agendamento de outro dia.
+     * Usa o mesmo caminho de "Iniciar agora" (startNow): vale fora da jornada, não manda aviso de agendamento
+     * ao paciente e não duplica (se o paciente já tem atendimento em andamento, devolve esse).
+     * @return array{id:int, created:bool}
+     */
+    public function startTodayKeepingFuture(int $futureAppointmentId, ?int $userId = null): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        TenantGuard::assertAppointmentBelongsToClinic($futureAppointmentId, $clinicId, $this->db);
+        $future = $this->getAppointment($futureAppointmentId);
+        if (!$future) {
+            throw new InvalidArgumentException('Consulta não encontrada.');
+        }
+        if (!in_array($future['status'], [self::STATUS_SCHEDULED, self::STATUS_CONFIRMED], true)) {
+            throw new InvalidAppointmentTransitionException('O agendamento de origem não está mais agendado.');
+        }
+        $kept = date('d/m/Y H:i', (int)strtotime((string)$future['scheduled_at']));
+        $res = $this->startNow(
+            (int)$future['patient_id'],
+            (int)$future['professional_id'],
+            $userId,
+            "Atendimento de hoje aberto a partir da consulta #{$futureAppointmentId}, que segue agendada para {$kept}."
+        );
+        if ($res['created']) {
+            (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_TODAY_KEEPING_FUTURE', 'appointments', (string)$res['id'], [
+                'future_appointment_id' => $futureAppointmentId,
+                'future_scheduled_at' => (string)$future['scheduled_at'],
+            ]);
+        }
+        return $res;
     }
 
     public function todayDate(): string
@@ -166,6 +286,8 @@ class AppointmentService
         // NI2-138: consulta marcada com o profissional = acompanhamento ativo; o vínculo libera o chat.
         (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, $patientId, $professionalId, 'appointment');
 
+        // NI2-894: um único aviso de agendamento ao paciente. O publicador ET06 já leva data, hora, fuso e modalidade
+        // e revalida a consulta antes de entregar; o segundo aviso (appt.N.scheduled) saía com {timezone}/{modality}.
         (new \ClyoNutri\Domain\Notification\AppointmentConfirmationPublisher($this->db))->publish($clinicId, $id);
 
         return [
@@ -335,8 +457,9 @@ class AppointmentService
         if ($ok && !$this->db->inTransaction() && $before !== null && (string)($before['status'] ?? '') !== $newStatus) {
             if ($newStatus === self::STATUS_CANCELLED) {
                 $this->notifyPatientAppointment($clinicId, (int)$before['patient_id'], 'appointment.cancelled_by_clinic', $appointmentId, (string)$before['scheduled_at'], 'clinic_cancelled');
-
             }
+            // NI2-894: confirmação pela clínica não gera mais um segundo aviso (appointment.confirmed_by_clinic);
+            // o aviso appointment.confirmed sai uma vez, pelo publicador ET06, em updateStatusAtomically().
         }
         return $ok;
     }
@@ -705,6 +828,12 @@ class AppointmentService
 
             // Se estiver em 'scheduled' ou 'confirmed', avança primeiro para in_progress se necessário
             if ($appointment['status'] === self::STATUS_SCHEDULED || $appointment['status'] === self::STATUS_CONFIRMED) {
+                // NI2-879: consulta de outro dia não pode ser concluída sem antes escolher, na sala, entre remarcar
+                // para agora ou criar o atendimento de hoje. Senão a agenda e a ficha mostram um atendimento
+                // "realizado" numa data em que ele não aconteceu.
+                if ($this->isDifferentDay((string)$appointment['scheduled_at'])) {
+                    throw new \DomainException(self::outOfDayMessage((string)$appointment['scheduled_at']));
+                }
                 $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, 'Início do atendimento clínico', $userId);
             }
 
@@ -712,10 +841,10 @@ class AppointmentService
             $artifactRefs = $this->collectConsultationArtifactRefs($clinicId, (int)$appointment['patient_id'], $appointmentId);
 
             // Append no Prontuário com SHA-256 e trilha criptográfica
-            // NI2-879: título e data clínica usam a data real de conclusão (hoje), nunca scheduled_at futuro.
-            $concludedAt = date('Y-m-d H:i:s');
+            // NI2-879: título e data clínica pela data real de conclusão, nunca pela data agendada.
+            $concludedAt = $this->nowLocal()->format('Y-m-d H:i:s');
             $clinicalService = new ClinicalRecordService($this->db);
-            $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . date('d/m/Y', strtotime($concludedAt)) . ")";
+            $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . substr($concludedAt, 8, 2) . '/' . substr($concludedAt, 5, 2) . '/' . substr($concludedAt, 0, 4) . ")";
             $recordContent = array_merge([
                 'appointment_id' => $appointmentId,
                 'scheduled_at' => $appointment['scheduled_at'],
@@ -920,65 +1049,13 @@ class AppointmentService
         return $ts !== false && $ts - ($now ?? time()) > self::EARLY_START_TOLERANCE_MINUTES * 60;
     }
 
-    /** NI2-879: verdadeiro quando a consulta está agendada para outro dia civil (ex.: data futura). */
-    public static function isDifferentDay(string $scheduledAt, ?int $now = null): bool
-    {
-        $ts = strtotime($scheduledAt);
-        if ($ts === false) {
-            return false;
-        }
-        return date('Y-m-d', $ts) !== date('Y-m-d', $now ?? time());
-    }
-
-    /**
-     * NI2-879: remarca a consulta futura para agora, grava no histórico e inicia o atendimento.
-     */
-    public function rescheduleForNowAndStart(int $appointmentId, int $userId, ?string $notes = null): void
-    {
-        $clinicId = TenantContext::getClinicId();
-        $nowStr = date('Y-m-d H:i:s');
-
-        $ownsTx = !$this->db->inTransaction();
-        if ($ownsTx) {
-            $this->db->beginTransaction();
-        }
-        try {
-            $app = $this->lockAppointment($appointmentId, $clinicId);
-            if (!$app) {
-                throw new InvalidArgumentException('Consulta não encontrada.');
-            }
-            $origFmt = date('d/m/Y H:i', strtotime((string)$app['scheduled_at']));
-            $upd = $this->db->prepare('UPDATE appointments SET scheduled_at = :now, updated_at = :now WHERE id = :id AND clinic_id = :clinic_id');
-            $upd->execute(['now' => $nowStr, 'id' => $appointmentId, 'clinic_id' => $clinicId]);
-
-            $histNote = trim(($notes ?? '') . " Remarcada para agora (agendada originalmente para {$origFmt}).");
-            $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, $histNote, $userId);
-
-            if ($ownsTx) {
-                $this->db->commit();
-            }
-        } catch (\Throwable $e) {
-            if ($ownsTx && $this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
-        }
-    }
-
     /**
      * NI2-879: cria um novo atendimento para hoje (encaixe imediato) e inicia, mantendo o agendamento futuro intacto.
      */
     public function createTodayWalkInKeepingFuture(int $futureAppointmentId, int $userId, ?string $notes = null): int
     {
-        $clinicId=TenantContext::getClinicId();
-        $future=$this->getAppointment($futureAppointmentId);
-        if(!$future) throw new InvalidArgumentException('Consulta não encontrada.');
-        if(!in_array($future['status'],[self::STATUS_SCHEDULED,self::STATUS_CONFIRMED],true)) throw new InvalidAppointmentTransitionException('O agendamento de origem não está mais agendado.');
-        // Same immediate-care path as the patient header: outside working hours, idempotent, no scheduled notice.
-        $note=trim(($notes??'').' Atendimento de hoje iniciado mantendo o agendamento #'.$futureAppointmentId.' para '.date('d/m/Y H:i',strtotime((string)$future['scheduled_at'])).'.');
-        $res=$this->startNow((int)$future['patient_id'],(int)$future['professional_id'],$userId,$note);
-        if($res['created']) (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_TODAY_KEEPING_FUTURE','appointments',(string)$res['id'],['future_appointment_id'=>$futureAppointmentId,'future_scheduled_at'=>(string)$future['scheduled_at']]);
-        return (int)$res['id'];
+        // v54.76: compatibilidade com chamadas da v54.75; o caminho único é startTodayKeepingFuture (NI2-879/v54.72).
+        return (int)$this->startTodayKeepingFuture($futureAppointmentId, $userId)['id'];
     }
 
     public static function humanUntil(string $scheduledAt, ?int $now = null): string
@@ -1516,7 +1593,8 @@ class AppointmentService
         string $scheduledAt,
         int $durationMinutes,
         ?int $excludeAppointmentId = null,
-        bool $lockForMutation = true
+        bool $lockForMutation = true,
+        bool $ignoreCompleted = false
     ): ?array {
         $newStart = strtotime($scheduledAt);
         $newEnd = $newStart + ($durationMinutes * 60);
@@ -1549,6 +1627,10 @@ class AppointmentService
         if ($excludeAppointmentId !== null) {
             $sql .= " AND a.id != :exclude_id";
             $params['exclude_id'] = $excludeAppointmentId;
+        }
+        // NI2-879: ao atender agora, uma consulta já concluída neste horário não ocupa mais o profissional.
+        if ($ignoreCompleted) {
+            $sql .= " AND a.status <> 'completed'";
         }
 
         if ($lockForMutation && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {

@@ -7,7 +7,7 @@ $pid = (int)$p['id'];
 <a class="btn btn-secondary" href="/agenda">Abrir agenda</a></div>
 <?php if (!$profile['appointments']): ?><p>Nenhuma consulta registrada.</p><?php else: ?>
 <div class="table-responsive" tabindex="0" role="region" aria-labelledby="patient-appointments"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Status</th></tr></thead><tbody>
-<?php foreach ($profile['appointments'] as $row): ?><tr><td><?= $escape(date('d/m/Y H:i', strtotime($row['scheduled_at']))) ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::appointmentType($row['type'])) ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::appointmentStatus($row['status'])) ?></td></tr><?php endforeach; ?>
+<?php foreach ($profile['appointments'] as $row): $rowWhen = ($row['status'] ?? '') === 'completed' && !empty($row['effective_at']) ? (string)$row['effective_at'] : (string)$row['scheduled_at']; /* NI2-879: realizada mostra quando aconteceu */ ?><tr><td><?= $escape(date('d/m/Y H:i', strtotime($rowWhen))) ?><?php if (substr($rowWhen, 0, 10) !== substr((string)$row['scheduled_at'], 0, 10)): ?> <span class="u-text-caption">(agendada para <?= $escape(date('d/m', strtotime((string)$row['scheduled_at']))) ?>)</span><?php endif; ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::appointmentType($row['type'])) ?></td><td><?= $escape(\ClyoNutri\Core\I18n\LabelMap::appointmentStatus($row['status'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?>
 <p class="cn-profile-note">Até 20 consultas, ordenadas pela data.</p>
 </section>

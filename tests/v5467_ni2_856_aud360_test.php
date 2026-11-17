@@ -172,6 +172,8 @@ T::ok(ClinicalEncryptionService::isEncrypted($rawDraft), 'NI2-862: consultation_
 T::ok($draftSvc->get($ap1Id, 1, 1)['evolution_summary'] === 'Evolução em rascunho confidencial', 'NI2-862: rascunho decifrado na leitura');
 
 // Concluir consulta -> prontuário cifrado com cadeia íntegra e referências de artefatos
+// NI2-879 (v54.72): consulta marcada para outro dia não é concluída direto; antes, remarcar para agora.
+$apptSvc->rescheduleForNowAndStart($ap1Id, 1, true);
 $comp = $apptSvc->completeConsultation($ap1Id, 'Consulta concluída com orientação nutricional.', ['pending_steps_acknowledged' => ['plano']], 1, 1);
 $rawRecJson = (string)$db->query("SELECT content_json FROM clinical_records WHERE id = " . (int)$comp['clinical_record_id'])->fetchColumn();
 T::ok(ClinicalEncryptionService::isEncrypted($rawRecJson), 'NI2-862: clinical_records.content_json cifrado no banco');

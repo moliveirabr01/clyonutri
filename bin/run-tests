@@ -40,6 +40,7 @@ case "$PROFILE" in
       "tests/ni2_892_query_metrics_test.php"
       "tests/ni2_893_finishing_test.php"
       "tests/v5470_ni2_880_food_diary_web_test.php"
+      "tests/ni2_879_consulta_outro_dia_test.php"
       "tests/v5469_ni2_879_and_cr360_fixes_test.php"
       "tests/v5468_ni2_878_subscription_test.php"
       "tests/v5467_ni2_856_aud360_test.php"

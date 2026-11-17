@@ -37,6 +37,7 @@ $meal=$mp->addMeal($plan['id'],'TESTE almoço','12:00');$mp->addItem($meal,$food
 jcheck('C','meal plan persisted',(int)$db->query('SELECT patient_id FROM meal_plans WHERE id='.(int)$plan['id'])->fetchColumn()===$pid);
 $agenda=new AppointmentService($db);$app=$agenda->schedule($pid,$professionals[0],$f['date'].' 14:00:00','first_visit',60,'TESTE jornada AF',false,$users[0]);
 jcheck('D','availability schedules appointment',!empty($app['id']));
+$agenda->rescheduleForNowAndStart((int)$app['id'],$users[0],true); // NI2-879 (v54.72): consulta de outro dia é remarcada para agora antes de concluir
 $done=$agenda->completeConsultation($app['id'],'TESTE evolução AF',['weight_kg'=>70],$users[0],$professionals[0]);
 jcheck('E','explicit clinical completion',$done['status']==='completed');
 $return=$agenda->schedule($pid,$professionals[0],date('Y-m-d',strtotime($f['date'].' +7 days')).' 14:00:00','return',60,'TESTE retorno AF',false,$users[0]);

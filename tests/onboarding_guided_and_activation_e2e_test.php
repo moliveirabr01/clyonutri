@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// CR875-09 (v54.76): banco SQLite isolado e novo a cada execução, como as demais suítes do gate core;
+// antes a suíte usava o banco do ambiente (.env) e falhava numa cópia limpa ("no such table: clinics").
+putenv('V54_DB=' . dirname(__DIR__) . '/storage/testing-onboarding-gate.sqlite');
+require __DIR__ . '/_v54_bootstrap.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

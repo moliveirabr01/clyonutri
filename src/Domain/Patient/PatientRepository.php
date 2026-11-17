@@ -331,7 +331,11 @@ class PatientRepository
             return $row;
         }, $crStmt->fetchAll());
 
-        $appointments = $this->relatedRows('appointments', $id, 'scheduled_at');
+        // NI2-879: consultas trazem a data efetiva (conclusão registrada na trilha ou, sem ela, a agendada).
+        $effectiveAt = \ClyoNutri\Domain\Appointment\AppointmentService::effectiveAtSql('a');
+        $apStmt = $this->db->prepare("SELECT a.*, {$effectiveAt} AS effective_at FROM appointments a WHERE a.clinic_id = ? AND a.patient_id = ? ORDER BY effective_at DESC, a.id DESC LIMIT 20");
+        $apStmt->execute([$clinicId, $id]);
+        $appointments = $apStmt->fetchAll();
         if ($appointments !== []) {
             $appIds = array_map(static fn(array $a): int => (int)$a['id'], $appointments);
             $ph = implode(',', array_fill(0, count($appIds), '?'));
@@ -372,7 +376,7 @@ class PatientRepository
             unset($receivable);
         }
         $timeline = [];
-        $sources = [['Consulta',$appointments,'scheduled_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
+        $sources = [['Consulta',$appointments,'effective_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
             ['Prontuário',$clinicalRecords,'created_at'], ['Anamnese',$anamneses,'created_at'], ['Avaliação',$assessments,'assessed_at'], ['Plano alimentar',$mealPlans,'created_at']];
         foreach ($sources as [$type,$rows,$dateField]) {
             foreach (array_slice($rows,0,20) as $row) {
@@ -393,16 +397,12 @@ class PatientRepository
                     'Prontuário'=>!empty($row['is_retracted'])?'Retificado':'Registrado',
                     default=>'Registrado',
                 };
-                $entryDate = $row[$dateField];
-                $entryTitle = $row['title'] ?? $row['description'] ?? $type;
-                if ($type === 'Consulta' && ($row['status'] ?? '') === 'completed') {
-                    $realDate = $row['completed_at'] ?? $row['started_at'] ?? $row['scheduled_at'];
-                    $entryDate = $realDate;
-                    if (!empty($row['scheduled_at']) && substr((string)$realDate, 0, 10) !== substr((string)$row['scheduled_at'], 0, 10)) {
-                        $entryTitle .= ' (agendada para ' . date('d/m', strtotime((string)$row['scheduled_at'])) . ')';
-                    }
+                $entryTitle=$row['title']??$row['description']??$type;
+                // NI2-879: consulta realizada em dia diferente do agendado mostra os dois.
+                if($type==='Consulta'&&($row['status']??'')==='completed'&&substr((string)$row['effective_at'],0,10)!==substr((string)$row['scheduled_at'],0,10)){
+                    $entryTitle.=' (agendada para '.date('d/m',(int)strtotime((string)$row['scheduled_at'])).')';
                 }
-                $timeline[]=['id'=>$rid,'type'=>$type,'date'=>$entryDate, 'title'=>$entryTitle,
+                $timeline[]=['id'=>$rid,'type'=>$type,'date'=>$row[$dateField], 'title'=>$entryTitle,
                     'url'=>$url,'state'=>$state,'version'=>(int)($row['version']??0)];
             }
         }

@@ -67,8 +67,8 @@ $appSvc = new AppointmentService($db);
 $futureDate = date('Y-m-d', strtotime('+30 days')) . ' 10:15:00';
 $futureApp = $appSvc->schedule($patientId, 1, $futureDate, 'return', 50);
 $futureId = (int)$futureApp['id'];
-assert(AppointmentService::isDifferentDay($futureDate) === true, 'Consulta daqui 30 dias deve ser isDifferentDay=true');
-assert(AppointmentService::isDifferentDay(date('Y-m-d H:i:s', time() + 7200)) === false || date('Y-m-d') !== date('Y-m-d', time() + 7200), 'Mesmo dia deve ser isDifferentDay=false');
+assert($appSvc->isDifferentDay($futureDate) === true, 'Consulta daqui 30 dias deve ser isDifferentDay=true');
+assert($appSvc->isDifferentDay(date('Y-m-d H:i:s', time() + 7200)) === false || date('Y-m-d') !== date('Y-m-d', time() + 7200), 'Mesmo dia deve ser isDifferentDay=false');
 
 // 3a) Opção "Criar atendimento de hoje e manter o agendamento futuro"
 $todayAppId = $appSvc->createTodayWalkInKeepingFuture($futureId, 1);

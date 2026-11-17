@@ -358,7 +358,7 @@ class DashboardController
           } catch (\Throwable $e) { $pendingExamCount = 0; }
           $lastCompleted = null;
           try {
-              $lc = Connection::getInstance()->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY scheduled_at DESC, id DESC LIMIT 1"); // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
+              $lc = Connection::getInstance()->prepare("SELECT a.id, a.scheduled_at, " . AppointmentService::effectiveAtSql('a') . " AS effective_at, a.type, a.status FROM appointments a WHERE a.clinic_id = ? AND a.patient_id = ? AND a.status = 'completed' ORDER BY effective_at DESC, a.id DESC LIMIT 1"); // NI2-879: data efetiva // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
               $lc->execute([(int)\ClyoNutri\Core\Auth\TenantContext::getClinicId(), (int)$p['id']]);
               $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
           } catch (\Throwable $e) { $lastCompleted = null; }
@@ -2278,20 +2278,39 @@ class DashboardController
             // Mesmo dia antes da hora continua exigindo apenas confirm_early.
             if ($newStatus === AppointmentService::STATUS_IN_PROGRESS) {
                 $current = $service->getAppointment($id);
-                if ($current && AppointmentService::isDifferentDay((string)$current['scheduled_at'])) {
-                    $dayAction = trim((string)($_POST['out_of_day_action'] ?? ''));
-                    if ($dayAction === 'reschedule_now') {
-                        $service->rescheduleForNowAndStart($id, TenantContext::getUserId(), $notes);
-                        header("Location: /consulta/{$id}");
-                        exit;
-                    }
-                    if ($dayAction === 'create_today') {
-                        $todayId = $service->createTodayWalkInKeepingFuture($id, TenantContext::getUserId(), $notes);
-                        header("Location: /consulta/{$todayId}");
-                        exit;
-                    }
-                    header("Location: /consulta/{$id}?inicio_antecipado=1&escolha_dia=1");
+                // Reenvio do formulário (duplo clique, voltar e reenviar): a consulta já está em andamento.
+                if ($current && $current['status'] === AppointmentService::STATUS_IN_PROGRESS) {
+                    header("Location: /consulta/{$id}");
                     exit;
+                }
+                // NI2-879: consulta de outro dia exige escolher entre remarcar para agora e criar o atendimento
+                // de hoje. Erros voltam para a sala da consulta, onde a escolha foi feita.
+                if ($current && $service->isDifferentDay((string)$current['scheduled_at'])) {
+                    $dayAction = (string)($_POST['out_of_day_action'] ?? '');
+                    try {
+                        if ($dayAction === 'reschedule_now') {
+                            $service->rescheduleForNowAndStart($id, (int)TenantContext::getUserId(), !empty($_POST['confirm_overbook']));
+                            header("Location: /consulta/{$id}");
+                            exit;
+                        }
+                        if ($dayAction === 'create_today') {
+                            $today = $service->startTodayKeepingFuture($id, (int)TenantContext::getUserId());
+                            header('Location: /consulta/' . (int)$today['id']);
+                            exit;
+                        }
+                        // Sem escolha: quem veio da agenda ou da ficha só vê as opções; quem enviou da sala sem marcar recebe o aviso.
+                        header("Location: /consulta/{$id}" . (!empty($_POST['from_room']) ? '?inicio=escolha' : ''));
+                        exit;
+                    } catch (\ClyoNutri\Domain\Appointment\AppointmentConflictException $e) {
+                        $at = (string)($e->getConflictingAppointment()['scheduled_at'] ?? '');
+                        header("Location: /consulta/{$id}?inicio=conflito" . ($at !== '' ? '&as=' . rawurlencode(date('H:i', (int)strtotime($at))) : ''));
+                        exit;
+                    } catch (\Throwable $e) {
+                        $msg = $e instanceof InvalidAppointmentTransitionException || $e instanceof \InvalidArgumentException
+                            ? $e->getMessage() : $this->userFacingError('agenda', $e);
+                        header("Location: /consulta/{$id}?inicio=falha&msg=" . rawurlencode($msg));
+                        exit;
+                    }
                 }
                 if ($current && AppointmentService::isEarlyStart((string)$current['scheduled_at'])) {
                     if (empty($_POST['confirm_early'])) {
@@ -2489,7 +2508,7 @@ class DashboardController
         } catch (\Throwable $e) { $pendingExamCount = 0; }
         $lastCompleted = null;
         try {
-            $lc = $db->prepare("SELECT id, scheduled_at, type, status FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'completed' ORDER BY scheduled_at DESC, id DESC LIMIT 1"); // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
+            $lc = $db->prepare("SELECT a.id, a.scheduled_at, " . AppointmentService::effectiveAtSql('a') . " AS effective_at, a.type, a.status FROM appointments a WHERE a.clinic_id = ? AND a.patient_id = ? AND a.status = 'completed' ORDER BY effective_at DESC, a.id DESC LIMIT 1"); // NI2-879: data efetiva // v54.57 (UX-124): appointments não tem completed_at (a consulta falhava e o resumo mostrava "—")
             $lc->execute([$clinicId, $id]);
             $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Throwable $e) { $lastCompleted = null; }
@@ -2603,6 +2622,11 @@ class DashboardController
         $canStart = in_array($app['status'], [AppointmentService::STATUS_SCHEDULED, AppointmentService::STATUS_CONFIRMED], true);
         $isEarly = $canStart && AppointmentService::isEarlyStart((string)$app['scheduled_at']);
         $inProgress = $app['status'] === AppointmentService::STATUS_IN_PROGRESS;
+        // NI2-879: consulta de outro dia pede escolha (remarcar para agora ou criar o atendimento de hoje).
+        $isDifferentDay = $canStart && $service->isDifferentDay((string)$app['scheduled_at']);
+        $startIssue = is_string($_GET['inicio'] ?? null) && in_array($_GET['inicio'], ['escolha', 'conflito', 'falha'], true) ? $_GET['inicio'] : '';
+        $startConflictAt = is_string($_GET['as'] ?? null) && preg_match('/^\d{2}:\d{2}$/', $_GET['as']) ? $_GET['as'] : '';
+        $startFailMsg = $startIssue === 'falha' && is_string($_GET['msg'] ?? null) ? mb_substr($_GET['msg'], 0, 300) : '';
 
         // UX-03 (v14/v16): rascunho por consulta + usuário, restaurado ao retomar ou após falha no POST de conclusão.
         $clinicId = (int)TenantContext::getClinicId();

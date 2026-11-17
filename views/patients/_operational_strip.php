@@ -26,7 +26,7 @@ $nextLabel = match ($stepState) {
     default => 'Sem consulta agendada',
 };
 $lastLabel = !empty($lastCompleted['scheduled_at'])
-    ? date('d/m/Y H:i', strtotime((string)$lastCompleted['scheduled_at']))
+    ? date('d/m/Y H:i', strtotime((string)($lastCompleted['effective_at'] ?? $lastCompleted['scheduled_at']))) // NI2-879
     : '—';
 $pendingBits = [];
 if (!empty($clinicalSummary['draft_in_progress'])) $pendingBits[] = 'anamnese em alteração';
