@@ -894,7 +894,7 @@ class ChatController
             box.append(b);
           });
           more.hidden = !data.has_more;
-          st.textContent = box.children.length ? box.children.length + ' paciente(s) exibido(s).' : 'Nenhum paciente ativo encontrado.';
+          st.textContent = box.children.length ? box.children.length + (box.children.length === 1 ? ' paciente exibido.' : ' pacientes exibidos.') : 'Nenhum paciente ativo encontrado.';
         } catch (e) { if (my === seq) st.textContent = 'Não foi possível buscar pacientes. Tente novamente.'; }
       }
       q.addEventListener('input', () => { clearTimeout(timer); page = 1; clear(); timer = setTimeout(() => load(false), 250); });

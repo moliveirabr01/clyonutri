@@ -3309,7 +3309,7 @@ class DashboardController
           <div class="card">
             <div class="card__header">
               <h3>Consultas do Dia (<?= date('d/m/Y', strtotime($currentDate)) ?>)</h3>
-              <span class="u-text-compact u-color-neutral-gray-500"><?= count($appointments) ?> agendamento(s)</span>
+              <span class="u-text-compact u-color-neutral-gray-500"><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count(count($appointments), '{n} agendamento', '{n} agendamentos', 'Nenhum agendamento')) ?></span>
             </div>
 
             <?php if (!empty($dayAvailability['times'])): ?>
@@ -3462,7 +3462,7 @@ class DashboardController
           </div>
         <?php elseif ($view === 'month' && is_array($monthData)): ?>
           <section class="card" data-testid="agenda-month-view" aria-label="Calendário mensal">
-            <div class="card__header"><h3><?= htmlspecialchars($nav['period_label']) ?></h3><span><?= (int)$monthData['total_appointments'] ?> consulta(s) neste mês</span></div>
+            <div class="card__header"><h3><?= htmlspecialchars($nav['period_label']) ?></h3><span><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count((int)$monthData['total_appointments'], '{n} consulta neste mês', '{n} consultas neste mês', 'Nenhuma consulta neste mês')) ?></span></div>
             <p class="agenda-month-list-label">Lista do mês por data</p>
             <div class="agenda-month-grid">
               <?php foreach(['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] as $weekday): ?><div class="agenda-month-weekday" aria-hidden="true"><?= $weekday ?></div><?php endforeach; ?>
@@ -4053,7 +4053,7 @@ class DashboardController
         <?php endif; ?>
         <?php if (!empty($preview['estimated_weights'])): ?>
           <div role="note" data-testid="estimated-weights" class="u-bg-neutral-gray-50 u-color-neutral-gray-700 u-py-3 u-px-4 u-radius-input u-mb-5 u-border u-text-compact">
-            <strong>Peso estimado em <?= count($preview['estimated_weights']) ?> item(ns):</strong> a medida caseira usada não está cadastrada para o alimento, então o cálculo usa um peso padrão (ex.: 1 unidade = 100 g). Prefira gramas ou uma medida cadastrada para o alimento.
+            <strong>Peso estimado em <?= count($preview['estimated_weights']) === 1 ? '1 item' : count($preview['estimated_weights']) . ' itens' ?>:</strong> a medida caseira usada não está cadastrada para o alimento, então o cálculo usa um peso padrão (ex.: 1 unidade = 100 g). Prefira gramas ou uma medida cadastrada para o alimento.
           </div>
         <?php endif; ?>
 
@@ -6296,14 +6296,14 @@ class DashboardController
           <div class="dash-kpi">
             <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('users') ?></span><span class="dash-kpi__label">Pacientes ativos</span></div>
             <div class="dash-kpi__value tabular-nums"><span data-testid="active-patients-count"><?= count($patients) ?></span></div>
-            <div class="dash-kpi__foot"><span class="dash-kpi__note" data-testid="new-patients-30d"><?= (int)$newPatients['current'] ?> novo(s) em 30 dias</span><?= $dashCmp($cmpPatients) ?><a href="/pacientes" class="dash-kpi__link">Ver pacientes</a></div>
+            <div class="dash-kpi__foot"><span class="dash-kpi__note" data-testid="new-patients-30d"><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count((int)$newPatients['current'], '{n} novo em 30 dias', '{n} novos em 30 dias', 'Nenhum novo em 30 dias')) ?></span><?= $dashCmp($cmpPatients) ?><a href="/pacientes" class="dash-kpi__link">Ver pacientes</a></div>
           </div>
           <div class="dash-kpi">
             <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('chart') ?></span><span class="dash-kpi__label">Adesão média</span></div>
             <div class="dash-kpi__value tabular-nums<?= $adherenceMetrics['has_data'] ? '' : ' dash-kpi__value--empty' ?>"><span data-testid="average-adherence-value"><?= htmlspecialchars($adherenceMetrics['formatted_value']) ?></span></div>
             <div class="dash-kpi__foot">
               <?php if ($adherenceMetrics['has_data']): ?>
-                <?= $dashCmp($cmpAdherence) ?><span class="dash-kpi__note"><?= (int)$adherenceMetrics['responses_count'] ?> resposta(s) · <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
+                <?= $dashCmp($cmpAdherence) ?><span class="dash-kpi__note"><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count((int)$adherenceMetrics['responses_count'], '{n} resposta', '{n} respostas', 'Nenhuma resposta')) ?> · <?= htmlspecialchars($adherenceMetrics['period_label']) ?></span>
               <?php else: ?>
                 <span class="dash-trend dash-trend--neutral" data-testid="dash-trend" data-tone="neutral">Sem dados (<?= (int)$adherenceMetrics['period_days'] ?> dias)</span><span class="dash-kpi__note">0 respostas · <?= (int)$adherenceMetrics['total_eligible_patients'] ?> elegíveis</span>
               <?php endif; ?>
@@ -6329,7 +6329,7 @@ class DashboardController
             <div class="dash-card__header">
               <h2 id="dash-week-title" class="dash-card__title">Agenda da semana</h2>
               <div class="dash-card__tools">
-                <span class="dash-week__range tabular-nums" data-testid="dash-week-range"><?= htmlspecialchars($weekAgenda['label']) ?> · <span data-testid="appointments-week-count"><?= (int)$weekAgenda['total'] ?></span> consulta(s)</span>
+                <span class="dash-week__range tabular-nums" data-testid="dash-week-range"><?= htmlspecialchars($weekAgenda['label']) ?> · <span data-testid="appointments-week-count"><?= (int)$weekAgenda['total'] ?></span> <?= (int)$weekAgenda['total'] === 1 ? 'consulta' : 'consultas' ?></span>
                 <?= $dashCmp($cmpWeek) ?>
                 <a href="/agenda?date=<?= htmlspecialchars($today) ?>&amp;view=week" class="dash-link">Ver agenda completa <?= $arrowIcon ?></a>
               </div>
@@ -6399,7 +6399,7 @@ class DashboardController
         <section class="dash-card attention-panel dash-attention" aria-labelledby="attention-title" data-testid="attention-panel">
           <div class="dash-card__header">
             <h2 id="attention-title" class="dash-card__title">Pacientes e prioridades que exigem atenção</h2>
-            <span class="attention-panel__count dash-card__hint" data-testid="attention-count"><?= $attentionTotal ?> item(ns) identificado(s)</span>
+            <span class="attention-panel__count dash-card__hint" data-testid="attention-count"><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count((int)$attentionTotal, '{n} item identificado', '{n} itens identificados', 'Nenhum item identificado')) ?></span>
           </div>
           <?php if (empty($attentionItems)): ?>
             <div class="attention-panel__empty">
@@ -6428,7 +6428,7 @@ class DashboardController
             <?php if ($attentionHidden > 0): ?>
               <?php /* NI2-610: os demais itens ficam a um clique, sem sair do painel */ ?>
               <details class="attention-more dash-attention__more" data-testid="attention-more">
-                <summary class="btn btn-outline btn-touch">Ver todos (<?= (int)$attentionTotal ?>)<span class="sr-only">: mais <?= (int)$attentionHidden ?> item(ns)</span></summary>
+                <summary class="btn btn-outline btn-touch">Ver todos (<?= (int)$attentionTotal ?>)<span class="sr-only">: mais <?= (int)$attentionHidden === 1 ? '1 item' : (int)$attentionHidden . ' itens' ?></span></summary>
                 <ul class="attention-list dash-attention__list">
                   <?php foreach (array_slice($attentionItems, count($attentionVisible)) as $att): ?>
                     <li class="attention-item" data-testid="attention-item" data-type="<?= htmlspecialchars((string)$att['type']) ?>">
@@ -6569,7 +6569,7 @@ class DashboardController
               <button type="submit" class="btn btn-primary">Buscar</button>
               <a href="/pacientes" class="btn btn-secondary">Limpar</a>
             </div>
-            <p id="patient-search-count" class="op-message op-message--info u-text-compact u-color-neutral-gray-500 u-mt-2" role="status" aria-live="polite"><?= (int)$listing['total'] ?> paciente(s) encontrado(s).</p>
+            <p id="patient-search-count" class="op-message op-message--info u-text-compact u-color-neutral-gray-500 u-mt-2" role="status" aria-live="polite"><?= htmlspecialchars(\ClyoNutri\Application\View\UserText::count((int)$listing['total'], '{n} paciente encontrado.', '{n} pacientes encontrados.', 'Nenhum paciente encontrado.')) ?></p>
           </form>
           <div class="table-responsive">
             <table class="table">
@@ -6670,11 +6670,11 @@ class DashboardController
                   }
                 });
                 if (emptyMsg) emptyMsg.hidden = (visibleCount > 0);
-                if (countMsg) countMsg.textContent = visibleCount + ' paciente(s) encontrado(s) na listagem.';
+                if (countMsg) countMsg.textContent = visibleCount === 0 ? 'Nenhum paciente encontrado na listagem.' : visibleCount + (visibleCount === 1 ? ' paciente encontrado' : ' pacientes encontrados') + ' na listagem.';
               } else if (term.length === 0) {
                 patientRows.forEach(function(row) { row.style.display = ''; });
                 if (emptyMsg) emptyMsg.hidden = true;
-                if (countMsg) countMsg.textContent = totalRows + ' paciente(s) encontrado(s).';
+                if (countMsg) countMsg.textContent = totalRows === 0 ? 'Nenhum paciente encontrado.' : totalRows + (totalRows === 1 ? ' paciente encontrado.' : ' pacientes encontrados.');
               }
             });
           }

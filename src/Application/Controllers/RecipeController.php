@@ -438,7 +438,7 @@ class RecipeController
                 ?>
                 <?php if ($rcUnknown || $rcEstimated): ?>
                   <div role="note" data-testid="recipe-nutrition-caveats" style="margin-top: 8px; font-size: 0.8rem; color: var(--semantic-warning-strong, #7A4A00); background: var(--semantic-warning-light, #FEF3C7); border: 1px solid var(--semantic-warning-border, #FEDF89); border-radius: 8px; padding: 8px 10px;">
-                    <?php if ($rcEstimated): ?><p style="margin: 0 0 4px;"><strong>Peso estimado</strong> em <?= count($rcEstimated) ?> ingrediente(s): a medida usada não tem peso cadastrado para o alimento.</p><?php endif; ?>
+                    <?php if ($rcEstimated): ?><p style="margin: 0 0 4px;"><strong>Peso estimado</strong> em <?= count($rcEstimated) === 1 ? '1 ingrediente' : count($rcEstimated) . ' ingredientes' ?>: a medida usada não tem peso cadastrado para o alimento.</p><?php endif; ?>
                     <?php if ($rcUnknown): ?><p style="margin: 0;"><strong>Valores incompletos:</strong> sem análise na TACO de <?= htmlspecialchars(implode('; ', array_map(static fn($n, $f) => ['energy_kcal' => 'energia', 'protein_g' => 'proteína', 'carbohydrate_g' => 'carboidratos', 'lipid_g' => 'lipídios', 'fiber_g' => 'fibra'][$n] . ' (' . implode(', ', array_keys($f)) . ')', array_keys($rcUnknown), $rcUnknown))) ?>; entram como zero.</p><?php endif; ?>
                   </div>
                 <?php endif; ?>

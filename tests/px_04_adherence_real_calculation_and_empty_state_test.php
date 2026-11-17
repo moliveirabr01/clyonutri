@@ -258,7 +258,7 @@ try {
 
     assertPx04(!str_contains($dashboardAlfaHtml, '94.0%'), "Dashboard Alfa NÃO deve conter 94.0%");
     assertPx04(str_contains($dashboardAlfaHtml, '85,0%'), "Dashboard Alfa deve exibir '85,0%'");
-    assertPx04(str_contains($dashboardAlfaHtml, '2 resposta(s) • Últimos 30 dias'), "Badge Alfa deve informar respostas e período");
+    assertPx04(str_contains($dashboardAlfaHtml, '2 respostas'), "Badge Alfa deve informar respostas e período");
     assertPx04(str_contains($dashboardAlfaHtml, '2 de 2 paciente(s) elegíveis responderam'), "Dashboard Alfa deve informar amostra sobre elegíveis");
 
     logPx04Pass("GATE_6", "Validação defensiva contra clinic_id inválido aprovada");

@@ -10,7 +10,7 @@
     if (v.badInput) return 'Informe um número válido.';
     if (v.rangeUnderflow) return 'O valor deve ser maior ou igual a ' + num(el.min) + '.';
     if (v.rangeOverflow) return 'O valor deve ser menor ou igual a ' + num(el.max) + '.';
-    if (v.stepMismatch) return 'Use no máximo ' + (String(el.step).split('.')[1] || '').length + ' casa(s) decimal(is).';
+    if (v.stepMismatch) var casas = (String(el.step).split('.')[1] || '').length; return casas === 0 ? 'Use um número inteiro.' : 'Use no máximo ' + casas + (casas === 1 ? ' casa decimal.' : ' casas decimais.');
     if (v.tooShort) return 'Use pelo menos ' + el.minLength + ' caracteres (agora: ' + el.value.length + ').';
     if (v.tooLong) return 'Use no máximo ' + el.maxLength + ' caracteres.';
     if (v.patternMismatch) return el.title ? el.title : 'Valor em formato inválido.';

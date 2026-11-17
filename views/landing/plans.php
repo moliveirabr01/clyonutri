@@ -237,7 +237,7 @@
           <ul class="pricing-features">
             <li>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span><?= $p['max_professionals'] > 0 ? 'Até ' . (int)$p['max_professionals'] . ' profissional(is)' : 'Profissionais ilimitados' ?></span>
+              <span><?= $p['max_professionals'] > 0 ? 'Até ' . ((int)$p['max_professionals'] === 1 ? '1 profissional' : (int)$p['max_professionals'] . ' profissionais') : 'Profissionais ilimitados' ?></span>
             </li>
             <li>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>

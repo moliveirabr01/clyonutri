@@ -148,7 +148,7 @@ class ClinicalProtocolController
             }
             unset($_SESSION['cp_answers'][$c . ':' . $pid]);
             $flags = count($r['red_flags']);
-            return ($conclude ? 'Módulos concluídos.' : 'Rascunho dos módulos salvo.') . ($flags ? ' Atenção: ' . $flags . ' sinal(is) de alerta para avaliação.' : '');
+            return ($conclude ? 'Módulos concluídos.' : 'Rascunho dos módulos salvo.') . ($flags ? ' Atenção: ' . ((int)$flags === 1 ? '1 sinal' : (int)$flags . ' sinais') . ' de alerta para avaliação.' : '');
         });
     }
 

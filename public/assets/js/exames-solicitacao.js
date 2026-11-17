@@ -19,7 +19,7 @@
 
   function updateCount() {
     var n = box.querySelectorAll('input[type=checkbox]:checked').length;
-    if (count) count.textContent = n + ' exame(s) selecionado(s)';
+    if (count) count.textContent = n === 0 ? 'Nenhum exame selecionado' : n + (n === 1 ? ' exame selecionado' : ' exames selecionados');
   }
   function setSyn(item, syn) {
     var h = item.querySelector('[data-exam-synonym]'), l = item.querySelector('[data-exam-synonym-label]');

@@ -145,7 +145,7 @@ class OnboardingController
           <!-- Barra de Progresso e Stepper Visual de 3 Passos (NI2-850 / UX-006) -->
           <div class="card" style="padding: var(--space-5); margin-bottom: var(--space-6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
-              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);" data-testid="onboarding-wizard-count">Progresso de Ativação · Passo <?= $visualStep ?> de 3 · <?= (int)$wizardSummary['done'] ?> de <?= (int)$wizardSummary['total'] ?> concluído(s)</span>
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--brand-navy-900);" data-testid="onboarding-wizard-count">Progresso de Ativação · Passo <?= $visualStep ?> de 3 · <?= (int)$wizardSummary['done'] ?> de <?= (int)$wizardSummary['total'] ?> <?= (int)$wizardSummary['done'] === 1 ? 'concluído' : 'concluídos' ?></span>
               <span style="font-size: 0.85rem; font-weight: 700; color: var(--brand-copper-600);" data-testid="onboarding-progress-pct"><?= (int)$progress['progress_pct'] ?>% Concluído</span>
             </div>
             <!-- Progress Bar -->

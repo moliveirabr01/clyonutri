@@ -33,7 +33,7 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  const indicator=html=>Number(html.match(/data-testid="appointments-today-count">\s*(\d+)/)?.[1]);
  check('Dashboard indicator reads six persisted current-day appointments',dashboard.status===200 && indicator(dashboard.text)===6);
  check('Dashboard table contains six statuses excluding adjacent days and other tenant', ['scheduled','confirmed','in_progress','completed','cancelled','no_show'].every(s=>dashboard.text.includes('NI298 '+s)) && !dashboard.text.includes('NI298 previous') && !dashboard.text.includes('NI298 next') && !dashboard.text.includes('NI298 other-tenant'));
- check('Agenda count agrees with dashboard indicator',agenda.status===200 && agenda.text.includes('6 agendamento(s)'));
+ check('Agenda count agrees with dashboard indicator',agenda.status===200 && agenda.text.includes('6 agendamentos'));
  check('Pending unconfirmed appointment matches actual agenda row',dashboard.text.includes('NI298 scheduled às 01:00') && !dashboard.text.includes('NI298 next às') && agenda.text.includes('NI298 scheduled'));
  check('Reading views preserves records and history',JSON.stringify(baseline)===JSON.stringify(JSON.parse(fixture('inspect'))));
  const csrf=agenda.text.match(/name="_csrf_token" value="([^"]+)"/)[1];
@@ -46,7 +46,7 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  check('Scheduling appends history without rewriting existing events',JSON.stringify(before.history)===JSON.stringify(after.history.slice(0,before.history.length)));
  writeFileSync(join(root,'docs/validation/NI2-298/evidence/persistence.json'),JSON.stringify({before,after},null,2));
  dashboard=await req('/dashboard');agenda=await req('/agenda?date='+prepared.date);
- check('Persisted new appointment updates indicator, agenda and pending list',indicator(dashboard.text)===7 && agenda.text.includes('7 agendamento(s)') && dashboard.text.includes('NI298 scheduled às 15:00'));
+ check('Persisted new appointment updates indicator, agenda and pending list',indicator(dashboard.text)===7 && agenda.text.includes('7 agendamentos') && dashboard.text.includes('NI298 scheduled às 15:00'));
  const cross=await req('/agenda',{method:'POST',body:new URLSearchParams({_csrf_token:csrf,patient_id:'9',scheduled_at:prepared.date+' 16:00:00'})});
  check('Cross-tenant scheduling denied without persisting',cross.status===302 && !cross.location.includes('success=') && JSON.parse(fixture('inspect')).appointments.length===after.appointments.length);
  const badDate=await req('/agenda?date=2026-02-30');check('Invalid date returns explicit 400 rather than empty agenda',badDate.status===400 && badDate.text.includes('Data inválida') && !badDate.text.includes('Nenhuma consulta agendada'));
@@ -55,7 +55,7 @@ function check(name,ok){assert.ok(ok,name);checks.push({name,status:'PASS'});con
  const failed=await req('/dashboard');const failedAgenda=await req('/agenda');
  check('Database failure produces 503 and retry rather than false zero',failed.status===503 && failed.text.includes('Tentar novamente') && !failed.text.includes('appointments-today-count') && !failed.text.includes('no such table'));
  check('Agenda database failure differs from empty state',failedAgenda.status===503 && !failedAgenda.text.includes('Nenhuma consulta agendada') && !failedAgenda.text.includes('no such table'));
- fixture('restore');check('Recovery restores actual persisted agenda',(await req('/agenda?date='+prepared.date)).text.includes('7 agendamento(s)'));
+ fixture('restore');check('Recovery restores actual persisted agenda',(await req('/agenda?date='+prepared.date)).text.includes('7 agendamentos'));
  await webLogout(req);await login('agenda2@example.test');const other=await req('/dashboard');
  check('Other authenticated clinic sees only own indicator and patient',indicator(other.text)===1 && other.text.includes('NI298 other-tenant') && !other.text.includes('NI298 completed') && !other.text.includes('NI298 scheduled'));
  await webLogout(req);await login('agenda3@example.test');const empty=await req('/dashboard');const emptyAgenda=await req('/agenda?date='+prepared.date);

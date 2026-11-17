@@ -188,7 +188,7 @@ final class PatientImportController
             if ($action === 'confirm') {
                 $r = $svc->confirm($id);
                 $_SESSION['feedback_message'] = $r['created'] . ($r['created'] === 1 ? ' paciente cadastrado' : ' pacientes cadastrados')
-                    . ($r['skipped'] > 0 ? ', ' . $r['skipped'] . ' pulado(s) por duplicidade' : '')
+                    . ($r['skipped'] > 0 ? ', ' . ((int)$r['skipped'] === 1 ? '1 pulado' : (int)$r['skipped'] . ' pulados') . ' por duplicidade' : '')
                     . '. O consentimento ficou como "não coletado": registre na ficha de cada paciente.';
                 $this->redirect('/pacientes/importar/' . $id);
             }
@@ -201,8 +201,8 @@ final class PatientImportController
                 throw new \InvalidArgumentException('Marque a confirmação para desfazer a importação.');
             }
             $r = $svc->rollback($id);
-            $_SESSION['feedback_message'] = 'Importação desfeita: ' . $r['removed'] . ' removido(s)'
-                . ($r['kept'] > 0 ? '; ' . $r['kept'] . ' mantido(s) porque já têm registros ou acesso ao app' : '') . '.';
+            $_SESSION['feedback_message'] = 'Importação desfeita: ' . ((int)$r['removed'] === 1 ? '1 removido' : (int)$r['removed'] . ' removidos')
+                . ($r['kept'] > 0 ? '; ' . ((int)$r['kept'] === 1 ? '1 mantido porque já tem registros ou acesso ao app' : (int)$r['kept'] . ' mantidos porque já têm registros ou acesso ao app') : '') . '.';
         } catch (\InvalidArgumentException | \DomainException $e) {
             $_SESSION['error_message'] = $e->getMessage();
         } catch (TenantSecurityException $e) {

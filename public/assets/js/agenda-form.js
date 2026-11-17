@@ -47,7 +47,7 @@
         item.addEventListener('pointerdown',e=>e.preventDefault());
         item.addEventListener('click',()=>choose(person));matchesBox.append(item);
       });
-      status.textContent=found.length?found.length+' paciente(s) encontrado(s). Use as setas e Enter para selecionar.':'Nenhum paciente encontrado. Use o botão novo paciente ou a lista de pacientes.';
+      status.textContent=found.length?found.length+(found.length===1?' paciente encontrado':' pacientes encontrados')+'. Use as setas e Enter para selecionar.':'Nenhum paciente encontrado. Use o botão novo paciente ou a lista de pacientes.';
       if(!found.length){close();return;}
       matchesBox.classList.remove('u-hidden');
       matchesBox.style.display='block';searchInput.setAttribute('aria-expanded','true');

@@ -13,7 +13,7 @@ final class UnreadableAnamnesisDraftException extends \DomainException
     /** @param list<string> $fields */
     public function __construct(private readonly array $fields, private readonly int $patientId)
     {
-        parent::__construct('O rascunho da anamnese em andamento tem ' . count($fields) . ' campo(s) que não puderam ser lidos (' . implode(', ', array_map([AnamnesisService::class, 'fieldLabel'], $fields)) . '). Nada foi gravado. Abra a anamnese do paciente e use "Recuperar rascunho" para manter o que está legível e descartar só o que está corrompido.');
+        parent::__construct('O rascunho da anamnese em andamento tem ' . (count($fields) === 1 ? '1 campo que não pôde ser lido (' : count($fields) . ' campos que não puderam ser lidos (') . implode(', ', array_map([AnamnesisService::class, 'fieldLabel'], $fields)) . '). Nada foi gravado. Abra a anamnese do paciente e use "Recuperar rascunho" para manter o que está legível e descartar só o que está corrompido.');
     }
 
     /** @return list<string> */

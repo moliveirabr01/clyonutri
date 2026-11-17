@@ -759,7 +759,7 @@ final class SubscriptionService
                 'expired' => true,
                 'in_grace' => true,
                 'read_only' => false,
-                'reason' => "Seu período de teste terminou. Você tem {$daysRemaining} dia(s) de carência antes do modo leitura.",
+                'reason' => 'Seu período de teste terminou. Você tem ' . ((int)$daysRemaining === 1 ? '1 dia' : (int)$daysRemaining . ' dias') . ' de carência antes do modo leitura.',
             ];
         }
 
@@ -775,7 +775,7 @@ final class SubscriptionService
             'expired' => true,
             'in_grace' => false,
             'read_only' => true,
-            'reason' => 'Seu período de teste terminou há mais de ' . $graceDays . ' dia(s). A conta está em modo leitura (leitura e exportação de dados continuam liberadas). Assine ou peça ativação de um plano para voltar a criar ou editar registros.',
+            'reason' => 'Seu período de teste terminou há mais de ' . ((int)$graceDays === 1 ? '1 dia' : (int)$graceDays . ' dias') . '. A conta está em modo leitura (leitura e exportação de dados continuam liberadas). Assine ou peça ativação de um plano para voltar a criar ou editar registros.',
         ];
     }
 
@@ -806,7 +806,7 @@ final class SubscriptionService
 
         if ($ts['state'] === 'grace') {
             $title = 'Seu período de teste terminou' . ($endDateFmt ? ' em ' . $endDateFmt : '') . ' (carência ativa)';
-            $message = 'Você está no período de carência de ' . $ts['days_remaining'] . ' dia(s)'
+            $message = 'Você está no período de carência de ' . ((int)$ts['days_remaining'] === 1 ? '1 dia' : (int)$ts['days_remaining'] . ' dias')
                 . ($graceDateFmt ? ' (até ' . $graceDateFmt . ')' : '')
                 . '. Seus dados continuam salvos e o sistema segue liberado temporariamente. '
                 . ($asaas ? 'Escolha um plano para assinar agora.' : 'Peça a ativação do seu plano para continuar sem interrupções.');
