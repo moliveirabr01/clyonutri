@@ -40,8 +40,23 @@
   const btnApprove = document.getElementById('btn-approve-evolution');
   const btnReopen = document.getElementById('btn-reopen-stt');
 
+  const unsupportedNotice = document.getElementById('stt-unsupported');
+  const draftSources = document.getElementById('stt-draft-sources');
+  const sourceDetail = document.getElementById('stt-source-detail');
+  // NI2-882: sem reconhecimento de fala no navegador (ex.: Firefox) não há transcrição. Nada é captado nem gravado,
+  // e nenhum texto substituto ("[Segmento de áudio captado #N]") é enviado como se fosse fala.
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  const SPEAKER_LABEL = { patient: 'Paciente', professional: 'Profissional', speaker_uncertain: 'Não identificado' };
+  function currentSpeaker() {
+    const el = document.querySelector('input[name="stt_speaker"]:checked');
+    return el && SPEAKER_LABEL[el.value] ? el.value : 'speaker_uncertain';
+  }
+  if (!SpeechRecognitionCtor) {
+    if (unsupportedNotice) unsupportedNotice.hidden = false;
+    if (btnStart) { btnStart.disabled = true; btnStart.setAttribute('aria-describedby', 'stt-unsupported'); }
+  }
+
   let mediaStream = null;
-  let mediaRecorder = null;
   let recognition = null;
   let currentSession = null;
   let currentMode = 'live';
@@ -87,12 +102,13 @@
     badgeStatus.className = `badge ${cls}`;
   }
 
-  function addSegmentToUI(seq, text, speaker = 'Interlocutor') {
+  function addSegmentToUI(seq, text, speaker = 'speaker_uncertain') {
     if (emptyNotice) emptyNotice.hidden = true;
     const div = document.createElement('div');
     div.className = 'stt-segment u-p-1 u-text-compact';
     div.dataset.seq = seq;
-    div.innerHTML = `<span class="u-font-bold u-color-botanical-green-700">[#${seq}]</span> ${escapeHtml(text)}`;
+    div.dataset.speaker = speaker;
+    div.innerHTML = `<span class="u-font-bold u-color-botanical-green-700">[#${seq}] ${escapeHtml(SPEAKER_LABEL[speaker] || SPEAKER_LABEL.speaker_uncertain)}:</span> ${escapeHtml(text)}`;
     segmentsList.appendChild(div);
     segmentsList.parentElement.scrollTop = segmentsList.parentElement.scrollHeight;
   }
@@ -280,6 +296,10 @@
 
   // Iniciar Transcrição
   btnStart?.addEventListener('click', async () => {
+    if (!SpeechRecognitionCtor) {
+      if (unsupportedNotice) unsupportedNotice.hidden = false;
+      return;
+    }
     try {
       setBadge('Iniciando...', 'badge-info');
       const res = await api('start', { mode: currentMode });
@@ -352,6 +372,7 @@
     if (!draftPanel || !draftEditor) return;
     draftPanel.hidden = false;
     draftEditor.value = draft.full_evolution_text || '';
+    renderSources(draft.segment_sources || {});
     if (draft.approval_status === 'approved') {
       draftBadge.textContent = 'Evolução Aprovada e Integrada';
       draftBadge.className = 'badge badge-success';
@@ -364,6 +385,48 @@
       btnApprove.textContent = '✓ Aprovar e Integrar ao Prontuário';
     }
     draftPanel.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // NI2-882: rastreabilidade — cada frase da minuta aponta para o trecho gravado de origem.
+  const TOPIC_LABEL = {
+    chief_complaint: 'Queixa principal', nutritional_goals: 'Objetivos', dietary_routine: 'Rotina alimentar',
+    reported_anthropometry: 'Medidas informadas', clinical_symptoms: 'Sintomas', adherence_notes: 'Adesão e dificuldades',
+    agreed_conduct: 'Conduta acordada', next_appointment_notes: 'Retorno', other_notes: 'Outros relatos',
+  };
+  function renderSources(sources) {
+    if (!draftSources) return;
+    draftSources.innerHTML = '';
+    if (sourceDetail) sourceDetail.hidden = true;
+    let total = 0;
+    Object.keys(TOPIC_LABEL).forEach((topic) => {
+      const list = Array.isArray(sources[topic]) ? sources[topic] : [];
+      if (!list.length) return;
+      const h = document.createElement('p');
+      h.className = 'u-font-bold u-mt-2 u-mb-1';
+      h.textContent = TOPIC_LABEL[topic];
+      draftSources.appendChild(h);
+      list.forEach((src) => {
+        total++;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-link btn-sm u-text-left';
+        b.dataset.testid = 'stt-source-sentence';
+        b.setAttribute('data-testid', 'stt-source-sentence');
+        b.dataset.segmentId = src.id;
+        b.textContent = src.text;
+        b.addEventListener('click', () => {
+          if (!sourceDetail) return;
+          const li = segmentsList ? segmentsList.querySelector(`[data-seq="${src.sequence_number}"]`) : null;
+          const original = li ? li.textContent.replace(/^\[#\d+\][^:]*:\s*/, '') : src.text;
+          sourceDetail.hidden = false;
+          sourceDetail.textContent = `Trecho #${src.sequence_number} (${SPEAKER_LABEL[src.speaker] || SPEAKER_LABEL.speaker_uncertain}): "${original}"`;
+        });
+        draftSources.appendChild(b);
+      });
+    });
+    if (!total) {
+      draftSources.textContent = 'Nenhuma frase da consulta entrou na minuta: todos os tópicos estão como "Não mencionado na consulta".';
+    }
   }
 
   // Aprovar e Integrar ao Prontuário
@@ -415,8 +478,8 @@
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
       }
 
-      // Reconhecimento de fala integrado (Web Speech API quando disponível) ou segmentação por áudio
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Reconhecimento de fala do navegador. Sem ele não há transcrição (NI2-882): nada é enviado.
+      const SpeechRecognition = SpeechRecognitionCtor;
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'pt-BR';
@@ -430,8 +493,9 @@
               const transcript = event.results[i][0].transcript.trim();
               if (transcript) {
                 sequenceCounter++;
-                addSegmentToUI(sequenceCounter, transcript);
-                await sendSegment(sequenceCounter, transcript);
+                const speaker = currentSpeaker();
+                addSegmentToUI(sequenceCounter, transcript, speaker);
+                await sendSegment(sequenceCounter, transcript, speaker);
               }
             }
           }
@@ -448,18 +512,10 @@
         };
 
         recognition.start();
-      } else if (mediaStream && window.MediaRecorder) {
-        // Fallback por MediaRecorder em pedaços de áudio
-        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
-        mediaRecorder.ondataavailable = async (e) => {
-          if (e.data && e.data.size > 0 && isCapturing) {
-            sequenceCounter++;
-            const mockText = `[Segmento de áudio captado #${sequenceCounter}]`;
-            addSegmentToUI(sequenceCounter, mockText);
-            await sendSegment(sequenceCounter, mockText);
-          }
-        };
-        mediaRecorder.start(4000); // chunk a cada 4 segundos
+      } else {
+        // Sem reconhecimento de fala: libera o microfone e avisa; nenhum trecho é inventado nem enviado.
+        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+        if (unsupportedNotice) unsupportedNotice.hidden = false;
       }
     } catch (err) {
       console.warn('[stt] Acesso a microfone não disponível:', err);
@@ -470,17 +526,11 @@
     if (recognition) {
       try { recognition.stop(); } catch (e) {}
     }
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      try { mediaRecorder.pause(); } catch (e) {}
-    }
   }
 
   function resumeAudioCapture() {
     if (recognition) {
       try { recognition.start(); } catch (e) {}
-    }
-    if (mediaRecorder && mediaRecorder.state === 'paused') {
-      try { mediaRecorder.resume(); } catch (e) {}
     }
   }
 
@@ -493,12 +543,12 @@
     }
   }
 
-  async function sendSegment(seq, text) {
+  async function sendSegment(seq, text, speaker = 'speaker_uncertain') {
     try {
       await api('segment', {
         sequence_number: seq,
         text,
-        speaker: 'speaker_uncertain',
+        speaker,
         is_final: 1,
       });
     } catch (e) {

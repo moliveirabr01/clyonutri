@@ -82,19 +82,25 @@ class NutritionalSummaryGenerator
                 if ($sentence === '') {
                     continue;
                 }
-                if ($speaker === 'professional' && $this->isQuestion($sentence)) {
-                    // Frase interrogativa do profissional não entra em nenhum tópico de conteúdo.
+                if ($speaker !== 'patient' && $this->isQuestion($sentence)) {
+                    // Frase interrogativa do profissional (ou de locutor não identificado) não entra em nenhum tópico.
+                    // v54.76 (CR875-08): antes, a pergunta sem locutor ia para "Sintomas" como se fosse relato.
+                    continue;
+                }
+                if (self::isSystemMarker($sentence)) {
+                    // Marcador técnico ("[Segmento de áudio captado #N]") não é fala: nunca entra na minuta.
                     continue;
                 }
 
-                $topic = $this->classifySentence($sentence, $speaker);
-                $buckets[$topic][] = $sentence;
-                $sources[$topic][] = [
-                    'id' => $segId,
-                    'sequence_number' => $seq,
-                    'speaker' => $speaker,
-                    'text' => $sentence,
-                ];
+                foreach ($this->classifySentenceTopics($sentence, $speaker) as $topic) {
+                    $buckets[$topic][] = $sentence;
+                    $sources[$topic][] = [
+                        'id' => $segId,
+                        'sequence_number' => $seq,
+                        'speaker' => $speaker,
+                        'text' => $sentence,
+                    ];
+                }
             }
         }
 
@@ -173,7 +179,7 @@ class NutritionalSummaryGenerator
             "8. Previsão de Retorno: " . trim($returnNotes),
         ];
         if ($otherNotes !== '' && $otherNotes !== self::NOT_MENTIONED) {
-            $lines[] = "9. Outros Relatos: " . trim($otherNotes);
+            $lines[] = "9. Outros Relatos (sem tópico ou locutor não identificado): " . trim($otherNotes);
         }
         $lines[] = "--------------------------------------------------";
         $lines[] = "[Minuta gerada por regras a partir dos segmentos transcritos — exige revisão e aprovação do profissional]";
@@ -226,48 +232,54 @@ class NutritionalSummaryGenerator
         return str_ends_with(trim($sentence), '?');
     }
 
-    private function classifySentence(string $sentence, string $speaker): string
+    /**
+     * Tópicos da frase conforme o locutor (NI2-882):
+     *  - paciente: queixa, sintomas, rotina, objetivos, medidas, adesão; sem regra → Outros relatos;
+     *  - profissional: conduta e/ou retorno (a mesma frase pode ir aos dois, ex.: "vamos reduzir o açúcar e retornar em 30 dias");
+     *  - locutor não identificado: só Outros relatos (não se presume que seja o paciente nem o profissional).
+     * @return list<string>
+     */
+    private function classifySentenceTopics(string $sentence, string $speaker): array
     {
         $norm = $this->normalizeText($sentence);
 
         if ($speaker === 'professional') {
-            foreach (self::PROFESSIONAL_TOPICS as $topic => $keywords) {
-                if ($this->matchesAny($norm, $keywords)) {
-                    return $topic;
-                }
+            $topics = [];
+            if ($this->matchesAny($norm, self::PROFESSIONAL_TOPICS['agreed_conduct'])) {
+                $topics[] = 'agreed_conduct';
             }
-            return 'agreed_conduct';
+            if ($this->matchesAny($norm, self::PROFESSIONAL_TOPICS['next_appointment_notes'])) {
+                $topics[] = 'next_appointment_notes';
+            }
+            return $topics !== [] ? $topics : ['agreed_conduct'];
         }
 
         if ($speaker === 'patient') {
             foreach (self::PATIENT_TOPICS as $topic => $keywords) {
                 if ($this->matchesAny($norm, $keywords)) {
-                    return $topic;
+                    return [$topic];
                 }
             }
-            return 'other_notes';
+            return ['other_notes'];
         }
 
-        // Locutor desconhecido: tenta paciente primeiro, depois profissional, senão Outros relatos.
-        foreach (self::PATIENT_TOPICS as $topic => $keywords) {
-            if ($this->matchesAny($norm, $keywords)) {
-                return $topic;
-            }
-        }
-        if (!$this->isQuestion($sentence)) {
-            foreach (self::PROFESSIONAL_TOPICS as $topic => $keywords) {
-                if ($this->matchesAny($norm, $keywords)) {
-                    return $topic;
-                }
-            }
-        }
-        return 'other_notes';
+        return ['other_notes'];
+    }
+
+    /** Texto que não é fala reconhecida: marcador entre colchetes ou sem nenhuma letra. */
+    public static function isSystemMarker(string $text): bool
+    {
+        $t = trim($text);
+        return $t === '' || preg_match('/^\[[^\]]*\]\.?$/u', $t) === 1 || preg_match('/\p{L}/u', $t) !== 1;
     }
 
     private function matchesAny(string $normalizedSentence, array $keywords): bool
     {
         foreach ($keywords as $kw) {
-            if (str_contains($normalizedSentence, $this->normalizeText($kw))) {
+            // Palavra inteira: "dor" não casa com "adorei", "come" não casa com "comecei".
+            // Aceita plural simples ("dores", "lanches") e número colado em unidade ("70kg").
+            $pattern = '/(?<!\p{L})' . preg_quote($this->normalizeText($kw), '/') . '(?:s|es)?(?!\p{L})/u';
+            if (preg_match($pattern, $normalizedSentence) === 1) {
                 return true;
             }
         }

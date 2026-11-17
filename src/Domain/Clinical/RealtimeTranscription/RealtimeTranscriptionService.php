@@ -19,6 +19,17 @@ use PDO;
  */
 class RealtimeTranscriptionService
 {
+    /** NI2-882: limite por trecho (o reconhecimento de fala entrega frases curtas; 2 MB num trecho é abuso). */
+    public const MAX_SEGMENT_CHARS = 2000;
+    /** NI2-882: locutores aceitos; o que vier diferente vira "não identificado". */
+    public const SPEAKERS = ['patient', 'professional', 'speaker_uncertain'];
+
+    public static function normalizeSpeaker(string $speaker): string
+    {
+        $s = strtolower(trim($speaker));
+        return in_array($s, self::SPEAKERS, true) ? $s : 'speaker_uncertain';
+    }
+
     private PDO $db;
     private TranscriptionConsentService $consentService;
     private AuditLogger $auditLogger;
@@ -258,6 +269,15 @@ class RealtimeTranscriptionService
         if ($cleanText === '') {
             return ['status' => 'ignored', 'reason' => 'empty'];
         }
+        // NI2-882 / CR875-08: só entra fala reconhecida. Marcador técnico ("[Segmento de áudio captado #N]")
+        // ou texto sem letras não é gravado como se alguém tivesse dito aquilo.
+        if (NutritionalSummaryGenerator::isSystemMarker($cleanText)) {
+            throw new \InvalidArgumentException('Trecho sem fala reconhecida não é gravado.');
+        }
+        if (mb_strlen($cleanText, 'UTF-8') > self::MAX_SEGMENT_CHARS) {
+            throw new \InvalidArgumentException('Trecho muito longo: o limite é de ' . self::MAX_SEGMENT_CHARS . ' caracteres por trecho.');
+        }
+        $speaker = self::normalizeSpeaker($speaker);
 
         $nowUtc = gmdate('Y-m-d H:i:s');
 

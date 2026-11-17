@@ -56,6 +56,9 @@
 
   <!-- 2. CONTROLES DA SESSÃO DE TRANSCRIÇÃO (DESBLOQUEADOS APÓS CONSENTIMENTO) -->
   <div id="stt-controls-panel" class="u-mt-3" hidden>
+    <p id="stt-unsupported" class="op-message op-message--warning u-mb-2" role="alert" data-testid="stt-unsupported" hidden>
+      Transcrição indisponível neste navegador: ele não reconhece fala. Nada será captado nem gravado aqui. Use o Chrome ou o Edge, ou escreva a evolução no campo da consulta.
+    </p>
     <div class="u-flex u-justify-between u-items-center u-wrap u-gap-3 u-p-3" style="background: var(--neutral-gray-50, #f8fafc); border-radius: 8px; border: 1px solid var(--neutral-gray-200, #e2e8f0);">
       
       <!-- Seletor de Modo -->
@@ -71,6 +74,26 @@
             <span><strong>Discreto</strong> (texto oculto na tela)</span>
           </label>
         </div>
+      </fieldset>
+
+      <!-- NI2-882: quem está falando (cada trecho reconhecido é gravado com este locutor) -->
+      <fieldset class="u-m-0 u-p-0" style="border: 0;" data-testid="stt-speaker">
+        <legend class="u-text-compact u-font-bold u-mb-1">Quem está falando agora:</legend>
+        <div class="u-flex u-gap-3 u-items-center u-wrap">
+          <label class="cr-radio u-flex u-items-center u-gap-1 u-pointer" style="min-height: 44px;">
+            <input type="radio" name="stt_speaker" value="patient" id="speaker-patient">
+            <span>Paciente</span>
+          </label>
+          <label class="cr-radio u-flex u-items-center u-gap-1 u-pointer" style="min-height: 44px;">
+            <input type="radio" name="stt_speaker" value="professional" id="speaker-professional">
+            <span>Profissional</span>
+          </label>
+          <label class="cr-radio u-flex u-items-center u-gap-1 u-pointer" style="min-height: 44px;">
+            <input type="radio" name="stt_speaker" value="speaker_uncertain" id="speaker-uncertain" checked>
+            <span>Não identificado</span>
+          </label>
+        </div>
+        <p class="u-text-compact u-m-0">Fala sem locutor identificado vai para "Outros relatos" da minuta, e perguntas sem locutor ficam de fora.</p>
       </fieldset>
 
       <!-- Botões de Ação do Áudio -->
@@ -122,6 +145,15 @@
       Você pode editar o texto livremente antes de aprovar. A evolução só entra no prontuário após sua confirmação explícita.
     </p>
 
+    <p class="op-message op-message--info u-text-compact u-mb-3" data-testid="stt-generator-notice">
+      Esta minuta é montada por regras (palavras-chave e locutor), sem inteligência artificial. Ela só reúne frases ditas na consulta; tópico sem fala aparece como "Não mencionado na consulta". Revise antes de aprovar.
+    </p>
+    <details class="u-mb-3" data-testid="stt-draft-sources-box">
+      <summary class="u-text-compact u-pointer u-font-bold">De onde veio cada frase (clique numa frase para ver a fala original)</summary>
+      <div id="stt-draft-sources" class="u-mt-2 u-text-compact" data-testid="stt-draft-sources"></div>
+      <p id="stt-source-detail" class="op-message op-message--info u-text-compact u-mt-2" role="status" aria-live="polite" data-testid="stt-source-detail" hidden></p>
+    </details>
+
     <div class="form-group u-mb-3">
       <label for="stt-evolution-editor" class="form-label u-font-bold">Evolução Clínica Consolidada (Editável):</label>
       <textarea id="stt-evolution-editor" class="form-control" rows="10" style="width: 100%; font-family: monospace; font-size: 0.875rem; line-height: 1.5;"></textarea>
@@ -141,4 +173,4 @@
   </div>
 </section>
 
-<script src="/assets/js/realtime-transcription.js?v=ni2-893" defer></script>
+<script src="/assets/js/realtime-transcription.js?v=v54-76-ni2-882" defer></script>

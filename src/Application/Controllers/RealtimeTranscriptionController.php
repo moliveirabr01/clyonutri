@@ -158,7 +158,7 @@ class RealtimeTranscriptionController
             $segments = $this->transcriptionService->getSegments((int)$session['id'], $afterSeq);
         }
 
-        $draft = $this->approvalService->getDraftByAppointment($appointmentId);
+        $draft = $this->withSources($this->approvalService->getDraftByAppointment($appointmentId));
 
         $this->jsonResponse([
             'appointment_id' => $appointmentId,
@@ -306,8 +306,12 @@ class RealtimeTranscriptionController
             $this->jsonResponse(['success' => true, 'segment' => $result]);
         } catch (DomainException $e) {
             $this->jsonResponse(['error' => $e->getMessage(), 'requires_consent' => true], 403);
+        } catch (\InvalidArgumentException $e) {
+            // NI2-882: trecho sem fala reconhecida ou acima do limite (mensagem de regra, sem detalhe interno).
+            $this->jsonResponse(['error' => $e->getMessage()], 422);
         } catch (Throwable $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 400);
+            error_log('[ClyoNutri][transcription] falha ao gravar trecho: ' . $e->getMessage());
+            $this->jsonResponse(['error' => 'Não foi possível gravar o trecho. Tente de novo.'], 400);
         }
     }
 
@@ -341,6 +345,9 @@ class RealtimeTranscriptionController
             // 4. Persiste a minuta como rascunho de evolução para revisão humana
             $draft = $this->approvalService->createOrUpdateDraft((int)$session['id'], $draftFields);
 
+            // NI2-882: origem de cada frase (id do trecho, sequência, locutor) para a revisão.
+            $draft['segment_sources'] = $draftFields['segment_sources'] ?? [];
+            $draft['generator_notice'] = $draftFields['generator_notice'] ?? null;
             $this->jsonResponse([
                 'success' => true,
                 'session' => $completedSession,
@@ -368,7 +375,7 @@ class RealtimeTranscriptionController
             return;
         }
 
-        $this->jsonResponse(['success' => true, 'draft' => $draft]);
+        $this->jsonResponse(['success' => true, 'draft' => $this->withSources($draft)]);
     }
 
     /**
@@ -404,6 +411,26 @@ class RealtimeTranscriptionController
     // =========================================================================
     // Helpers de Segurança e Resposta
     // =========================================================================
+
+    /**
+     * NI2-882: recompõe a origem das frases da minuta a partir dos trechos gravados da sessão (o gerador é determinístico).
+     * @param array<string,mixed>|null $draft
+     * @return array<string,mixed>|null
+     */
+    private function withSources(?array $draft): ?array
+    {
+        if (!$draft || empty($draft['session_id'])) {
+            return $draft;
+        }
+        try {
+            $gen = $this->summaryGenerator->generateDraftFromSegments($this->transcriptionService->getSegments((int)$draft['session_id'], 0));
+            $draft['segment_sources'] = $gen['segment_sources'] ?? [];
+            $draft['generator_notice'] = $gen['generator_notice'] ?? null;
+        } catch (Throwable $e) {
+            $draft['segment_sources'] = [];
+        }
+        return $draft;
+    }
 
     private function requireAuth(): bool
     {
