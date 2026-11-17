@@ -54,7 +54,12 @@ $tabs = [
         </span>
       </p>
       <?php if (in_array($stepState, ['continue', 'selected'], true)): // v54.57 (UX-105): etapas navegáveis sem voltar à sala ?>
-        <?= \ClyoNutri\Application\View\AttendanceContext::stepsNav($stepApp) ?>
+        <?php $stepsHtml = \ClyoNutri\Application\View\AttendanceContext::stepsNav($stepApp); ?>
+        <?php if ($stepsHtml !== '' && ($activeTab ?? 'resumo') === 'resumo'): /* v54.77 (decisão 3, ≤15 links com as abas): no Resumo as etapas ficam recolhidas — o botão "Continuar atendimento" e as abas levam aos mesmos lugares */ ?>
+          <details class="attendance-steps-toggle" data-testid="attendance-steps-toggle"><summary>Etapas deste atendimento</summary><?= $stepsHtml ?></details>
+        <?php else: ?>
+          <?= $stepsHtml ?>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
     <div class="patient-header__actions" data-testid="care-next-step" data-state="<?= $e($stepState) ?>">

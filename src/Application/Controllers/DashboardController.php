@@ -370,9 +370,9 @@ class DashboardController
               $priorityActions[] = ['label' => 'Novo plano', 'href' => '/pacientes/' . (int)$p['id'] . '/plano', 'testid' => 'acao-plano'];
           }
           $priorityActions[] = ['label' => 'Mensagem', 'href' => '/chat?patient_id=' . (int)$p['id'], 'testid' => 'acao-mensagem'];
-          if (!empty($clinicalSummary['allergy_review'])) {
-              $priorityActions[] = ['label' => 'Revisar alergia', 'href' => '#alergia-revisao', 'testid' => 'acao-pendencia'];
-          } elseif (!empty($clinicalSummary['draft_in_progress'])) {
+          // v54.77 (decisão do Maicon: ≤15 links contando as 7 abas): sem atalho "Revisar alergia" para o próprio bloco
+          // de alergia, que já aparece logo acima com a ação dele; a anamnese em alteração continua com o atalho.
+          if (!empty($clinicalSummary['draft_in_progress'])) {
               $priorityActions[] = ['label' => 'Continuar anamnese', 'href' => '/pacientes/' . (int)$p['id'] . '/anamnese', 'testid' => 'acao-pendencia'];
           }
           $lastEvolution = $clinicalRecords[0] ?? null;
