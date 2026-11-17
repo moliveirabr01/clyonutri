@@ -1,4 +1,5 @@
 <?php
+// NI2-884 (v54.76): publishPlan passou a exigir autorização de adequação (NI2-587); chamadas atualizadas com justificativa de TESTE.
 
 declare(strict_types=1);
 
@@ -101,13 +102,13 @@ check($r['unverified_foods'] !== [] && $r['requires_confirmation'], 'C1 alimento
 $r = $v->validateFoodsForPatient($pidKiwi, [9952]);
 check($r['unmapped_allergy_text'] && $r['requires_confirmation'], 'C1 alergia não reconhecida ("kiwi") exige confirmação');
 $pCracker = $newPlan($pid, 'Plano cream cracker', $cracker, 30);
-check(throws(fn() => $svc->publishPlan($pCracker, false), 'conflito de alergênicos'), 'C1 plano com cream cracker para paciente celíaca NÃO publica sem override');
+check(throws(fn() => $svc->publishPlan($pCracker, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).'), 'conflito de alergênicos'), 'C1 plano com cream cracker para paciente celíaca NÃO publica sem override');
 check($db->query("SELECT status FROM meal_plans WHERE id = {$pCracker}")->fetchColumn() === 'draft', 'C1 bloqueio desfaz a transação: plano continua rascunho');
 
 // ---------- A2: override exige justificativa e registra autor ----------
-check(throws(fn() => $svc->publishPlan($pCracker, true), 'justificativa'), 'A2 override sem justificativa é recusado');
+check(throws(fn() => $svc->publishPlan($pCracker, true, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).'), 'justificativa'), 'A2 override sem justificativa é recusado');
 $_SERVER['REMOTE_ADDR'] = '203.0.113.9';
-$res = $svc->publishPlan($pCracker, true, true, 'Cream cracker sem glúten da marca conferida com a paciente.');
+$res = $svc->publishPlan($pCracker, true, true, 'Cream cracker sem glúten da marca conferida com a paciente.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 check($res['status'] === 'published', 'A2 override com justificativa publica');
 $audit = $db->query("SELECT user_id, ip_address, details FROM audit_logs WHERE action = 'MEAL_PLAN_PUBLISHED' AND resource_id = '{$pCracker}' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $details = json_decode((string)$audit['details'], true);
@@ -119,10 +120,10 @@ check(json_decode($ver['payload_json'], true)['status'] === 'published', 'A2 sna
 
 // ---------- M2: só rascunho publica; versão única ----------
 $pVerified = $newPlan($pid, 'Plano verificado', 9952, 150);
-$svc->publishPlan($pVerified);
+$svc->publishPlan($pVerified, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 check($db->query("SELECT status FROM meal_plans WHERE id = {$pCracker}")->fetchColumn() === 'superseded', 'M2 versão anterior vira superseded');
-check(throws(fn() => $svc->publishPlan($pCracker, true, false, 'Tentativa de republicar plano antigo.'), 'Somente rascunhos'), 'M2 plano superseded não é republicado');
-check(throws(fn() => $svc->publishPlan($pVerified), 'já está publicado'), 'M2 plano publicado não é publicado de novo');
+check(throws(fn() => $svc->publishPlan($pCracker, true, false, 'Tentativa de republicar plano antigo.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).'), 'Somente rascunhos'), 'M2 plano superseded não é republicado');
+check(throws(fn() => $svc->publishPlan($pVerified, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).'), 'já está publicado'), 'M2 plano publicado não é publicado de novo');
 $uq = $db->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'uq_meal_plan_versions_number'")->fetchColumn();
 check((int)$uq === 1, 'M2 índice único (clinic_id, patient_id, version_number) existe');
 check(throws(fn() => $db->exec("INSERT INTO meal_plan_versions (clinic_id, meal_plan_id, patient_id, professional_id, version_number, title, payload_json, published_at)
@@ -139,7 +140,7 @@ check((int)$db->query("SELECT COUNT(*) FROM meal_plan_items WHERE meal_id = {$me
 
 // ---------- M1: paciente lê o snapshot publicado ----------
 $pSnap = $newPlan($pid, 'Plano snapshot', 9951, 50);
-$svc->publishPlan($pSnap, true, false, 'Pão caseiro sem glúten preparado pela própria clínica.');
+$svc->publishPlan($pSnap, true, false, 'Pão caseiro sem glúten preparado pela própria clínica.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 $db->exec("UPDATE foods SET name = 'Pão RENOMEADO', energy_kcal = 999 WHERE id = 9951");
 $api = (new PatientApiController($db))->getDailyMealPlan($pid);
 $apiItem = $api['meals'][0]['items'][0] ?? [];

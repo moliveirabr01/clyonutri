@@ -137,7 +137,7 @@ assert($patientRejected, "Geração para paciente sem versão publicada deve fal
 echo "  [PASS] [AC1_PATIENT_REJECTED] Paciente sem plano publicado bloqueado.\n";
 
 // Agora publicar o plano alimentar
-$publishResult = $mealPlanService->publishPlan($draftPlan['plan_id'], true, false, 'Justificativa clínica para homologação');
+$publishResult = $mealPlanService->publishPlan($draftPlan['plan_id'], true, false, 'Justificativa clínica para homologação', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).', true);
 assert($publishResult === true, "Plano deve ser publicado com sucesso");
 
 // Agora gerar a lista de compras para o plano publicado -> DEVE SUCEDER
@@ -176,7 +176,7 @@ $planoAgrupamento = $mealPlanService->createPlan(
         ]
     ]
 );
-$mealPlanService->publishPlan($planoAgrupamento['plan_id'], true, false, 'Aprovação de plano para validação de agrupamento');
+$mealPlanService->publishPlan($planoAgrupamento['plan_id'], true, false, 'Aprovação de plano para validação de agrupamento', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).', true);
 
 $lista7Dias = $shoppingService->generateForPlan($planoAgrupamento['plan_id'], 7);
 
@@ -228,7 +228,7 @@ $planoSub = $mealPlanService->createPlan(
         ]
     ]
 );
-$mealPlanService->publishPlan($planoSub['plan_id'], true, false, 'Plano com substituições validado');
+$mealPlanService->publishPlan($planoSub['plan_id'], true, false, 'Plano com substituições validado', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).', true);
 
 // Buscar id do item e da substituição no banco
 $itemStmt = $db->prepare("SELECT id FROM meal_plan_items WHERE meal_id IN (SELECT id FROM meal_plan_meals WHERE meal_plan_id = ?)");
@@ -335,7 +335,7 @@ $planoAlergenico = $mealPlanService->createPlan(
         ]
     ]
 );
-$mealPlanService->publishPlan($planoAlergenico['plan_id'], true, false, 'Aprovação justificada para teste de alérgeno');
+$mealPlanService->publishPlan($planoAlergenico['plan_id'], true, false, 'Aprovação justificada para teste de alérgeno', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).', true);
 
 // Validar multiplicadores de dias e arredondamento (1, 7, 14, 30 dias)
 foreach ([1 => 1.3, 7 => 9.3, 14 => 18.7, 30 => 40.0] as $dias => $esperadoBanana) {

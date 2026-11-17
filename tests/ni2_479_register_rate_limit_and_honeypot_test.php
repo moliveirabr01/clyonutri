@@ -43,7 +43,8 @@ echo "[1/4] Teste de persistência e bloqueio no RegistrationRateLimiter...\n";
 
 $testIp = '198.51.100.' . rand(10, 250);
 $limiter = new RegistrationRateLimiter($db, null, 5);
-$limiter->reset($testIp);
+// NI2-884 (v54.76): RegistrationRateLimiter::reset() foi removido; o teste limpa o próprio balde do IP de TESTE.
+$db->prepare("DELETE FROM login_attempts WHERE bucket_key = ? AND scope = 'register_ip'")->execute([RegistrationRateLimiter::bucketKey($testIp)]);
 
 // 5 tentativas permitidas
 for ($i = 1; $i <= 5; $i++) {
@@ -57,11 +58,12 @@ check($blockedRes['allowed'] === false, "6ª tentativa bloqueada por exceder o l
 check($blockedRes['retry_after'] > 0, "Retry-After retornado com sucesso ({$blockedRes['retry_after']}s)");
 
 // Verificar registro na tabela login_attempts
-$st = $db->prepare("SELECT failures, locked_until FROM login_attempts WHERE bucket_key = :k AND scope = 'register_ip'");
+$st = $db->prepare("SELECT failures, window_started_at FROM login_attempts WHERE bucket_key = :k AND scope = 'register_ip'");
 $st->execute(['k' => RegistrationRateLimiter::bucketKey($testIp)]);
 $attemptRow = $st->fetch(\PDO::FETCH_ASSOC);
 check(!empty($attemptRow) && (int)$attemptRow['failures'] >= 5, "Contador de falhas persistido na login_attempts");
-check(!empty($attemptRow['locked_until']), "Campo locked_until populado com bloqueio temporário");
+// NI2-884 (v54.76): o limitador passou a usar janela de 1 h (window_started_at) em vez de locked_until.
+check(!empty($attemptRow['window_started_at']), "Janela do limite (window_started_at) registrada para o bloqueio temporário");
 
 // Verificar auditoria do bloqueio na audit_logs
 $stAudit = $db->prepare("SELECT action, details FROM audit_logs WHERE action = 'REGISTER_RATE_LIMITED' AND ip_address = :ip ORDER BY id DESC LIMIT 1");
@@ -70,7 +72,7 @@ $auditRow = $stAudit->fetch(\PDO::FETCH_ASSOC);
 check(!empty($auditRow), "Evento REGISTER_RATE_LIMITED registrado na trilha de auditoria audit_logs");
 
 // Limpar fixture de teste
-$limiter->reset($testIp);
+$db->prepare("DELETE FROM login_attempts WHERE bucket_key = ? AND scope = 'register_ip'")->execute([RegistrationRateLimiter::bucketKey($testIp)]);
 
 
 // -------------------------------------------------------------------------

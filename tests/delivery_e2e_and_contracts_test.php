@@ -1,4 +1,5 @@
 <?php
+// NI2-884 (v54.76): publishPlan passou a exigir autorização de adequação (NI2-587); chamadas atualizadas com justificativa de TESTE.
 
 declare(strict_types=1);
 
@@ -122,7 +123,7 @@ $plan = $mealPlanService->createPlan($patId, $profId, 'Plano de Performance Juli
         ],
     ],
 ]);
-$published = $mealPlanService->publishPlan($plan['plan_id']);
+$published = $mealPlanService->publishPlan($plan['plan_id'], false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 assert($published === true, "Plano publicado com sucesso");
 echo "  [Passo 5 e 6] Plano alimentar prescrito e publicado transacionalmente.\n";
 

@@ -80,7 +80,7 @@ assert($novoPlano['daily_energy_kcal'] > 400.0, "Cálculo calórico automático 
 
 // Publicar o plano para atender AC1 do NI2-116 (somente versões publicadas)
 $mealPlanService = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
-$mealPlanService->publishPlan($novoPlano['plan_id'], false, false, null, true, 'Autorizado clinicamente para teste onda 1');
+$mealPlanService->publishPlan($novoPlano['plan_id'], false, false, null, true, 'Autorizado clinicamente para teste onda 1', true) /* NI2-884: medidas estimadas confirmadas (NI2-886) */;
 echo "  ✓ Template criado, clonado para o paciente e publicado com sucesso (Total: {$novoPlano['daily_energy_kcal']} kcal).\n\n";
 
 // 2. NI2-114: Módulo de Receitas Culinárias com Cálculo Nutricional

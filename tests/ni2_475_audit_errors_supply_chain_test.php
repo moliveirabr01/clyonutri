@@ -49,20 +49,20 @@ check(str_contains($errorExposureSrc, "ini_set('log_errors', '1')"), "ErrorExpos
 check(str_contains($errorExposureSrc, "header_remove('X-Powered-By')"), "ErrorExposure suprime o cabeçalho identificador X-Powered-By");
 
 // 2. Validação da lógica debugOutputAllowed
-$_ENV['APP_ENV'] = 'production';
-$_ENV['APP_DEBUG'] = 'true';
+$_ENV['APP_ENV'] = 'production'; putenv('APP_ENV=production');
+$_ENV['APP_DEBUG'] = 'true'; putenv('APP_DEBUG=true');
 check(ErrorExposure::debugOutputAllowed(['REMOTE_ADDR' => '127.0.0.1']) === false, "debugOutputAllowed: NUNCA permite saída de debug quando APP_ENV=production, mesmo com APP_DEBUG=true");
 
-$_ENV['APP_ENV'] = 'development';
-$_ENV['APP_DEBUG'] = 'false';
+$_ENV['APP_ENV'] = 'development'; putenv('APP_ENV=development');
+$_ENV['APP_DEBUG'] = 'false'; putenv('APP_DEBUG=false');
 check(ErrorExposure::debugOutputAllowed(['REMOTE_ADDR' => '127.0.0.1']) === false, "debugOutputAllowed: Bloqueia debug quando APP_DEBUG=false");
 
 // Validar que o código restringe conexões web a 127.0.0.1 e ::1
 check(str_contains($errorExposureSrc, "\$ip === '127.0.0.1' || \$ip === '::1'"), "debugOutputAllowed: Restringe estritamente debug a loopback (127.0.0.1 e ::1)");
 
 // Restaurar ambiente
-$_ENV['APP_ENV'] = 'production';
-$_ENV['APP_DEBUG'] = 'false';
+$_ENV['APP_ENV'] = 'production'; putenv('APP_ENV=production');
+$_ENV['APP_DEBUG'] = 'false'; putenv('APP_DEBUG=false');
 
 // 3. Teste de renderização da página 500 neutra
 $sampleId = 'err_audit_' . bin2hex(random_bytes(4));

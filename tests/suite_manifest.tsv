@@ -1,0 +1,17 @@
+# NI2-884 — manifesto da suíte completa (bin/run-tests full). Uma linha por arquivo que NÃO roda como teste PHP isolado.
+# arquivo	categoria	motivo / como rodar
+# categorias: fixture (não é teste), wrapper (rodado por outro script), infra-mysql, infra-apache, infra-replatform, dbprefix:<prefixo> (exige banco SQLite com esse prefixo de caminho)
+tests/ni2_630_fixture.php	fixture	gera fixture sintética para tests/README-ni2-630.md; não é teste
+tests/ni2_688_portal_fixture.php	fixture	fixture do roteiro NI2-688 (tests/README-ni2-688.md); não é teste
+tests/ux_benchmark_reset.php	fixture	reinicia banco de benchmark UX (exige DSN de testes); não é teste
+tests/ni2_298_calendar_integration_test.php	wrapper	rodado por tests/ni2_298_verify.sh (prepara fixture própria; também chama node)
+tests/ni2_6_prontuario_e_anamnese_nutricional_test.php	wrapper	rodado por tests/ni2_299_verify.sh
+tests/adaptive_concurrency.php	infra-mysql	dois processos e conexões MySQL reais (ADAPTIVE_TEST_DSN com "test" no nome)
+tests/ux19_concurrency.php	infra-mysql	exige banco MySQL isolado com "test" no nome
+tests/ux_concurrency.php	infra-mysql	exige banco MySQL isolado com "test" no nome
+tests/mysql8_migrations_and_ddl_validation_test.php	infra-mysql	DDL das migrações no MySQL (MYSQL_TEST_* ); ver tests/mysql/
+tests/laravel_replatform_verification_test.php	infra-replatform	exige replatform/laravel13/vendor (composer install do projeto de replataforma)
+tests/ni2_209_remediation_and_go_live_gate_test.php	infra-replatform	exige replatform/laravel13/vendor
+tests/hsts_apache_http_validation_test.php	infra-apache	valida cabeçalhos servidos pelo Apache (.htaccess)
+tests/replatform_infrastructure_test.php	infra-apache	listagem de diretórios desabilitada no Apache
+tests/review_ni2_91_provas.php	dbprefix:/tmp/ni2-89-	exige DB_DATABASE em /tmp/ni2-89-*

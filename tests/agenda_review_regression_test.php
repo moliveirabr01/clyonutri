@@ -21,7 +21,7 @@ if (($argv[1] ?? '') === '--complete-worker') {
     fflush(STDOUT);
     fgets(STDIN);
     try {
-        (new AppointmentService($workerDb))->completeConsultation((int)$argv[3], 'Concurrent conclusion');
+        (new AppointmentService($workerDb, new DateTimeImmutable('2031-01-10 10:00:00')))->completeConsultation((int)$argv[3], 'Concurrent conclusion');
         echo "completed\n";
     } catch (InvalidArgumentException $e) {
         echo "rejected\n";
@@ -39,7 +39,9 @@ $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role, status) VALUES 
 $db->exec("INSERT INTO professionals (id, user_id, crn, crn_region) VALUES (1, 1, 'review', 'review')");
 $db->exec("INSERT INTO patients (id, clinic_id, uuid, name) VALUES (1, 1, 'review-p1', 'Patient A'), (2, 1, 'review-p2', 'Patient B')");
 TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist']);
+// NI2-884 (v54.76): relógio da clínica no dia das consultas de 2031, senão a guarda da NI2-879 recusa a conclusão direta.
 $s = new AppointmentService($db);
+$s2031 = new AppointmentService($db, new DateTimeImmutable('2031-01-10 10:00:00'));
 $checks = 0;
 function check(bool $ok, string $label): void {
     global $checks;
@@ -60,7 +62,7 @@ function breakHistory(PDO $db, string $condition = ''): void {
 }
 
 $a = $s->schedule(1, 1, '2031-01-10T10:00');
-$r = $s->completeConsultation($a['id'], 'First and only conclusion');
+$r = $s2031->completeConsultation($a['id'], 'First and only conclusion');
 $count = (int)$db->query('SELECT COUNT(*) FROM clinical_records')->fetchColumn();
 rejects(fn() => $s->completeConsultation($a['id'], 'First and only conclusion'), InvalidArgumentException::class, 'Repeated conclusion rejected');
 check((int)$db->query('SELECT COUNT(*) FROM clinical_records')->fetchColumn() === $count, 'Retry creates no second signed record');

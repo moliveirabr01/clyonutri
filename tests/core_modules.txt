@@ -1,0 +1,25 @@
+# NI2-884: suítes por módulo que entram no gate core (rodam isoladas pelo tests/run_full_suite.php, cada uma num SQLite novo).
+# prontuário (append-only, retificação versionada, cifragem enc:v1 em repouso)
+tests/clinical_safety_and_precision_test.php
+tests/v47_ni2_537_prontuario_render_test.php
+# isolamento entre clínicas (web, serviços e /api/v1)
+tests/cross_tenant_end_to_end_security_test.php
+tests/cross_tenant_offensive_test.php
+tests/reauditoria_varredura_tenant_test.php
+tests/ni2_473_audit_authorization_isolation_test.php
+tests/patient_mobile_api_integration_test.php
+tests/ni2_476_audit_backups_restore_logs_test.php
+# cálculos (GET/VET, macros, antropometria, dobras)
+tests/ni2_514_phase1_test.php
+tests/ni2_439_skinfold_protocols_test.php
+# agenda
+tests/agenda_calendar_waitlist_test.php
+tests/v5439_agenda_disponibilidade_test.php
+tests/agenda_operational_and_concurrency_test.php
+# assinatura
+tests/trust_subscription_and_cancellation_e2e_test.php
+tests/subscription_trial_test.php
+# autenticação (login, limite de tentativas, OTP do paciente)
+tests/auditoria_2026_10_14_f03_login_rate_limit_test.php
+tests/reauditoria_v2_02_account_wide_rate_limit_test.php
+tests/patient_otp_concurrency_and_security_test.php

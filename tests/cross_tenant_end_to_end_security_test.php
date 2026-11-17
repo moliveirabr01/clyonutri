@@ -244,14 +244,18 @@ class CrossTenantEndToEndSecurityTest
         $this->assertEquals(2, $res['total_imported'], "2 pacientes importados com sucesso");
 
         // Comprovar persistência isolada: todos os pacientes criados pertencem à Clínica Alfa
-        $stmtAlfa = $this->db->prepare("SELECT COUNT(*) as total FROM patients WHERE clinic_id = :clinic_id AND notes LIKE 'Migrado de Dietbox%'");
+        // notes fica cifrado em repouso (enc:v1): conta decifrando, não com LIKE no texto cifrado.
+        $stmtAlfa = $this->db->prepare("SELECT notes FROM patients WHERE clinic_id = :clinic_id");
         $stmtAlfa->execute(['clinic_id' => $this->clinicAlfaId]);
-        $this->assertEquals(2, (int)$stmtAlfa->fetch()['total'], "Pacientes gravados estritamente na Clínica Alfa");
+        $nAlfa = count(array_filter($stmtAlfa->fetchAll(PDO::FETCH_COLUMN), fn($n) => str_starts_with((string)\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt($n), 'Migrado de Dietbox')));
+        $this->assertEquals(2, $nAlfa, "Pacientes gravados estritamente na Clínica Alfa");
 
         // Comprovar isolamento: Clínica Beta tem zero pacientes desta importação
-        $stmtBeta = $this->db->prepare("SELECT COUNT(*) as total FROM patients WHERE clinic_id = :clinic_id AND notes LIKE 'Migrado de Dietbox%'");
+        // notes fica cifrado em repouso (enc:v1): conta decifrando, não com LIKE no texto cifrado.
+        $stmtBeta = $this->db->prepare("SELECT notes FROM patients WHERE clinic_id = :clinic_id");
         $stmtBeta->execute(['clinic_id' => $this->clinicBetaId]);
-        $this->assertEquals(0, (int)$stmtBeta->fetch()['total'], "Nenhum paciente importado vazou para a Clínica Beta");
+        $nBeta = count(array_filter($stmtBeta->fetchAll(PDO::FETCH_COLUMN), fn($n) => str_starts_with((string)\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt($n), 'Migrado de Dietbox')));
+        $this->assertEquals(0, $nBeta, "Nenhum paciente importado vazou para a Clínica Beta");
     }
 
     private function testFilesAndDocumentsFlows(): void

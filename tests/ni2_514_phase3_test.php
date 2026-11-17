@@ -1,4 +1,5 @@
 <?php
+// NI2-884 (v54.76): publishPlan passou a exigir autorização de adequação (NI2-587); chamadas atualizadas com justificativa de TESTE.
 
 declare(strict_types=1);
 
@@ -242,7 +243,7 @@ $p1Details = $planSvc->getPlanWithDetails((int)$planV1['plan_id']);
 $p1MealId = (int)$p1Details['meals'][0]['id'];
 $planSvc->addItem($p1MealId, $fRiceId, 100.0, 'g');   // 124 kcal
 $planSvc->addItem($p1MealId, $fBeansId, 100.0, 'g');  // 76 kcal -> Total v1 = 200 kcal
-$pub1 = $planSvc->publishPlan((int)$planV1['plan_id'], true, true, 'Alimentos vegetais conferidos sem alérgenos para a paciente.');
+$pub1 = $planSvc->publishPlan((int)$planV1['plan_id'], true, true, 'Alimentos vegetais conferidos sem alérgenos para a paciente.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 
 // Duplicar v1 para criar v2: aumentar arroz para 150g (186 kcal), remover feijão, adicionar abacate 100g (96 kcal) -> Total v2 = 282 kcal
 $copyPlan = $planSvc->duplicatePlan((int)$planV1['plan_id'], 'Plano Evolução Retorno (v2)');
@@ -256,7 +257,7 @@ foreach ($p2Details['meals'][0]['items'] as $it) {
     }
 }
 $planSvc->addItem($p2MealId, $fAvocadoId, 100.0, 'g');
-$pub2 = $planSvc->publishPlan((int)$copyPlan['plan_id'], true, true, 'Alimentos vegetais conferidos sem alérgenos no retorno.');
+$pub2 = $planSvc->publishPlan((int)$copyPlan['plan_id'], true, true, 'Alimentos vegetais conferidos sem alérgenos no retorno.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 
 // Adulterar o catálogo vivo DEPOIS da publicação para provar que o diff lê estritamente do snapshot imutável!
 $db->prepare("UPDATE foods SET energy_kcal = 9999 WHERE id = ?")->execute([$fRiceId]);
@@ -295,7 +296,11 @@ $patNoEmailId = (int)$db->lastInsertId();
 $eventsBeforeNoEmail = (int)$db->query("SELECT COUNT(*) FROM notification_events WHERE clinic_id = 1 AND recipient_type = 'patient' AND recipient_id = {$patNoEmailId}")->fetchColumn();
 $appNoEmail = $appSvc->schedule($patNoEmailId, 1, '2026-11-10 10:00', 'first_visit', 60, null, true);
 $eventsAfterNoEmail = (int)$db->query("SELECT COUNT(*) FROM notification_events WHERE clinic_id = 1 AND recipient_type = 'patient' AND recipient_id = {$patNoEmailId}")->fetchColumn();
-check($eventsAfterNoEmail === $eventsBeforeNoEmail, 'NI2-527: Agendamento para paciente sem e-mail validado NÃO dispara mensagem externa automática');
+// NI2-884: o evento interno pode existir (central do paciente); a garantia do NI2-527 é que nenhuma mensagem externa sai.
+// O cron de envio é executado de verdade e a entrega de e-mail tem de ficar 'skipped/no_email' (nada enviado nem registrado).
+(new \ClyoNutri\Domain\Notification\NotificationService($db, new \ClyoNutri\Core\Mail\ArrayMailer()))->drain();
+$externalOut = $db->query("SELECT d.channel, d.status FROM notification_events e JOIN notification_deliveries d ON d.event_id = e.id WHERE e.recipient_type = 'patient' AND e.recipient_id = {$patNoEmailId} AND d.channel = 'email'")->fetchAll(PDO::FETCH_ASSOC);
+check($externalOut !== [] && array_filter($externalOut, fn($d) => $d['status'] !== 'skipped') === [], 'NI2-527: Agendamento para paciente sem e-mail validado NÃO dispara mensagem externa automática (entrega de e-mail ignorada pelo cron)');
 
 $prevNoEmail = $appSvc->previewConfirmationMessage((int)$appNoEmail['id']);
 check($prevNoEmail['can_send'] === false && str_contains((string)$prevNoEmail['blocked_reason'], 'sem e-mail válido'), 'NI2-527: Prévia de confirmação bloqueia envio e explica o motivo quando paciente não tem e-mail válido');
@@ -307,7 +312,10 @@ check($prevValid['can_send'] === true && $prevValid['recipient_email'] === 'mari
 
 $send1 = $appSvc->sendAuthorizedConfirmation((int)$appValid['id'], 1);
 $send2 = $appSvc->sendAuthorizedConfirmation((int)$appValid['id'], 1);
-check($send1['sent'] === true && $send1['idempotent_reused'] === false && $send2['sent'] === false && $send2['idempotent_reused'] === true && $send1['event_id'] === $send2['event_id'], 'NI2-527: Envio autorizado de confirmação é estritamente idempotente (não duplica evento na fila)');
+// NI2-884: o envio ficou com o worker (sent=false, queued=true); idempotência = mesmo evento, segundo pedido reaproveitado.
+$dupCount = (int)$db->query("SELECT COUNT(*) FROM notification_events WHERE dedupe_key = " . $db->quote((string)$send1['dedupe_key']))->fetchColumn();
+// A confirmação já é enfileirada no agendamento (AppointmentConfirmationPublisher); o envio autorizado reaproveita o mesmo evento.
+check($dupCount === 1 && $send1['queued'] === true && $send2['queued'] === true && $send2['idempotent_reused'] === true && $send1['event_id'] === $send2['event_id'], 'NI2-527: Envio autorizado de confirmação é estritamente idempotente (não duplica evento na fila)');
 
 $monthData = $appSvc->listByMonth('2026-11-01');
 check($monthData['start_date'] === '2026-11-01' && $monthData['end_date'] === '2026-11-30' && count($monthData['days']) === 30 && $monthData['total_appointments'] >= 2, 'NI2-527: listByMonth retorna todos os dias do mês e agrupa as consultas agendadas');

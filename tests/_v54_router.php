@@ -11,6 +11,7 @@ if ($path === '/__teste_expirar' || $path === '/__teste_quase') {
 }
 if ($path === '/__teste_login') {
     session_start();
+    $_SESSION = []; // como logout + login real (AuthController::logout zera a sessão)
     $_SESSION['user_id'] = (int)$_GET['u']; $_SESSION['clinic_id'] = (int)$_GET['c']; $_SESSION['auth_version'] = (int)$_GET['v'];
     $_SESSION['last_activity'] = time();
     header('Location: ' . ($_GET['to'] ?? '/dashboard')); exit;

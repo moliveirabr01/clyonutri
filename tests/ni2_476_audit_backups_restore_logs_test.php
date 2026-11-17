@@ -149,6 +149,10 @@ $crossTenantBlocked = false;
 try {
     // Buscar um paciente existente
     $samplePatient = $db->query("SELECT id, clinic_id FROM patients LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$samplePatient) { // banco de teste limpo: cria um paciente TESTE para o teste não passar no vazio
+        $db->exec("INSERT INTO patients (uuid, clinic_id, name, status) VALUES ('00000000-0000-4000-a476-000000000001', 1, 'Paciente TESTE NI2-476', 'active')");
+        $samplePatient = $db->query("SELECT id, clinic_id FROM patients LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    }
     if ($samplePatient) {
         $wrongClinicId = (int)$samplePatient['clinic_id'] + 9999;
         TenantGuard::assertPatientBelongsToClinic((int)$samplePatient['id'], $wrongClinicId, $db);

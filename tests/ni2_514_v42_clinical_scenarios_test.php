@@ -1,4 +1,5 @@
 <?php
+// NI2-884 (v54.76): publishPlan passou a exigir autorização de adequação (NI2-587); chamadas atualizadas com justificativa de TESTE.
 
 declare(strict_types=1);
 
@@ -192,13 +193,13 @@ check($c3Preview['allergen_safety']['has_conflict'] === true && $c3Preview['alle
 
 $c3BlockedWithoutOverride = false;
 try {
-    $planSvc->publishPlan($c3PlanId, false, false, null);
+    $planSvc->publishPlan($c3PlanId, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 } catch (\InvalidArgumentException | \RuntimeException $e) {
     $c3BlockedWithoutOverride = str_contains($e->getMessage(), 'alergênico') || str_contains($e->getMessage(), 'Publicação bloqueada');
 }
 check($c3BlockedWithoutOverride, 'C3: Publicação sem justificativa clínica é bloqueada quando há conflito de alergia');
 
-$c3PublishedWithJustification = $planSvc->publishPlan($c3PlanId, true, false, 'Dessensibilização oral supervisionada em ambulatório de alergia.');
+$c3PublishedWithJustification = $planSvc->publishPlan($c3PlanId, true, false, 'Dessensibilização oral supervisionada em ambulatório de alergia.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 check($c3PublishedWithJustification === true, 'C3b: Publicação com override expresso e justificativa clínica (>=10 chars) é aceita e auditada');
 
 // =========================================================================
@@ -266,7 +267,7 @@ check(abs($c7Delta['energy_kcal']) <= 1.0 && $c7Eq['verdict'] !== 'equivalente',
 // =========================================================================
 // CENÁRIO C8: Publicar v1, editar rascunho/duplicar e publicar v2 preservando histórico imutável
 // =========================================================================
-$publishedV1 = $planSvc->publishPlan($c1PlanId);
+$publishedV1 = $planSvc->publishPlan($c1PlanId, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 $v1AfterPub = $planSvc->getPlanWithDetails($c1PlanId);
 check($publishedV1 === true && $v1AfterPub['status'] === 'published' && (int)$v1AfterPub['version'] === 1, 'C8: Publica versão 1 do plano C1');
 
@@ -274,7 +275,7 @@ $dupRes = $planSvc->duplicatePlan($c1PlanId);
 $v2DraftId = (int)$dupRes['plan_id'];
 $v2Meals = $planSvc->getPlanWithDetails($v2DraftId)['meals'];
 $planSvc->addItem((int)$v2Meals[1]['id'], 1009, 100, 'g'); // Adiciona iogurte na colação da v2
-$publishedV2 = $planSvc->publishPlan($v2DraftId);
+$publishedV2 = $planSvc->publishPlan($v2DraftId, false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 $v2AfterPub = $planSvc->getPlanWithDetails($v2DraftId);
 
 $versionsCount = (int)$db->query("SELECT COUNT(*) FROM meal_plan_versions WHERE meal_plan_id IN ({$c1PlanId}, {$v2DraftId})")->fetchColumn();

@@ -283,7 +283,7 @@ assertCondition("Delta de peso entre avaliação 2 e 3 é -3.2 kg", $evolution['
 
 // Alternativa textual acessível para leitores de tela
 assertCondition("Alternativa textual acessível gerada com sucesso", !empty($evolution['accessible_summary']));
-assertCondition("Resumo textual descreve redução total de 6.5 kg", str_contains($evolution['accessible_summary'], '6.5') && str_contains($evolution['accessible_summary'], 'redução'));
+assertCondition("Resumo textual descreve redução total de 6,5 kg (vírgula decimal pt-BR)", str_contains($evolution['accessible_summary'], '6,5') && str_contains($evolution['accessible_summary'], 'redução'));
 
 // =============================================================================
 // [4] NI2-68: COMPARAR AVALIAÇÕES (BASELINE VS. FOLLOW-UP E MISSING DATA)

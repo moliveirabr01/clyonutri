@@ -179,7 +179,7 @@ check('P4', 'Push nunca sai dentro da requisição (fica na fila para o cron)', 
 $dr = $svc->drain();
 $sent = $calls[0]['payload'] ?? [];
 check('P4', 'Cron manda uma mensagem por aparelho ativo, numa requisição', count($calls) === 1 && count($sent) === 2 && $dr['sent'] >= 1, $dr);
-check('P4', 'Texto do push é neutro (sem conteúdo da mensagem nem dado de saúde)', ($sent[0]['title'] ?? '') === 'ClyoNutri' && ($sent[0]['body'] ?? '') === 'Você tem uma mensagem nova do consultório. Abra o app para ler.'
+check('P4', 'Texto do push é neutro (sem conteúdo da mensagem nem dado de saúde)', ($sent[0]['title'] ?? '') === 'Clyo Nutri' && ($sent[0]['body'] ?? '') === 'Você tem uma mensagem nova do consultório. Abra o app para ler.'
     && array_keys($sent[0]['data'] ?? []) === ['event_id', 'category'] && $sent[0]['data']['category'] === 'chat');
 check('P4', 'Entrega fica sent e cada aparelho ganha um recibo pendente', one($db, "SELECT status FROM notification_deliveries WHERE event_id = ? AND channel = 'push'", [$r['event_id']]) === 'sent'
     && (int)one($db, "SELECT COUNT(*) FROM notification_push_tickets t JOIN notification_deliveries d ON d.id = t.delivery_id WHERE d.event_id = ? AND t.status = 'pending'", [$r['event_id']]) === 2);

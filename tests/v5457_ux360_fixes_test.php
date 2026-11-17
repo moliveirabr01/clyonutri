@@ -229,7 +229,7 @@ try {
     [$c, $b2, $h] = $req('/pacientes/2/editar', ['_csrf_token' => $csrf($b), 'name' => 'Paciente TESTE 108', 'allergies' => 'camarão (forjado)', 'allergy_denied' => '1']);
     $r = $pdo->query("SELECT name, allergies, allergy_assessment FROM patients WHERE id = 2")->fetch();
     $ok($r['name'] === 'Paciente TESTE 108', 'o resto do cadastro continua salvando');
-    $ok($r['allergies'] === 'cadastro antigo TESTE' && $r['allergy_assessment'] === 'recorded', 'negativo: POST forjado não grava alergia paralela nem "nega alergias" por cima da anamnese');
+    $ok(Enc::decrypt($r['allergies']) === 'cadastro antigo TESTE' && $r['allergy_assessment'] === 'recorded', 'negativo: POST forjado não grava alergia paralela nem "nega alergias" por cima da anamnese');
     [$c, $b] = $req('/pacientes/2');
     $ok(str_contains($b, 'amendoim'), 'selo/resumo do perfil continua vindo da anamnese');
     // sem anamnese concluída: o cadastro continua sendo onde se informa
@@ -238,7 +238,7 @@ try {
     [$c, $b] = $req("/pacientes/$pN/editar");
     $ok(str_contains($b, 'name="allergies"') && !str_contains($b, 'data-testid="edit-allergy-source"'), 'regressão: sem anamnese o campo de alergia do cadastro continua editável');
     [$c, $b2] = $req("/pacientes/$pN/editar", ['_csrf_token' => $csrf($b), 'name' => 'Paciente TESTE sem anamnese', 'allergies' => 'glúten TESTE']);
-    $ok($pdo->query("SELECT allergies FROM patients WHERE id = $pN")->fetchColumn() === 'glúten TESTE', 'regressão: sem anamnese a alergia do cadastro é gravada');
+    $ok(Enc::decrypt((string)$pdo->query("SELECT allergies FROM patients WHERE id = $pN")->fetchColumn()) === 'glúten TESTE', 'regressão: sem anamnese a alergia do cadastro é gravada');
     // tenant: outra clínica não abre
     $pdo->prepare("INSERT INTO patients (clinic_id, uuid, name, birth_date, gender, status) VALUES (2, ?, 'Paciente TESTE B 108', '1991-01-01', 'F', 'active')")->execute([bin2hex(random_bytes(8))]);
     $pB8 = (int)$pdo->lastInsertId();

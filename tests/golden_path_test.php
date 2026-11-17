@@ -1,4 +1,5 @@
 <?php
+// NI2-884 (v54.76): publishPlan passou a exigir autorização de adequação (NI2-587); chamadas atualizadas com justificativa de TESTE.
 
 declare(strict_types=1);
 
@@ -107,7 +108,7 @@ echo "  ✓ Plano alimentar '{$plano['title']}' criado com {$plano['daily_energy
 
 // 6. Publicação do Plano e Checagem do Perfil 360
 echo "[6/6] Publicando Plano e Checando Perfil 360...\n";
-$published = $mealPlanService->publishPlan($plano['plan_id']);
+$published = $mealPlanService->publishPlan($plano['plan_id'], false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 assert($published === true, "Plano deve ser publicado");
 
 $p360 = $patientRepo->getProfile360($patient['id']);

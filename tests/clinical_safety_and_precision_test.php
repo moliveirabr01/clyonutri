@@ -79,7 +79,9 @@ $stmtCheck = $db->prepare("SELECT * FROM clinical_records WHERE id = :id");
 $stmtCheck->execute(['id' => $rec1['id']]);
 $orig = $stmtCheck->fetch();
 assert((int)$orig['is_retracted'] === 1, "Registro original v1 deve estar marcado como superado");
-$origContent = json_decode($orig['content_json'], true);
+// v54.6x: content_json fica cifrado em repouso (enc:v1); a imutabilidade é conferida no conteúdo decifrado.
+assert(\ClyoNutri\Core\Security\ClinicalEncryptionService::isEncrypted($orig['content_json']), "content_json da v1 cifrado em repouso");
+$origContent = json_decode(\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt($orig['content_json']), true);
 assert($origContent['conduta'] === 'Plano alimentar hipocalórico de 1800 kcal', "Conteúdo original da v1 NUNCA pode ser sobrescrito");
 echo "  ✓ Retificação versionada v2 criada com justificativa. Histórico v1 100% preservado e imutável.\n\n";
 
@@ -171,7 +173,7 @@ $plan1 = $mealPlanService->createPlan($patientId, $profId, 'Plano Inicial Hipert
 assert($plan1['status'] === 'draft', "Plano recém-criado nasce como rascunho");
 
 // Publicar Plano 1
-$published1 = $mealPlanService->publishPlan($plan1['plan_id']);
+$published1 = $mealPlanService->publishPlan($plan1['plan_id'], false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 assert($published1 === true, "Plano 1 deve ser publicado com sucesso");
 
 // Verificar snapshot imutável em meal_plan_versions
@@ -192,7 +194,7 @@ $plan2 = $mealPlanService->createPlan($patientId, $profId, 'Plano Ajustado Fase 
         ],
     ],
 ]);
-$published2 = $mealPlanService->publishPlan($plan2['plan_id']);
+$published2 = $mealPlanService->publishPlan($plan2['plan_id'], false, false, null, true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 assert($published2 === true, "Plano 2 publicado com sucesso");
 
 // O Plano ativo agora deve ser o Plano 2 e o Plano 1 deve ser superseded
@@ -253,7 +255,7 @@ assert($allergenBlocked === true, "Publicação de prescrição com alergênico 
 echo "  ✓ Alerta e bloqueio de segurança clínica ativados: tentativa de prescrever Leite desnatado para paciente com alergia a lactose foi barrada.\n";
 
 // Publicação supervisionada expressa (quando o profissional insere substituto ou confirmação clínica formal)
-$publishedWithOverride = $mealPlanService->publishPlan($planInseguro['plan_id'], true, false, 'Leite sem lactose orientado; conferido com a paciente.');
+$publishedWithOverride = $mealPlanService->publishPlan($planInseguro['plan_id'], true, false, 'Leite sem lactose orientado; conferido com a paciente.', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).');
 assert($publishedWithOverride === true, "Com autorização explícita de override, publicação supervisionada é permitida");
 echo "  ✓ Supervisão profissional com confirmação explícita registrada com sucesso.\n\n";
 

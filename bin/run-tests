@@ -59,6 +59,8 @@ case "$PROFILE" in
       "tests/ni2_703.php"
       "bin/compare_migrations_schema.php"
     )
+    # NI2-884: uma suíte por módulo (prontuário, isolamento, cálculos, agenda, assinatura, autenticação), isoladas.
+    run_step "tests/core_modules.txt (NI2-884, isoladas)" php tests/run_full_suite.php @tests/core_modules.txt
     for t in "${CORE_TESTS[@]}"; do
       if [ -f "$t" ]; then
         run_step "$t" php -d zend.assertions=1 -d assert.exception=1 "$t"
@@ -72,8 +74,12 @@ case "$PROFILE" in
   infra)
     run_step "tests/run_release_gate.sh --browser" bash tests/run_release_gate.sh --browser
     ;;
+  full)
+    # NI2-884: suíte inteira (tests/*.php), cada arquivo com SQLite próprio; sai com 1 se algo falhar.
+    exec php tests/run_full_suite.php "${@:2}"
+    ;;
   *)
-    echo "Uso: bin/run-tests [core|infra]" >&2
+    echo "Uso: bin/run-tests [core|infra|full]" >&2
     exit 2
     ;;
 esac

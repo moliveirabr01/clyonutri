@@ -239,7 +239,8 @@ assertCheck($consultDetails['patient_id'] === $p1['id'], "Contexto da consulta c
 assertCheck($consultDetails['patient_name'] === $p1['name'], "Contexto da consulta carrega nome real do paciente ({$p1['name']})");
 
 // Executar conclusão clínica com append-only e SHA-256 no prontuário
-$completeResult = $service->completeConsultation(
+// NI2-884 (v54.76): conclui no dia agendado (relógio injetado); a data fixa 18/11/2026 virava "outro dia" (NI2-879).
+$completeResult = (new AppointmentService($db, new DateTimeImmutable((string)$consultDetails['scheduled_at'])))->completeConsultation(
     $consultApp['id'],
     'Evolução clínica favorável. Paciente aderiu 90% da prescrição, redução de 1.2kg.',
     ['weight_kg' => 68.5, 'notes' => 'Conduta mantida']
