@@ -2003,7 +2003,9 @@ final class AdminController
         $flash = $this->takeProtocolFlash();
         $importReport = $_SESSION['measure_import_report'] ?? null;
         unset($_SESSION['measure_import_report']);
-        $this->render(__DIR__ . '/../../../views/admin/medidas-caseiras.php', compact('ready', 'filters', 'page', 'perPage', 'stats', 'rows', 'groups', 'total', 'canManage', 'flash', 'importReport'),
+        // v54.77: RT nomeado (decisão do Maicon: Raphael Lombardi). Sem nome e CRN, a tela mostra o que falta e não grava revisão.
+        $rt = \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($this->db);
+        $this->render(__DIR__ . '/../../../views/admin/medidas-caseiras.php', compact('ready', 'filters', 'page', 'perPage', 'stats', 'rows', 'groups', 'total', 'canManage', 'flash', 'importReport', 'rt'),
             'Medidas caseiras', 'medidas', [['label' => 'Medidas caseiras', 'url' => '']]);
     }
 
@@ -2046,9 +2048,20 @@ final class AdminController
         }
         $svc = new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($this->db);
         $uid = (int)$user->getUserId();
-        $name = (string)$user->getName();
         $s = static fn(string $k): string => is_string($_POST[$k] ?? null) ? trim($_POST[$k]) : '';
+        $rt = \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($this->db);
+        // v54.77: o revisor gravado é sempre o RT configurado (nome — CRN); quem clicou fica em reviewed_by e na auditoria.
+        $name = $rt->label();
         try {
+            if ($s('acao') === 'rt') {
+                $changes = \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::save($this->db, $s('rt_nome'), $s('rt_crn'), $s('rt_email'), $uid);
+                $this->protocolFlash('success', $changes ? 'Responsável técnico salvo. As próximas revisões ficam registradas em nome de ' . \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($this->db)->label() . '.' : 'Nada mudou no responsável técnico.');
+                header('Location: ' . $back);
+                exit;
+            }
+            if (in_array($s('acao'), ['aprovar', 'corrigir', 'remover', 'lote', 'importar'], true)) {
+                $rt->assertReady();
+            }
             switch ($s('acao')) {
                 case 'aprovar':
                     $svc->approve((int)$s('id'), $uid, $name, $s('fonte'));

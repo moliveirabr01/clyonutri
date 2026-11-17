@@ -89,7 +89,8 @@ class ClinicMeasuresController
             if (\ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService::ready($mdb)) {
                 $st = (new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($mdb))->stats();
                 $measureBase = ['pending' => $st['pending'], 'approved' => $st['approved'],
-                    'last_at' => $mdb->query("SELECT MAX(reviewed_at) FROM food_household_measures WHERE review_status IN ('approved','removed')")->fetchColumn() ?: null];
+                    'last_at' => $mdb->query("SELECT MAX(reviewed_at) FROM food_household_measures WHERE review_status IN ('approved','removed')")->fetchColumn() ?: null,
+                    'rt' => \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($mdb)->name]; // v54.77: RT nomeado
             }
         } catch (\Throwable) { /* sem a migração 99 o texto neutro abaixo vale */ }
 

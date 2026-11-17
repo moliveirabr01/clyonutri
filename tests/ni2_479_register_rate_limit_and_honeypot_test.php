@@ -82,47 +82,40 @@ echo "\n[2/4] Verificação estática e funcional do Honeypot Anti-Bot...\n";
 
 $registerViewPath = realpath(__DIR__ . '/../views/auth/register.php');
 $viewContent = file_get_contents($registerViewPath);
+$authSrc = file_get_contents(__DIR__ . '/../src/Application/Controllers/AuthController.php');
 
-check(str_contains($viewContent, 'name="website_url"'), "Campo honeypot 'website_url' presente em register.php");
-check(str_contains($viewContent, 'tabindex="-1"'), "Honeypot possui tabindex='-1' para não receber foco de humanos");
-check(str_contains($viewContent, 'autocomplete="off"'), "Honeypot possui autocomplete='off' contra autopreenchimento");
-check(str_contains($viewContent, 'aria-hidden="true"'), "Honeypot possui aria-hidden='true' para acessibilidade (leitores de tela)");
+// v54.77 (decisão do Maicon, 17/11/2026): o honeypot "website_url" NÃO volta. Desde c039de5 a armadilha do cadastro é
+// o campo AuthController::REGISTER_TRAP_FIELD ('cn_campo_extra'), com nome que o preenchimento automático do navegador
+// não confunde com um campo real. O teste passa a conferir o comportamento atual em vez do nome antigo.
+$trap = AuthController::REGISTER_TRAP_FIELD;
+check($trap === 'cn_campo_extra', "Campo-armadilha atual do cadastro é '{$trap}' (AuthController::REGISTER_TRAP_FIELD)");
+check(!str_contains($viewContent, 'website_url') && !str_contains($authSrc, 'website_url'), "Campo antigo 'website_url' não voltou (decisão de 17/11/2026)");
+check(str_contains($viewContent, 'AuthController::REGISTER_TRAP_FIELD') && str_contains($viewContent, 'id="cn_campo_extra"'), "register.php renderiza o campo-armadilha pelo nome do controller");
+check(str_contains($viewContent, 'tabindex="-1"'), "Campo-armadilha com tabindex='-1' (fora da ordem do Tab)");
+check(str_contains($viewContent, 'autocomplete="off"'), "Campo-armadilha com autocomplete='off' contra autopreenchimento");
+check(str_contains($viewContent, 'aria-hidden="true"'), "Campo-armadilha dentro de bloco aria-hidden='true' (leitor de tela não anuncia)");
+$trapPos = strpos($authSrc, '$_POST[self::REGISTER_TRAP_FIELD]');
+$limiterPos = strpos($authSrc, '$limiter->attempt($ip)');
+$createPos = strpos($authSrc, 'registerNutritionist(');
+check($trapPos !== false && $limiterPos !== false && $createPos !== false && $trapPos < $limiterPos && $limiterPos < $createPos,
+    "Controller confere a armadilha antes do limite por IP, e os dois antes de criar a conta");
+check(str_contains($authSrc, "auditRegisterBlock('REGISTER_BOT_BLOCKED'"), "Armadilha preenchida é auditada como REGISTER_BOT_BLOCKED");
 
-// Simular requisição de bot preenchendo o honeypot
+// Registro de auditoria igual ao que o controller grava (o fluxo HTTP real fica na evidência de navegador da v54.77)
 $_SERVER['REMOTE_ADDR'] = '203.0.113.88';
 $_SERVER['HTTP_USER_AGENT'] = 'MaliciousBot/2.1 (Automated Script)';
-$_POST = [
-    'website_url' => 'https://spam-phishing-link.com',
-    'name' => 'Bot Spammer',
-    'email' => 'bot@spammer.com',
-];
-
+$_POST = [$trap => 'https://spam-phishing-link.com', 'name' => 'Bot Spammer', 'email' => 'bot@spammer.com'];
 if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
     @session_start();
 }
 $_SESSION = [];
-
-$honeypotCaught = false;
-$authController = new AuthController();
-
-// Interceptar header Location sem saída de script
-try {
-    // Testamos a lógica direta do honeypot do controller
-    $honeypot = trim((string)($_POST['website_url'] ?? ''));
-    if ($honeypot !== '') {
-        $honeypotCaught = true;
-        $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, details, ip_address, user_agent) VALUES (NULL, NULL, 'REGISTER_BOT_BLOCKED', 'auth', :d, :ip, :ua)")
-            ->execute([
-                'd' => json_encode(['reason' => 'honeypot_filled']),
-                'ip' => $_SERVER['REMOTE_ADDR'],
-                'ua' => $_SERVER['HTTP_USER_AGENT'],
-            ]);
-        $_SESSION['flash_error'] = 'Requisição inválida detectada.';
-    }
-} catch (\Throwable $e) {}
-
-check($honeypotCaught, "Submissão com honeypot preenchido foi interceptada e rejeitada");
-check($_SESSION['flash_error'] === 'Requisição inválida detectada.', "Mensagem flash genérica atribuída à sessão");
+$audit = new ReflectionMethod(AuthController::class, 'auditRegisterBlock');
+$audit->setAccessible(true);
+$honeypotCaught = trim((string)($_POST[$trap] ?? '')) !== '';
+if ($honeypotCaught) {
+    $audit->invoke(new AuthController(), 'REGISTER_BOT_BLOCKED', $_SERVER['REMOTE_ADDR']);
+}
+check($honeypotCaught, "Submissão com o campo-armadilha preenchido é reconhecida como robô");
 
 // Verificar se foi auditado como bot bloqueado
 $stBotAudit = $db->prepare("SELECT action, details FROM audit_logs WHERE action = 'REGISTER_BOT_BLOCKED' AND ip_address = :ip ORDER BY id DESC LIMIT 1");

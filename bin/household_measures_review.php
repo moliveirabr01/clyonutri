@@ -52,9 +52,17 @@ if (isset($o['import'])) {
     $st->execute([$rid]);
     $name = $st->fetchColumn();
     if ($rid <= 0 || $name === false) {
-        fwrite(STDERR, "Informe --reviewer-id de um usuário ativo (o nutricionista que revisou).\n");
+        fwrite(STDERR, "Informe --reviewer-id de um usuário ativo (quem registra a revisão do RT).\n");
         exit(2);
     }
+    // v54.77: o revisor gravado é o RT configurado (nome — CRN); --reviewer-id é quem registra (fica na auditoria).
+    $rt = \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($db);
+    if (!$rt->isReady()) {
+        fwrite(STDERR, 'Revisão bloqueada: falta ' . implode(' e ', $rt->missing()) . ". Preencha em Admin > Medidas caseiras > Responsável técnico (RT) dos catálogos.\n");
+        exit(2);
+    }
+    $name = $rt->label();
+    echo "Revisor (RT): {$name} · registrado por: usuário #{$rid}\n";
     $content = @file_get_contents((string)$o['import']);
     if ($content === false) {
         fwrite(STDERR, "Arquivo não encontrado: {$o['import']}\n");
@@ -72,5 +80,5 @@ if (isset($o['sql'])) {
     echo "SQL gravado: {$o['sql']}\n";
     exit(0);
 }
-fwrite(STDERR, "Uso: --count | --export=arq.csv | --import=arq.csv --reviewer-id=ID [--dry-run] | --sql=arq.sql\n");
+fwrite(STDERR, "Uso: --count | --export=arq.csv | --import=arq.csv --reviewer-id=ID_DE_QUEM_REGISTRA [--dry-run] | --sql=arq.sql\n");
 exit(2);

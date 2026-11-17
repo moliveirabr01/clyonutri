@@ -53,7 +53,7 @@ if ($lastEvolution) {
     <div><dt>Pendências</dt><dd data-testid="op-strip-pending"><?= $e($pendingLabel) ?></dd></div>
     <div><dt>Alergias</dt><dd data-testid="op-strip-allergy"><?= $e($allergyLabel . $allergyExtra) ?></dd></div>
     <div><dt>Plano vigente</dt><dd data-testid="op-strip-plan"><?= $e($planLabel) ?></dd></div>
-    <div class="op-strip__wide"><dt>Última evolução</dt><dd data-testid="op-strip-evolution"><?php if ($lastEvolution): ?><a href="/pacientes/<?= $pid ?>/prontuario"><?= $e($lastEvolution['title'] ?? 'Registro') ?></a> · <?= $e(date('d/m/Y', strtotime((string)$lastEvolution['created_at']))) ?><?php if ($evolutionText !== ''): ?><span class="op-strip__excerpt"><?= $e($evolutionText) ?></span><?php endif; ?><?php else: ?>Nenhuma evolução registrada<?php endif; ?></dd></div>
+    <div class="op-strip__wide"><dt>Última evolução</dt><dd data-testid="op-strip-evolution"><?php if ($lastEvolution): /* v54.77: texto, não link — a aba Atendimento abre o prontuário */ ?><strong><?= $e($lastEvolution['title'] ?? 'Registro') ?></strong> · <?= $e(date('d/m/Y', strtotime((string)$lastEvolution['created_at']))) ?><?php if ($evolutionText !== ''): ?><span class="op-strip__excerpt"><?= $e($evolutionText) ?></span><?php endif; ?><?php else: ?>Nenhuma evolução registrada<?php endif; ?></dd></div>
   </dl>
   <?php if ($priorityActions): ?>
   <div class="op-strip__actions" data-testid="op-strip-actions">

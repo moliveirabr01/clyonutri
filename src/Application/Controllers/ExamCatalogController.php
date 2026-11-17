@@ -49,12 +49,14 @@ class ExamCatalogController
         $favoriteIds = $this->catalog->favoriteIds($clinicId, $userId);
         $custom = $this->catalog->listCustomExams($clinicId);
         $isManager = ExamCatalogService::isClinicManager($this->db, $userId, $clinicId);
+        // v54.77: nome do RT que revisa o catálogo geral (decisão do Maicon: Raphael Lombardi), para o aviso da gestão.
+        $catalogRtName = \ClyoNutri\Domain\Catalog\CatalogTechnicalReviewer::load($this->db)->name;
         $flash = $this->takeFlash();
         $csrfToken = Csrf::token();
         http_response_code($status);
         $this->noStore();
         $this->render('catalog', 'Catálogo de exames laboratoriais',
-            compact('catalog', 'favoriteIds', 'custom', 'isManager', 'flash', 'csrfToken', 'old', 'error', 'eligibilityError'));
+            compact('catalog', 'favoriteIds', 'custom', 'isManager', 'flash', 'csrfToken', 'old', 'error', 'eligibilityError', 'catalogRtName'));
     }
 
     /** POST /exames/catalogo/favoritos/{examId} */

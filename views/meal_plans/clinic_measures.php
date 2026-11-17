@@ -15,9 +15,9 @@ $pct = $coverage['foods'] > 0 ? round(100 * $coverage['with_any'] / $coverage['f
     <?php $measureBase = $measureBase ?? ['pending' => 0, 'approved' => 0, 'last_at' => null]; ?>
     <p class="u-color-neutral-gray-600 u-m-0 u-text-body u-leading-body" data-testid="measures-base-status">
       <?php if ((int)$measureBase['approved'] > 0 && (int)$measureBase['pending'] === 0 && !empty($measureBase['last_at'])): ?>
-        Base Clyo Nutri revisada em <?= $e(date('d/m/Y', strtotime((string)$measureBase['last_at']))) ?>. Você pode cadastrar abaixo as medidas próprias da sua clínica; elas valem só para ela e têm prioridade no plano.
+        Base Clyo Nutri revisada em <?= $e(date('d/m/Y', strtotime((string)$measureBase['last_at']))) ?><?= !empty($measureBase['rt']) ? ' pelo nutricionista responsável técnico ' . $e($measureBase['rt']) : '' ?>. Você pode cadastrar abaixo as medidas próprias da sua clínica; elas valem só para ela e têm prioridade no plano.
       <?php elseif ((int)$measureBase['approved'] > 0): ?>
-        A base Clyo Nutri está em revisão: <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['approved'], '1 medida já revisada', '{n} medidas já revisadas')) ?> e <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['pending'], '1 estimada aguarda revisão', '{n} estimadas aguardam revisão')) ?>.
+        A base Clyo Nutri está em revisão<?= !empty($measureBase['rt']) ? ' pelo nutricionista responsável técnico ' . $e($measureBase['rt']) : '' ?>: <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['approved'], '1 medida já revisada', '{n} medidas já revisadas')) ?> e <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['pending'], '1 estimada aguarda revisão', '{n} estimadas aguardam revisão')) ?>.
         Enquanto isso, <a href="#cm-add">cadastre as medidas que você usa</a> com a fonte (pesagem na clínica, rótulo, tabela publicada); elas valem só para a sua clínica.
       <?php else: ?>
         A base Clyo Nutri de medidas caseiras ainda está em revisão. Você já pode <a href="#cm-add">cadastrar as medidas que você usa</a> com a fonte (pesagem na clínica, rótulo, tabela publicada); elas valem só para a sua clínica.

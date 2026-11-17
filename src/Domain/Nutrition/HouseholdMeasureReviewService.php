@@ -78,8 +78,10 @@ final class HouseholdMeasureReviewService
         $offset = max(0, (int)($f['offset'] ?? 0));
         $st = $this->db->prepare("SELECT m.id, m.food_id, f.name AS alimento, COALESCE(NULLIF(TRIM(f.category), ''), 'Sem grupo') AS grupo,
                 m.measure_name, m.grams_equivalent, m.source, m.review_status, m.reviewer_name, m.reviewed_at, m.grams_before_review,
+                m.reviewed_by, u.name AS registered_by_name, u.email AS registered_by_email,
                 (" . $this->usesSql() . ") AS usos
             FROM food_household_measures m JOIN foods f ON f.id = m.food_id
+            LEFT JOIN users u ON u.id = m.reviewed_by
             WHERE {$where} ORDER BY {$order} LIMIT {$limit} OFFSET {$offset}");
         $st->execute($args);
         return $st->fetchAll(PDO::FETCH_ASSOC);

@@ -83,13 +83,13 @@ check($allHaveClinicId, "100% das tabelas de domínio clínico possuem a coluna 
 // -------------------------------------------------------------------------
 echo "\n[3/6] Inventário de Dependências PHP e Mobile...\n";
 
-$composerJson = json_decode(file_get_contents(__DIR__ . '/../composer.json'), true);
-$composerLock = json_decode(file_get_contents(__DIR__ . '/../composer.lock'), true);
-
-check(isset($composerJson['require']['phpmailer/phpmailer']), "composer.json declara phpmailer/phpmailer");
-$packages = $composerLock['packages'] ?? [];
-check(count($packages) === 1 && $packages[0]['name'] === 'phpmailer/phpmailer', "Ambiente PHP de produção restrito estritamente a 1 pacote de terceiros (superfície mínima)");
-check(empty($composerLock['packages-dev']), "Zero dependências dev incluídas no runtime de produção");
+// v54.77 (decisão do Maicon, 17/11/2026): a política de dependências que vale é a da NI2-475 (supply chain).
+// Antes este inventário exigia "exatamente 1 pacote no composer.lock" (só PHPMailer), escrito antes do dompdf (v45).
+// Agora confere a mesma política da ni2_475, de um lugar só (tests/_dependency_policy.php).
+require_once __DIR__ . '/_dependency_policy.php';
+foreach (clyonutri_dependency_policy(dirname(__DIR__)) as [$cond, $label]) {
+    check($cond, $label);
+}
 
 $mobilePkg = json_decode(file_get_contents(__DIR__ . '/../mobile/package.json'), true);
 check(isset($mobilePkg['dependencies']['expo']), "mobile/package.json declara ecossistema Expo 51");

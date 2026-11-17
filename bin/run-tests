@@ -44,6 +44,8 @@ case "$PROFILE" in
       "tests/cr875_11_codigo_agendamento_test.php"
       "tests/cr875_14_limite_convite_test.php"
       "tests/cr875_15_sql_manual_registro_test.php"
+      "tests/v5477_rt_catalogos_test.php"
+      "tests/v5477_ficha_links_test.php"
       "tests/v5475_reconciliation_test.php"
       "tests/ni2_894_aviso_agendamento_test.php"
       "tests/ni2_868_870_871_872_regression_test.php"

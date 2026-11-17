@@ -1,70 +1,64 @@
 {
   "product": "Clyo Nutri",
   "title": "ClyoNutri II",
-  "version": "v54.76",
-  "ui_version": "v54.76",
+  "version": "v54.77",
+  "ui_version": "v54.77",
   "status": "CANDIDATE_LOCAL_VALIDATION",
   "prepared_date": "2026-11-17",
   "production_deployed": false,
   "jira_updated": false,
   "source": "/Users/moliveira/Nutri_II",
-  "source_branch": "feat/v54-76-ni2-875",
-  "source_commit": "commit de versão v54.76 no branch feat/v54-76-ni2-875 (hash no RELATORIO.md; um arquivo não pode conter o hash do próprio commit)",
+  "source_branch": "feat/v54-77-decisoes",
+  "source_commit": "commit de versão v54.77 no branch feat/v54-77-decisoes (hash no RELATORIO.md; um arquivo não pode conter o hash do próprio commit)",
   "source_dirty": false,
-  "base_version": "v54.75 + NI2-875 (épico) — reaplica v54.72/73 (NI2-879)",
+  "base_version": "v54.76 (épico NI2-875) + decisões do Maicon de 17/11/2026",
   "upgrade_supported_from": [
     "v54.71",
     "v54.72",
     "v54.73",
     "v54.74",
-    "v54.75"
+    "v54.75",
+    "v54.76"
   ],
-  "schema_changes": "Migrações 091 (se ainda faltar), 097, 098, 099, 100 e 101. Rode, em ordem e no phpMyAdmin, os SQL manuais listados no LEIA-ME-HOSTGATOR-v54-76.md. Todos idempotentes e testados 2x no MySQL 5.7.44 sobre cópia do banco de produção. Nunca rode o instalador completo em produção.",
+  "schema_changes": "Migrações 091 (se ainda faltar), 097, 098, 099, 100, 101 e 102 (nova: RT dos catálogos em platform_settings). Rode, em ordem e no phpMyAdmin, os SQL manuais listados no LEIA-ME-HOSTGATOR-v54-77.md. Todos idempotentes e testados 2x no MySQL 5.7.44 sobre cópia do banco de produção (estrito e não estrito). Nunca rode o instalador completo em produção. NI2-885: NÃO rodar a cifragem agora (decisão de 17/11); o SQL 098 pode rodar.",
   "mfa": "NI2-876 fora desta versão: MFA da plataforma segue desligado (MFA_PLATFORM_REQUIRED=false).",
   "summary": [
-    "NI2-879: reaplica as correções da v54.72/73 perdidas na v54.75 (consulta futura concluída hoje, ficha, encaixe).",
-    "NI2-882: transcrição sem texto fictício e com locutor.",
-    "NI2-884 (parcial): bin/run-tests full + triagem; core por módulo.",
-    "NI2-885: cifragem do legado (script idempotente, retomável, dry-run/verify) e HSTS de 6 meses; patients.allergies TEXT (098).",
-    "NI2-877: bin/integration_check.php e SMTP que não prende a requisição.",
-    "NI2-886: revisão das medidas caseiras estimadas (console, CSV, SQL) — 099.",
-    "NI2-887 (parcial): ficha do paciente com resumo curto; editor de plano, anamnese em etapas, Configurações e menu ADIADOS.",
-    "NI2-889 + CR875-12: texto de usuário e plurais.",
-    "NI2-891: revisão do catálogo de exames (CSV, revisor, fonte, SQL) — 100; texto de medidas e da solicitação.",
-    "NI2-892 (parcial): checagem de paciente memorizada em GET e nenhum catch vazio em PHP.",
-    "NI2-893 item 3 / CR875-11: agendamento online sem ids sequenciais, com código.",
-    "CR875-14 (NI2-890): limite de links inválidos de convite/nova senha + tipo do link (101); tela de espera sem texto de link inválido.",
-    "CR875-15: SQL manual da 097 passa a registrar a migração."
+    "Decisão RT: Raphael Lombardi é o nutricionista RT dos catálogos (medidas caseiras NI2-886 e exames NI2-891) — nome configurável (SQL 102 + Admin > Medidas caseiras), revisões exigem CRN (a preencher pelo Maicon), nome nas telas e registros, quem registrou fica em reviewed_by/auditoria.",
+    "Decisão NI2-887: ficha do paciente com até 15 links visíveis contando as 7 abas (antes 18/20/23 nos casos medidos; agora 12/14/12).",
+    "Decisão de dependências: vale a política da NI2-475 (php, PHPMailer, dompdf aprovados; lock íntegro; nada solto); ni2_469 confere a mesma.",
+    "Decisão honeypot: website_url não volta; ni2_479 confere o campo-armadilha atual (cn_campo_extra).",
+    "Decisão NI2-885: cifragem em produção adiada (LEIA-ME seção 5).",
+    "Mantém tudo da v54.76 (NI2-875)."
   ],
   "package": {
-    "file": "clyonutri-v54-76-hostgator.zip",
+    "file": "clyonutri-v54-77-hostgator.zip",
     "type": "complete-runtime-update",
-    "readme": "LEIA-ME-HOSTGATOR-v54-76.md"
+    "readme": "LEIA-ME-HOSTGATOR-v54-77.md"
   },
   "validation": {
     "core_clean": {
       "command": "bin/run-tests core (cópia limpa, sem .env/sqlite)",
-      "passed_suites": 40,
+      "passed_suites": 42,
       "failed_suites": 0,
       "native_assertions": true
     },
     "full_suite": {
       "command": "bin/run-tests full",
-      "pass": 166,
+      "pass": 171,
       "fail": 0,
-      "known_triaged": 69,
+      "known_triaged": 66,
       "not_run_infra": 13,
       "exit_code": 1,
       "note": "exit 1 por desenho enquanto houver falhas conhecidas triadas (tests/known_failures_full.tsv)"
     },
-    "mysql_real": "PASS: MySQL 5.7.44 real; cópia do banco de produção de 13/11 + v54.63/v54.68 sem 091; SQL 091,097,098,099,100,101 2x (estrito e não estrito) 22/0 cada; login e agendamento online reais Chromium+Firefox 21/0 em cada modo",
-    "browser": "PASS por história (Chromium + Firefox) — ver RELATORIO.md",
+    "mysql_real": "PASS: MySQL 5.7.44 real; cópia do banco de produção de 13/11 + v54.63/v54.68 sem 091; SQL 091,097,098,099,100,101,102 2x (estrito e não estrito) 26/0 cada; 102 rodado de novo preserva CRN; console do RT (bloqueio sem CRN, salvar CRN, aprovar medida) Chromium+Firefox 8/0",
+    "browser": "PASS por decisão (Chromium + Firefox) — ver RELATORIO.md",
     "apache_hostgator": "BLOCKED",
     "external_smtp": "BLOCKED",
     "asaas_sandbox": "BLOCKED",
     "real_voice": "BLOCKED",
     "production_approved": false
   },
-  "supersedes": "v54.75",
-  "upgrade_notes": "Não instale a v54.75 sobre a v54.72/73; a v54.76 corrige isso. Antes de subir: backup do banco e dos arquivos, SQL em ordem (LEIA-ME), depois os arquivos."
+  "supersedes": "v54.76",
+  "upgrade_notes": "Antes de subir: backup do banco e dos arquivos, SQL em ordem (LEIA-ME, inclui a 102), depois os arquivos; em seguida preencher o CRN do RT em Admin > Medidas caseiras. Não rodar a cifragem NI2-885 agora."
 }
