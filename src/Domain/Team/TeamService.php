@@ -145,7 +145,7 @@ final class TeamService
             if ($needsCrn) {
                 $this->db->prepare('INSERT INTO professionals (user_id, crn, crn_region) VALUES (?, ?, ?)')->execute([$userId, $crn, $region]);
             }
-            $issued = (new PasswordResetService($this->db))->issueAdminToken($email, self::INVITE_VALIDITY_SECONDS);
+            $issued = (new PasswordResetService($this->db))->issueAdminToken($email, self::INVITE_VALIDITY_SECONDS, 'invite');
             $this->audit('TEAM_MEMBER_INVITED', $clinicId, $actorId, $userId, ['role' => $role, 'expires_at_utc' => $issued['expires_at']]);
             if ($own) {
                 $this->db->commit();
@@ -170,7 +170,7 @@ final class TeamService
         if ($m['member_status'] !== 'active' || $m['user_status'] !== 'invited') {
             throw new DomainException('Só dá para reenviar convite de quem ainda não criou a senha.');
         }
-        $issued = (new PasswordResetService($this->db))->issueAdminToken((string)$m['email'], self::INVITE_VALIDITY_SECONDS);
+        $issued = (new PasswordResetService($this->db))->issueAdminToken((string)$m['email'], self::INVITE_VALIDITY_SECONDS, 'invite');
         $this->audit('TEAM_INVITE_RESENT', $clinicId, $actorId, $userId, ['expires_at_utc' => $issued['expires_at']]);
         return $this->deliver($clinicId, $actorId, $userId, (string)$m['name'], (string)$m['email'], (string)$m['member_role'], $issued);
     }

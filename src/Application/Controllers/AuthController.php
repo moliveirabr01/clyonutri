@@ -7,6 +7,7 @@ namespace ClyoNutri\Application\Controllers;
 use ClyoNutri\Core\Auth\AuthService;
 use ClyoNutri\Core\Auth\PasswordResetService;
 use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Core\Security\RegistrationRateLimiter;
 
@@ -705,7 +706,8 @@ class AuthController
         $error = $_SESSION['flash_error'] ?? null;
         unset($_SESSION['flash_error']);
 
-        $tokenData = $this->resetService->validateToken($token, 'invite');
+        // CR875-14: mesmo limite de tentativas com link inválido da tela de nova senha.
+        [$tokenData, $error] = $this->checkTokenLink($token, 'invite', $error);
         $isValidToken = ($tokenData !== null);
 
         require __DIR__ . '/../../../views/auth/team-invite.php';
@@ -738,14 +740,18 @@ class AuthController
         try {
             $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
-            $tokenInfo = $this->resetService->validateToken($tokenParam, 'invite');
+            [$tokenInfo, $blockedMsg] = $this->checkTokenLink($tokenParam, 'invite', null);
+            if ($tokenInfo === null) {
+                throw new \InvalidArgumentException($blockedMsg ?? 'Convite inválido ou expirado. Peça um novo convite ao responsável.');
+            }
             $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua, 'invite');
             $userId = (int)($res['user_id'] ?? 0);
             $clinicId = $tokenInfo['clinic_id'] ?? null;
 
-            $termsVersion = class_exists(\ClyoNutri\Domain\Legal\LegalDocuments::class)
-                ? (string)(\ClyoNutri\Domain\Legal\LegalDocuments::VERSION ?? '1.0')
-                : '1.0';
+            // CR875-14: LegalDocuments não tem VERSION (o acesso lançava Error depois de a senha já estar criada,
+            // e a pessoa via "Não foi possível concluir o aceite"). Versões reais dos Termos e da Privacidade.
+            $termsVersion = \ClyoNutri\Domain\Legal\LegalDocuments::TERMS_VERSION;
+            $privacyVersion = \ClyoNutri\Domain\Legal\LegalDocuments::PRIVACY_VERSION;
             $aud = Connection::getInstance()->prepare(
                 'INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -758,7 +764,7 @@ class AuthController
                 (string)$userId,
                 $ip,
                 $ua !== null ? mb_substr($ua, 0, 255) : null,
-                json_encode(['terms_accepted' => true, 'terms_version' => $termsVersion], JSON_UNESCAPED_UNICODE),
+                json_encode(['terms_accepted' => true, 'terms_version' => $termsVersion, 'privacy_version' => $privacyVersion], JSON_UNESCAPED_UNICODE),
             ]);
 
             $_SESSION['flash_success'] = 'Convite aceito e senha criada. Já dá para entrar.';
@@ -769,6 +775,7 @@ class AuthController
             header("Location: /convite/{$tokenParam}");
             exit;
         } catch (\Throwable $e) {
+            error_log('[ClyoNutri][NI2-890] aceite de convite falhou: ' . get_class($e));
             $_SESSION['flash_error'] = 'Não foi possível concluir o aceite do convite. Peça um novo convite ao responsável.';
             header("Location: /convite/{$tokenParam}");
             exit;
@@ -795,10 +802,43 @@ class AuthController
         $error = $_SESSION['flash_error'] ?? null;
         unset($_SESSION['flash_error']);
 
-        $tokenData = $this->resetService->validateToken($token, 'reset');
+        [$tokenData, $error] = $this->checkTokenLink($token, 'reset', $error);
         $isValidToken = ($tokenData !== null);
 
         require __DIR__ . '/../../../views/auth/reset-password.php';
+    }
+
+    /**
+     * CR875-14: valida o link (convite ou nova senha) com limite de tentativas inválidas por IP.
+     * Bloqueado: não consulta o token, responde 429 nas telas e devolve a mensagem. Link inválido conta 1 tentativa.
+     *
+     * @return array{0:?array,1:?string} [dados do token ou null, mensagem de erro]
+     */
+    private function checkTokenLink(string $token, string $scope, ?string $error): array
+    {
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        try {
+            $limiter = new \ClyoNutri\Core\Security\TokenLinkRateLimiter(Connection::getInstance());
+            if ($limiter->blocked($scope, $ip)) {
+                if (!headers_sent()) {
+                    http_response_code(429);
+                    header('Retry-After: ' . \ClyoNutri\Core\Security\TokenLinkRateLimiter::WINDOW_SECONDS);
+                }
+                return [null, 'Muitas tentativas com link inválido a partir desta conexão. Espere 15 minutos ou peça um novo link.'];
+            }
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][CR875-14] limite de link indisponível: ' . get_class($e));
+            $limiter = null;
+        }
+        $data = $this->resetService->validateToken($token, $scope);
+        if ($data === null && $limiter !== null) {
+            try {
+                $limiter->fail($scope, $ip);
+            } catch (\Throwable $e) {
+                error_log('[ClyoNutri][CR875-14] tentativa inválida não registrada: ' . get_class($e));
+            }
+        }
+        return [$data, $error];
     }
 
     /**
@@ -838,6 +878,10 @@ class AuthController
         try {
             $ip = $_SERVER['REMOTE_ADDR'] ?? null;
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            [$tokenInfo, $blockedMsg] = $this->checkTokenLink($tokenParam, 'reset', null);
+            if ($tokenInfo === null) {
+                throw new \InvalidArgumentException($blockedMsg ?? 'Link de recuperação inválido ou expirado. Por favor, solicite um novo.');
+            }
             $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua, 'reset');
 
             // NI2-481 P1c: aviso de segurança de senha alterada (não bloqueia o fluxo se o e-mail falhar).

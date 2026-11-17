@@ -151,16 +151,7 @@ class PasswordResetService
             $del->execute(['email' => $email]);
 
             // Insere o novo token único
-            $ins = $this->db->prepare("
-                INSERT INTO password_resets (email, token, created_at, expires_at)
-                VALUES (:email, :token, :created_at, :expires_at)
-            ");
-            $ins->execute([
-                'email' => $email,
-                'token' => $tokenHash,
-                'created_at' => $createdAt,
-                'expires_at' => $expiresAt,
-            ]);
+            $this->insertToken($email, $tokenHash, $createdAt, $expiresAt, 'reset');
 
             // Registra auditoria
             $this->logAudit(
@@ -216,8 +207,9 @@ class PasswordResetService
         }
         $tokenHash = self::hashToken(strtolower($token));
 
+        $purposeCol = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'password_resets', 'purpose') ? 'pr.purpose' : 'NULL';
         $stmt = $this->db->prepare("
-            SELECT pr.email, pr.token, pr.created_at, pr.expires_at,
+            SELECT pr.email, pr.token, pr.created_at, pr.expires_at, {$purposeCol} AS purpose,
                    u.id AS user_id, u.uuid AS user_uuid, u.name AS user_name, u.status AS user_status, u.role AS user_role,
                    cm.clinic_id, cm.role AS member_role, c.name AS clinic_name
             FROM password_resets pr
@@ -244,6 +236,11 @@ class PasswordResetService
             return null;
         }
         if ($scope === 'invite' && $status !== 'invited') {
+            return null;
+        }
+        // CR875-14: o tipo gravado no link manda (convite não abre a tela de nova senha e vice-versa).
+        $purpose = $row['purpose'] ?? null;
+        if ($scope !== null && $purpose !== null && $purpose !== '' && $purpose !== $scope) {
             return null;
         }
 
@@ -396,23 +393,29 @@ class PasswordResetService
      *
      * @return array{token:string, expires_at:string} expires_at em UTC (DATETIME)
      */
-    public function issueAdminToken(string $email, int $validitySeconds): array
+    public function issueAdminToken(string $email, int $validitySeconds, ?string $purpose = null): array
     {
         $email = strtolower(trim($email));
-        if ($email === '' || $validitySeconds < 60) {
+        if ($email === '' || $validitySeconds < 60 || ($purpose !== null && !in_array($purpose, ['reset', 'invite'], true))) {
             throw new InvalidArgumentException('Pedido de token inválido.');
         }
         $token = bin2hex(random_bytes(32));
         $this->db->prepare('DELETE FROM password_resets WHERE LOWER(email) = :email')->execute(['email' => $email]);
         $expiresAt = self::nowUtc($validitySeconds);
-        $this->db->prepare('INSERT INTO password_resets (email, token, created_at, expires_at) VALUES (:email, :token, :created_at, :expires_at)')
-            ->execute([
-                'email' => $email,
-                'token' => self::hashToken($token),
-                'created_at' => self::nowUtc(),
-                'expires_at' => $expiresAt,
-            ]);
+        $this->insertToken($email, self::hashToken($token), self::nowUtc(), $expiresAt, $purpose);
         return ['token' => $token, 'expires_at' => $expiresAt];
+    }
+
+    /** CR875-14: grava o tipo do link quando a migração 101 já rodou (sem ela, mesmo INSERT de antes). */
+    private function insertToken(string $email, string $tokenHash, string $createdAt, string $expiresAt, ?string $purpose): void
+    {
+        $params = ['email' => $email, 'token' => $tokenHash, 'created_at' => $createdAt, 'expires_at' => $expiresAt];
+        if ($purpose !== null && \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'password_resets', 'purpose')) {
+            $this->db->prepare('INSERT INTO password_resets (email, token, created_at, expires_at, purpose) VALUES (:email, :token, :created_at, :expires_at, :purpose)')
+                ->execute($params + ['purpose' => $purpose]);
+            return;
+        }
+        $this->db->prepare('INSERT INTO password_resets (email, token, created_at, expires_at) VALUES (:email, :token, :created_at, :expires_at)')->execute($params);
     }
 
     /**

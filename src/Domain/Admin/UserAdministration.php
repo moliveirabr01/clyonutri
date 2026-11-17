@@ -351,7 +351,7 @@ final class UserAdministration
                     // Volta ativo, mas a senha antiga morre: só entra de novo criando uma nova senha pelo link.
                     $this->setStatus($targetId, self::STATUS_ACTIVE);
                     $this->cutAccess($targetId, (string)$target['email'], true);
-                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::RESET_VALIDITY_SECONDS);
+                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::RESET_VALIDITY_SECONDS, 'reset');
                     $details['new_status'] = self::STATUS_ACTIVE;
                     $details['password_invalidated'] = true;
                     $details['token_expires_at_utc'] = $issued['expires_at'];
@@ -359,13 +359,13 @@ final class UserAdministration
                     break;
                 case 'redefinir-senha':
                     $this->cutAccess($targetId, (string)$target['email'], true);
-                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::RESET_VALIDITY_SECONDS);
+                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::RESET_VALIDITY_SECONDS, 'reset');
                     $details['password_invalidated'] = true;
                     $details['token_expires_at_utc'] = $issued['expires_at'];
                     $auditAction = 'ADMIN_USER_PASSWORD_RESET_ISSUED';
                     break;
                 case 'reenviar-convite':
-                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::INVITE_VALIDITY_SECONDS);
+                    $issued = $this->resetService->issueAdminToken((string)$target['email'], self::INVITE_VALIDITY_SECONDS, 'invite');
                     $details['token_expires_at_utc'] = $issued['expires_at'];
                     $auditAction = 'ADMIN_STAFF_INVITE_REISSUED';
                     break;
@@ -470,7 +470,7 @@ final class UserAdministration
             $clinicId = $this->platformClinicId($actor, $email);
             $this->db->prepare("INSERT INTO clinic_members (clinic_id, user_id, role, status) VALUES (:cid, :uid, 'admin', 'active')")
                 ->execute(['cid' => $clinicId, 'uid' => $userId]);
-            $issued = $this->resetService->issueAdminToken($email, self::INVITE_VALIDITY_SECONDS);
+            $issued = $this->resetService->issueAdminToken($email, self::INVITE_VALIDITY_SECONDS, 'invite');
             $this->audit($actor, 'ADMIN_STAFF_CREATED', (string)$userId, [
                 'operator_id' => (int)$actor['id'],
                 'target_user_id' => $userId,
@@ -667,9 +667,10 @@ final class UserAdministration
     }
 
     /** Link absoluto de APP_URL (https em produção), ou caminho relativo se APP_URL não estiver configurada. */
-    private function linkFor(string $token): string
+    private function linkFor(string $token, bool $invite = false): string
     {
-        $path = '/recuperar-senha/' . rawurlencode($token);
+        // CR875-14: convite (conta 'invited') vai para /convite/; /recuperar-senha/ recusa conta convidada.
+        $path = ($invite ? '/convite/' : '/recuperar-senha/') . rawurlencode($token);
         $base = rtrim(trim((string)($this->appUrl ?? Env::get('APP_URL') ?? '')), '/');
         if (!preg_match('#^https?://[^/\s]+#i', $base)) {
             return $path;
@@ -702,9 +703,9 @@ final class UserAdministration
      */
     private function deliver(array $actor, array $target, string $action, array $issued, ?string $ip, ?string $ua): array
     {
-        $url = $this->linkFor($issued['token']);
-        $expiresLocal = self::localExpiry($issued['expires_at']);
         $invite = in_array($action, ['criar', 'reenviar-convite'], true);
+        $url = $this->linkFor($issued['token'], $invite);
+        $expiresLocal = self::localExpiry($issued['expires_at']);
         $delivery = 'manual';
         $note = 'Servidor de e-mail não está entregando mensagens: copie o link agora e envie por um canal seguro.';
 
