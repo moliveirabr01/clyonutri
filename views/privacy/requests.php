@@ -10,7 +10,7 @@ $overdue = count(array_filter($open, fn($r) => $r['is_overdue']));
 <h1>Pedidos de titulares (LGPD)</h1>
 <p>Pedidos de pacientes sobre os próprios dados. O prazo de resposta é de 15 dias a partir do pedido.</p>
 <?php if ($flash): ?><p role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>" class="card" data-testid="privacy-flash"><?= $e($flash['message']) ?></p><?php endif; ?>
-<p class="card" data-testid="privacy-summary"><strong><?= count($open) ?></strong> pedido(s) em aberto<?= $overdue ? ' · <strong>' . $overdue . ' com prazo vencido</strong>' : '' ?>.</p>
+<p class="card" data-testid="privacy-summary"><strong><?= count($open) ?></strong> <?= \ClyoNutri\Application\View\UserText::count(count($open), 'pedido', 'pedidos') ?> em aberto<?= $overdue ? ' · <strong>' . $overdue . ' com prazo vencido</strong>' : '' ?>.</p>
 <?php if (!$requests): ?>
   <p class="card">Nenhum pedido registrado. Pedidos feitos pela paciente no app ou registrados no perfil do paciente aparecem aqui.</p>
 <?php else: ?>

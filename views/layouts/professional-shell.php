@@ -24,7 +24,7 @@ if ($shellFirstName === '') {
   <link rel="stylesheet" href="/assets/css/ds-utilities.css?v=v54-47">
   <link rel="stylesheet" href="/assets/css/ds-pages.css?v=v54-53">
   <link rel="stylesheet" href="/assets/css/ux-v54-52.css?v=v54-54">
-  <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=v54-66">
+  <link rel="stylesheet" href="/assets/css/ux-v54-57.css?v=ni2-888">
   <?php if (!empty($dashboardV5456Styles)): ?><link rel="stylesheet" href="/assets/css/dashboard-v54-56.css?v=v54-56"><?php endif; ?>
   <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-66">
 </head>
@@ -83,12 +83,13 @@ if ($shellFirstName === '') {
 <?php endif; ?>
 <script src="/assets/js/validacao-ptbr.js" defer></script>
 <script src="/assets/js/decimal-input.js?v=v54-63" defer></script>
+<script src="/assets/js/form-local-draft.js?v=v54-67" defer></script>
 <script src="/assets/js/clinical-journeys.js?v=v54-58" defer></script>
 <script src="/assets/js/session-timeout.js?v=v54-30" defer></script>
 <script src="/assets/js/avaliacao-confirmacoes.js?v=v54-63" defer></script>
 <script src="/assets/js/clinical-context.js?v=v54-26" defer></script>
 <script src="/assets/js/operational-ui.js?v=v54-64" defer></script>
-<script src="/assets/js/workflow-drafts.js?v=v54-64" defer></script>
+<script src="/assets/js/workflow-drafts.js?v=v54-68" defer></script>
 <script src="/assets/js/navigation-v54-58.js?v=v54-64" defer></script>
 </body>
 </html>

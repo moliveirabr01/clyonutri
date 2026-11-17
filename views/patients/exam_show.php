@@ -20,7 +20,7 @@ $ver = (int)($request['version_number'] ?? 1);
 ?>
 <?= \ClyoNutri\Application\View\OperationalUI::state(['draft'=>'saved','review'=>'review','issued'=>'issued','cancelled'=>'completed'][$st]??'not_started',$request['updated_at']??$request['created_at']??null) ?>
 
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <link rel="stylesheet" href="/assets/css/exame-documento.css?v=botanical-20261029a">
 <?= \ClyoNutri\Application\View\PatientHeader::render(\ClyoNutri\Core\Database\Connection::getInstance(), (int)$patient['id'], 'exames') // NI2-629/661 ?>
 <div class="clinical-journey ex-page">
@@ -102,7 +102,7 @@ $ver = (int)($request['version_number'] ?? 1);
       </dl>
       <p class="ex-muted">O documento sai com linha para assinatura e carimbo do nutricionista. Assinatura digital ainda não está disponível.</p>
     </section>
-  <?php else: ?>
+  <?php elseif ($st === 'cancelled'): ?>
     <div class="op-message op-message--info ex-msg ex-msg-error" role="status"><strong>Solicitação cancelada em <?= $e($doc['cancelled_at_local']) ?>.</strong> Motivo: <?= $e($request['cancellation_reason']) ?></div>
   <?php endif; ?>
 

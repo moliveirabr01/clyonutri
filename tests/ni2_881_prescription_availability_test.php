@@ -1,0 +1,64 @@
+<?php
+declare(strict_types=1);
+putenv('V54_DB='.sys_get_temp_dir().'/ni2-881-'.getmypid().'.sqlite');
+require __DIR__.'/_v54_bootstrap.php';
+ob_start();
+use ClyoNutri\Core\Auth\TenantContext;
+use ClyoNutri\Domain\Prescription\{PrescriptionAvailability,PrescriptionService};
+use ClyoNutri\Application\Controllers\PrescriptionController;
+$c=Fx::clinic($pdo,'Clínica TESTE 881');$u=Fx::user($pdo,$c,'Nutri TESTE','owner');$pid=Fx::patient($pdo,$c,'Paciente TESTE');Fx::act($u);
+$c2=Fx::clinic($pdo,'Outra clínica TESTE');$u2=Fx::user($pdo,$c2,'Outro Nutri TESTE','owner');
+$a=new PrescriptionAvailability($pdo);$svc=new PrescriptionService($pdo);
+$render=static function(string $path,array $vars=[]):string{extract($vars);ob_start();require dirname(__DIR__).'/views/'.$path;return ob_get_clean();};
+$documents=static fn()=>$render('patients/documents.php',['p'=>['id'=>$pid]]);
+$portal=static fn(bool $enabled)=>$render('patient/app.php',['step'=>'logged_in','portal'=>['manipulados_available'=>$enabled,'patient_name'=>'Paciente TESTE','clinic_name'=>'Clínica TESTE','plan'=>null,'next'=>null,'water_today'=>0,'water_goal'=>null]]);
+T::ok(!$a->available($c) && $a->catalog($c)===[],'Clínica sem catálogo indisponível');
+$html=$documents();T::ok(!str_contains($html,'/prescricoes') && str_contains($html,'Registrar orientação em texto no prontuário'),'Documentos oculta módulo e preserva orientação no prontuário');
+T::ok(!str_contains($portal(false),'/paciente/prescricoes'),'Portal oculta cartão quando indisponível');
+T::ok($render('prescriptions/timeline.php',['rxPatientId'=>$pid,'rxAppointmentId'=>null])==='','Prontuário não renderiza seção de manipulados vazia');
+http_response_code(200);ob_start();(new PrescriptionController($pdo))->index(['id'=>$pid]);$html=ob_get_clean();
+T::ok(http_response_code()===200 && str_contains($html,'Recurso ainda não disponível neste consultório'),'URL direta: controller responde 200 e mensagem neutra');
+T::ok(!str_contains($html,'Nova prescrição') && !str_contains($html,'bin/') && str_contains($html,'Voltar a Documentos'),'Indisponível sem botão inútil nem comando interno');
+// Synthetic issued row: tests only list visibility; no signature or issuance is simulated as a completed flow.
+$pdo->prepare("INSERT INTO rx_prescriptions (clinic_id,patient_id,professional_id,status,payload_json,issued_at,created_at,updated_at) VALUES (?,?,?,'issued','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)")->execute([$c,$pid,$u['professional_id']]);
+TenantContext::set($c,['id'=>$pid,'role'=>'patient']);
+T::ok($svc->patientList($c,$pid)===[],'Leitura usada pela API devolve [] mesmo com histórico quando módulo indisponível');
+T::throws(fn()=>$svc->patientList($c2,$pid),'API preserva vínculo do paciente com a clínica');
+Fx::act($u);
+// Explicit test-only regulatory metadata, never shipped as a production catalog.
+$pdo->prepare("INSERT INTO rx_policy_versions (clinic_id,version,effective_from,effective_until,clinical_reviewer,legal_reviewer,evidence,signature_profile,retention_days,retention_basis,enabled,created_at) VALUES (?,'TESTE','2000-01-01','2099-12-31','TESTE clínico','TESTE jurídico','Dados sintéticos','cms_detached',365,'TESTE',1,CURRENT_TIMESTAMP)")->execute([$c]);$policy=(int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO rx_ingredients (clinic_id,code,name,category,enabled) VALUES (?,'TESTE-881','Ativo sintético TESTE','supplement',1)")->execute([$c]);$ingredient=(int)$pdo->lastInsertId();
+T::ok(!$a->available($c),'Ingrediente sem regra validada não habilita módulo');
+$pdo->prepare("INSERT INTO rx_ingredient_rules (clinic_id,policy_id,ingredient_id,decision,constraints_json,justification,source_url) VALUES (?,?,?,'deny','{}','TESTE','https://example.test/881')")->execute([$c,$policy,$ingredient]);
+T::ok(!$a->available($c),'Regra deny não habilita módulo');
+$pdo->exec("UPDATE rx_ingredient_rules SET decision='allow'");
+T::ok($a->available($c) && count($a->catalog($c))===1,'Ativo habilitado com regra allow vigente habilita catálogo');
+T::ok(!$a->available($c2),'Catálogo de outra clínica não habilita módulo');
+$pdo->exec("UPDATE rx_policy_versions SET effective_until='2000-01-01'");T::ok(!$a->available($c),'Política expirada não habilita');
+$pdo->exec("UPDATE rx_policy_versions SET effective_until='2099-12-31',effective_from='2099-01-01'");T::ok(!$a->available($c),'Política futura não habilita');
+$pdo->exec("UPDATE rx_policy_versions SET effective_from='2000-01-01',enabled=0");T::ok(!$a->available($c),'Política desativada não habilita');
+$pdo->exec('UPDATE rx_policy_versions SET enabled=1');$pdo->exec('UPDATE rx_ingredients SET enabled=0');T::ok(!$a->available($c),'Ingrediente desativado não habilita');
+$pdo->exec('UPDATE rx_ingredients SET enabled=1');
+$html=$documents();T::ok(str_contains($html,'/prescricoes'),'Documentos mantém link com catálogo validado');
+T::ok(str_contains($portal(true),'/paciente/prescricoes'),'Portal mantém cartão com catálogo validado');
+ob_start();(new PrescriptionController($pdo))->index(['id'=>$pid]);$html=ob_get_clean();
+T::ok(http_response_code()===200 && str_contains($html,'Nova prescrição') && str_contains($html,'Ativo sintético TESTE') && !str_contains($html,'bin/'),'Controller preserva editor com catálogo validado');
+TenantContext::set($c,['id'=>$pid,'role'=>'patient']);T::ok(count($svc->patientList($c,$pid))===1,'API preserva lista com catálogo validado');
+Fx::act($u2);ob_start();(new PrescriptionController($pdo))->index(['id'=>$pid]);$html=ob_get_clean();T::ok(http_response_code()===403 && !str_contains($html,'Paciente TESTE'),'URL direta não revela paciente de outra clínica');
+Fx::act($u);
+$plan=(new \ClyoNutri\Domain\MealPlan\MealPlanService($pdo))->createPlan($pid,(int)$u['professional_id'],'Plano TESTE 881');
+$_SESSION=['user_name'=>'Nutri TESTE','clinic_name'=>'Clínica TESTE'];$_GET=[];$_POST=[];
+$dashboard=new \ClyoNutri\Application\Controllers\DashboardController();
+foreach([false,true] as $enabled){
+    $pdo->prepare('UPDATE rx_ingredients SET enabled=? WHERE clinic_id=?')->execute([$enabled?1:0,$c]);
+    http_response_code(200);ob_start();$dashboard->profile360(['id'=>$pid]);$html=ob_get_clean();
+    T::ok(str_contains($html,'data-testid="profile-manipulados-btn"')===$enabled,'Ficha preserva visibilidade conforme catálogo: '.($enabled?'disponível':'indisponível'));
+    http_response_code(200);ob_start();$dashboard->mealPlanEditor(['id'=>$plan['plan_id']]);$html=ob_get_clean();
+    T::ok(str_contains($html,'/prescricoes?plano=')===$enabled,'Mais ações do plano segue catálogo: '.($enabled?'disponível':'indisponível'));
+    TenantContext::set($c,['id'=>$pid,'role'=>'patient']);
+    $method=new ReflectionMethod(\ClyoNutri\Application\Controllers\PatientAppController::class,'portalData');
+    $data=$method->invoke(null,$pdo,['patient_id'=>$pid,'clinic_id'=>$c,'patient_name'=>'Paciente TESTE','clinic_name'=>'Clínica TESTE']);
+    T::ok($data['manipulados_available']===$enabled,'Dados reais do portal usam checagem única: '.($enabled?'disponível':'indisponível'));
+    Fx::act($u);
+}
+T::done();

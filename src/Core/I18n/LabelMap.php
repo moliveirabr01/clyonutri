@@ -54,6 +54,7 @@ class LabelMap
     private const MEAL_PLAN_STATUSES = [
         'draft' => ['label' => 'Rascunho', 'badge' => 'badge-warning'],
         'published' => ['label' => 'Publicado', 'badge' => 'badge-success'],
+        'superseded' => ['label' => 'Substituído', 'badge' => 'badge-secondary'],
         'archived' => ['label' => 'Arquivado', 'badge' => 'badge-secondary'],
     ];
 

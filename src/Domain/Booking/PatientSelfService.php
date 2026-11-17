@@ -87,8 +87,9 @@ final class PatientSelfService
             $this->db->prepare("INSERT INTO audit_logs (clinic_id,action,resource,resource_id,user_agent,details) VALUES (?,'APPOINTMENT_SELF_RESCHEDULED','appointments',?,'patient-self-service',NULL)")->execute([$clinic,(string)$id]);
             $result=['success'=>true,'appointment_id'=>$id,'scheduled_at'=>$to,'status'=>'scheduled','message'=>'Consulta remarcada. Confirme a presença no novo horário.'];
             $this->db->prepare('INSERT INTO booking_self_service_operations (clinic_id,patient_id,idempotency_key,appointment_id,from_scheduled_at,to_scheduled_at,result_json,created_at) VALUES (?,?,?,?,?,?,?,?)')->execute([$clinic,$p['id'],$key,$id,$from,$to,json_encode($result,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE),gmdate('Y-m-d H:i:s')]);
-            (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish($clinic,'appointment.rescheduled','patient',(int)$p['id'],'self-reschedule.'.hash('sha256',$clinic.'.'.$p['id'].'.'.$key),'/paciente/consultas');
-            (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish($clinic,'appointment.rescheduled','professional',(int)$a['professional_id'],'self-reschedule.'.hash('sha256',$clinic.'.'.$p['id'].'.'.$key),'/agenda');
+            $notificationVars=['date'=>substr($to,8,2).'/'.substr($to,5,2).'/'.substr($to,0,4),'time'=>substr($to,11,5)];
+            (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish($clinic,'appointment.rescheduled','patient',(int)$p['id'],'self-reschedule.'.hash('sha256',$clinic.'.'.$p['id'].'.'.$key),'/paciente/consultas',$notificationVars);
+            (new \ClyoNutri\Domain\Notification\NotificationService($this->db))->publish($clinic,'appointment.rescheduled','professional',(int)$a['professional_id'],'self-reschedule.'.hash('sha256',$clinic.'.'.$p['id'].'.'.$key),'/agenda',$notificationVars);
             (new BookingFlowMetrics($this->db))->count($clinic,'direct_rescheduled');$this->db->commit();return $result;
         }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
     }

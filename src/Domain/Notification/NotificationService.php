@@ -94,6 +94,12 @@ final class NotificationService
             'body' => 'Seu pedido de remarcação foi aceito. A nova data é {date} às {time}. Abra o Clyo Nutri para ver.',
             'push_body' => 'Seu reagendamento foi aceito. Abra o app para ver a nova data.',
         ],
+        'food_diary.entry_created' => [
+            'category' => 'checkin', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
+            'title' => 'Novo registro no diário alimentar',
+            'body' => 'Um paciente registrou uma refeição no diário alimentar. Abra o consultório para ler e enviar devolutiva.',
+            'push_body' => 'Um paciente registrou uma refeição no diário alimentar.',
+        ],
         'appointment.reschedule_declined' => [
             'category' => 'appointments', 'critical' => false, 'immediate' => false, 'quiet' => 'defer',
             'title' => 'Pedido de reagendamento não aceito',
@@ -197,6 +203,16 @@ final class NotificationService
             return ['event_id' => $existing, 'duplicate' => true, 'deliveries' => []];
         }
         $body = strtr($def['body'], array_map('strval', array_combine(array_map(fn($k) => '{' . $k . '}', array_keys($vars)), array_values($vars)) ?: []));
+        if (preg_match_all('/\{([a-z_]+)\}/', $body . ' ' . $def['title'], $left) > 0) {
+            $missing=array_values(array_unique($left[1]));
+            error_log('[ClyoNutri][notification] aviso bloqueado: marcador sem valor em '.$eventType.' ('.implode(',',$missing).')');
+            try {
+                (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('NOTIFICATION_BLOCKED_UNFILLED_PLACEHOLDER','notification_events',null,['event_type'=>$eventType,'recipient_type'=>$recipientType,'placeholders'=>$missing]);
+            } catch (\Throwable) {
+                // Failure to record the audit never authorizes delivery of an invalid template.
+            }
+            return ['event_id'=>null,'duplicate'=>false,'deliveries'=>[],'blocked'=>'unfilled_placeholder'];
+        }
         $now = $this->now();
         try {
             $this->db->prepare('INSERT INTO notification_events (clinic_id, event_type, category, recipient_type, recipient_id, title, body, link, critical, dedupe_key, created_at)

@@ -85,7 +85,7 @@ $global = array_values(array_filter($templates, fn($t) => $t['is_global']));
               <?php endif; ?>
               <p class="u-m-0 u-text-caption u-color-neutral-gray-500">
                 <?php if (!empty($t['created_by_name'])): ?>Criado por <?= $e($t['created_by_name']) ?> · <?php endif; ?><?= $e(date('d/m/Y', strtotime((string)$t['created_at']))) ?>
-                <?php if (!empty($t['source_plan_id'])): ?> · a partir do plano #<?= (int)$t['source_plan_id'] ?><?php endif; ?>
+                <?php if (!empty($t['source_plan_id'])): ?> · <span title="Plano de origem: <?= (int)$t['source_plan_id'] ?>">Criado a partir de um plano alimentar</span><?php endif; ?>
               </p>
             </div>
             <?php if (!$archived): ?>

@@ -1,5 +1,5 @@
 /* Pedido de exames laboratoriais (NI2-529, v45) — classes do módulo sobre o Botanical Design System. */
-.ex-page{max-width:960px;margin:0 auto}
+.ex-page{width:100%;max-width:none;margin:0}
 .ex-back{display:inline-block;margin-bottom:16px;color:var(--botanical-copper-600);font-weight:600;font-size:.9rem;text-decoration:none}
 .ex-back:hover{text-decoration:underline}
 .ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px}
@@ -15,7 +15,7 @@
 .ex-card{padding:22px;margin-bottom:18px}
 .ex-card h2{font-size:1.05rem;color:var(--botanical-forest-900);margin:0 0 12px}
 .ex-muted{color:var(--neutral-gray-500);font-size:.85rem}
-.ex-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;word-break:break-all}
+.ex-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem;white-space:nowrap}
 .ex-empty{padding:40px 24px;text-align:center;background:var(--botanical-cream-50);border:1px dashed var(--botanical-sage-300)}
 .ex-search{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px}
 @media (max-width:640px){.ex-search{grid-template-columns:1fr}}
@@ -43,6 +43,7 @@
 .ex-dl dt{color:var(--neutral-gray-500)}
 .ex-dl dd{margin:0}
 .ex-table td,.ex-table th{vertical-align:middle}
+.ex-date,.ex-table-actions,.ex-table-actions .btn{white-space:nowrap}
 .ex-modal-actions{display:flex;justify-content:flex-end;gap:10px}
 /* v47 (NI2-532, NI2-533, NI2-537): favoritos, ordem dos exames, catálogo, versões e linha do tempo. */
 .ex-star{color:var(--botanical-copper-600)}

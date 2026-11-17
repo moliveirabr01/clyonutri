@@ -686,9 +686,9 @@ class DashboardController
 
         <section class="card u-mb-6" id="secao-documentos" aria-labelledby="docs-title">
           <h3 id="docs-title" class="u-mt-0">Documentos</h3>
-          <p class="u-color-neutral-gray-600 u-text-compact">A área completa está em <a href="/pacientes/<?= (int)$p['id'] ?>/documentos">Documentos</a>. Manipulados = fórmulas/suplementação.</p>
+          <p class="u-color-neutral-gray-600 u-text-compact">A área completa está em <a href="/pacientes/<?= (int)$p['id'] ?>/documentos">Documentos</a>.<?php if((new \ClyoNutri\Domain\Prescription\PrescriptionAvailability(Connection::getInstance()))->available(TenantContext::getClinicId())): ?> Manipulados = fórmulas/suplementação.<?php endif; ?></p>
           <ul class="cn-profile-links" data-testid="profile-docs">
-            <li><a href="/pacientes/<?= (int)$p['id'] ?>/prescricoes" data-testid="profile-manipulados-btn">Manipulados (fórmulas)</a></li>
+            <?php if((new \ClyoNutri\Domain\Prescription\PrescriptionAvailability(Connection::getInstance()))->available(TenantContext::getClinicId())): ?><li><a href="/pacientes/<?= (int)$p['id'] ?>/prescricoes" data-testid="profile-manipulados-btn">Manipulados (fórmulas)</a></li><?php endif; ?>
             <li><a href="/pacientes/<?= (int)$p['id'] ?>/prontuario/imprimir">Prontuário para impressão</a></li>
             <li><a href="/pacientes/<?= (int)$p['id'] ?>/prontuario/exportar">Exportar prontuário</a></li>
             <li><a href="#patient-consents">Termos e consentimentos</a></li>
@@ -785,7 +785,7 @@ class DashboardController
 
                 <div class="u-mt-3 u-p-3 u-bg-neutral-gray-50 u-border u-radius-input">
                   <label class="u-flex u-items-center u-gap-2 u-pointer u-text-compact u-color-botanical-forest-900 u-font-medium">
-                    <input type="checkbox" name="is_shared" value="1" class="ds-check"><?php /* UX-02 (v14): liberação ao app é opt-in (padrão privado) */ ?>
+                    <input type="checkbox" name="is_shared" value="1" class="ds-check"<?= \ClyoNutri\Domain\Evolution\PatientEvolutionService::hasActiveGoal((int)TenantContext::getClinicId(), (int)$id, Connection::getInstance()) ? ' checked' : '' ?>><?php /* UX-02 (v14) / NI2-883: pré-marcado quando há meta ativa */ ?>
                     Liberar imediatamente para o paciente visualizar no aplicativo
                   </label>
                 </div>
@@ -1233,7 +1233,7 @@ class DashboardController
 
                   <div class="u-mt-3 u-p-3 u-bg-neutral-gray-50 u-border u-radius-input">
                     <label class="u-flex u-items-center u-gap-2 u-pointer u-text-compact u-color-botanical-forest-900 u-font-medium">
-                      <input type="checkbox" name="is_shared" value="1" class="ds-check">
+                      <input type="checkbox" name="is_shared" value="1" class="ds-check"<?= \ClyoNutri\Domain\Evolution\PatientEvolutionService::hasActiveGoal((int)TenantContext::getClinicId(), (int)$id, Connection::getInstance()) ? ' checked' : '' ?>>
                       Liberar imediatamente para o paciente visualizar no aplicativo
                     </label>
                   </div>
@@ -1497,6 +1497,7 @@ class DashboardController
         } catch (\Throwable $e) {
             $consultLinkIds = [];
         }
+        $diaryPanel = $this->loadFoodDiaryPanel($id);
         ob_start();
         // v54.25 (NI2-220 I9/I10): tela no design system, em views/clinical/medical_record.php.
         require __DIR__ . '/../../../views/clinical/medical_record.php';
@@ -1990,22 +1991,8 @@ class DashboardController
     private function nextValidSlot(int $duration, ?string $fromDate = null): ?string
     {
         try {
-            $svc = new AppointmentService();
-            $prof = $this->getActiveProfessionalId();
-            $tz = new \DateTimeZone(getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo');
-            $now = new \DateTimeImmutable('now', $tz);
-            $todayStr = $now->format('Y-m-d');
-            $base = ($fromDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) && $fromDate >= $todayStr)
-                ? new \DateTimeImmutable($fromDate, $tz)
-                : $now;
-            for ($i = 0; $i < 60; $i++) {
-                $d = $base->modify("+{$i} days")->format('Y-m-d');
-                $prev = $svc->availabilityPreview($prof, $d, max(15, min(240, $duration ?: 60)));
-                foreach ($prev['times'] ?? [] as $t) {
-                    if ($d === $todayStr && $t <= $now->format('H:i')) continue;
-                    return $d . 'T' . $t;
-                }
-            }
+            return (new \ClyoNutri\Domain\Appointment\NextAvailableSlot(Connection::getInstance()))
+                ->find($this->getActiveProfessionalId(), $duration, $fromDate);
         } catch (\Throwable $e) {
             error_log('[agenda] próximo horário indisponível: ' . get_class($e));
         }
@@ -2277,7 +2264,7 @@ class DashboardController
     {
         $token = $_POST['_csrf_token'] ?? '';
         if (!Csrf::validate($token)) {
-            header('Location: /agenda?error=csrf');
+            header('Location: ' . \ClyoNutri\Application\View\AgendaReturnLocation::make($_POST, null, ['error'=>'csrf']));
             exit;
         }
 
@@ -2287,9 +2274,25 @@ class DashboardController
 
         $service = new AppointmentService();
         try {
-            // UX-07 (v14): início antecipado (> 15 min antes do horário marcado) exige confirmação explícita.
+            // UX-07 (v14) / NI2-879: início fora do dia agendado exige escolha explícita (remarcar para agora ou criar atendimento de hoje).
+            // Mesmo dia antes da hora continua exigindo apenas confirm_early.
             if ($newStatus === AppointmentService::STATUS_IN_PROGRESS) {
                 $current = $service->getAppointment($id);
+                if ($current && AppointmentService::isDifferentDay((string)$current['scheduled_at'])) {
+                    $dayAction = trim((string)($_POST['out_of_day_action'] ?? ''));
+                    if ($dayAction === 'reschedule_now') {
+                        $service->rescheduleForNowAndStart($id, TenantContext::getUserId(), $notes);
+                        header("Location: /consulta/{$id}");
+                        exit;
+                    }
+                    if ($dayAction === 'create_today') {
+                        $todayId = $service->createTodayWalkInKeepingFuture($id, TenantContext::getUserId(), $notes);
+                        header("Location: /consulta/{$todayId}");
+                        exit;
+                    }
+                    header("Location: /consulta/{$id}?inicio_antecipado=1&escolha_dia=1");
+                    exit;
+                }
                 if ($current && AppointmentService::isEarlyStart((string)$current['scheduled_at'])) {
                     if (empty($_POST['confirm_early'])) {
                         header("Location: /consulta/{$id}?inicio_antecipado=1");
@@ -2305,13 +2308,18 @@ class DashboardController
                 exit;
             }
 
-            header("Location: /agenda?status_updated=1");
+            $fallback = null;
+            if (!\ClyoNutri\Application\View\AgendaReturnLocation::validDate($_POST['date'] ?? null)) {
+                $appAfter=$service->getAppointment($id);
+                $fallback=$appAfter['scheduled_at']??null;
+            }
+            header('Location: '.\ClyoNutri\Application\View\AgendaReturnLocation::make($_POST,$fallback,['status_updated'=>'1']));
             exit;
         } catch (InvalidAppointmentTransitionException $e) {
-            header("Location: /agenda?error=transicao_invalida&msg=" . urlencode($e->getMessage()));
+            header('Location: '.\ClyoNutri\Application\View\AgendaReturnLocation::make($_POST,null,['error'=>'transicao_invalida','msg'=>$e->getMessage()]));
             exit;
         } catch (\Throwable $e) {
-            header("Location: /agenda?error=falha&msg=" . urlencode($this->userFacingError('agenda', $e)));
+            header('Location: '.\ClyoNutri\Application\View\AgendaReturnLocation::make($_POST,null,['error'=>'falha','msg'=>$this->userFacingError('agenda',$e)]));
             exit;
         }
     }
@@ -2343,6 +2351,104 @@ class DashboardController
         }
         header('Location: /consulta/' . (int)$r['id']);
         exit;
+    }
+
+    /** NI2-880: carrega o bloco "Diário do paciente" reutilizando FoodDiaryService. */
+    private function loadFoodDiaryPanel(int $patientId): ?array
+    {
+        try {
+            $from = isset($_GET['diario_de']) && is_string($_GET['diario_de']) ? trim($_GET['diario_de']) : null;
+            $to = isset($_GET['diario_ate']) && is_string($_GET['diario_ate']) ? trim($_GET['diario_ate']) : null;
+            $showAll = !empty($_GET['diario_tudo']);
+            return (new \ClyoNutri\Domain\FoodDiary\FoodDiaryService(Connection::getInstance()))
+                ->professionalWebPanel($patientId, (int)TenantContext::getUserId(), $from, $to, $showAll);
+        } catch (\Throwable $e) {
+            error_log('food_diary_panel_failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** NI2-880: GET /pacientes/{id}/diario — diário alimentar do paciente com devolutiva. */
+    public function patientFoodDiary(array $params): void
+    {
+        $db = Connection::getInstance();
+        $actor = \ClyoNutri\Core\Auth\AuthContext::get()?->toArray() ?? [];
+        if (!\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical($actor)) {
+            \ClyoNutri\Core\Security\ClinicalAuthorization::deny($db);
+        }
+        $id = (int)($params['id'] ?? 0);
+        $repo = new PatientRepository($db);
+        $p = $repo->findById($id);
+        if (!$p) {
+            http_response_code(404);
+            header('Location: /pacientes');
+            return;
+        }
+        $csrfToken = Csrf::token();
+        $diaryPanel = $this->loadFoodDiaryPanel($id);
+        $title = 'Diário do paciente · ' . $p['name'];
+        $activeNav = 'pacientes';
+        $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
+        $userName = $_SESSION['user_name'] ?? 'Nutricionista';
+        $pid = $id;
+        $diaryReturnTo = '/pacientes/' . $id . '/diario#diario-paciente';
+        $diaryFilterAction = '/pacientes/' . $id . '/diario';
+        ob_start();
+        echo \ClyoNutri\Application\View\PatientHeader::render($db, $id, 'atendimento', $p);
+        require __DIR__ . '/../../../views/patients/_food_diary_block.php';
+        $content = ob_get_clean();
+        require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    /** NI2-880: POST /pacientes/{id}/diario/{entryId}/devolutiva — envia feedback clínico com CSRF e auditoria. */
+    public function submitPatientFoodDiaryFeedback(array $params): void
+    {
+        $db = Connection::getInstance();
+        $actor = \ClyoNutri\Core\Auth\AuthContext::get()?->toArray() ?? [];
+        if (!\ClyoNutri\Core\Security\ClinicalAuthorization::isClinical($actor)) {
+            \ClyoNutri\Core\Security\ClinicalAuthorization::deny($db);
+        }
+
+        $patientId = (int)($params['id'] ?? 0);
+        $entryId = (int)($params['entryId'] ?? 0);
+        $returnRaw = isset($_POST['return_to']) && is_string($_POST['return_to']) ? trim($_POST['return_to']) : '';
+        $safeBase = preg_match('#^/pacientes/' . $patientId . '(?:/(?:preparar|prontuario|diario))?(?:\#diario-paciente)?$#', $returnRaw)
+            ? strtok($returnRaw, '#')
+            : ('/pacientes/' . $patientId . '/preparar');
+
+        if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
+            http_response_code(403);
+            header('Location: ' . $safeBase . '?diario_error=csrf#diario-paciente');
+            return;
+        }
+
+        $repo = new PatientRepository($db);
+        if (!$repo->findById($patientId)) {
+            http_response_code(404);
+            header('Location: /pacientes');
+            return;
+        }
+
+        $feedback = trim((string)($_POST['feedback'] ?? ''));
+        $svc = new \ClyoNutri\Domain\FoodDiary\FoodDiaryService($db);
+        try {
+            $updated = $svc->submitProfessionalFeedback($entryId, $feedback);
+            if ($updated === null || (int)($updated['patient_id'] ?? 0) !== $patientId) {
+                http_response_code(404);
+                header('Location: ' . $safeBase . '?diario_error=not_found#diario-paciente');
+                return;
+            }
+            $svc->auditFeedbackSent(
+                TenantContext::getClinicId(),
+                (int)TenantContext::getUserId(),
+                $patientId,
+                $entryId,
+                !empty($updated['_replaced'])
+            );
+            header('Location: ' . $safeBase . '?diario_feedback=enviado#diario-paciente', true, 303);
+        } catch (\InvalidArgumentException $e) {
+            header('Location: ' . $safeBase . '?diario_error=validacao&diario_msg=' . rawurlencode($e->getMessage()) . '#diario-paciente', true, 303);
+        }
     }
 
     /** NI2-712: GET /pacientes/{id}/preparar — painel Preparar consulta (≠ anamnese). */
@@ -2387,6 +2493,7 @@ class DashboardController
             $lc->execute([$clinicId, $id]);
             $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Throwable $e) { $lastCompleted = null; }
+        $diaryPanel = $this->loadFoodDiaryPanel($id);
         ob_start();
         echo \ClyoNutri\Application\View\PatientHeader::render($db, $id, 'resumo', $p, $careStep, $clinicalSummary, $activePlan, true);
         require __DIR__ . '/../../../views/patients/prepare.php';
@@ -2698,6 +2805,7 @@ class DashboardController
                 header("Location: /consulta/{$id}?error=revisao_pendente#cr-pending-review");
                 exit;
             }
+            $details['pending_steps_acknowledged'] = array_column($pendingReview, 'key');
         }
 
         try {
@@ -2923,9 +3031,10 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $csrfToken = Csrf::generate();
 
+        $activeProfId = $this->getActiveProfessionalId();
         $appointmentPreferences=null;
         try {
-            $appointmentPreferences=(new AppointmentService())->practicePreferences($this->getActiveProfessionalId());
+            $appointmentPreferences=(new AppointmentService())->practicePreferences($activeProfId);
         } catch (\Throwable $e) {
             $appointmentPreferences = [];
         }
@@ -2933,7 +3042,7 @@ class DashboardController
         $dayAvailability=null;
         if($view==='day') {
             try {
-                $dayAvailability=$appointmentService->availabilityPreview($this->getActiveProfessionalId(),$currentDate,$defaultDuration);
+                $dayAvailability=$appointmentService->availabilityPreview($activeProfId,$currentDate,$defaultDuration);
             } catch (\Throwable $e) {
                 $dayAvailability=null;
             }
@@ -2946,7 +3055,6 @@ class DashboardController
         }
         // NI2-612: um aviso só, o mais específico (horários a confirmar, sem dias ou sem horário livre em 14 dias).
         $agendaBookingNotice = null;
-        $activeProfId = $this->getActiveProfessionalId();
         if (!empty($agendaBookingSettings['is_enabled']) && $activeProfId > 0) {
             try {
                 $agendaBookingState = (new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(), $activeProfId);
@@ -2954,6 +3062,14 @@ class DashboardController
             } catch (\Throwable $e) {
                 $agendaBookingNotice = null;
             }
+        }
+        $canConfigureAgenda=\ClyoNutri\Domain\Booking\BookingManagementAccess::allowed(Connection::getInstance());
+        $bookingUiState=\ClyoNutri\Domain\Booking\BookingSetupState::DISABLED;
+        $agendaPublicBookingLink='';
+        if($canConfigureAgenda){
+            $bookingUiState=(new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(),$activeProfId);
+            $slug=(new \ClyoNutri\Domain\Booking\PublicBookingSlug(Connection::getInstance()))->current($activeProfId);
+            $agendaPublicBookingLink=rtrim((string)(getenv('APP_URL')?:($_ENV['APP_URL']??'')),'/').'/agendar/'.rawurlencode($slug??(string)$activeProfId);
         }
         $agendaNoSlotsIn14Days = $agendaBookingNotice !== null;
         $agendaSubmissionId = bin2hex(random_bytes(16));
@@ -2986,7 +3102,7 @@ class DashboardController
 
         <?php if ($agendaNoSlotsIn14Days): ?>
           <div class="op-message op-message--error card u-mb-4" role="alert" data-testid="agenda-no-slots-alert">
-            <strong>Aviso de autoagendamento:</strong> <?= htmlspecialchars((string)$agendaBookingNotice) ?> <a href="<?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::ACTION_URL) ?>" class="u-color-semantic-warning-strong u-font-semibold u-underline">Configurar horários de atendimento em Configurações →</a>
+            <strong>Aviso de autoagendamento:</strong> <?= htmlspecialchars((string)$agendaBookingNotice) ?>
           </div>
         <?php endif; ?>
 
@@ -3020,18 +3136,10 @@ class DashboardController
               <a href="/agenda?view=month&amp;date=<?= $currentDate ?>" data-testid="agenda-view-month" class="agenda-view-segmented__item <?= $view === 'month' ? 'is-active' : '' ?>">Mês</a>
             </div>
 
-            <a href="/configuracoes?tab=agenda&amp;secao=feriados" class="btn btn-secondary agenda-week-toolbar__block-btn" title="Cadastrar bloqueio de horário ou feriado">
-              + Bloquear Horário
-            </a>
-            <a href="/configuracoes?tab=agenda" class="sr-only" data-testid="agenda-to-settings-btn">Horários &amp; Regras</a>
-
-            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-primary agenda-week-toolbar__new-btn">
-              + Novo Atendimento
-            </button>
+            <?php require __DIR__.'/../../../views/agenda/_configuration_menu.php'; ?>
+            <?= \ClyoNutri\Application\View\NewConsultationButton::dialog('card-novo-agendamento') ?>
           </div>
         </div>
-        <?php $bookingUiState=(new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(),$activeProfId); ?>
-        <p class="op-help sr-only" data-booking-state="<?= htmlspecialchars($bookingUiState) ?>">Agendamento online: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::label($bookingUiState)) ?></strong></p>
         <?php else: ?>
         <div class="u-flex u-justify-between u-items-center u-mb-6 u-wrap u-gap-4">
           <div>
@@ -3060,22 +3168,13 @@ class DashboardController
               <a href="/agenda?view=month&date=<?= $currentDate ?>" data-testid="agenda-view-month" class="btn <?= $view === 'month' ? 'btn-primary' : 'btn-secondary' ?> u-border-0 u-radius-0 u-minh-touch">Visão mensal</a>
             </div>
 
-            <?php /* Atalho 1-clique para Configurações da Agenda (NI2-588) */ ?>
-            <a href="/configuracoes?tab=agenda" class="btn btn-secondary u-minh-touch u-inline-flex u-items-center u-gap-1" data-testid="agenda-to-settings-btn" title="Configurar horários de atendimento e regras de agendamento">
-              <?= \ClyoNutri\Application\View\Icon::svg('settings', 16) ?> Horários &amp; Regras
-            </a>
-
-            <!-- Botão Novo Agendamento -->
-            <button type="button" aria-controls="card-novo-agendamento" data-toggle-dialog="card-novo-agendamento" class="btn btn-accent u-minh-touch">
-              + Nova Consulta
-            </button>
+            <?php require __DIR__.'/../../../views/agenda/_configuration_menu.php'; ?>
+            <?= \ClyoNutri\Application\View\NewConsultationButton::dialog('card-novo-agendamento') ?>
           </div>
         </div>
 
-        <?php $bookingUiState=(new \ClyoNutri\Domain\Booking\BookingSetupState(Connection::getInstance()))->forProfessional(TenantContext::getClinicId(),$activeProfId); ?>
-        <p class="op-help" data-booking-state="<?= htmlspecialchars($bookingUiState) ?>">Agendamento online: <strong><?= htmlspecialchars(\ClyoNutri\Domain\Booking\BookingSetupState::label($bookingUiState)) ?></strong></p>
-        <p class="agenda-secondary-links"><a class="btn btn-secondary" href="/configuracoes?tab=agenda&amp;secao=feriados">Feriados e bloqueios</a> <a class="btn btn-secondary" href="/configuracoes?tab=agenda">Configurações da agenda</a></p>
         <?php endif; ?>
+        <?php require __DIR__.'/../../../views/agenda/_booking_state.php'; ?>
         <?php if($view==='day'): ?>
           <?php $agendaMarkerDate=$currentDate;$agendaDayRules=$agendaCalendarRules[$currentDate]??[];require __DIR__.'/../../../views/agenda/_calendar_markers.php'; ?>
           <?php if($agendaDayRules): ?><p class="agenda-calendar-note">As exceções do calendário aplicam-se a novas marcações. Consultas já agendadas são mantidas.</p><?php endif; ?>
@@ -3258,12 +3357,16 @@ class DashboardController
                               <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="confirmed">
+                                <input type="hidden" name="view" value="<?= htmlspecialchars((string)$view) ?>">
+                                <input type="hidden" name="date" value="<?= htmlspecialchars((string)$currentDate) ?>">
                                 <button type="submit" class="btn btn-secondary u-text-caption u-py-1 u-px-2 u-minh-touch">Confirmar</button>
                               </form>
                               <!-- Iniciar em 1 clique (UX-011 / NI2-855) -->
                               <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="in_progress">
+                                <input type="hidden" name="view" value="<?= htmlspecialchars((string)$view) ?>">
+                                <input type="hidden" name="date" value="<?= htmlspecialchars((string)$currentDate) ?>">
                                 <button type="submit" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch" data-testid="agenda-start-appointment">Iniciar</button>
                               </form>
                             <?php elseif ($a['status'] === 'confirmed'): ?>
@@ -3271,6 +3374,8 @@ class DashboardController
                               <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-inline">
                                 <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="status" value="in_progress">
+                                <input type="hidden" name="view" value="<?= htmlspecialchars((string)$view) ?>">
+                                <input type="hidden" name="date" value="<?= htmlspecialchars((string)$currentDate) ?>">
                                 <button type="submit" class="btn btn-primary u-text-caption u-py-1 u-px-2 u-minh-touch" data-testid="agenda-start-appointment">Iniciar atendimento</button>
                               </form>
                             <?php elseif ($a['status'] === 'in_progress'): ?>
@@ -3288,11 +3393,15 @@ class DashboardController
                                   <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-m-0" data-confirm="Deseja marcar como Não Compareceu?">
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                     <input type="hidden" name="status" value="no_show">
+                                    <input type="hidden" name="view" value="<?= htmlspecialchars((string)$view) ?>">
+                                    <input type="hidden" name="date" value="<?= htmlspecialchars((string)$currentDate) ?>">
                                     <button type="submit" class="agenda-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-1 u-px-3 u-text-caption u-color-semantic-error u-bg-none u-border-0 u-pointer" title="Não compareceu">Não compareceu</button>
                                   </form>
                                   <form action="/agenda/<?= $a['id'] ?>/status" method="POST" class="u-m-0" data-confirm="Confirmar cancelamento da consulta?">
                                     <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
                                     <input type="hidden" name="status" value="cancelled">
+                                    <input type="hidden" name="view" value="<?= htmlspecialchars((string)$view) ?>">
+                                    <input type="hidden" name="date" value="<?= htmlspecialchars((string)$currentDate) ?>">
                                     <button type="submit" class="agenda-menu-item u-minh-touch u-flex u-items-center u-w-full u-text-left u-py-1 u-px-3 u-text-caption u-color-neutral-gray-500 u-bg-none u-border-0 u-pointer" title="Cancelar consulta">Cancelar</button>
                                   </form>
                                 </div>
@@ -3404,6 +3513,7 @@ class DashboardController
         </div>
 
         <script src="/assets/js/agenda-form.js?v=v54-64" defer></script>
+        <script src="/assets/js/agenda-configuration.js?v=ni2-888" defer></script>
         <?php
         $content = ob_get_clean();
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
@@ -3559,9 +3669,9 @@ class DashboardController
                   <?php foreach ($plans as $pl): ?>
                     <tr class="u-border-b u-bc-neutral-gray-100">
                       <td class="u-p-3 u-font-semibold u-color-botanical-forest-900">
-                        <?= htmlspecialchars($pl['title']) ?>
+                        <?= htmlspecialchars(\ClyoNutri\Domain\MealPlan\PlanTitle::forPatient((string)$pl['title'])) ?> · versão <?= (int)$pl['version'] ?><?= $pl['status'] === 'draft' ? ' (rascunho)' : '' ?>
                         <?php if (!empty($pl['parent_plan_id'])): ?>
-                          <span class="u-text-caption u-color-neutral-gray-500 u-block u-font-regular">(Derivado de #<?= (int)$pl['parent_plan_id'] ?>)</span>
+                          <span class="u-text-caption u-color-neutral-gray-500 u-block u-font-regular">Nova versão <span title="Plano de origem: <?= (int)$pl['parent_plan_id'] ?>">do plano anterior</span></span>
                         <?php endif; ?>
                       </td>
                       <td class="u-p-3"><?= $pl['patient_name'] !== null ? htmlspecialchars($pl['patient_name']) : '<span class="u-color-neutral-gray-500" data-testid="plan-no-patient">Sem paciente (atribuir depois)</span>' ?></td>
@@ -3808,7 +3918,7 @@ class DashboardController
               <summary class="btn btn-outline u-text-compact u-pointer u-list-none" data-testid="plan-more-actions">Mais ações <?= \ClyoNutri\Application\View\Icon::svg('chevron-down', 14) ?></summary>
               <div class="plan-actions-menu ds-menu-panel ds-menu-panel--wide">
                 <?php if ($planHasPatient): ?>
-                  <a class="plan-menu-item u-minh-touch u-flex u-items-center u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" href="/pacientes/<?= (int)$plan['patient_id'] ?>/prescricoes?plano=<?= (int)$planId ?>">Manipulados e suplementação</a>
+                  <?php if((new \ClyoNutri\Domain\Prescription\PrescriptionAvailability(Connection::getInstance()))->available(TenantContext::getClinicId())): ?><a class="plan-menu-item u-minh-touch u-flex u-items-center u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" href="/pacientes/<?= (int)$plan['patient_id'] ?>/prescricoes?plano=<?= (int)$planId ?>">Manipulados e suplementação</a><?php endif; ?>
                 <?php endif; ?>
                 <?php if ($planHasPatient && $publishedVersionsCount >= 2): ?>
                   <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/planos/comparar" class="plan-menu-item u-minh-touch u-flex u-items-center u-gap-2 u-py-2 u-px-4 u-text-compact u-color-neutral-ink-900 u-no-underline" data-testid="compare-plan-versions-link">
@@ -4578,11 +4688,7 @@ class DashboardController
               </div>
             <?php endif; ?>
 
-            <?php if (!empty($preview['allergen_safety']['requires_confirmation'])): ?>
-              <div class="op-message op-message--warning u-mb-4 u-text-compact">
-                <strong><?= !empty($preview['allergen_safety']['has_conflict']) ? 'Conflito de alérgeno' : 'Alérgenos não verificados' ?>:</strong> Para prosseguir, o profissional deve marcar a autorização clínica expressa e justificar abaixo. A justificativa fica registrada na versão e na trilha de auditoria.
-              </div>
-            <?php endif; ?>
+            <?php $allergenSafety=$preview['allergen_safety']; require __DIR__.'/../../../views/meal_plans/_allergen_publication_warning.php'; ?>
 
             <div data-testid="publication-allergy-review" class="u-mb-4">
               <strong>Alergias: <?= htmlspecialchars($clinicalSummary['allergy_label']) ?></strong>
@@ -4594,7 +4700,26 @@ class DashboardController
               <?php if (!empty($clinicalSummary['draft_in_progress'])): ?><p data-testid="publication-anamnesis-draft"><?= htmlspecialchars($clinicalSummary['draft_in_progress']['label']) ?>. <a href="/pacientes/<?= (int)$plan['patient_id'] ?>/anamnese">Continuar</a></p><?php endif; ?>
             </div>
             <form method="POST" action="/planos/<?= $planId ?>/publicar">
+              <?php if (\ClyoNutri\Domain\MealPlan\PlanTitle::needsConfirmation((string)$plan['title'])): ?>
+                <label for="confirmed-plan-title">Confirme o título que o paciente verá</label>
+                <p>Revise o título antes de publicar esta versão.</p>
+                <input id="confirmed-plan-title" class="form-control" name="confirmed_title" required maxlength="255" value="<?= htmlspecialchars(\ClyoNutri\Domain\MealPlan\PlanTitle::forPatient((string)$plan['title']), ENT_QUOTES, 'UTF-8') ?>">
+              <?php endif; ?>
               <input type="hidden" name="_csrf_token" value="<?= $csrfToken ?>">
+              <?php if (!empty($preview['unreviewed_estimated_measures'])): ?>
+                <div class="op-message op-message--warning u-mb-4 u-text-compact" data-testid="estimated-measures-warning">
+                  <strong>Medidas estimadas (revise o peso):</strong>
+                  <ul class="u-mt-1 u-mb-2">
+                    <?php foreach ($preview['unreviewed_estimated_measures'] as $em): ?>
+                      <li><?= htmlspecialchars((string)$em['food_name']) ?> — <?= htmlspecialchars((string)$em['measure_unit']) ?> (<?= number_format((float)($em['weight_grams'] ?? 0), 0, ',', '.') ?> g · estimativa, revise o peso)</li>
+                    <?php endforeach; ?>
+                  </ul>
+                  <label class="u-flex u-items-start u-gap-2 u-pointer">
+                    <input type="checkbox" name="confirm_estimated_measures" value="1" required class="u-mt-1" data-testid="confirm-estimated-measures">
+                    <span>Revisei os pesos das medidas caseiras estimadas acima e confirmo a prescrição.</span>
+                  </label>
+                </div>
+              <?php endif; ?>
               <?php if (!empty($preview['adequacy']['requires_override'])): ?>
                 <div class="u-mb-4">
                   <label class="u-flex u-items-start u-gap-2 u-text-compact u-pointer">
@@ -4609,7 +4734,7 @@ class DashboardController
                 <div class="u-mb-4">
                   <label class="u-flex u-items-start u-gap-2 u-text-compact u-pointer">
                     <input type="checkbox" name="allow_allergen_override" value="1" required class="u-mt-1">
-                    <span>Confirmo e autorizo clinicamente a prescrição dos alimentos assinalados mesmo com os alertas detectados.</span>
+                    <span><?= !empty($preview['allergen_safety']['has_conflict']) ? 'Revisei os conflitos dos alimentos listados e autorizo clinicamente a prescrição, conforme a justificativa.' : 'Conferi a composição e os rótulos dos alimentos sem informação e registrei a justificativa para publicar.' ?></span>
                   </label>
                   <label for="allergen-override-reason" class="u-block u-font-semibold u-mt-2 u-mb-1 u-mx-0 u-text-compact">Justificativa clínica *</label>
                   <textarea id="allergen-override-reason" name="allergen_override_reason" rows="3" required minlength="10" maxlength="1000" placeholder="Ex.: rótulos conferidos com a paciente; produto sem glúten da marca X" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input"></textarea>
@@ -4866,6 +4991,10 @@ class DashboardController
             }
             (new \ClyoNutri\Domain\Clinical\AllergyHistoryReview($db))->dismiss($clinicId, $id, $group, (int)TenantContext::getUserId(), $reason);
             header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '?alergia_revisada=1'));
+        } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
+            http_response_code(404);
+            echo 'Paciente não encontrado.';
+            return;
         } catch (\InvalidArgumentException $e) {
             header(\ClyoNutri\Application\View\AttendanceContext::location('Location: /pacientes/' . $id . '?error=1&msg=' . rawurlencode($e->getMessage()) . '#alergia-revisao'));
         }
@@ -5100,12 +5229,13 @@ class DashboardController
         $overrideReason = is_string($_POST['allergen_override_reason'] ?? null) ? trim($_POST['allergen_override_reason']) : null;
         $allowAdequacyOverride = !empty($_POST['allow_adequacy_override']);
         $adequacyOverrideReason = is_string($_POST['adequacy_override_reason'] ?? null) ? trim($_POST['adequacy_override_reason']) : null;
+        $confirmEstimatedMeasures = !empty($_POST['confirm_estimated_measures']);
 
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $service = new \ClyoNutri\Domain\MealPlan\MealPlanService($db);
 
         try {
-            $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason, $allowAdequacyOverride, $adequacyOverrideReason);
+            $res = $service->publishPlan($planId, $allowAllergenOverride, true, $overrideReason, $allowAdequacyOverride, $adequacyOverrideReason, $confirmEstimatedMeasures, is_string($_POST['confirmed_title'] ?? null) ? trim($_POST['confirmed_title']) : null);
             $_SESSION['feedback_message'] = "Plano publicado como versão {$res['version']}! As versões anteriores continuam disponíveis no histórico.";
             $planPatient = $db->prepare('SELECT patient_id FROM meal_plans WHERE id = ? AND clinic_id = ?');
             $planPatient->execute([$planId, TenantContext::getClinicId()]);
@@ -5528,7 +5658,7 @@ class DashboardController
               <div class="u-grid u-cols-2 u-gap-3 u-mb-4">
                 <div>
                   <label for="dc29-amount" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Valor (R$) *</label>
-                  <input id="dc29-amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="Ex: 250,00" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
+                  <input id="dc29-amount" type="text" inputmode="decimal" data-decimal-field="money" data-min="0.01" data-max="500000" name="amount" required placeholder="Ex: 250,00" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
                 </div>
                 <div>
                   <label for="dc30-due_date" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900"><span id="fin-date-label">Data de vencimento</span> *</label>
@@ -5585,7 +5715,7 @@ class DashboardController
 
               <div class="u-mb-5">
                 <label for="pay-modal-amount" class="u-block u-font-semibold u-text-compact u-mb-1 u-color-botanical-forest-900">Valor Recebido (R$) *</label>
-                <input id="pay-modal-amount" type="number" step="0.01" min="0.01" name="amount" required class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
+                <input id="pay-modal-amount" type="text" inputmode="decimal" data-decimal-field="money" data-min="0.01" data-max="500000" name="amount" required placeholder="Ex: 250,00" class="u-w-full u-py-2 u-px-3 u-border u-bc-border-input u-radius-input u-text-compact">
               </div>
 
               <div class="u-flex u-justify-end u-gap-3">
@@ -5601,7 +5731,9 @@ class DashboardController
           var form = document.getElementById('form-dar-baixa');
           form.action = '/financeiro/recebiveis/' + id + '/pagar';
           document.getElementById('pay-modal-description').textContent = description;
-          document.getElementById('pay-modal-amount').value = (amountCents / 100).toFixed(2);
+          var payInput = document.getElementById('pay-modal-amount');
+          payInput.value = (amountCents / 100).toFixed(2).replace('.', ',');
+          payInput.dispatchEvent(new Event('input', { bubbles: true }));
           document.getElementById('modal-dar-baixa').style.display = 'flex';
         }
         // v54.37: alterna Entrada/Saída no novo lançamento
@@ -5630,6 +5762,35 @@ class DashboardController
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
     }
 
+    private function guardFinancialAmount(int $amountCents, bool $isJson): bool
+    {
+        if ($amountCents <= 0) {
+            $msg = 'Informe um valor financeiro positivo maior que zero.';
+            if ($isJson) {
+                http_response_code(422);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $msg]);
+                exit;
+            }
+            $_SESSION['finance_error'] = $msg;
+            header('Location: /financeiro');
+            exit;
+        }
+        if ($amountCents > 5000000 && empty($_POST['confirm_high_amount'])) {
+            $msg = 'Valor acima de R$ 50.000,00 (' . \ClyoNutri\Domain\Finance\Money::format($amountCents) . ') exige confirmação explícita (confirm_high_amount).';
+            if ($isJson) {
+                http_response_code(422);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => $msg, 'requires_confirmation' => true, 'amount_cents' => $amountCents]);
+                exit;
+            }
+            $_SESSION['finance_error'] = $msg;
+            header('Location: /financeiro');
+            exit;
+        }
+        return true;
+    }
+
     public function createReceivableAction(): void
     {
         if (($_POST['direction'] ?? 'entrada') === 'saida') {
@@ -5649,6 +5810,8 @@ class DashboardController
 
         $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
                || (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json'));
+
+        $this->guardFinancialAmount($amountCents, $isJson);
 
         try {
             $category = trim((string)($_POST['category'] ?? ''));
@@ -5690,10 +5853,12 @@ class DashboardController
         $db = \ClyoNutri\Core\Database\Connection::getInstance();
         $isJson = isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json');
         try {
+            $expenseCents = \ClyoNutri\Domain\Finance\Money::parseToCents((string)($_POST['amount'] ?? ''));
+            $this->guardFinancialAmount($expenseCents, $isJson);
             $created = (new \ClyoNutri\Domain\Finance\ExpenseService($db))->create(
                 (string)($_POST['expense_category'] ?? $_POST['category'] ?? ''),
                 (string)($_POST['description'] ?? ''),
-                \ClyoNutri\Domain\Finance\Money::parseToCents((string)($_POST['amount'] ?? '')),
+                $expenseCents,
                 (string)($_POST['due_date'] ?? ''),
                 !empty($_POST['already_paid'])
             );
@@ -5740,6 +5905,7 @@ class DashboardController
                 $paid = (int)$totStmt->fetchColumn();
                 $amountCents = max(0, (int)$rec['amount_cents'] - $paid);
             }
+            $this->guardFinancialAmount($amountCents, $isJson);
 
             $res = $service->recordPayment($receivableId, $amountCents, $method);
 
@@ -5933,18 +6099,17 @@ class DashboardController
         $userName = $_SESSION['user_name'] ?? 'Dra. Camila Mendes';
         $arrowIcon = '<svg class="icon-inline" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
         // NI2-614: estado da assinatura no painel quando o teste terminou. Regra vigente (Configurações > Assinatura):
-        // nada é bloqueado e a contratação pelo sistema ainda não está disponível.
-        $dashSubscription = null; $dashCanManagePlan = false;
+        // O estado por data determina carência, modo leitura e a ação disponível para contratação.
+        $dashSubscription = null; $dashCanManagePlan = false; $dashExpiredNotice = null;
         try {
-            // Leitura simples: o painel não cria assinatura nem dispara aviso ao backoffice.
-            $dashSubStmt = $db->prepare('SELECT status, trial_ends_at FROM clinic_subscriptions WHERE clinic_id = ? LIMIT 1');
-            $dashSubStmt->execute([TenantContext::getClinicId()]);
-            $dashSubscription = $dashSubStmt->fetch(\PDO::FETCH_ASSOC) ?: null;
-            if ($dashSubscription && $dashSubscription['status'] === 'expired') {
-                $dashCanManagePlan = (new \ClyoNutri\Domain\Subscription\SubscriptionService($db))->canManageSubscription(TenantContext::getClinicId(), (int)TenantContext::getUserId());
+            // NI2-878: aviso único baseado em data (sem depender do cron), usando SubscriptionService::expiredNotice().
+            $dashSubSvc = new \ClyoNutri\Domain\Subscription\SubscriptionService($db);
+            $dashExpiredNotice = $dashSubSvc->expiredNotice(TenantContext::getClinicId());
+            if ($dashExpiredNotice !== null) {
+                $dashCanManagePlan = $dashSubSvc->canManageSubscription(TenantContext::getClinicId(), (int)TenantContext::getUserId());
             }
         } catch (\Throwable $e) {
-            $dashSubscription = null;
+            $dashExpiredNotice = null;
         }
 
         // v54.56: topo no estilo Talui (saudação, indicadores com comparação real, agenda da semana) e lista acionável logo abaixo.
@@ -6006,18 +6171,21 @@ class DashboardController
               <button type="submit" class="btn btn-outline dash-search__btn">Buscar</button>
             </form>
             <a href="/pacientes?novo=1" class="btn btn-outline dash-new-patient" data-testid="quick-new-patient">+ Novo paciente</a>
-            <a href="/agenda?novo=1" class="btn btn-primary dash-new-appointment" data-testid="dash-new-appointment">+ Nova consulta</a>
+            <?= \ClyoNutri\Application\View\NewConsultationButton::link('/agenda?novo=1','dash-new-appointment') ?>
           </div>
         </header>
 
-        <?php if ($dashSubscription && ($dashSubscription['status'] ?? '') === 'expired'): ?>
-          <?php $dashTrialEnd = !empty($dashSubscription['trial_ends_at']) ? (new \DateTimeImmutable((string)$dashSubscription['trial_ends_at']))->format('d/m/Y') : null; ?>
-          <div class="op-message op-message--info card dashboard-banner" role="status" data-testid="dashboard-trial-expired">
+        <?php if ($dashExpiredNotice !== null): ?>
+          <div class="op-message <?= $dashExpiredNotice['state'] === 'read_only' ? 'op-message--error' : 'op-message--info' ?> card dashboard-banner" role="status" data-testid="dashboard-trial-expired" data-trial-state="<?= htmlspecialchars($dashExpiredNotice['state']) ?>">
             <div>
-              <div class="dashboard-banner__title">Seu período de teste terminou<?= $dashTrialEnd ? ' em ' . htmlspecialchars($dashTrialEnd) : '' ?>.</div>
+              <div class="dashboard-banner__title"><?= htmlspecialchars($dashExpiredNotice['title']) ?></div>
               <div class="dashboard-banner__text">
-                O sistema continua liberado e seus dados seguem salvos. A contratação de um plano pelo sistema ainda não está disponível.
-                <?php if ($dashCanManagePlan): ?><a href="/configuracoes/assinatura" class="u-font-semibold u-link">Ver assinatura</a><?php else: ?>Fale com o titular do consultório sobre o plano.<?php endif; ?>
+                <?= htmlspecialchars($dashExpiredNotice['message']) ?>
+                <?php if ($dashCanManagePlan): ?>
+                  <a href="<?= htmlspecialchars($dashExpiredNotice['cta_href']) ?>" class="u-font-semibold u-link"><?= htmlspecialchars($dashExpiredNotice['cta_label']) ?></a>
+                <?php else: ?>
+                  Fale com o titular do consultório sobre o plano.
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -6100,7 +6268,7 @@ class DashboardController
           <div class="dash-kpi">
             <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('calendar') ?></span><span class="dash-kpi__label">Consultas hoje</span></div>
             <div class="dash-kpi__value tabular-nums"><span data-testid="appointments-today-count"><?= (int)$todayStats['total_today'] ?></span></div>
-            <div class="dash-kpi__foot"><?= $dashCmp($cmpToday) ?><span class="dash-kpi__note"><?= (int)$todayStats['confirmed'] ?> confirmada(s) · <?= (int)$todayStats['completed'] ?> realizada(s)<?= (int)$todayStats['cancelled'] > 0 ? ' · ' . (int)$todayStats['cancelled'] . ' cancelada(s)' : '' ?></span></div>
+            <div class="dash-kpi__foot"><?= $dashCmp($cmpToday) ?><span class="dash-kpi__note"><?= \ClyoNutri\Application\View\UserText::count((int)$todayStats['confirmed'], '{n} confirmada', '{n} confirmadas', 'Nenhuma confirmada') ?> · <?= \ClyoNutri\Application\View\UserText::count((int)$todayStats['completed'], '{n} realizada', '{n} realizadas', 'Nenhuma realizada') ?><?= (int)$todayStats['cancelled'] > 0 ? ' · ' . \ClyoNutri\Application\View\UserText::count((int)$todayStats['cancelled'], '{n} cancelada', '{n} canceladas') : '' ?></span></div>
           </div>
           <div class="dash-kpi">
             <div class="dash-kpi__head"><span class="dash-kpi__icon"><?= $dashIcon('users') ?></span><span class="dash-kpi__label">Pacientes ativos</span></div>

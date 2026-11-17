@@ -30,6 +30,52 @@ class ProductionEventService
     }
 
     /**
+     * NI2-871 (F-12): remove campos de texto livre clínico da telemetria em production_events.metadata,
+     * mantendo apenas indicadores booleanos e tamanho do texto.
+     */
+    public static function stripClinicalFreeText(array $meta, bool $strict = false): array
+    {
+        $blockedKeys = [
+            'allergen_override_reason', 'adequacy_override_reason', 'evolution_summary',
+            'notes', 'allergies', 'objectives', 'chief_complaint', 'routine',
+            'clinical_history', 'symptoms', 'medications_details', 'pathologies',
+            'restrictions', 'food_preferences', 'habits', 'reason',
+        ];
+        $clean = [];
+        foreach ($meta as $k => $v) {
+            $normalized=strtolower((string)preg_replace('/(?<!^)[A-Z]/','_$0',(string)$k));
+            if (in_array(strtolower((string)$k), $blockedKeys, true) || in_array($normalized, $blockedKeys, true)) {
+                if (is_string($v) && $v !== '') {
+                    $clean[$k . '_present'] = true;
+                    $clean[$k . '_len'] = mb_strlen($v, 'UTF-8');
+                }
+                continue;
+            }
+            if ($strict && !preg_match('/^[a-zA-Z0-9_.-]{1,80}$/D',(string)$k)) continue;
+            if (is_array($v)) {
+                $clean[$k]=self::stripClinicalFreeText($v,$strict);
+            } elseif ($strict && is_string($v)) {
+                // Clinical events default to numeric/boolean signals; strings require a typed operational field.
+                $states=['draft','review','published','superseded','issued','cancelled','completed','in_progress','scheduled','confirmed','no_show','active','inactive','success','failure','denied','saved','signed','not_started'];
+                $isState=preg_match('/(?:^|_)(?:status|state)$/D',$normalized) && in_array($v,$states,true);
+                $isId=preg_match('/(?:^|_)(?:id|ids)$/D',$normalized) && ctype_digit($v);
+                $isHash=preg_match('/(?:^|_)(?:hash|sha256|digest)$/D',$normalized) && preg_match('/^[a-f0-9]{64}$/Di',$v);
+                if($isState || $isId || $isHash)$clean[$k]=$v;
+                elseif($v!==''){$clean[$k.'_present']=true;$clean[$k.'_len']=mb_strlen($v,'UTF-8');}
+            } elseif(is_scalar($v)||$v===null){$clean[$k]=$v;}
+
+        }
+        return $clean;
+    }
+
+    public static function clinicalContext(string $category, ?string $resource, string $eventType): bool
+    {
+        return in_array($category,[ProductionEvent::CATEGORY_CLINICAL_WORKFLOW,ProductionEvent::CATEGORY_DOCUMENT],true)
+            || in_array($resource,['patients','clinical_records','anamnesis','anamneses','anthropometric_assessments','meal_plans','meal_plan_versions','prescriptions','rx_prescriptions','exam_requests','protocols','protocol_responses'],true)
+            || preg_match('/^(?:CLINICAL|ANAMNESIS|ANTHROPOMETRY|MEAL_PLAN|PRESCRIPTION|EXAM|PATIENT|RX)_/i',$eventType)===1;
+    }
+
+    /**
      * Emite e persiste um evento operacional de produção.
      * Resiliente: falhas internas de banco são capturadas e não propagadas para o fluxo chamador.
      */
@@ -37,7 +83,8 @@ class ProductionEventService
     {
         try {
             $data = $event->toArray();
-            $metaJson = !empty($data['metadata']) ? json_encode($data['metadata'], JSON_UNESCAPED_UNICODE) : null;
+            $meta = is_array($data['metadata'] ?? null) ? self::stripClinicalFreeText($data['metadata'],self::clinicalContext((string)$data['category'],$data['resource_type']??null,(string)$data['event_type'])) : [];
+            $metaJson = !empty($meta) ? json_encode($meta, JSON_UNESCAPED_UNICODE) : null;
 
             $stmt = $this->db->prepare("
                 INSERT INTO production_events (

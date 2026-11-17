@@ -1,0 +1,3 @@
+PASS diary UI: different consumption, explicit missing legacy details, professional feedback retained
+PASS preferences network failure: error shown, persisted switch remains enabled
+MEASURE logout {"color":"rgb(24, 61, 50)","height":48,"background":"rgba(0, 0, 0, 0)"}

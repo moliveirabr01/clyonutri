@@ -83,11 +83,21 @@ class RealtimeTranscriptionController
         try {
             (new \ClyoNutri\Domain\Telehealth\TeleconsultationRateLimiter($this->db))
                 ->hit('ai_consent_request', TenantContext::getClinicId() . '|' . $appointmentId, 6, 600);
-            $res = $this->consentService->createRequest($appointmentId, $patientId, $userId);
-            $payload = ['success' => true, 'created' => $res['created'], 'consent' => $res['consent']];
-            if (!empty($res['token'])) {
-                $payload['link'] = $this->publicBaseUrl() . '/consentimento-transcricao/' . $res['token'];
-            }
+            $res = $this->consentService->createRequest(
+                $appointmentId,
+                $patientId,
+                $userId,
+                'professional_session',
+                (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0')
+            );
+            // SEG360-SEC-001 (NI2-858): nunca devolver o token ao profissional; o link e o OTP vão ao paciente.
+            $payload = [
+                'success' => true,
+                'created' => $res['created'],
+                'consent' => $res['consent'],
+                'delivery_channel' => $res['delivery_channel'] ?? 'portal',
+                'portal_path' => '/paciente/consentimento',
+            ];
             $this->jsonResponse($payload);
         } catch (\ClyoNutri\Domain\Telehealth\Exceptions\TeleconsultationRateLimitException $e) {
             $this->jsonResponse(['error' => 'Muitos pedidos de aceite para este atendimento. Aguarde alguns minutos.'], 429);
@@ -322,11 +332,11 @@ class RealtimeTranscriptionController
             // 1. Encerra sessão de transcrição
             $completedSession = $this->transcriptionService->completeSession((int)$session['id']);
 
-            // 2. Extrai todo o texto transcrito
-            $fullTranscript = $this->transcriptionService->getAllSegmentsText((int)$session['id']);
+            // 2. Extrai os segmentos com locutor e ID para rastreabilidade (NI2-882)
+            $segments = $this->transcriptionService->getSegments((int)$session['id'], 0);
 
-            // 3. Gera a minuta estruturada sem alucinações clínicas
-            $draftFields = $this->summaryGenerator->generateDraft($fullTranscript);
+            // 3. Gera a minuta estruturada por regras e locutor, sem frases inventadas
+            $draftFields = $this->summaryGenerator->generateDraftFromSegments($segments);
 
             // 4. Persiste a minuta como rascunho de evolução para revisão humana
             $draft = $this->approvalService->createOrUpdateDraft((int)$session['id'], $draftFields);

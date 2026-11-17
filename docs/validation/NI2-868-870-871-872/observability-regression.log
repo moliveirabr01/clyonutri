@@ -1,0 +1,72 @@
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+===============================================================================
+   CLYONUTRI II — CENTRAL DE EVENTOS DE PRODUÇÃO NO BACKOFFICE (NI2-767)
+   Validação Integral das Histórias OPS EVENT 01 a OPS EVENT 12
+===============================================================================
+
+  [PASS] SETUP-01 [SETUP] — Migrações aplicadas, incluindo tabela production_events e production_alerts (Evidência: 95 migrações executadas)
+
+--> [1/12] NI2-768 (OPS EVENT 01): Taxonomia Operacional e Mapeamento de Fontes...
+  [PASS] TAX-01 [OPS EVENT 01] — Taxonomia cobre exatamente as 9 categorias operacionais homologadas (Evidência: AUTH, SECURITY, CLINICAL_WORKFLOW, SCHEDULING, DOCUMENT, BILLING, NOTIFICATION, SYSTEM, ADMIN)
+  [PASS] TAX-02 [OPS EVENT 01] — Validação estrita bloqueia emissão de evento com categoria fora da taxonomia (Evidência: Exceção disparada para categoria inválida)
+
+--> [2/12] NI2-769 (OPS EVENT 02): Schema Versionado e Sanitização Anti-PHI...
+  [PASS] PHI-01 [OPS EVENT 02] — Chave password removida da persistência de metadados (Evidência: Chave password ausente)
+  [PASS] PHI-02 [OPS EVENT 02] — Chave auth_token e tokens JWT removidos ou mascarados (Evidência: Token ausente)
+  [PASS] PHI-03 [OPS EVENT 02] — Chaves clínicas anamnese_resposta e diagnostico removidas (zero PHI) (Evidência: Dados clínicos de saúde bloqueados)
+  [PASS] PHI-04 [OPS EVENT 02] — Chave cpf removida conforme LGPD (Evidência: CPF removido)
+  [PASS] PHI-05 [OPS EVENT 02] — Metadados operacionais não sensíveis preservados (duration_seconds, safe_metric) (Evidência: Metadados permitidos preservados)
+  [PASS] DEDUP-01 [OPS EVENT 02] — Emissão com mesmo event_id é idempotente e não gera erro 500 (Evidência: event_id=fb624347-5830-4fe2-bc55-94080c5924e9 idempotente)
+
+--> [3/12] NI2-770 (OPS EVENT 03): Ingestão Resiliente e Fail-Safe...
+  [PASS] RESIL-01 [OPS EVENT 03] — Falha na persistência operacional é absorvida com segurança (retorna false sem derrubar transação) (Evidência: Fail-safe ativo: transação clínica protegida)
+
+--> [4/12] NI2-771 (OPS EVENT 04): API de Consulta e Matriz RBAC...
+  [PASS] QRY-01 [OPS EVENT 04] — Filtro por categoria AUTH retorna apenas eventos dessa categoria (Evidência: Total AUTH: 3)
+  [PASS] QRY-02 [OPS EVENT 04] — Filtro por severidade CRITICAL identifica evento crítico corretamente (Evidência: Total Críticos: 1)
+  [PASS] RBAC-01 [OPS EVENT 04] — Perfil superadmin possui permissões events.read, events.manage e events.export (Evidência: superadmin: total autorização)
+  [PASS] RBAC-02 [OPS EVENT 04] — Perfil support_agent NÃO possui permissão events.read (princípio do menor privilégio) (Evidência: support_agent bloqueado)
+  [PASS] RBAC-03 [OPS EVENT 04] — Perfil security_auditor possui leitura (events.read) mas NÃO possui mutação (events.manage) (Evidência: security_auditor: leitura estrita)
+
+--> [5/12] NI2-772 (OPS EVENT 05): Painel Executivo e Métricas Operacionais...
+  [PASS] KPI-01 [OPS EVENT 05] — Métrica total_24h reflete volume total de eventos persistidos (Evidência: Volume 24h: 11)
+  [PASS] KPI-02 [OPS EVENT 05] — Cálculo de taxa de erro (error_rate) apurado com precisão percentual (Evidência: Taxa de erro: 9.09%)
+  [PASS] KPI-03 [OPS EVENT 05] — Distribuição por categorias populada no painel executivo (Evidência: Categorias ativas: SCHEDULING, AUTH, SECURITY, CLINICAL_WORKFLOW)
+
+--> [6/12] NI2-773 (OPS EVENT 06): Timeline Investigativa e Correlação...
+  [PASS] TIME-01 [OPS EVENT 06] — Recuperação de cadeia correlacionada retorna todos os eventos do mesmo correlation_id (Evidência: Eventos correlacionados encontrados: 3)
+  [PASS] TIME-02 [OPS EVENT 06] — Eventos na linha do tempo ordenados cronologicamente por ocorrência (Evidência: Ordem temporal estrita)
+
+--> [7/12] NI2-774 (OPS EVENT 07): Instrumentação de Jornadas Clínicas e Administrativas...
+  [PASS] INST-01 [OPS EVENT 07] — AuditLogger despacha evento AUTH_LOGIN_SUCCESS para a central operacional (Evidência: AUTH capturado)
+  [PASS] INST-02 [OPS EVENT 07] — AuditLogger despacha APPOINTMENT_SCHEDULED na categoria SCHEDULING (Evidência: SCHEDULING capturado)
+  [PASS] INST-03 [OPS EVENT 07] — AuditLogger despacha ADMIN_USER_SUSPENDED na categoria ADMIN (Evidência: ADMIN capturado)
+
+--> [8/12] NI2-775 (OPS EVENT 08): Observabilidade de Billing, Jobs e Webhooks...
+  [PASS] BILL-01 [OPS EVENT 08] — Evento de webhook financeiro Asaas capturado com sucesso e sem dados de cartão (Evidência: Billing registrado)
+  [PASS] CRON-01 [OPS EVENT 08] — Evento de ciclo do Cron Scheduler registrado na categoria SYSTEM com duração (Evidência: Cron registrado (120ms))
+
+--> [9/12] NI2-776 (OPS EVENT 09): Alertas Operacionais e Cooldown...
+  [PASS] ALT-01 [OPS EVENT 09] — Regra de alerta detecta pico de erros (> 5 erros em 15 min) e cria alerta ativo (Evidência: Alerta HIGH_ERROR_RATE disparado)
+  [PASS] ALT-02 [OPS EVENT 09] — Mecanismo de cooldown impede duplicação de alertas ativos idênticos (Evidência: Alerta mantido em already_firing sem criar nova linha)
+
+--> [10/12] NI2-777 (OPS EVENT 10): Auditoria de Acesso e Política de Retenção...
+  [PASS] PURGE-01 [OPS EVENT 10] — Política de retenção remove eventos com mais de 90 dias sem afetar eventos recentes (Evidência: Eventos purgados: 1)
+
+--> [11/12] NI2-778 (OPS EVENT 11): Integração com Service Desk e Exportação...
+  [PASS] INC-01 [OPS EVENT 11] — Criação de incidente a partir de evento gera ticket no Service Desk com protocolo (Evidência: Protocolo: SUP-2026-59432 (ID #1))
+  [PASS] INC-02 [OPS EVENT 11] — Severidade critical é automaticamente mapeada para prioridade P1 no chamado (Evidência: Prioridade: P1)
+  [PASS] EXP-01 [OPS EVENT 11] — Exportação serializa eventos sanitizados em formato JSON válido e sem PHI (Evidência: JSON com 22 eventos auditados)
+
+--> [12/12] NI2-779 (OPS EVENT 12): Homologação dos 7 Quality Gates...
+  [PASS] REL-01 [OPS EVENT 12] — Todos os 7 Quality Gates homologados para a Central de Eventos de Produção (Evidência: 7/7 Quality Gates APROVADOS)
+
+===============================================================================
+   RESULTADO FINAL DOS TESTES DA CENTRAL DE EVENTOS (NI2-767)
+===============================================================================
+   TOTAL DE ASSERÇÕES : 32
+   APROVADAS (PASS)   : 32
+   FALHAS (FAIL)      : 0
+   TAXA DE SUCESSO    : 100%
+   VEREDITO TÉCNICO   : APPROVED PARA HOMOLOGAÇÃO INDEPENDENTE
+===============================================================================

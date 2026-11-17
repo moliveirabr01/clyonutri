@@ -9,6 +9,9 @@ use PDO;
 
 class AuthService
 {
+    /** Hash bcrypt custo 12 para equalizar tempo de resposta quando o usuário não existe (SEC-005). */
+    public const DUMMY_BCRYPT_HASH = '$2y$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW';
+
     private PDO $db;
 
     public function __construct(?PDO $db = null)
@@ -179,7 +182,11 @@ class AuthService
             $stmt = $this->db->prepare("SELECT id, password_hash, status FROM users WHERE email = :email AND status IN ('suspended', 'blocked') LIMIT 1");
             $stmt->execute(['email' => strtolower(trim($email))]);
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if (!$row || !password_verify($password, (string)$row['password_hash'])) {
+            if (!$row) {
+                password_verify($password, self::DUMMY_BCRYPT_HASH);
+                return false;
+            }
+            if (!password_verify($password, (string)$row['password_hash'])) {
                 return false;
             }
             try {
@@ -228,6 +235,7 @@ class AuthService
         $user = $stmt->fetch();
 
         if (!$user) {
+            password_verify($password, self::DUMMY_BCRYPT_HASH);
             return null;
         }
 

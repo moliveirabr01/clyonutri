@@ -239,10 +239,10 @@ final class PatientImportService
         $existing->execute([$this->clinicId(), $sha]);
         $old = $existing->fetch(PDO::FETCH_ASSOC);
         if ($old) {
-            if (in_array($old['status'], ['preview', 'confirmed', 'rolled_back'], true)) {
+            if (!in_array($old['status'], ['discarded', 'rolled_back'], true)) {
                 return ['batch_id' => (int)$old['id'], 'reused' => true, 'status' => (string)$old['status']];
             }
-            $this->deleteBatch((int)$old['id']); // descartado: pode gerar a prévia de novo
+            $this->deleteBatch((int)$old['id']); // descartado ou 100% desfeito: pode gerar a prévia de novo
         }
 
         $parsed = self::parse($content);

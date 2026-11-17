@@ -19,7 +19,7 @@
   <div class="kpi-card kpi-card--link">
     <div class="kpi-card__title">Assinaturas ativas</div>
     <div class="kpi-card__value" style="color: var(--admin-success);"><a class="kpi-card__link" href="/admin/comercial?status=active#assinantes"><span class="kpi-card__sr">Assinaturas ativas: </span><?= (int)($activeSubscriptions ?? 0) ?></a></div>
-    <div class="kpi-card__subtitle"><?= (int)($canceledSubscriptions ?? 0) ?> cancelamento(s) histórico(s)</div>
+    <div class="kpi-card__subtitle"><?= (int)($canceledSubscriptions ?? 0) ?> <?= \ClyoNutri\Application\View\UserText::count((int)($canceledSubscriptions ?? 0), 'cancelamento histórico', 'cancelamentos históricos') ?></div>
   </div>
   <div class="kpi-card">
     <div class="kpi-card__title">Planos ativos</div>
@@ -88,9 +88,9 @@
               <td>
                 <?php $planSubs = (int)($subMap[$p['id']] ?? 0); ?>
                 <?php if ($planSubs > 0): ?>
-                  <a href="/admin/comercial?plano=<?= rawurlencode((string)$p['code']) ?>&amp;status=active#assinantes" aria-label="Ver os <?= $planSubs ?> consultório(s) ativos do plano <?= htmlspecialchars((string)$p['code']) ?>" style="color: var(--admin-navy-900); text-decoration: underline; text-underline-offset: 2px;"><strong><?= $planSubs ?></strong></a> consultório(s)
+                  <a href="/admin/comercial?plano=<?= rawurlencode((string)$p['code']) ?>&amp;status=active#assinantes" aria-label="Ver os <?= $planSubs ?> <?= \ClyoNutri\Application\View\UserText::count($planSubs, 'consultório ativo', 'consultórios ativos') ?> do plano <?= htmlspecialchars((string)$p['code']) ?>" style="color: var(--admin-navy-900); text-decoration: underline; text-underline-offset: 2px;"><strong><?= $planSubs ?></strong></a> <?= \ClyoNutri\Application\View\UserText::count($planSubs, 'consultório', 'consultórios') ?>
                 <?php else: ?>
-                  <strong>0</strong> consultório(s)
+                  <strong>0</strong> consultórios
                 <?php endif; ?>
               </td>
               <td>
@@ -162,11 +162,12 @@
           <th>Valor mensal contratado</th>
           <th>Início</th>
           <th>Último login</th>
+          <?php if (!empty($canActivatePlans)): ?><th>Ações</th><?php endif; ?>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($subRows)): ?>
-          <tr><td colspan="6" style="text-align: center; color: var(--admin-gray-400); padding: 2rem;">
+          <tr><td colspan="<?= !empty($canActivatePlans) ? 7 : 6 ?>" style="text-align: center; color: var(--admin-gray-400); padding: 2rem;">
             <?= $filtersActive ? 'Nenhuma assinatura com os filtros escolhidos.' : 'Nenhuma assinatura registrada ainda.' ?>
           </td></tr>
         <?php else: ?>
@@ -217,6 +218,25 @@
                   require __DIR__ . '/_ultimo_login.php';
                 ?>
               </td>
+              <?php if (!empty($canActivatePlans)): ?>
+                <td>
+                  <details>
+                    <summary class="btn btn--secondary btn--sm" style="cursor: pointer; list-style: none;">Ativar / trocar plano</summary>
+                    <form method="POST" action="/admin/comercial/ativar" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; min-width: 210px;">
+                      <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token(), ENT_QUOTES) ?>">
+                      <input type="hidden" name="clinic_id" value="<?= (int)$sr['clinic_id'] ?>">
+                      <select name="plan_id" required aria-label="Plano alvo" style="padding: 0.35rem; border: 1px solid var(--border-input, #828B9B); border-radius: 6px; font-size: 0.8rem;">
+                        <?php foreach (($plans ?? []) as $pOpt): ?>
+                          <option value="<?= (int)$pOpt['id'] ?>" <?= (int)$pOpt['id'] === (int)($sr['plan_id'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string)$pOpt['code'] . ' · ' . (string)$pOpt['name']) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <input type="date" name="valid_until" required value="<?= date('Y-m-d', strtotime('+30 days')) ?>" aria-label="Válido até" style="padding: 0.35rem; border: 1px solid var(--border-input, #828B9B); border-radius: 6px; font-size: 0.8rem;">
+                      <input type="text" name="reason" required maxlength="255" placeholder="Motivo obrigatório" aria-label="Motivo da ativação" style="padding: 0.35rem; border: 1px solid var(--border-input, #828B9B); border-radius: 6px; font-size: 0.8rem;">
+                      <button type="submit" class="btn btn--primary btn--sm">Confirmar ativação</button>
+                    </form>
+                  </details>
+                </td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>
@@ -225,5 +245,37 @@
   </div>
   <?php require __DIR__ . '/_pagination.php'; ?>
 </div>
+
+<?php if (!empty($activationRequests)): ?>
+<div class="admin-card" id="pedidos-ativacao" style="margin-top: 1.5rem;">
+  <div class="admin-card__header">
+    <h3 class="admin-card__title">Pedidos de ativação pendentes (<?= count($activationRequests) ?>)</h3>
+  </div>
+  <div class="admin-table-wrapper">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Clínica</th>
+          <th>Plano solicitado</th>
+          <th>Solicitante</th>
+          <th>Observações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($activationRequests as $ar): ?>
+          <tr>
+            <td><?= htmlspecialchars($dmy($ar['created_at'] ?? null)) ?></td>
+            <td><strong><?= htmlspecialchars((string)$ar['clinic_name']) ?></strong></td>
+            <td><code><?= htmlspecialchars((string)$ar['plan_code']) ?></code> · <?= htmlspecialchars((string)$ar['plan_name']) ?></td>
+            <td><?= htmlspecialchars((string)$ar['requester_name']) ?></td>
+            <td><?= htmlspecialchars((string)($ar['notes'] ?? '—')) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php require __DIR__ . '/_comercial_trocas_pedidos.php'; ?>

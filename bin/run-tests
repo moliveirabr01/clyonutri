@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# NI2-860 (F-02): Runner oficial de testes com perfis 'core' (sem infra externa) e 'infra' (browser/MySQL/Apache).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+PROFILE="${1:-core}"
+PASS=0
+FAIL=0
+FAILED_TESTS=()
+
+run_step() {
+  local label="$1"
+  shift
+  echo "==> [$PROFILE] $label"
+  if "$@"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    FAILED_TESTS+=("$label")
+  fi
+}
+
+case "$PROFILE" in
+  core)
+    # NI2-892: refuse a green gate when native assertions are compiled out.
+    if ! php -d zend.assertions=1 -d assert.exception=1 -r 'try { assert(false); exit(1); } catch (AssertionError) { exit(0); }'; then
+      echo "ERRO: asserções PHP indisponíveis; gate interrompido."
+      exit 1
+    fi
+    CORE_TESTS=(
+      "tests/v5472_ni2_890_onboarding_entry_test.php"
+      "tests/v5471_ni2_882_883_test.php"
+      "tests/v5475_reconciliation_test.php"
+      "tests/ni2_894_aviso_agendamento_test.php"
+      "tests/ni2_868_870_871_872_regression_test.php"
+      "tests/ni2_888_agenda_usability_test.php"
+      "tests/ni2_881_prescription_availability_test.php"
+      "tests/ni2_892_query_metrics_test.php"
+      "tests/ni2_893_finishing_test.php"
+      "tests/v5470_ni2_880_food_diary_web_test.php"
+      "tests/v5469_ni2_879_and_cr360_fixes_test.php"
+      "tests/v5468_ni2_878_subscription_test.php"
+      "tests/v5467_ni2_856_aud360_test.php"
+      "tests/v5462_ni2_844_ux360_test.php"
+      "tests/v5461_ni2_830_consentimento_test.php"
+      "tests/v545_ni2_609_test.php"
+      "tests/v5412_ni2_625_activation_test.php"
+      "tests/onboarding_guided_and_activation_e2e_test.php"
+      "tests/ni2_514_v42_units_test.php"
+      "tests/ni2_514_v42_phase2_http_test.php"
+      "tests/ni2_519_520_v44_test.php"
+      "tests/v5425_ni2_220_test.php"
+      "tests/v5426_consulta_contexto_test.php"
+      "tests/ux_workflows.php"
+      "tests/ni2_703.php"
+      "bin/compare_migrations_schema.php"
+    )
+    for t in "${CORE_TESTS[@]}"; do
+      if [ -f "$t" ]; then
+        run_step "$t" php -d zend.assertions=1 -d assert.exception=1 "$t"
+      else
+        echo "ERRO: arquivo de teste ausente: $t"
+        FAIL=$((FAIL + 1))
+        FAILED_TESTS+=("$t (ausente)")
+      fi
+    done
+    ;;
+  infra)
+    run_step "tests/run_release_gate.sh --browser" bash tests/run_release_gate.sh --browser
+    ;;
+  *)
+    echo "Uso: bin/run-tests [core|infra]" >&2
+    exit 2
+    ;;
+esac
+
+echo ""
+echo "Resumo bin/run-tests [$PROFILE]: $PASS suíte(s) OK, $FAIL falha(s)."
+if [ "$FAIL" -gt 0 ]; then
+  echo "Falharam: ${FAILED_TESTS[*]}"
+  exit 1
+fi
+exit 0

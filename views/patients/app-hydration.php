@@ -26,7 +26,7 @@ $ml = static fn(int $v) => number_format($v, 0, ',', '.') . ' ml';
     <p data-testid="app-hydration-summary">
       Dias com registro: <strong><?= (int)$appHydration['days_with_records'] ?></strong> de <?= (int)$appHydration['period_days'] ?>
       · Média nesses dias: <strong><?= $h($ml((int)$appHydration['average_ml_on_recorded_days'])) ?></strong>
-      <?php if ($appHydration['days_goal_reached'] !== null): ?> · Meta atingida em <strong><?= (int)$appHydration['days_goal_reached'] ?></strong> dia(s)<?php endif; ?>
+      <?php if ($appHydration['days_goal_reached'] !== null): ?> · Meta atingida em <strong><?= (int)$appHydration['days_goal_reached'] ?></strong> <?= \ClyoNutri\Application\View\UserText::count((int)$appHydration['days_goal_reached'], 'dia', 'dias') ?><?php endif; ?>
       <?php if ($appHydration['last_logged_at']): ?> · Último registro: <?= $h(date('d/m/Y H:i', strtotime($appHydration['last_logged_at']))) ?><?php endif; ?>
     </p>
     <div class="table-responsive"><table class="table" data-testid="app-hydration-days">

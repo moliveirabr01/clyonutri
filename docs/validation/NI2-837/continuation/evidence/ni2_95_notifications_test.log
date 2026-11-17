@@ -1,0 +1,55 @@
+PASS [S0] Migration 52 aplicada (tabelas do domínio existem)
+PASS [S1] Plano publicado: aviso criado e e-mail/push na fila (não entregam na hora)
+PASS [S1] Mesma chave não cria segundo aviso nem segunda entrega
+PASS [S1] Nada sai antes do cron
+PASS [S1] Cron entrega o e-mail (sent) e o push fica bloqueado sem provedor
+PASS [S1] Status real gravado por canal
+PASS [S1] E-mail para a paciente, texto neutro (sem nome, sem dado clínico)
+PASS [S1] Segundo ciclo do cron não reenvia nada
+PASS [S1] Evento fora do catálogo é recusado
+PASS [S2] E-mail de plano desligado pela paciente: skipped/preference_off, aviso continua no app
+PASS [S2] Só a categoria alterada mudou; o resto segue no padrão
+PASS [S2] Entrada inválida #0 é recusada (Tipo de aviso inválido.)
+PASS [S2] Entrada inválida #1 é recusada (Use verdadeiro ou falso para ligar ou desligar o aviso.)
+PASS [S2] Entrada inválida #2 é recusada (Use verdadeiro ou falso para ligar ou desligar o aviso.)
+PASS [S2] Entrada inválida #3 é recusada (Informe o horário no formato HH:MM, por exemplo 22:00.)
+PASS [S2] Entrada inválida #4 é recusada (O início e o fim do horário de silêncio precisam ser diferentes.)
+PASS [S2] Entrada inválida #5 é recusada (Envie as preferências de aviso que deseja alterar.)
+PASS [S2] Recusa não grava nada pela metade
+PASS [S3] Janela que vira a meia-noite
+PASS [S3] Plano às 23h com silêncio 22h–07h: e-mail adiado para 07:00 do dia seguinte
+PASS [S3] Às 06:45 ainda não sai
+PASS [S3] Às 07:05 o cron entrega
+PASS [S4] Falha de SMTP: volta para a fila com motivo e espera (1ª tentativa)
+PASS [S4] Depois de 3 tentativas fica failed (não tenta para sempre)
+PASS [S4] Paciente sem e-mail: skipped/no_email
+PASS [S4] Entrega presa em sending é retomada
+PASS [S5] Lembretes só para consultas ativas entre 15 min e 24 h (cancelada, distante e em 10 min ficam de fora)
+PASS [S5] Cada lembrete vai para a paciente certa, na clínica certa
+PASS [S5] Texto com data e hora, sem profissional nem local
+PASS [S5] Cron seguinte não duplica lembrete
+PASS [S5] Consulta remarcada ganha lembrete novo
+PASS [S5] Paciente inativa não recebe lembrete
+PASS [S5] Lembrete respeita a preferência de consultas da paciente
+PASS [S6] Mensagem nova: no app (sent), e-mail na hora (sent), push bloqueado
+PASS [S6] Histórico do chat (chat_notifications_log) continua sendo gravado
+PASS [S6] O aviso entra na caixa do profissional com link para a conversa
+FAIL [S6] E-mail do chat sem conteúdo e com o aviso de urgência
+PASS [S6] Segunda mensagem em 30 min: e-mail pulado (recent_email)
+PASS [S6] Repetir a mesma mensagem não gera novo aviso
+PASS [S6] chat_preferences antiga ainda é respeitada (e-mail e push desligados)
+PASS [S6] Salvar a preferência nova parte do valor antigo (só muda o que foi enviado)
+PASS [S6] Silêncio no chat descarta o e-mail (a mensagem já está no app)
+PASS [S7] Caixa da paciente: mais novos primeiro, paginada
+PASS [S7] Segunda página continua de onde parou, sem repetir
+PASS [S7] Só avisos da própria paciente
+PASS [S7] Marcar como lido aviso de outra paciente ou de outra clínica: não encontrado
+PASS [S7] Marcar um como lido baixa o contador em 1 (e repetir não muda)
+PASS [S7] Marcar todos como lidos zera só a própria caixa
+PASS [S7] Mesmo id de destinatário em outra clínica não enxerga a caixa
+FAIL [S8] Publicar o plano cria o aviso para a paciente :: "PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 FOREIGN KEY constraint failed"
+PASS [S9] Exportação LGPD leva avisos e preferências da paciente
+PASS [S9] Anonimização apaga avisos, entregas pendentes e preferências da paciente
+PASS [S10] Cron não conta mais a tabela antiga nem diz DRAINED sem entregar
+
+Resultado NI2-95: 51 passaram, 2 falharam

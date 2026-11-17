@@ -542,7 +542,7 @@ $apptEvents = $db->query("SELECT event_type FROM notification_events WHERE clini
 check_ni2_481(
     in_array('appointment.scheduled', $apptEvents, true)
     && in_array('appointment.rescheduled', $apptEvents, true)
-    && in_array('appointment.confirmed_by_clinic', $apptEvents, true)
+    && in_array('appointment.confirmed', $apptEvents, true)
     && in_array('appointment.cancelled_by_clinic', $apptEvents, true),
     'ET06 (A4): Clínica gera eventos de notificação ao agendar, remarcar, confirmar e cancelar consulta'
 );

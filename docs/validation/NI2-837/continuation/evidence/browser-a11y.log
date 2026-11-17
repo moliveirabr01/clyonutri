@@ -1,0 +1,55 @@
+PASS Cancelar por teclado devolve foco ao registro e não grava consumo
+PASS Sequência original Cancelar → Plano abre no início e foca título
+PASS Cancelar e reabrir preserva modo e texto do rascunho
+PASS Trocar de seção preserva formulário aberto
+PASS Receita mostra carregamento e impede abertura concorrente
+PASS Receita válida mostra ingredientes, quantidades e preparo reais
+PASS Reabrir receita não duplica prescrição
+PASS Snapshot incompleto mostra indisponibilidade contextual
+PASS Recuperação abre Chat sem enviar mensagem automaticamente
+PASS Axe WCAG A/AA 1280px Hoje
+PASS Sem overflow horizontal 1280px Hoje
+PASS Axe WCAG A/AA 1280px Plano
+PASS Sem overflow horizontal 1280px Plano
+PASS Axe WCAG A/AA 1280px Diário
+PASS Sem overflow horizontal 1280px Diário
+PASS Axe WCAG A/AA 1280px Chat
+PASS Sem overflow horizontal 1280px Chat
+PASS Axe WCAG A/AA 1280px Evolução
+PASS Sem overflow horizontal 1280px Evolução
+PASS Axe WCAG A/AA 1280px Perfil
+PASS Sem overflow horizontal 1280px Perfil
+PASS Axe WCAG A/AA 390px Hoje
+PASS Sem overflow horizontal 390px Hoje
+PASS Axe WCAG A/AA 390px Plano
+PASS Sem overflow horizontal 390px Plano
+PASS Axe WCAG A/AA 390px Diário
+PASS Sem overflow horizontal 390px Diário
+PASS Axe WCAG A/AA 390px Chat
+PASS Sem overflow horizontal 390px Chat
+PASS Axe WCAG A/AA 390px Evolução
+PASS Sem overflow horizontal 390px Evolução
+PASS Axe WCAG A/AA 390px Perfil
+PASS Sem overflow horizontal 390px Perfil
+PASS Axe WCAG A/AA 360px Hoje
+PASS Sem overflow horizontal 360px Hoje
+PASS Axe WCAG A/AA 360px Plano
+PASS Sem overflow horizontal 360px Plano
+PASS Axe WCAG A/AA 360px Diário
+PASS Sem overflow horizontal 360px Diário
+PASS Axe WCAG A/AA 360px Chat
+PASS Sem overflow horizontal 360px Chat
+PASS Axe WCAG A/AA 360px Evolução
+PASS Sem overflow horizontal 360px Evolução
+PASS Axe WCAG A/AA 360px Perfil
+PASS Sem overflow horizontal 360px Perfil
+PASS Erro obrigatório associado semanticamente ao grupo
+PASS Resposta por teclado resolve erro
+PASS Ampliação CSS 200%: seção Hoje alcançável
+PASS Ampliação CSS 200%: seção Plano alcançável
+PASS Ampliação CSS 200%: seção Diário alcançável
+PASS Ampliação CSS 200%: seção Chat alcançável
+PASS Ampliação CSS 200%: seção Evolução alcançável
+PASS Ampliação CSS 200%: seção Perfil alcançável
+PASS Menu profissional mostra 2 avisos reais não lidos
+PASS Formulário de avisos acessível no destino atual

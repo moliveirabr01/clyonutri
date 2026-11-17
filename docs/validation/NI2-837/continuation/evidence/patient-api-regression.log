@@ -1,0 +1,4 @@
+PASS expired session denied on diary, preferences and recipes
+PASS negative check-in: missing and invalid adherence refused
+PASS different consumption: actual text persisted, repeat deduplicated, isolated across patient and clinic
+PASS preferences: invalid time refused, quiet/reminder times persist, patient and clinic isolation

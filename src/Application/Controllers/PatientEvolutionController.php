@@ -66,8 +66,24 @@ final class PatientEvolutionController
                 'target_value' => is_string($_POST['target_value'] ?? null) ? $_POST['target_value'] : '',
                 'target_date' => is_string($_POST['target_date'] ?? null) ? $_POST['target_date'] : '',
                 'message_for_patient' => is_string($_POST['message_for_patient'] ?? null) ? $_POST['message_for_patient'] : '',
+                'allow_self_report' => !empty($_POST['allow_self_report']),
+                'share_clinical_assessments' => !empty($_POST['share_clinical_assessments']),
             ]);
             $this->back($pid, 'success', 'Meta criada. A paciente passa a vê-la na aba Evolução do app.');
+        } catch (\InvalidArgumentException $e) {
+            $this->back($pid, 'error', $e->getMessage());
+        } catch (TenantSecurityException $e) {
+            http_response_code(404); echo 'Paciente não encontrado.';
+        }
+    }
+
+    public function releaseEvolution(array $params = []): void
+    {
+        if ($this->authorize() === null) return;
+        $pid = (int)($params['id'] ?? 0);
+        try {
+            (new PatientEvolutionService())->releaseAllForPatient($pid, (int)TenantContext::getUserId());
+            $this->back($pid, 'success', 'Evolução liberada no app do paciente.');
         } catch (\InvalidArgumentException $e) {
             $this->back($pid, 'error', $e->getMessage());
         } catch (TenantSecurityException $e) {

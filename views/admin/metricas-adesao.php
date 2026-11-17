@@ -49,7 +49,7 @@ $labels = \ClyoNutri\Domain\Analytics\AdherenceAnalytics::LABELS;
     <div class="am-kpi" data-testid="am-kpi-<?= $e($m) ?>">
       <h3><?= $e($labels[$m]) ?></h3>
       <strong><?= $e($t['avg_patients_per_day'] === null ? 'menos de ' . (int)$report['k_min'] : number_format($t['avg_patients_per_day'], 1, ',', '.')) ?></strong>
-      <p>pacientes por dia, em média · <?= $e($n($t['patient_days'])) ?> no período · <?= $e($n($t['events'])) ?> registros · <?= (int)$t['clinics'] ?> clínica(s)</p>
+      <p>pacientes por dia, em média · <?= $e($n($t['patient_days'])) ?> no período · <?= $e($n($t['events'])) ?> registros · <?= (int)$t['clinics'] ?> <?= \ClyoNutri\Application\View\UserText::count((int)$t['clinics'], 'clínica', 'clínicas') ?></p>
     </div>
   <?php endforeach; ?>
 </div>
@@ -88,7 +88,7 @@ $labels = \ClyoNutri\Domain\Analytics\AdherenceAnalytics::LABELS;
       </table></div>
     <?php endif; ?>
     <?php if ($report['clinics_hidden'] > 0): ?>
-      <p style="margin-top:.75rem;font-size:.82rem;color:var(--admin-gray-600)" data-testid="am-clinics-hidden"><?= (int)$report['clinics_hidden'] ?> clínica(s) com menos de <?= (int)$report['k_min'] ?> pacientes no app não aparecem separadas (entram só nos totais).</p>
+      <p style="margin-top:.75rem;font-size:.82rem;color:var(--admin-gray-600)" data-testid="am-clinics-hidden"><?= (int)$report['clinics_hidden'] ?> <?= \ClyoNutri\Application\View\UserText::count((int)$report['clinics_hidden'], 'clínica com menos', 'clínicas com menos') ?> de <?= (int)$report['k_min'] ?> pacientes no app não aparecem separadas (entram só nos totais).</p>
     <?php endif; ?>
   </div>
 </div>

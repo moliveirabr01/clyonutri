@@ -9,6 +9,22 @@ $statusLabels = ['active' => 'Ativa', 'achieved' => 'Atingida', 'cancelled' => '
 <h2 id="app-evolucao-titulo">Evolução no app da paciente</h2>
 <?php if ($appEvolutionFlash): ?><p role="<?= $appEvolutionFlash['type'] === 'error' ? 'alert' : 'status' ?>" data-testid="app-evolution-flash"><strong><?= $e($appEvolutionFlash['message']) ?></strong></p><?php endif; ?>
 
+<?php $vis = (array)($appEvolution['app_visibility'] ?? []); ?>
+<div class="u-bg-neutral-gray-50 u-border u-radius-input u-p-4 u-mb-4" data-testid="app-evolution-visibility">
+  <strong>O que o paciente vê no app:</strong>
+  <ul class="u-m-0 u-mt-2 u-pl-4 u-text-compact">
+    <li>Autorrelato no app: <strong><?= !empty($vis['has_enabled_metrics']) ? 'Liberado' : 'Nenhuma medida liberada' ?></strong></li>
+    <li>Avaliações compartilhadas: <strong><?= (int)($vis['shared_assessments_count'] ?? 0) ?> de <?= (int)($vis['total_assessments_count'] ?? 0) ?></strong></li>
+    <li>Metas ativas: <strong><?= (int)($vis['active_goals_count'] ?? 0) ?></strong></li>
+  </ul>
+  <?php if ($canEditAppEvolution && !empty($vis['has_missing_release'])): ?>
+    <form method="post" action="/pacientes/<?= $pid ?>/evolucao/liberar" class="u-mt-3 u-mb-0">
+      <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
+      <button type="submit" class="btn btn-primary btn-sm" data-testid="btn-release-evolution">Liberar evolução</button>
+    </form>
+  <?php endif; ?>
+</div>
+
 <h3 class="u-mt-5">Medidas que a paciente pode registrar</h3>
 <?php if ($canEditAppEvolution): ?>
 <form method="post" action="/pacientes/<?= $pid ?>/autorrelatos/permissoes" data-testid="self-metric-permissions" class="cn-profile-form">
@@ -78,6 +94,8 @@ $statusLabels = ['active' => 'Ativa', 'achieved' => 'Atingida', 'cancelled' => '
   <input id="goal-date" name="target_date" type="date" class="form-control">
   <label for="goal-message" class="form-label">Mensagem para a paciente (opcional)</label>
   <textarea id="goal-message" name="message_for_patient" class="form-control" maxlength="500" rows="2"></textarea>
+  <label class="cn-check-row"><input class="ds-check" type="checkbox" name="allow_self_report" value="1" checked> Permitir que o paciente registre esta medida pelo app</label>
+  <label class="cn-check-row"><input class="ds-check" type="checkbox" name="share_clinical_assessments" value="1" checked> Mostrar ao paciente as avaliações já registradas desta medida</label>
   <p class="cn-profile-note">A paciente vê a meta e os registros mais recentes. O app não calcula "quanto falta" nem sugere mudanças no tratamento.</p>
   <button type="submit" class="btn btn-secondary">Criar meta</button>
   </fieldset>

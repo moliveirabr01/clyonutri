@@ -71,11 +71,12 @@ try { $svc->decideByToken('AAAAAAAAAAAAAAAAAAAA', 'accept', $sha, $ip, $ua); T::
 T::ok($svc->isConsentActive($apA1, $pA) === false, 'tentativas inválidas não criaram aceite');
 
 // Critério 2: paciente aceita; evidência completa e mínima
-$res = $svc->decideByToken($token, 'accept', $sha, $ip, $ua);
+try { $svc->decideByToken($token, 'accept', $sha, $ip, $ua); T::ok(false, 'aceite sem OTP deveria falhar'); } catch (DomainException $e) { T::ok(true, 'SEG360-SEC-001: aceite sem OTP é recusado'); }
+$res = $svc->decideByToken($token, 'accept', $sha, $ip, $ua, (string)$req['otp']);
 T::ok($res['state'] === 'accepted' && preg_match('/^[a-f0-9]{32}$/', (string)$res['revoke_token']) === 1, 'paciente aceita pelo link: estado accepted + código de revogação');
 $row = $db->query('SELECT * FROM consultation_ai_consent_requests WHERE id = ' . (int)$req['consent']['id'])->fetch();
 T::ok((int)$row['clinic_id'] === $cA && (int)$row['appointment_id'] === $apA1 && (int)$row['patient_id'] === $pA, 'evidência vinculada a clínica + atendimento + paciente');
-T::ok($row['terms_version'] === TranscriptionConsentTerms::VERSION && $row['terms_sha256'] === $sha && $row['decision_mechanism'] === 'patient_link' && $row['request_origin'] === 'professional_session' && $row['decided_at_utc'] !== null, 'evidência: versão, SHA do texto, mecanismo, origem do pedido e timestamp');
+T::ok($row['terms_version'] === TranscriptionConsentTerms::VERSION && $row['terms_sha256'] === $sha && $row['decision_mechanism'] === 'otp' && $row['request_origin'] === 'professional_session' && $row['decided_at_utc'] !== null, 'evidência: versão, SHA do texto, mecanismo, origem do pedido e timestamp');
 T::ok($row['decision_ip_hash'] === hash_hmac('sha256', $ip, (string)(\ClyoNutri\Core\Security\Env::get('APP_KEY') ?: 'clyonutri-local')), 'IP guardado só como hash HMAC (64 hex), nunca em claro');
 T::ok(!str_contains(json_encode($row), $ip), 'IP do paciente não aparece em claro na evidência');
 T::ok($svc->isConsentActive($apA1, $pA) === true, 'com aceite do paciente, isConsentActive=true para este atendimento');
@@ -123,7 +124,7 @@ try { $svc->decideByToken((string)$r2['token'], 'accept', $sha, $ip, $ua); T::ok
 T::ok($svc->getConsent($apA1, $pA)['state'] === 'expired', 'estado do pedido vencido é "expired"');
 T::ok($svc->isConsentActive($apA1, $pA) === false, 'pedido expirado não libera captação');
 $r3 = $svc->createRequest($apA1, $pA, $uid);
-$svc->decideByToken((string)$r3['token'], 'accept', $sha, $ip, $ua);
+$svc->decideByToken((string)$r3['token'], 'accept', $sha, $ip, $ua, (string)$r3['otp']);
 T::ok($svc->isConsentActive($apA1, $pA) === true, 'novo pedido aceito volta a liberar (após revogação anterior)');
 $db->prepare("UPDATE consultation_ai_consent_requests SET valid_until_utc = ? WHERE id = ?")->execute([gmdate('Y-m-d H:i:s', time() - 5), (int)$r3['consent']['id']]);
 T::ok($svc->isConsentActive($apA1, $pA) === false, 'aceite com validade vencida deixa de valer');

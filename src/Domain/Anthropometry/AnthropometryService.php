@@ -139,12 +139,16 @@ class AnthropometryService
         }
 
         $hasPhase3Cols = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anthropometric_assessments', 'abdomen_cm');
+        $hasApptCol = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anthropometric_assessments', 'appointment_id');
+        $resolvedApptId = isset($data['appointment_id']) && is_numeric($data['appointment_id']) && (int)$data['appointment_id'] > 0
+            ? (int)$data['appointment_id']
+            : \ClyoNutri\Application\View\AttendanceContext::currentAppointmentId($patientId);
 
         // 4. Persistência relacional
         if ($hasPhase3Cols) {
             $stmt = $this->db->prepare("
                 INSERT INTO anthropometric_assessments (
-                    clinic_id, patient_id, professional_id,
+                    clinic_id, patient_id, professional_id," . ($hasApptCol ? " appointment_id," : "") . "
                     weight_kg, height_cm, bmi, waist_cm, hip_cm, whr,
                     body_fat_pct, muscle_mass_pct,
                     neck_cm, chest_cm, arm_cm, thigh_cm, calf_cm,
@@ -152,7 +156,7 @@ class AnthropometryService
                     body_fat_source, bioimpedance_device, visceral_fat_level, total_body_water_pct, bone_mass_kg, phase_angle_deg,
                     notes, is_shared, shared_at, shared_by_user_id, assessed_at
                 ) VALUES (
-                    :clinic_id, :patient_id, :professional_id,
+                    :clinic_id, :patient_id, :professional_id," . ($hasApptCol ? " :appointment_id," : "") . "
                     :weight_kg, :height_cm, :bmi, :waist_cm, :hip_cm, :whr,
                     :body_fat_pct, :muscle_mass_pct,
                     :neck_cm, :chest_cm, :arm_cm, :thigh_cm, :calf_cm,
@@ -161,7 +165,7 @@ class AnthropometryService
                     :notes, :is_shared, :shared_at, :shared_by_user_id, :assessed_at
                 )
             ");
-            $stmt->execute([
+            $params = [
                 'clinic_id' => $clinicId,
                 'patient_id' => $patientId,
                 'professional_id' => $professionalId,
@@ -196,7 +200,11 @@ class AnthropometryService
                 'shared_at' => $sharedAt,
                 'shared_by_user_id' => $userId,
                 'assessed_at' => $assessedAt,
-            ]);
+            ];
+            if ($hasApptCol) {
+                $params['appointment_id'] = $resolvedApptId;
+            }
+            $stmt->execute($params);
         } else {
             $stmt = $this->db->prepare("
                 INSERT INTO anthropometric_assessments (

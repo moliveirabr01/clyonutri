@@ -1,0 +1,10 @@
+locator.fill: Timeout 12000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('textbox', { name: 'O que você comeu e quantidade aproximada', exact: true })[22m
+
+    at /Users/moliveira/Nutri_II/tests/ni2_837_continuation_browser_test.cjs:15:107 {
+  log: [
+    "  - waiting for getByRole('textbox', { name: 'O que você comeu e quantidade aproximada', exact: true })"
+  ],
+  name: 'TimeoutError'
+}

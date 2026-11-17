@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Encerrar sessão",
+    "viewport": 1280,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(255, 255, 255)",
+    "contrast": 11.983611320517493,
+    "width": 686,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Atualizar receitas",
+    "viewport": 1280,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(245, 247, 242)",
+    "contrast": 11.109927401588806,
+    "width": 720,
+    "height": 44,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Abrir receita",
+    "viewport": 1280,
+    "color": "rgb(255, 255, 255)",
+    "background": "rgb(24, 61, 50)",
+    "contrast": 11.983611320517493,
+    "width": 686,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Encerrar sessão",
+    "viewport": 390,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(255, 255, 255)",
+    "contrast": 11.983611320517493,
+    "width": 316,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Atualizar receitas",
+    "viewport": 390,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(245, 247, 242)",
+    "contrast": 11.109927401588806,
+    "width": 350,
+    "height": 44,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Abrir receita",
+    "viewport": 390,
+    "color": "rgb(255, 255, 255)",
+    "background": "rgb(24, 61, 50)",
+    "contrast": 11.983611320517493,
+    "width": 316,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Encerrar sessão",
+    "viewport": 360,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(255, 255, 255)",
+    "contrast": 11.983611320517493,
+    "width": 286,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Atualizar receitas",
+    "viewport": 360,
+    "color": "rgb(24, 61, 50)",
+    "background": "rgb(245, 247, 242)",
+    "contrast": 11.109927401588806,
+    "width": 320,
+    "height": 44,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  },
+  {
+    "name": "Abrir receita",
+    "viewport": 360,
+    "color": "rgb(255, 255, 255)",
+    "background": "rgb(24, 61, 50)",
+    "contrast": 11.983611320517493,
+    "width": 286,
+    "height": 48,
+    "outlineStyle": "solid",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(185, 79, 31)"
+  }
+]

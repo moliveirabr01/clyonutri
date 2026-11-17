@@ -62,8 +62,9 @@ class ClinicalRecordService
             $contentJson = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             $createdAt = date('Y-m-d H:i:s');
 
-            // 2. Computar o hash SHA-256 canônico do registro
+            // 2. Computar o hash SHA-256 canônico do registro sobre o texto puro antes da cifragem
             $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, null, $contentJson, $previousHash, $createdAt, trim($title), null, 2);
+            $storedContentJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt($contentJson);
 
             // 3. Inserir append-only
             $stmt = $this->db->prepare("
@@ -84,7 +85,7 @@ class ClinicalRecordService
                 'professional_id' => $professionalId,
                 'version' => $nextVersion,
                 'title' => trim($title),
-                'content_json' => $contentJson,
+                'content_json' => $storedContentJson,
                 'record_hash' => $recordHash,
                 'previous_hash' => $previousHash,
                 'created_at' => $createdAt,
@@ -172,7 +173,8 @@ class ClinicalRecordService
 
             // NI2-220: a retificação troca o texto, não apaga os dados estruturados da versão anterior
             // (consulta de origem, data, peso e cintura aferidos, categoria). Valores novos têm prioridade.
-            $previousContent = json_decode((string)($target['content_json'] ?? ''), true);
+            $rawPrevJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)($target['content_json'] ?? ''));
+            $previousContent = json_decode((string)$rawPrevJson, true);
             if (is_array($previousContent)) {
                 // v54.27: registro em anotações/metas (sala de teleconsulta) continua nesse formato depois da retificação.
                 if (ClinicalRecordContent::present($previousContent)['structured'] && !array_key_exists('notes', $newContent) && array_key_exists('text', $newContent)) {
@@ -216,6 +218,7 @@ class ClinicalRecordService
             if (mb_strlen($newTitle, 'UTF-8') > 255) throw new InvalidArgumentException('O título legado excede o limite permitido para a retificação.');
 
             $recordHash = $this->computeHash($clinicId, $patientId, $professionalId, $nextVersion, $targetRecordId, $contentJson, $previousHash, $createdAt, $newTitle, $trimmedReason, 2);
+            $storedContentJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt($contentJson);
 
             // Inserir a nova versão retificada
             $stmt = $this->db->prepare("
@@ -238,7 +241,7 @@ class ClinicalRecordService
                 'supersedes_id' => $targetRecordId,
                 'revision_reason' => $trimmedReason,
                 'title' => $newTitle,
-                'content_json' => $contentJson,
+                'content_json' => $storedContentJson,
                 'record_hash' => $recordHash,
                 'previous_hash' => $previousHash,
                 'created_at' => $createdAt,
@@ -327,14 +330,15 @@ class ClinicalRecordService
                 ];
             }
 
-            // 2. Recalcular e comparar o record_hash com o conteúdo persistido
+            // 2. Recalcular e comparar o record_hash com o conteúdo persistido (decifrado se cifrado em repouso)
+            $plainJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)$rec['content_json']);
             $recalculated = $this->computeHash(
                 (int)$rec['clinic_id'],
                 (int)$rec['patient_id'],
                 (int)$rec['professional_id'],
                 $version,
                 $supersedesId,
-                $rec['content_json'],
+                (string)$plainJson,
                 $rec['previous_hash'],
                 $rec['created_at'],
                 $rec['title'],
@@ -394,11 +398,12 @@ class ClinicalRecordService
         ]);
 
         return array_map(function ($row) {
-            $decoded = json_decode((string)$row['content_json'], true);
+            $plainJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)$row['content_json']);
+            $decoded = json_decode((string)$plainJson, true);
             $row['content'] = is_array($decoded) ? $decoded : null;
             // v54.27: conteúdo que não é JSON válido segue como texto bruto, para a tela mostrar como texto simples.
-            if (!is_array($decoded) && trim((string)$row['content_json']) !== '') {
-                $row['content_unparsed'] = (string)$row['content_json'];
+            if (!is_array($decoded) && trim((string)$plainJson) !== '') {
+                $row['content_unparsed'] = (string)$plainJson;
             }
             unset($row['content_json']);
             return $row;

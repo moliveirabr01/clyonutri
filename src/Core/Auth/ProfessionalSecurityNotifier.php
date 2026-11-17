@@ -107,7 +107,11 @@ final class ProfessionalSecurityNotifier
         if (strlen($k) >= 16) {
             return $k;
         }
-        return 'clyonutri-email-verification-secret-token-key-2026';
+        $appEnv = strtolower((string)(Env::get('APP_ENV') ?: 'local'));
+        if ($appEnv === 'production' || $appEnv === 'prod') {
+            throw new \RuntimeException('APP_KEY ausente ou fraca em produção para assinatura de tokens de verificação.');
+        }
+        return hash('sha256', __FILE__ . '|' . (string)Env::get('DB_DATABASE'));
     }
 
     public function generateEmailToken(int $userId, string $email): string
@@ -151,6 +155,11 @@ final class ProfessionalSecurityNotifier
         }
         $user = $this->user($userId);
         if ($user === null) {
+            return null;
+        }
+        $tokenEmail = strtolower(trim((string)($data['email'] ?? '')));
+        $currentEmail = strtolower(trim((string)($user['email'] ?? '')));
+        if ($tokenEmail === '' || $currentEmail === '' || !hash_equals($currentEmail, $tokenEmail)) {
             return null;
         }
         $clinicId = !empty($user['clinic_id']) ? (int)$user['clinic_id'] : null;

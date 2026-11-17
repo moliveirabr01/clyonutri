@@ -50,7 +50,7 @@ class Connection
                     mkdir($dir, 0755, true);
                 }
             }
-            self::$instance = new PDO('sqlite:' . $dbPath);
+            self::$instance = new ProfiledPdo('sqlite:' . $dbPath);
             self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$instance->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             self::$instance->exec('PRAGMA foreign_keys = ON;');
@@ -60,6 +60,7 @@ class Connection
             if ($needsTestSchema) {
                 self::prepareTestDatabase(self::$instance);
             }
+            self::registerMetrics();
             return;
         }
 
@@ -95,10 +96,20 @@ class Connection
             if ($charset === 'utf8mb4') {
                 self::$instance->exec("SET NAMES utf8mb4 COLLATE " . MySqlCompatPdo::COLLATION);
             }
+            self::registerMetrics();
             return;
         }
 
         throw new RuntimeException("Driver de banco de dados não suportado: {$driver}");
+    }
+
+    private static function registerMetrics(): void
+    {
+        $connection = self::$instance;
+        if (!$connection instanceof ProfiledPdo || !$connection->metrics()->snapshot()['enabled']) return;
+        register_shutdown_function(static function () use ($connection): void {
+            error_log('[ClyoNutri][query-metrics] ' . json_encode($connection->metrics()->snapshot(), JSON_THROW_ON_ERROR));
+        });
     }
 
     private static function projectRoot(): string

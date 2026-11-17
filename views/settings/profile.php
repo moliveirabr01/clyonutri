@@ -137,7 +137,10 @@
 <label class="u-flex u-gap-2 u-items-center u-mb-3"><input type="checkbox" name="booking_public_show_address" value="1" <?= $settingsRecovery->checked('booking','booking_public_show_address',!empty($bs['public_show_address']))?'checked':'' ?> <?= $dis ?>> Mostrar o endereço do consultório na página do link de agendamento</label>
 <p class="text-muted ds-hint-tight u-text-compact">Desligado, o endereço só aparece para a paciente depois de marcar a consulta presencial.</p>
 <?php if($bookingLink): ?><div class="form-group"><label class="form-label" for="booking-link">Seu link de agendamento</label><input class="form-control" id="booking-link" type="text" readonly value="<?= htmlspecialchars($bookingLink,ENT_QUOTES) ?>"><small><?= !empty($bs['is_enabled'])?'Envie este link aos pacientes.':'O link só funciona depois de ligar o agendamento online.' ?></small></div><?php endif; ?>
-<?php if($canManageBooking): ?><button type="submit" class="btn btn-primary">Salvar agendamento online</button><?php endif; ?>
+<?php if($canManageBooking): ?>
+<?php if(empty($bs['is_enabled'])): ?><button type="submit" name="booking_enabled" value="1" class="btn btn-primary" data-testid="activate-online-booking">Ativar agendamento online</button><?php endif; ?>
+<button type="submit" class="btn btn-secondary">Salvar agendamento online</button>
+<?php endif; ?>
 </form>
 <?php else: ?>
 <?php require __DIR__ . '/_calendar.php'; ?>

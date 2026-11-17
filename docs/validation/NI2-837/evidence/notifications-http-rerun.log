@@ -1,0 +1,76 @@
+PASS [setup] Login das três pacientes TESTE
+PASS [auth] GET /api/v1/patient/notifications sem token → 401
+PASS [auth] POST /api/v1/patient/notifications/1/read sem token → 401
+PASS [auth] POST /api/v1/patient/notifications/read-all sem token → 401
+PASS [auth] GET /api/v1/patient/notification-preferences sem token → 401
+PASS [auth] POST /api/v1/patient/notification-preferences sem token → 401
+PASS [caixa] Plano publicado já aparece na caixa da Ana (antes do cron)
+PASS [caixa] Resposta da caixa não fica em cache
+PASS [caixa] Aviso sem nome, sem plano e sem calorias
+PASS [fila] E-mail do plano ainda está na fila (só o cron entrega)
+PASS [cron] Cron real roda e mostra entregas e lembretes
+PASS [cron] Depois do cron: e-mails logged (driver de log), push bloqueado, nada na fila
+PASS [cron] Segundo ciclo não duplica lembrete nem reenvia
+PASS [caixa] Ana vê plano + lembrete da consulta, mais novo primeiro
+PASS [caixa] Lembrete usa o horário local da consulta (cron no fuso da aplicação, não em UTC)
+PASS [caixa] Lembrete traz só data e hora
+PASS [caixa] Paginação: limit=1 devolve o cursor da próxima página
+PASS [caixa] before_id traz o restante
+PASS [caixa] Parâmetros inválidos são ignorados (não quebram)
+PASS [idor] Ana marcar aviso da Carla (outra clínica) → 404 sem detalhes
+PASS [idor] Ana marcar aviso do Bruno (mesma clínica) → 404 sem detalhes
+PASS [idor] Ana marcar aviso inexistente → 404 sem detalhes
+PASS [idor] Id não numérico → 404
+PASS [idor] Avisos dos outros continuam não lidos
+PASS [idor] Carla só vê os avisos dela
+PASS [lido] Marcar um como lido
+PASS [lido] Marcar todos como lidos
+PASS [lido] Caixa do Bruno não foi mexida (2 lembretes)
+PASS [pref] Padrão: tudo ligado, silêncio desligado, push indisponível
+PASS [pref] Salvar: desliga e-mail de lembrete e liga silêncio 21:30–07:00
+PASS [pref] Mudança fica na auditoria
+PASS [pref] Recusa categoria desconhecida com 422
+PASS [pref] Recusa valor não booleano com 422
+PASS [pref] Recusa hora inválida com 422
+PASS [pref] Recusa início = fim com 422
+PASS [pref] Recusa corpo vazio com 422
+PASS [pref] Recusa canal inexistente com 422
+PASS [pref] JSON quebrado → 422
+PASS [pref] Preferência da Ana não vaza para a Carla
+PASS [checkin] Com o check-in diário (NI2-96) o lembrete vem disponível e desligado, e a categoria checkin aparece
+PASS [checkin] Ligar o lembrete de check-in grava a configuração da Ana
+FAIL [web] Configurações mostram "Seus avisos" com e-mail do chat ligado por padrão → "200 "
+FAIL [web] Configurações mostram o e-mail de check-in recebido ligado por padrão (no máximo um por dia)
+FAIL [web] Desligar e-mail do chat e ligar silêncio 20:00–08:00 → 302
+PASS [web] Desmarcar o check-in desliga só o e-mail de check-in recebido (opt-out)
+FAIL [web] Hora inválida: 422 com mensagem e nada muda → 403
+PASS [web] Sem CSRF válido não salva
+PASS [web] Mudança do profissional fica na auditoria
+FAIL [lembrete] Configurações mostram o lembrete de consulta (24 h padrão) → 200
+FAIL [lembrete] Gestão salva 6 h para a clínica e 2 h para as próprias consultas → 302
+PASS [lembrete] Mudança do lembrete fica na auditoria
+FAIL [lembrete] Recusa 73 h com 422 e nada muda → 403
+FAIL [lembrete] Recusa 0 h com 422 e nada muda → 403
+FAIL [lembrete] Recusa texto com 422 e nada muda → 403
+FAIL [lembrete] Recusa um válido e um inválido com 422 e nada muda → 403
+FAIL [lembrete] Apagar o próprio volta a seguir a clínica (6 h) → 403
+FAIL [avisos] Caixa de avisos web abre com os avisos do profissional e o contador no menu → 200
+PASS [avisos] Aviso de outro profissional: não abre nem marca
+PASS [avisos] Link externo no aviso não redireciona para fora
+PASS [avisos] Abrir marca como lido e vai para a página do aviso
+PASS [avisos] Sem CSRF válido não marca nada
+PASS [avisos] Sem avisos novos o contador some
+PASS [lembrete] Profissional que não é da gestão não muda o padrão da clínica
+FAIL [lembrete] Mas ajusta o lembrete das próprias consultas → 302
+PASS [avisos] Caixa de outro profissional da mesma clínica vem vazia
+PASS [push] Cadastrar aparelho sem login → 401
+PASS [push] Recusa token fora do formato com 422
+PASS [push] Recusa sem token com 422
+PASS [push] Recusa token não texto com 422
+PASS [push] Cadastra o aparelho da Ana (push ainda desligado no servidor)
+PASS [push] Auditoria registra o aparelho sem guardar o token
+PASS [push] Carla não desliga o aparelho da Ana (resposta igual, sem revelar nada)
+PASS [push] Ana sai do app: aparelho desligado; repetir não dá erro
+PASS [openapi] Rotas novas documentadas no OpenAPI
+
+Resultado NI2-95 (HTTP): 61 passaram, 13 falharam

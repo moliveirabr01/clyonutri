@@ -1,0 +1,33 @@
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: consent_terms.id in /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php:28
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php(28): PDO->exec('UPDATE clinic_m...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php on line 28
+Error: Command failed: php tests/support/ni2_281_fixture.php prepare
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: consent_terms.id in /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php:28
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php(28): PDO->exec('UPDATE clinic_m...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/ni2_281_fixture.php on line 28
+
+    at genericNodeError (node:internal/errors:999:15)
+    at wrappedFn (node:internal/errors:544:14)
+    at checkExecSyncError (node:child_process:942:11)
+    at execFileSync (node:child_process:978:15)
+    at /Users/moliveira/Nutri_II/tests/patient_recipe_prescription_http_test.cjs:6:1
+    at Object.<anonymous> (/Users/moliveira/Nutri_II/tests/patient_recipe_prescription_http_test.cjs:30:3)
+    at Module._compile (node:internal/modules/cjs/loader:1934:14)
+    at Object..js (node:internal/modules/cjs/loader:2074:10)
+    at Module.load (node:internal/modules/cjs/loader:1656:32)
+    at Module._load (node:internal/modules/cjs/loader:1448:12) {
+  status: 255,
+  signal: null,
+  output: [
+    null,
+    <Buffer 0a 46 61 74 61 6c 20 65 72 72 6f 72 3a 20 55 6e 63 61 75 67 68 74 20 50 44 4f 45 78 63 65 70 74 69 6f 6e 3a 20 53 51 4c 53 54 41 54 45 5b 32 33 30 30 ... 354 more bytes>,
+    <Buffer 50 48 50 20 46 61 74 61 6c 20 65 72 72 6f 72 3a 20 20 55 6e 63 61 75 67 68 74 20 50 44 4f 45 78 63 65 70 74 69 6f 6e 3a 20 53 51 4c 53 54 41 54 45 5b ... 358 more bytes>
+  ],
+  pid: 99558,
+  stdout: <Buffer 0a 46 61 74 61 6c 20 65 72 72 6f 72 3a 20 55 6e 63 61 75 67 68 74 20 50 44 4f 45 78 63 65 70 74 69 6f 6e 3a 20 53 51 4c 53 54 41 54 45 5b 32 33 30 30 ... 354 more bytes>,
+  stderr: <Buffer 50 48 50 20 46 61 74 61 6c 20 65 72 72 6f 72 3a 20 20 55 6e 63 61 75 67 68 74 20 50 44 4f 45 78 63 65 70 74 69 6f 6e 3a 20 53 51 4c 53 54 41 54 45 5b ... 358 more bytes>
+}

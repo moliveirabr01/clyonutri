@@ -11,7 +11,7 @@ $valBadge = ['pending' => 'badge-warning', 'approved' => 'badge-success', 'rejec
 $fmt = static fn($v) => $v ? date('d/m/Y H:i', strtotime((string)$v)) : '';
 $pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_status'] ?? 'pending') !== 'reviewed'));
 ?>
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <div class="clinical-journey ex-page">
   <a class="ex-back" href="/pacientes">← Voltar aos pacientes</a>
   <div class="ex-head">
@@ -25,7 +25,7 @@ $pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_sta
     <div class="ex-msg <?= $flash['type'] === 'error' ? 'ex-msg-error' : 'ex-msg-success' ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= $e($flash['message']) ?></div>
   <?php endif; ?>
   <?php if ($pendingReview > 0): ?>
-    <div class="ex-msg ex-msg-warning" role="note"><strong>Revisão clínica do catálogo pendente.</strong> <?= (int)$pendingReview ?> exame(s) ainda sem revisão registrada por nutricionista responsável técnico. Os códigos TUSS/LOINC ficam em branco até haver licença de uso.</div>
+    <div class="ex-msg ex-msg-warning" role="note"><strong>Revisão clínica do catálogo pendente.</strong> <?= (int)$pendingReview ?> <?= \ClyoNutri\Application\View\UserText::count((int)$pendingReview, 'exame', 'exames') ?> ainda sem revisão registrada por nutricionista responsável técnico. Os códigos TUSS/LOINC ficam em branco até haver licença de uso.</div>
   <?php endif; ?>
 
   <section class="card ex-card" aria-labelledby="cat-titulo">

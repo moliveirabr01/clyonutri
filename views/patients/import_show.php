@@ -19,7 +19,7 @@ $valid = (int)$batch['valid_rows'];
     <h1 class="u-text-h2 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">
       <?= $status === 'preview' ? 'Prévia da importação' : 'Relatório da importação' ?>
     </h1>
-    <p class="u-color-neutral-gray-600 u-m-0 u-text-body"><?= $e($batch['file_name'] ?: 'Planilha') ?> · <?= (int)$batch['total_rows'] ?> linha(s)</p>
+    <p class="u-color-neutral-gray-600 u-m-0 u-text-body"><?= $e($batch['file_name'] ?: 'Planilha') ?> · <?= (int)$batch['total_rows'] ?> <?= \ClyoNutri\Application\View\UserText::count((int)$batch['total_rows'], 'linha', 'linhas') ?></p>
   </div>
 
   <?php if ($error): ?>
@@ -30,9 +30,9 @@ $valid = (int)$batch['valid_rows'];
   <?php endif; ?>
 
   <section class="card u-py-4 u-px-5 u-mb-4" data-testid="patient-import-summary">
-    <p class="u-mt-0 u-mb-1 u-mx-0"><strong><?= $valid ?></strong> pronto(s) para cadastrar · <strong><?= (int)$batch['skipped_rows'] ?></strong> já existente(s) · <strong><?= (int)$batch['error_rows'] ?></strong> com erro
-      <?php if ($status !== 'preview'): ?> · <strong><?= (int)$batch['created_rows'] ?></strong> cadastrado(s)<?php endif; ?>
-      <?php if ($status === 'rolled_back'): ?> · <strong><?= (int)$batch['rolled_back_rows'] ?></strong> removido(s) ao desfazer<?php endif; ?></p>
+    <p class="u-mt-0 u-mb-1 u-mx-0"><strong><?= $valid ?></strong> <?= \ClyoNutri\Application\View\UserText::count($valid, 'pronto', 'prontos') ?> para cadastrar · <strong><?= (int)$batch['skipped_rows'] ?></strong> já <?= \ClyoNutri\Application\View\UserText::count((int)$batch['skipped_rows'], 'existente', 'existentes') ?> · <strong><?= (int)$batch['error_rows'] ?></strong> com erro
+      <?php if ($status !== 'preview'): ?> · <strong><?= (int)$batch['created_rows'] ?></strong> <?= \ClyoNutri\Application\View\UserText::count((int)$batch['created_rows'], 'cadastrado', 'cadastrados') ?><?php endif; ?>
+      <?php if ($status === 'rolled_back'): ?> · <strong><?= (int)$batch['rolled_back_rows'] ?></strong> <?= \ClyoNutri\Application\View\UserText::count((int)$batch['rolled_back_rows'], 'removido', 'removidos') ?> ao desfazer<?php endif; ?></p>
     <?php if (!empty($batch['mapping']['columns'])): ?>
       <p class="u-m-0 u-text-compact u-color-neutral-gray-600">Colunas reconhecidas:
         <?= $e(implode(' · ', array_map(fn($c) => $c['header'] . ' → ' . ($labels[$c['field']] ?? $c['field']), $batch['mapping']['columns']))) ?>
@@ -44,7 +44,7 @@ $valid = (int)$batch['valid_rows'];
     <div class="u-flex u-gap-2 u-wrap u-mb-4">
       <form method="POST" action="/pacientes/importar/<?= (int)$batch['id'] ?>/confirmar" data-busy-text="Cadastrando…">
         <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
-        <button type="submit" class="btn btn-primary" data-testid="patient-import-confirm"<?= $valid === 0 ? ' disabled' : '' ?>>Cadastrar <?= $valid ?> paciente(s)</button>
+        <button type="submit" class="btn btn-primary" data-testid="patient-import-confirm"<?= $valid === 0 ? ' disabled' : '' ?>>Cadastrar <?= $valid ?> <?= \ClyoNutri\Application\View\UserText::count($valid, 'paciente', 'pacientes') ?></button>
       </form>
       <form method="POST" action="/pacientes/importar/<?= (int)$batch['id'] ?>/descartar" data-confirm="Descartar a prévia? Os dados da planilha serão apagados.">
         <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">

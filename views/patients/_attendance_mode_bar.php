@@ -15,11 +15,11 @@ $flow = (isset($careFlow) && is_array($careFlow) && (int)($careFlow['appointment
 $stateLabels = \ClyoNutri\Domain\Appointment\CareWorkflow::LABELS;
 ?>
 <aside class="attendance-mode" data-testid="attendance-mode" data-appointment="<?= $aid ?>" aria-label="Modo Atendimento">
-  <a class="btn btn-secondary btn-sm" href="/consulta/<?= $aid ?>" data-testid="attendance-hub">Voltar ao atendimento #<?= $aid ?></a>
+  <a class="btn btn-secondary btn-sm" href="/consulta/<?= $aid ?>" data-testid="attendance-hub" title="Referência para suporte: <?= $aid ?>">Voltar ao atendimento</a>
   <details class="ux52-attendance-tools"><summary>Etapas e ferramentas do atendimento</summary>
   <div class="attendance-mode__main">
     <strong class="attendance-mode__badge">Modo Atendimento · em andamento</strong>
-    <span class="attendance-mode__meta">Consulta #<?= $aid ?><?= $when !== '' ? ' · ' . $e($when) : '' ?></span>
+    <span class="attendance-mode__meta" title="Referência para suporte: <?= $aid ?>">Consulta<?= $when !== '' ? ' · ' . $e($when) : '' ?></span>
     <?php if ($flow): ?>
       <?php if (!empty($flow['quantitative'])): ?>
         <span class="attendance-mode__meta" data-testid="attendance-progress">Progresso: <?= (int)$flow['done'] ?> de <?= (int)$flow['total'] ?> etapas necessárias confirmadas</span>

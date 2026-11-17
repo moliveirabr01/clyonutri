@@ -1,7 +1,7 @@
 /**
  * ClyoNutri II — Transcrição em Tempo Real na Consulta (NI2-820).
  * Modos Ao Vivo e Discreto, Consentimento LGPD, Ingestão Incremental e Aprovação da Minuta.
- * NI2-830 (SEC-001): o aceite é do PACIENTE. Aqui o profissional só pede o aceite (link/QR de uso único) e vê o estado real
+ * NI2-830 (SEC-001): o aceite é do PACIENTE. Aqui o profissional só pede o aceite pelo portal ou por envio direto ao paciente e vê o estado real
  * devolvido pelo servidor; a interface nunca afirma consentimento sem evidência e libera a captação só com aceite válido.
  */
 (() => {
@@ -19,11 +19,7 @@
   const btnRequestConsent = document.getElementById('btn-request-consent');
   const btnRevokeConsent = document.getElementById('btn-revoke-consent');
   const consentState = document.getElementById('stt-consent-state');
-  const linkBox = document.getElementById('stt-consent-link-box');
-  const linkInput = document.getElementById('stt-consent-link');
-  const btnCopyLink = document.getElementById('btn-copy-consent-link');
-  const qrBox = document.getElementById('stt-consent-qr');
-  const linkExpiry = document.getElementById('stt-consent-link-expiry');
+
 
   const controlsPanel = document.getElementById('stt-controls-panel');
   const modeLiveRadio = document.getElementById('mode-live');
@@ -122,7 +118,6 @@
 
   // ---- Estado do aceite do paciente (sempre vindo do servidor) --------------------------------------------------
   let consentPoll = null;
-  let linkTimer = null;
   let activeConsent = false;
 
   const fmtLocal = (utc) => {
@@ -139,33 +134,6 @@
     if (cls) consentState.className = `op-message ${cls} u-mt-2`;
   }
 
-  function showLink(link, expiresUtc) {
-    if (!linkBox || !linkInput) return;
-    linkInput.value = link;
-    linkBox.hidden = false;
-    if (qrBox) {
-      qrBox.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        try { new QRCode(qrBox, { text: link, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M }); } catch (e) { /* o link continua disponível */ }
-      }
-    }
-    clearInterval(linkTimer);
-    const exp = new Date(String(expiresUtc).replace(' ', 'T') + 'Z').getTime();
-    const tick = () => {
-      const left = Math.max(0, Math.round((exp - Date.now()) / 1000));
-      if (linkExpiry) linkExpiry.textContent = left > 0 ? `Link válido por mais ${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s. Uso único.` : 'Link expirado. Gere outro.';
-      if (left <= 0) clearInterval(linkTimer);
-    };
-    tick();
-    linkTimer = setInterval(tick, 1000);
-  }
-  function hideLink() {
-    if (linkBox) linkBox.hidden = true;
-    if (linkInput) linkInput.value = '';
-    if (qrBox) qrBox.innerHTML = '';
-    clearInterval(linkTimer);
-  }
-
   function applyConsent(data) {
     const c = data.consent || { state: 'none' };
     const wasActive = activeConsent;
@@ -177,37 +145,32 @@
       case 'accepted':
         setConsentState('accepted', `Paciente aceitou ${MECH[c.mechanism] || ''} às ${fmtLocal(c.accepted_at_utc)} (texto ${c.terms_version}). Válido para esta consulta até ${fmtLocal(c.valid_until_utc)}.`, 'op-message--success');
         setBadge('Aceite do paciente confirmado', 'badge-info');
-        hideLink();
         break;
       case 'pending':
         setConsentState('pending', 'Aguardando aceite do paciente. Nenhum áudio é captado até lá.', 'op-message--info');
         setBadge('Aguardando aceite do paciente', 'badge-secondary');
-        btnRequestConsent.textContent = 'Gerar novo link (cancela o anterior)';
+        btnRequestConsent.textContent = 'Reenviar pedido de aceite (cancela o anterior)';
         break;
       case 'rejected':
         setConsentState('rejected', 'O paciente recusou. A consulta segue sem transcrição.', 'op-message--info');
         setBadge('Paciente recusou a transcrição', 'badge-secondary');
         btnRequestConsent.textContent = 'Pedir aceite de novo';
-        hideLink();
         break;
       case 'expired':
         setConsentState('expired', 'O pedido de aceite expirou sem resposta do paciente. Nada foi captado. Gere um novo.', 'op-message--info');
         setBadge('Aceite expirado', 'badge-secondary');
         btnRequestConsent.textContent = 'Pedir aceite ao paciente';
-        hideLink();
         break;
       case 'revoked':
         setConsentState('revoked', `Aceite revogado ${c.revoked_by === 'patient' ? 'pelo paciente' : 'a pedido do paciente'}. A captação foi interrompida.`, 'op-message--info');
         setBadge('Autorização revogada', 'badge-secondary');
         btnRequestConsent.textContent = 'Pedir novo aceite ao paciente';
-        hideLink();
         break;
       case 'cancelled':
       default:
         setConsentState('none', 'Aguardando aceite do paciente. Nenhum áudio é captado.', 'op-message--info');
         setBadge('Aguardando aceite do paciente', 'badge-secondary');
         btnRequestConsent.textContent = 'Pedir aceite ao paciente';
-        hideLink();
     }
     if (wasActive && !activeConsent) {
       // Aceite deixou de valer (revogado ou expirado): para a captação local na hora.
@@ -276,24 +239,17 @@
     }
   }
 
-  // Pedir o aceite ao paciente: gera o link de uso único. O profissional NÃO concede o aceite.
+  // Pedir o aceite ao paciente pelo canal protegido. O profissional NÃO concede o aceite.
   btnRequestConsent?.addEventListener('click', async () => {
     btnRequestConsent.disabled = true;
     try {
-      const res = await api('consent/request', {});
-      if (res.link) showLink(res.link, res.consent.expires_at_utc);
+      await api('consent/request', {});
       await refreshStatus();
     } catch (e) {
       alert('Não foi possível pedir o aceite: ' + e.message);
     } finally {
       btnRequestConsent.disabled = false;
     }
-  });
-
-  btnCopyLink?.addEventListener('click', async () => {
-    if (!linkInput || !linkInput.value) return;
-    try { await navigator.clipboard.writeText(linkInput.value); btnCopyLink.textContent = 'Link copiado'; }
-    catch (e) { linkInput.select(); btnCopyLink.textContent = 'Selecionado: copie com Ctrl+C'; }
   });
 
   btnRevokeConsent?.addEventListener('click', async () => {

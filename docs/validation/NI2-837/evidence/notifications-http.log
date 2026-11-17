@@ -1,0 +1,57 @@
+PHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\Domain\MealPlan\MealPlanService->publishPlan(1)
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071
+node:internal/errors:999
+  const err = new Error(message);
+              ^
+
+Error: Command failed: php /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php prepare
+PHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\Domain\MealPlan\MealPlanService->publishPlan(1)
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071
+
+    at genericNodeError (node:internal/errors:999:15)
+    at wrappedFn (node:internal/errors:544:14)
+    at checkExecSyncError (node:child_process:942:11)
+    at execFileSync (node:child_process:978:15)
+    at php (/Users/moliveira/Nutri_II/tests/ni2_95_notifications_real_test.cjs:19:23)
+    at /Users/moliveira/Nutri_II/tests/ni2_95_notifications_real_test.cjs:25:27
+    at Object.<anonymous> (/Users/moliveira/Nutri_II/tests/ni2_95_notifications_real_test.cjs:233:3)
+    at Module._compile (node:internal/modules/cjs/loader:1934:14)
+    at Object..js (node:internal/modules/cjs/loader:2074:10)
+    at Module.load (node:internal/modules/cjs/loader:1656:32) {
+  status: 255,
+  signal: null,
+  output: [
+    null,
+    '\n' +
+      'Fatal error: Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071\n' +
+      'Stack trace:\n' +
+      '#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n' +
+      '#1 {main}\n' +
+      '  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071\n',
+    'PHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071\n' +
+      'Stack trace:\n' +
+      '#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n' +
+      '#1 {main}\n' +
+      '  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071\n'
+  ],
+  pid: 99560,
+  stdout: '\n' +
+    'Fatal error: Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071\n' +
+    'Stack trace:\n' +
+    '#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n' +
+    '#1 {main}\n' +
+    '  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071\n',
+  stderr: 'PHP Fatal error:  Uncaught InvalidArgumentException: Alerta de adequação do plano: O plano tem 1 refeição(ões); o padrão é ao menos 3. Para publicar assim, confirme a autorização clínica e informe a justificativa (mínimo de 10 caracteres). in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php:1071\n' +
+    'Stack trace:\n' +
+    '#0 /Users/moliveira/Nutri_II/tests/support/ni2_95_fixture.php(45): ClyoNutri\\Domain\\MealPlan\\MealPlanService->publishPlan(1)\n' +
+    '#1 {main}\n' +
+    '  thrown in /Users/moliveira/Nutri_II/src/Domain/MealPlan/MealPlanService.php on line 1071\n'
+}
+
+Node.js v26.7.0

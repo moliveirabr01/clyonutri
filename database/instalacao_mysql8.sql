@@ -3295,3 +3295,765 @@ CREATE TABLE IF NOT EXISTS dietary_confirmations (
  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
  FOREIGN KEY (professional_id) REFERENCES professionals(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- NI2-867 (F-08): Tabelas sincronizadas a partir das migrações
+CREATE TABLE IF NOT EXISTS `academy_articles` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `pmid` VARCHAR(30) NULL,
+  `doi` VARCHAR(120) NULL,
+  `title` VARCHAR(500) NOT NULL,
+  `authors` TEXT NOT NULL,
+  `journal` VARCHAR(255) NOT NULL,
+  `publication_year` BIGINT NOT NULL,
+  `study_design` VARCHAR(50) NOT NULL,
+  `access_type` VARCHAR(30) NOT NULL DEFAULT 'publisher_link',
+  `abstract` TEXT NULL,
+  `url` VARCHAR(500) NOT NULL,
+  `source` VARCHAR(50) NOT NULL DEFAULT 'pubmed',
+  `condition_tags` VARCHAR(255) NULL,
+  `has_evidence_sheet` BIGINT NOT NULL DEFAULT 0,
+  `retraction_status` VARCHAR(20) NOT NULL DEFAULT 'none',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `license` VARCHAR(60) NULL,
+  `retrieved_at` DATETIME NULL,
+  `created_by_user_id` BIGINT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'published',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_evidence_sheets` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `article_id` BIGINT NOT NULL,
+  `curator_user_id` BIGINT NULL,
+  `curator_name` VARCHAR(160) NOT NULL,
+  `curator_crn` VARCHAR(50) NULL,
+  `population` TEXT NOT NULL,
+  `intervention` TEXT NOT NULL,
+  `comparator` TEXT NOT NULL,
+  `outcomes` TEXT NOT NULL,
+  `methodological_limitations` TEXT NOT NULL,
+  `evidence_certainty` VARCHAR(30) NOT NULL,
+  `clinical_applicability` TEXT NOT NULL,
+  `conflict_of_interest` TEXT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `reviewed_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL,
+  `submitted_at` DATETIME NULL,
+  `approved_by_user_id` BIGINT NULL,
+  `approved_by_name` VARCHAR(160) NULL,
+  `approved_by_crn` VARCHAR(50) NULL,
+  `approved_at` DATETIME NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_favorites` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `article_id` BIGINT NOT NULL,
+  `collection_name` VARCHAR(100) NOT NULL DEFAULT 'Geral',
+  `personal_notes` TEXT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_handout_favorites` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `handout_id` BIGINT NOT NULL,
+  `collection_name` VARCHAR(100) NOT NULL DEFAULT 'Geral',
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_handouts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `slug` VARCHAR(120) NOT NULL,
+  `title` VARCHAR(200) NOT NULL,
+  `summary` TEXT NULL,
+  `tags` VARCHAR(500) NULL,
+  `source_citation` TEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `file_name` VARCHAR(160) NOT NULL,
+  `mime_type` VARCHAR(60) NOT NULL,
+  `size_bytes` BIGINT NOT NULL,
+  `sha256` TEXT NOT NULL,
+  `storage_name` VARCHAR(120) NOT NULL,
+  `preview_storage_name` VARCHAR(120) NULL,
+  `preview_mime` VARCHAR(60) NULL,
+  `preview_size` BIGINT NULL,
+  `preview_sha256` TEXT NULL,
+  `created_by_user_id` BIGINT NOT NULL,
+  `updated_by_user_id` BIGINT NULL,
+  `published_at` DATETIME NULL,
+  `published_by_user_id` BIGINT NULL,
+  `archived_reason` VARCHAR(255) NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_protocol_links` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `protocol_code` VARCHAR(60) NOT NULL,
+  `article_id` BIGINT NOT NULL,
+  `relevance_note` VARCHAR(255) NULL,
+  `created_at` DATETIME NOT NULL,
+  `created_by_user_id` BIGINT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `academy_publications` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `author_user_id` BIGINT NOT NULL,
+  `author_name` VARCHAR(160) NOT NULL,
+  `author_crn` VARCHAR(50) NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `category` VARCHAR(50) NOT NULL,
+  `summary` TEXT NOT NULL,
+  `body_markdown` TEXT NOT NULL,
+  `references_text` TEXT NOT NULL,
+  `conflict_of_interest_disclosure` TEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `editorial_notes` TEXT NULL,
+  `reviewer_user_id` BIGINT NULL,
+  `reviewed_at` DATETIME NULL,
+  `published_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  `submitted_at` DATETIME NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `asaas_checkouts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `subscription_id` BIGINT NOT NULL,
+  `plan_id` BIGINT NOT NULL,
+  `requested_by` BIGINT NOT NULL,
+  `idempotency_key` TEXT NOT NULL,
+  `external_reference` VARCHAR(100) NOT NULL,
+  `asaas_customer_id` VARCHAR(60) NULL,
+  `asaas_checkout_id` VARCHAR(60) NULL,
+  `hosted_url` VARCHAR(500) NULL,
+  `amount_cents` BIGINT NOT NULL,
+  `billing_cycle` VARCHAR(20) NOT NULL DEFAULT 'monthly',
+  `status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+  `from_plan_id` BIGINT NULL,
+  `activated_at` DATETIME NULL,
+  `last_event_id` VARCHAR(120) NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `asaas_customers` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `asaas_customer_id` VARCHAR(60) NOT NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `asaas_payment_receipts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `checkout_id` BIGINT NOT NULL,
+  `invoice_id` BIGINT NOT NULL,
+  `asaas_payment_id` VARCHAR(60) NOT NULL,
+  `asaas_subscription_id` VARCHAR(60) NULL,
+  `event_type` VARCHAR(60) NOT NULL,
+  `amount_cents` BIGINT NOT NULL,
+  `paid_at` DATETIME NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `receipt_url` VARCHAR(500) NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `asaas_webhook_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `event_id` VARCHAR(120) NOT NULL,
+  `event_type` VARCHAR(60) NOT NULL,
+  `external_reference` VARCHAR(100) NULL,
+  `clinic_id` BIGINT NULL,
+  `checkout_id` BIGINT NULL,
+  `payment_id` VARCHAR(60) NULL,
+  `processing_status` VARCHAR(20) NOT NULL DEFAULT 'processed',
+  `detail` VARCHAR(255) NULL,
+  `received_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `processed_at` DATETIME NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_calendar_exceptions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NULL,
+  `rule_date` DATE NOT NULL,
+  `kind` VARCHAR(16) NOT NULL,
+  `start_time` VARCHAR(5) NULL,
+  `end_time` VARCHAR(5) NULL,
+  `label` VARCHAR(100) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_calendar_policies` (
+  `clinic_id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `buffer_before_minutes` BIGINT NOT NULL DEFAULT 0,
+  `buffer_after_minutes` BIGINT NOT NULL DEFAULT 0,
+  `waitlist_enabled` BIGINT NOT NULL DEFAULT 0,
+  `offer_ttl_minutes` BIGINT NOT NULL DEFAULT 15,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`clinic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_daily_metrics` (
+  `clinic_id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `metric_date` DATE NOT NULL,
+  `event_name` VARCHAR(40) NOT NULL,
+  `event_count` BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`clinic_id`, `metric_date`, `event_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_self_service_operations` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `idempotency_key` VARCHAR(64) NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `from_scheduled_at` VARCHAR(19) NOT NULL,
+  `to_scheduled_at` VARCHAR(19) NOT NULL,
+  `result_json` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_self_service_policies` (
+  `clinic_id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `direct_reschedule` BIGINT NOT NULL DEFAULT 0,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`clinic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_waitlist` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `date_from` DATE NOT NULL,
+  `date_to` DATE NOT NULL,
+  `time_from` VARCHAR(5) NOT NULL,
+  `time_to` VARCHAR(5) NOT NULL,
+  `modality` VARCHAR(16) NOT NULL,
+  `service_type` VARCHAR(20) NOT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'waiting',
+  `active_key` VARCHAR(80) NULL,
+  `hold_id` BIGINT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `booking_waitlist_worker` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `cursor_created` VARCHAR(19) NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `cursor_id` BIGINT NOT NULL DEFAULT 0,
+  `pass_max_id` BIGINT NOT NULL DEFAULT 0,
+  `resume_id` BIGINT NULL,
+  `resume_date` VARCHAR(10) NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `care_progress_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `step_key` VARCHAR(24) NOT NULL,
+  `decision` VARCHAR(24) NOT NULL,
+  `reason_code` VARCHAR(40) NOT NULL,
+  `evidence_sha256` TEXT NOT NULL,
+  `request_key` VARCHAR(80) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `care_workflow_policies` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `consultation_type` VARCHAR(24) NOT NULL,
+  `policy_json` TEXT NOT NULL,
+  `request_key` VARCHAR(80) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinic_protocol_settings` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `protocol_id` BIGINT NOT NULL,
+  `enabled` BIGINT NOT NULL DEFAULT 0,
+  `updated_by_user_id` BIGINT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinic_protocol_shares` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `protocol_version_id` BIGINT NOT NULL,
+  `source_clinic_id` BIGINT NOT NULL,
+  `target_clinic_id` BIGINT NOT NULL,
+  `shared_by_user_id` BIGINT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_protocol_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `protocol_version_id` BIGINT NOT NULL,
+  `action` VARCHAR(30) NOT NULL,
+  `actor_user_id` BIGINT NULL,
+  `note` TEXT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_protocol_versions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `protocol_id` BIGINT NOT NULL,
+  `version` BIGINT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `definition_json` TEXT NOT NULL,
+  `content_sha256` TEXT NOT NULL,
+  `references_text` TEXT NULL,
+  `authored_by_user_id` BIGINT NULL,
+  `submitted_at` DATETIME NULL,
+  `approved_by_user_id` BIGINT NULL,
+  `approved_by_name` VARCHAR(160) NULL,
+  `approved_by_crn` VARCHAR(30) NULL,
+  `specialist_review_note` TEXT NULL,
+  `approved_at` DATETIME NULL,
+  `review_due_at` DATE NULL,
+  `retired_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_protocols` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `code` VARCHAR(60) NOT NULL,
+  `name` VARCHAR(160) NOT NULL,
+  `kind` VARCHAR(20) NOT NULL DEFAULT 'condition',
+  `catalog_phase` TEXT NOT NULL DEFAULT 'A',
+  `requires_specialist_review` BIGINT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  `clinic_id` BIGINT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `consultation_ai_consent_requests` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `requested_by_user_id` BIGINT NOT NULL,
+  `token_hash` TEXT NOT NULL,
+  `revoke_token_hash` TEXT NULL,
+  `terms_version` VARCHAR(50) NOT NULL,
+  `terms_sha256` TEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  `request_origin` VARCHAR(40) NOT NULL DEFAULT 'professional_session',
+  `expires_at_utc` DATETIME NOT NULL,
+  `decided_at_utc` DATETIME NULL,
+  `decision_mechanism` VARCHAR(40) NULL,
+  `decision_ip_hash` TEXT NULL,
+  `decision_user_agent` VARCHAR(120) NULL,
+  `valid_until_utc` DATETIME NULL,
+  `revoked_at_utc` DATETIME NULL,
+  `revoked_by` VARCHAR(30) NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `otp_hash` TEXT NULL,
+  `otp_expires_at_utc` TEXT NULL,
+  `otp_attempts` BIGINT NOT NULL DEFAULT 0,
+  `requested_ip_hash` TEXT NULL,
+  `same_ip_alert` BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `consultation_ai_consents` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'granted',
+  `terms_version` VARCHAR(50) NOT NULL DEFAULT 'v1.0',
+  `consented_at_utc` DATETIME NOT NULL,
+  `revoked_at_utc` DATETIME NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `consultation_evolution_drafts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `session_id` BIGINT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `chief_complaint` TEXT NULL,
+  `nutritional_goals` TEXT NULL,
+  `dietary_routine` TEXT NULL,
+  `reported_anthropometry` TEXT NULL,
+  `clinical_symptoms` TEXT NULL,
+  `adherence_notes` TEXT NULL,
+  `agreed_conduct` TEXT NULL,
+  `next_appointment_notes` TEXT NULL,
+  `full_evolution_text` TEXT NOT NULL,
+  `approval_status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `approved_by` BIGINT NULL,
+  `approved_at_utc` DATETIME NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `consultation_transcription_segments` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `session_id` BIGINT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `sequence_number` BIGINT NOT NULL,
+  `speaker` VARCHAR(50) NOT NULL DEFAULT 'speaker_uncertain',
+  `text` TEXT NOT NULL,
+  `is_final` BIGINT NOT NULL DEFAULT 1,
+  `confidence` DECIMAL(12,4) NULL,
+  `start_seconds` DECIMAL(12,4) NULL,
+  `end_seconds` DECIMAL(12,4) NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `consultation_transcription_sessions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `session_uuid` VARCHAR(64) NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `mode` VARCHAR(20) NOT NULL DEFAULT 'live',
+  `status` VARCHAR(30) NOT NULL DEFAULT 'connected',
+  `started_at_utc` DATETIME NOT NULL,
+  `paused_at_utc` DATETIME NULL,
+  `resumed_at_utc` DATETIME NULL,
+  `completed_at_utc` DATETIME NULL,
+  `duration_seconds` BIGINT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `educational_material_shares` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `material_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `shared_by_user_id` BIGINT NOT NULL,
+  `note` VARCHAR(500) NULL,
+  `shared_at` DATETIME NOT NULL,
+  `revoked_at` DATETIME NULL,
+  `revoked_by_user_id` BIGINT NULL,
+  `first_opened_at` DATETIME NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `educational_materials` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `title` VARCHAR(160) NOT NULL,
+  `description` TEXT NULL,
+  `category` VARCHAR(40) NOT NULL,
+  `file_name` VARCHAR(160) NOT NULL,
+  `mime_type` VARCHAR(60) NOT NULL,
+  `size_bytes` BIGINT NOT NULL,
+  `sha256` TEXT NOT NULL,
+  `storage_name` VARCHAR(120) NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+  `uploaded_by_user_id` BIGINT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `finance_expenses` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `category` VARCHAR(60) NOT NULL,
+  `description` VARCHAR(255) NOT NULL,
+  `amount_cents` BIGINT NOT NULL,
+  `due_date` DATE NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+  `payment_method` VARCHAR(50) NULL,
+  `paid_at` DATETIME NULL,
+  `created_by_user_id` BIGINT NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_condition_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `condition_id` BIGINT NOT NULL,
+  `from_status` VARCHAR(20) NULL,
+  `to_status` VARCHAR(20) NOT NULL,
+  `provenance` VARCHAR(20) NULL,
+  `actor_user_id` BIGINT NULL,
+  `note` VARCHAR(500) NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_conditions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `protocol_code` VARCHAR(60) NOT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `provenance` VARCHAR(20) NOT NULL,
+  `evidence_text` VARCHAR(500) NULL,
+  `noted_at` DATE NULL,
+  `valid_until` DATE NULL,
+  `created_by_user_id` BIGINT NULL,
+  `confirmed_by_user_id` BIGINT NULL,
+  `confirmed_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `production_alerts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `alert_id` VARCHAR(36) NOT NULL,
+  `rule_name` VARCHAR(80) NOT NULL,
+  `severity` VARCHAR(20) NOT NULL DEFAULT 'warning',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'firing',
+  `description` TEXT NOT NULL,
+  `context_json` TEXT NULL,
+  `triggered_at` DATETIME NOT NULL,
+  `resolved_at` DATETIME NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `production_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `event_id` VARCHAR(36) NOT NULL,
+  `schema_version` VARCHAR(10) NOT NULL DEFAULT 'v1',
+  `occurred_at` DATETIME NOT NULL,
+  `received_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `environment` VARCHAR(20) NOT NULL DEFAULT 'production',
+  `service` VARCHAR(50) NOT NULL DEFAULT 'clyo_core',
+  `category` VARCHAR(30) NOT NULL,
+  `event_type` VARCHAR(80) NOT NULL,
+  `severity` VARCHAR(20) NOT NULL DEFAULT 'info',
+  `outcome` VARCHAR(20) NOT NULL DEFAULT 'success',
+  `clinic_id` BIGINT NULL,
+  `actor_type` VARCHAR(30) NOT NULL DEFAULT 'system',
+  `actor_id` VARCHAR(64) NULL,
+  `resource_type` VARCHAR(50) NULL,
+  `resource_ref` VARCHAR(64) NULL,
+  `correlation_id` VARCHAR(64) NULL,
+  `request_id` VARCHAR(64) NULL,
+  `duration_ms` BIGINT NULL,
+  `retry_count` BIGINT NOT NULL DEFAULT 0,
+  `metadata` TEXT NULL,
+  `created_at` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `protocol_responses` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `protocol_version_id` BIGINT NOT NULL,
+  `anamnesis_id` BIGINT NULL,
+  `answers_json` TEXT NOT NULL,
+  `provenance` VARCHAR(20) NOT NULL,
+  `is_draft` BIGINT NOT NULL DEFAULT 1,
+  `answered_by_user_id` BIGINT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_audit_events` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `prescription_id` BIGINT NULL,
+  `actor_type` VARCHAR(20) NOT NULL,
+  `actor_id` BIGINT NULL,
+  `action` VARCHAR(40) NOT NULL,
+  `metadata_json` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_deliveries` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `prescription_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `channel` VARCHAR(20) NOT NULL,
+  `action` VARCHAR(20) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_followups` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `prescription_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `note` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_ingredient_rules` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `policy_id` BIGINT NOT NULL,
+  `ingredient_id` BIGINT NOT NULL,
+  `decision` VARCHAR(16) NOT NULL,
+  `constraints_json` TEXT NOT NULL,
+  `justification` TEXT NOT NULL,
+  `source_url` VARCHAR(1000) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_ingredients` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `code` VARCHAR(80) NOT NULL,
+  `name` VARCHAR(180) NOT NULL,
+  `category` VARCHAR(40) NOT NULL,
+  `enabled` BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_policy_versions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `version` VARCHAR(80) NOT NULL,
+  `effective_from` DATE NOT NULL,
+  `effective_until` DATE NOT NULL,
+  `clinical_reviewer` VARCHAR(160) NOT NULL,
+  `legal_reviewer` VARCHAR(160) NOT NULL,
+  `evidence` TEXT NOT NULL,
+  `signature_profile` VARCHAR(40) NOT NULL,
+  `retention_days` BIGINT NOT NULL,
+  `retention_basis` TEXT NOT NULL,
+  `enabled` BIGINT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_prescriptions` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `patient_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `appointment_id` BIGINT NULL,
+  `meal_plan_id` BIGINT NULL,
+  `root_id` BIGINT NULL,
+  `previous_id` BIGINT NULL,
+  `version_number` BIGINT NOT NULL DEFAULT 1,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+  `revision` BIGINT NOT NULL DEFAULT 1,
+  `payload_json` TEXT NOT NULL,
+  `snapshot_json` TEXT NULL,
+  `document_pdf` TEXT NULL,
+  `pdf_sha256` VARCHAR(64) NULL,
+  `policy_id` BIGINT NULL,
+  `prepared_at` DATETIME NULL,
+  `issued_at` DATETIME NULL,
+  `retain_until` DATE NULL,
+  `cancelled_at` DATETIME NULL,
+  `cancellation_reason` TEXT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_qualifications` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `crn` VARCHAR(40) NOT NULL,
+  `crn_region` VARCHAR(20) NOT NULL,
+  `registration_status` VARCHAR(20) NOT NULL,
+  `phytotherapy` BIGINT NOT NULL DEFAULT 0,
+  `certificate_sha256` VARCHAR(64) NOT NULL,
+  `verified_by` VARCHAR(160) NOT NULL,
+  `evidence` TEXT NOT NULL,
+  `valid_until` DATETIME NOT NULL,
+  `revoked_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_signatures` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `prescription_id` BIGINT NOT NULL,
+  `signature_der` TEXT NOT NULL,
+  `certificate_sha256` VARCHAR(64) NOT NULL,
+  `pdf_sha256` VARCHAR(64) NOT NULL,
+  `qualification_id` BIGINT NOT NULL,
+  `verified_at` DATETIME NOT NULL,
+  `profile` VARCHAR(40) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rx_templates` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `professional_id` BIGINT NOT NULL,
+  `name` VARCHAR(160) NOT NULL,
+  `payload_json` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `workflow_write_receipts` (
+  `id` INT UNSIGNED AUTO_INCREMENT NOT NULL,
+  `clinic_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `request_key` VARCHAR(80) NOT NULL,
+  `request_sha256` TEXT NOT NULL,
+  `result_json` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `subscription_activation_requests` (
+  `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `clinic_id` BIGINT UNSIGNED NOT NULL,
+  `plan_id` BIGINT UNSIGNED NOT NULL,
+  `plan_code` VARCHAR(40) NOT NULL,
+  `requested_by_user_id` BIGINT UNSIGNED NOT NULL,
+  `notes` VARCHAR(500) NULL,
+  `status` VARCHAR(30) NOT NULL DEFAULT 'pending',
+  `processed_by_user_id` BIGINT UNSIGNED NULL,
+  `processed_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_sar_clinic_created` (`clinic_id`, `created_at`),
+  INDEX `idx_sar_status` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,29 @@
+  PASS  Clínica sem catálogo indisponível
+  PASS  Documentos oculta módulo e preserva orientação no prontuário
+  PASS  Portal oculta cartão quando indisponível
+  PASS  Prontuário não renderiza seção de manipulados vazia
+  PASS  URL direta: controller responde 200 e mensagem neutra
+  PASS  Indisponível sem botão inútil nem comando interno
+  PASS  Leitura usada pela API devolve [] mesmo com histórico quando módulo indisponível
+  PASS  API preserva vínculo do paciente com a clínica
+  PASS  Ingrediente sem regra validada não habilita módulo
+  PASS  Regra deny não habilita módulo
+  PASS  Ativo habilitado com regra allow vigente habilita catálogo
+  PASS  Catálogo de outra clínica não habilita módulo
+  PASS  Política expirada não habilita
+  PASS  Política futura não habilita
+  PASS  Política desativada não habilita
+  PASS  Ingrediente desativado não habilita
+  PASS  Documentos mantém link com catálogo validado
+  PASS  Portal mantém cartão com catálogo validado
+  PASS  Controller preserva editor com catálogo validado
+  PASS  API preserva lista com catálogo validado
+  PASS  URL direta não revela paciente de outra clínica
+  PASS  Ficha preserva visibilidade conforme catálogo: indisponível
+  PASS  Mais ações do plano segue catálogo: indisponível
+  PASS  Dados reais do portal usam checagem única: indisponível
+  PASS  Ficha preserva visibilidade conforme catálogo: disponível
+  PASS  Mais ações do plano segue catálogo: disponível
+  PASS  Dados reais do portal usam checagem única: disponível
+
+27 PASS, 0 FAIL

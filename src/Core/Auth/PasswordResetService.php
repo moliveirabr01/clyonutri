@@ -208,7 +208,7 @@ class PasswordResetService
      * Valida um token de recuperação.
      * Retorna os dados do reset e do usuário caso válido e não expirado, ou null.
      */
-    public function validateToken(string $token): ?array
+    public function validateToken(string $token, ?string $scope = null): ?array
     {
         $token = trim($token);
         if (strlen($token) !== 64 || !ctype_xdigit($token)) {
@@ -219,10 +219,11 @@ class PasswordResetService
         $stmt = $this->db->prepare("
             SELECT pr.email, pr.token, pr.created_at, pr.expires_at,
                    u.id AS user_id, u.uuid AS user_uuid, u.name AS user_name, u.status AS user_status, u.role AS user_role,
-                   cm.clinic_id
+                   cm.clinic_id, cm.role AS member_role, c.name AS clinic_name
             FROM password_resets pr
             JOIN users u ON LOWER(u.email) = LOWER(pr.email)
             LEFT JOIN clinic_members cm ON cm.user_id = u.id AND cm.status = 'active'
+            LEFT JOIN clinics c ON c.id = cm.clinic_id
             WHERE pr.token = :token
             LIMIT 1
         ");
@@ -235,7 +236,14 @@ class PasswordResetService
 
         // Verifica status da conta. 'invited' (v33): equipe convidada que ainda vai definir a primeira senha.
         // Suspensa e bloqueada nunca redefinem senha por token.
-        if (!in_array((string)$row['user_status'], ['active', 'invited'], true)) {
+        $status = (string)$row['user_status'];
+        if (!in_array($status, ['active', 'invited'], true)) {
+            return null;
+        }
+        if ($scope === 'reset' && $status === 'invited') {
+            return null;
+        }
+        if ($scope === 'invite' && $status !== 'invited') {
             return null;
         }
 
@@ -255,8 +263,10 @@ class PasswordResetService
             'user_uuid' => $row['user_uuid'],
             'user_name' => $row['user_name'],
             'user_role' => (string)($row['user_role'] ?? ''),
-            'user_status' => (string)$row['user_status'],
+            'user_status' => $status,
             'clinic_id' => !empty($row['clinic_id']) ? (int)$row['clinic_id'] : null,
+            'clinic_name' => (string)($row['clinic_name'] ?? ''),
+            'member_role' => (string)($row['member_role'] ?? ''),
             'expires_at' => $row['expires_at'],
             'password_min_length' => PasswordPolicy::minLengthForRole((string)($row['user_role'] ?? '')),
         ];
@@ -276,13 +286,14 @@ class PasswordResetService
         string $token,
         string $newPassword,
         ?string $ipAddress = null,
-        ?string $userAgent = null
+        ?string $userAgent = null,
+        ?string $scope = null
     ): array {
         if (strlen($newPassword) < 8) {
             throw new InvalidArgumentException('A nova senha deve possuir pelo menos 8 caracteres.');
         }
 
-        $validToken = $this->validateToken($token);
+        $validToken = $this->validateToken($token, $scope);
         if (!$validToken) {
             throw new InvalidArgumentException('Link de recuperação inválido ou expirado. Por favor, solicite um novo.');
         }

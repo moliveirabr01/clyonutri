@@ -98,7 +98,7 @@ $nextTodayApp = $stNextToday->fetch(\PDO::FETCH_ASSOC) ?: null;
     <div>
       <div class="u-flex u-items-center u-gap-2 u-mb-1">
         <span class="badge ds-pill ds-pill--success">Realizada</span>
-        <span class="u-text-compact u-color-neutral-gray-600">Consulta #<?= $closingAppId ?></span>
+        <span class="u-text-compact u-color-neutral-gray-600" title="Referência para suporte: <?= $closingAppId ?>">Consulta atual</span>
       </div>
       <h2 id="closing-panel-title" class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-m-0">Fechamento da consulta — próximos passos</h2>
       <p class="u-text-compact u-color-neutral-gray-700 u-mt-1 u-mb-0">Evolução clínica registrada no prontuário. Agende o retorno e entregue o plano ao paciente sem sair desta tela.</p>

@@ -26,7 +26,7 @@ $calendarScope=function(?string $selected=null)use($bookingProfessionalId,$canMa
 <div class="clyo-calendar__form-title"><h3>Feriados nacionais de <?= !empty($holidayImportAll)?$ce(implode(' e ',$holidayImportYears)):(int)$holidayImportYear ?></h3><span class="clyo-calendar__subtle">Dia inteiro · revise antes de salvar</span></div>
 <ul class="clyo-calendar__import-list">
 <?php foreach($holidayImportPreview as $h): ?>
-<li><label><input type="checkbox" name="holiday_dates[]" value="<?= $ce($h['date']) ?>" <?= $h['already']?'disabled':($h['optional']?'':'checked') ?> <?= $h['optional']?'data-optional="1"':'' ?>> <strong><?= $ce(date('d/m/Y',strtotime($h['date']))) ?></strong> · <?= $h['optional']?'<em>Ponto facultativo</em> · ':'' ?><?= $ce($h['name']) ?> <span class="clyo-calendar__subtle">(<?= $ce($h['basis']) ?>)</span><?= $h['already']?' <em class="clyo-calendar__subtle">já cadastrado</em>':($h['other_rules']>0?' <em class="clyo-calendar__subtle">a data já tem '.(int)$h['other_rules'].' feriado(s) com outro nome</em>':'') ?></label></li>
+<li><label><input type="checkbox" name="holiday_dates[]" value="<?= $ce($h['date']) ?>" <?= $h['already']?'disabled':($h['optional']?'':'checked') ?> <?= $h['optional']?'data-optional="1"':'' ?>> <strong><?= $ce(date('d/m/Y',strtotime($h['date']))) ?></strong> · <?= $h['optional']?'<em>Ponto facultativo</em> · ':'' ?><?= $ce($h['name']) ?> <span class="clyo-calendar__subtle">(<?= $ce($h['basis']) ?>)</span><?= $h['already']?' <em class="clyo-calendar__subtle">já cadastrado</em>':($h['other_rules']>0?' <em class="clyo-calendar__subtle">a data já tem '.\ClyoNutri\Application\View\UserText::count((int)$h['other_rules'], '{n} feriado', '{n} feriados').' com outro nome</em>':'') ?></label></li>
 <?php endforeach; ?>
 </ul>
 <div class="clyo-calendar__grid"><label class="clyo-calendar__field">Aplicar a<?php $calendarScope(); ?></label></div>
@@ -48,7 +48,7 @@ $calendarScope=function(?string $selected=null)use($bookingProfessionalId,$canMa
 <?php $calendarMonths=['01'=>'JAN','02'=>'FEV','03'=>'MAR','04'=>'ABR','05'=>'MAI','06'=>'JUN','07'=>'JUL','08'=>'AGO','09'=>'SET','10'=>'OUT','11'=>'NOV','12'=>'DEZ']; ?>
 <?php $calendarDateGroups=[];foreach($calendarRules as $savedRule)$calendarDateGroups[$savedRule['rule_date']][]=$savedRule; ?>
 <?php foreach($calendarDateGroups as $ruleDate=>$dateRules): ?>
-<details class="clyo-calendar__date-group"><summary><?= $ce(date('d/m/Y',strtotime($ruleDate))) ?> · <strong><?= $ce(implode(', ',array_unique(array_column($dateRules,'label')))) ?></strong> · <?= count($dateRules) ?> regra(s) · Ver escopos e períodos</summary>
+<details class="clyo-calendar__date-group"><summary><?= $ce(date('d/m/Y',strtotime($ruleDate))) ?> · <strong><?= $ce(implode(', ',array_unique(array_column($dateRules,'label')))) ?></strong> · <?= \ClyoNutri\Application\View\UserText::count(count($dateRules), '{n} regra', '{n} regras') ?> · Ver escopos e períodos</summary>
 <p>Feriados e bloqueios prevalecem sobre aberturas. A disponibilidade final depende de todas as regras aplicáveis; remover uma pode não liberar o dia. Consultas existentes são mantidas.</p>
 <?php foreach($dateRules as $rule): $ruleScope=$rule['professional_id']===null?'Toda a clínica':($calendarProfessionalNames[(int)$rule['professional_id']]??'Agenda do profissional');$rulePeriod=$rule['start_time']!==null?$rule['start_time'].'–'.$rule['end_time']:'Dia inteiro'; ?>
 <article class="clyo-calendar__entry" id="calendar-rule-<?= (int)$rule['id'] ?>">
@@ -100,7 +100,7 @@ const savedRules=<?= json_encode(array_map(static fn($r)=>['date'=>$r['rule_date
 root.querySelectorAll('form').forEach(function(form){
 if(form.querySelector('[name="section"][value="calendar_rule"]')){
  const date=form.querySelector('[name="rule_date"]'),note=document.createElement('p');note.setAttribute('role','status');date.closest('div').after(note);
- date.addEventListener('change',()=>{const n=savedRules.filter(rule=>rule.date===date.value).length;note.textContent=n?'Já existem '+n+' regra(s) nesta data. Confira escopos e períodos antes de cadastrar outra. Nenhuma regra será removida automaticamente.':'';});
+ date.addEventListener('change',()=>{const n=savedRules.filter(rule=>rule.date===date.value).length;note.textContent=n?(n===1?'Já existe 1 regra nesta data.':'Já existem '+n+' regras nesta data.')+' Confira escopos e períodos antes de cadastrar outra. Nenhuma regra será removida automaticamente.':'';});
 }
 const period=form.querySelector('[data-calendar-period]');if(!period)return;
 const times=form.querySelectorAll('input[type="time"]'),kind=form.querySelector('[name="kind"]');

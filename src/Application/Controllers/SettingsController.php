@@ -58,6 +58,7 @@ final class SettingsController
                     }
                 }
                 elseif($section==='booking'){
+                    if(!\ClyoNutri\Core\Security\Csrf::validate($_POST['_csrf_token']??'')) throw new \DomainException('Sua sessão expirou. Atualize a página e tente novamente.');
                     // Política de autoagendamento é da clínica: só a gestão altera (NI2-433).
                     if(!in_array($profile['member_role'],['owner','admin'],true))throw new \DomainException('Somente a gestão do consultório pode alterar o agendamento online.');
                     $bookingSvc=new BookingService(Connection::getInstance());

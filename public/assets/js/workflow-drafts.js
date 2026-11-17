@@ -6,7 +6,7 @@
   const attendance=new URL(form.action,location.href).searchParams.get('atendimento');
   function carryAttendance(value){const url=new URL(value,location.href);if(attendance&&url.origin===location.origin)url.searchParams.set('atendimento',attendance);return url.pathname+url.search+url.hash;}
   const buttonDefaults=[...form.querySelectorAll('button[type=submit],button:not([type])')].map(b=>({b,disabled:b.disabled,label:b.textContent}));
-  let timer,saving=null,pending=null,blocked=false,serial=0,submitted=false;
+  let timer,saving=null,pending=null,blocked=false,serial=0,submitted=false,autoRetries=0;
   const storageKey = WF_STORAGE_PREFIX + (form.dataset.workflowDraft || location.pathname);
   const retry=document.createElement('button');retry.type='button';retry.className='op-button op-button--secondary';retry.textContent='Tentar confirmar o mesmo salvamento';retry.hidden=true;
   const message=document.createElement('p');message.className='op-error';message.setAttribute('role','alert');message.hidden=true;
@@ -76,14 +76,17 @@
     }
     if(j.status!=='saved'||!j.workflow||typeof j.workflow.revision!=='string')throw Error('Resposta sem confirmação válida. Confira o salvo antes de continuar.');
     j.workflow.resume_url=carryAttendance(j.workflow.resume_url);
-    pending=null;markFields(null);form.dataset.revision=j.workflow.revision;form.elements._workflow_revision.value=j.workflow.revision;const resume=state.querySelector('[data-resume]');if(resume){resume.hidden=false;resume.href=j.workflow.resume_url;}
+    pending=null;autoRetries=0;markFields(null);form.dataset.revision=j.workflow.revision;form.elements._workflow_revision.value=j.workflow.revision;const resume=state.querySelector('[data-resume]');if(resume){resume.hidden=false;resume.href=j.workflow.resume_url;}
     if(j.workflow.kind==='exam'){
      form.dataset.workflowDraft='/api/workflow/exam/'+j.workflow.id;form.action=j.workflow.resume_url;
      history.replaceState(null,'',j.workflow.resume_url);state.querySelector('[data-resume]').href=j.workflow.resume_url;
     }
     if(fingerprint(payload())===op.hash){clearLocalBackup();window.ClyoForms?.saved(form);window.ClyoWorkflow?.set(form,'saved',j.workflow.saved_at);}else{say('editing');timer=setTimeout(save,600);}
     return true;
-   }catch(e){backupFormLocally();say('error',(window.ClyoWorkflow?.netMessage?.(e)??e.message)+' Você pode repetir a mesma tentativa sem duplicar a gravação.');retry.hidden=false;return false;}
+   }catch(e){backupFormLocally();
+    // v54.68 / F-19: falha de rede/5xx repete sozinha a MESMA gravação (mesma chave, sem duplicar), com espera crescente.
+    let auto='';if(!submitted&&!blocked&&autoRetries<5){const d=Math.min(30000,3000*2**autoRetries);autoRetries++;clearTimeout(timer);timer=setTimeout(save,d);auto=' Nova tentativa automática em '+Math.round(d/1000)+' s.';}
+    say('error',(window.ClyoWorkflow?.netMessage?.(e)??e.message)+' Você pode repetir a mesma tentativa sem duplicar a gravação.'+auto);retry.hidden=false;return false;}
    finally{saving=null;buttonDefaults.forEach(({b,disabled,label})=>{b.disabled=disabled;b.removeAttribute('aria-busy');b.textContent=label;});}})();return saving;
   }
   function change(e){if(e.target.matches('input[type=search],[data-transient],#exam-category'))return;serial++;backupFormLocally();say('editing');if(!blocked&&!pending){clearTimeout(timer);timer=setTimeout(save,1200);}}

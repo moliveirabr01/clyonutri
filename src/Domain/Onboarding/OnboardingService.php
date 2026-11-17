@@ -186,7 +186,17 @@ class OnboardingService
                         ? $data['working_days']
                         : ['seg', 'ter', 'qua', 'qui', 'sex'];
                     $price = max(0.0, (float)($data['default_price'] ?? 250.00));
-                    $interval = max(0, (int)($data['appointment_interval_minutes'] ?? 10));
+                    $policy=(new \ClyoNutri\Domain\Booking\BookingCalendarService($this->db))->policy($clinicId);
+                    $interval=(int)$policy['buffer_after_minutes'];
+                    $changeInterval=array_key_exists('appointment_interval_minutes',$data);
+                    if($changeInterval){
+                        $raw=$data['appointment_interval_minutes'];
+                        if((!is_int($raw)&&!is_string($raw)) || filter_var($raw,FILTER_VALIDATE_INT)===false || (int)$raw<0 || (int)$raw>120) throw new InvalidArgumentException('Informe um intervalo de 0 a 120 minutos.');
+                        $manager=$this->db->prepare("SELECT m.user_id FROM clinic_members m JOIN users u ON u.id=m.user_id JOIN clinics c ON c.id=m.clinic_id WHERE m.clinic_id=? AND m.user_id=? AND m.role IN ('owner','admin') AND m.status='active' AND u.status='active' AND c.status='active'");
+                        $manager->execute([$clinicId,$userId]);
+                        if(!$manager->fetchColumn()) throw new \DomainException('Somente a gestão do consultório pode alterar o intervalo entre consultas.');
+                        $interval=(int)$raw;
+                    }
 
                     $allDays = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
                     $weekly = $practicePayload['weekly_availability'] ?? [];
@@ -222,6 +232,14 @@ class OnboardingService
                         'pref' => json_encode($practicePayload, JSON_UNESCAPED_UNICODE),
                         'id' => $progress['id'],
                     ]);
+                    // Upsert works even when MySQL reports zero changed rows for an unchanged value.
+                    if ($changeInterval) {
+                        if (!\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db,'booking_calendar_policies')) throw new \RuntimeException('Configuração da agenda indisponível. Tente novamente após atualizar o sistema.');
+                        $sql=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'
+                            ? 'INSERT INTO booking_calendar_policies (clinic_id,buffer_after_minutes,updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE buffer_after_minutes=VALUES(buffer_after_minutes),updated_at=VALUES(updated_at)'
+                            : 'INSERT INTO booking_calendar_policies (clinic_id,buffer_after_minutes,updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(clinic_id) DO UPDATE SET buffer_after_minutes=excluded.buffer_after_minutes,updated_at=excluded.updated_at';
+                        $this->db->prepare($sql)->execute([$clinicId,$interval]);
+                    }
                     break;
 
                 case 4:
@@ -375,7 +393,7 @@ class OnboardingService
         $stmt->execute(['uid' => $userId, 'cid' => $clinicId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
+        return \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($row ?: null); // N-01
     }
 
     /**

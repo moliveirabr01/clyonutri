@@ -51,16 +51,7 @@
         Registrar revogação a pedido do paciente
       </button>
     </div>
-    <div id="stt-consent-link-box" class="u-mt-2" hidden>
-      <label for="stt-consent-link" class="u-font-bold u-text-compact">Link para o paciente abrir no próprio aparelho:</label>
-      <div class="u-flex u-gap-2 u-items-center u-wrap">
-        <input type="text" id="stt-consent-link" class="form-control" readonly style="flex: 1 1 280px; min-height: 44px;" data-testid="stt-consent-link">
-        <button type="button" id="btn-copy-consent-link" class="btn btn-outline btn-sm" style="min-height: 44px;">Copiar link</button>
-      </div>
-      <div id="stt-consent-qr" class="u-mt-2" aria-label="QR code do link de aceite"></div>
-      <p id="stt-consent-link-expiry" class="u-text-compact u-mt-1" aria-live="off"></p>
-      <p class="u-text-compact">Por segurança o link aparece só agora. Para ver de novo, gere outro (o anterior é cancelado).</p>
-    </div>
+    <p class="u-text-compact u-mt-2">O paciente pode responder pelo portal. Quando disponível, o link e o código de confirmação são enviados diretamente a ele.</p>
   </div>
 
   <!-- 2. CONTROLES DA SESSÃO DE TRANSCRIÇÃO (DESBLOQUEADOS APÓS CONSENTIMENTO) -->
@@ -150,5 +141,4 @@
   </div>
 </section>
 
-<script src="/assets/js/qrcode.min.js?v=v54-61" defer></script>
-<script src="/assets/js/realtime-transcription.js?v=v54-61" defer></script>
+<script src="/assets/js/realtime-transcription.js?v=ni2-893" defer></script>

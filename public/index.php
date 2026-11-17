@@ -25,8 +25,6 @@ use ClyoNutri\Core\Security\Csrf;
 use ClyoNutri\Core\Security\Env;
 use ClyoNutri\Domain\Patient\PatientRepository;
 
-Env::load(__DIR__ . '/../.env');
-
 // Configuração segura de fuso horário da aplicação (NI2-187)
 $appTimezone = (string)(Env::get('APP_TIMEZONE') ?? 'America/Sao_Paulo');
 date_default_timezone_set($appTimezone);
@@ -154,6 +152,10 @@ $asaasWebhookCtrl = new \ClyoNutri\Application\Controllers\AsaasWebhookControlle
 // 1. Rotas de Autenticação & Recuperação de Acesso (PX-29 / NI2-322)
 $router->get('/login', [$authCtrl, 'showLogin']);
 $router->post('/login', [$authCtrl, 'login']);
+$router->get('/login/mfa', [$authCtrl, 'showMfaChallenge']);
+$router->post('/login/mfa', [$authCtrl, 'verifyMfaChallenge']);
+$router->get('/login/mfa/codigos', [$authCtrl, 'showRecoveryCodes']);
+$router->post('/login/mfa/codigos', [$authCtrl, 'confirmRecoveryCodes']);
 $router->get('/cadastro', [$authCtrl, 'showRegister']);
 $router->post('/cadastro', [$authCtrl, 'register']);
 $router->get('/logout', [$authCtrl, 'logoutConfirm']); // GET não encerra sessão: 405 + formulário de confirmação (POST + CSRF)
@@ -162,6 +164,8 @@ $router->get('/recuperar-senha', [$authCtrl, 'showForgotPassword']);
 $router->post('/recuperar-senha', [$authCtrl, 'sendResetLink']);
 $router->get('/recuperar-senha/{token}', [$authCtrl, 'showResetPassword']);
 $router->post('/recuperar-senha/{token}', [$authCtrl, 'resetPassword']);
+$router->get('/convite/{token}', [$authCtrl, 'showTeamInvite']);
+$router->post('/convite/{token}', [$authCtrl, 'acceptTeamInvite']);
 $router->get('/verificar-email/{token}', [$authCtrl, 'verifyEmail']);
 
 // 2. Health Check & Observabilidade (/up padrão Laravel 13)
@@ -281,10 +285,28 @@ $requireAuth = function (callable $action) use ($db, $sessionReturnPath) {
         // v10 (2.2): páginas autenticadas nunca ficam em cache (navegador/proxy).
         if (!headers_sent()) { header('Cache-Control: no-store, private'); header('Pragma: no-cache'); }
         $actor = $authUser->toArray();
+        // NI2-859 (SEG360-SEC-004): papéis de plataforma não acessam /admin/* sem MFA verificado na sessão.
+        if (str_starts_with($reqUriPath, '/admin') && \ClyoNutri\Core\Auth\MfaService::isRequiredForRole((string)($actor['role'] ?? '')) && empty($_SESSION['mfa_verified_at'])) {
+            if ($wantsJsonAuthError) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => 'Autenticação em duas etapas (MFA) obrigatória para acessar o console administrativo.']);
+                return;
+            }
+            \ClyoNutri\Core\Http\Response::redirect('/login/mfa');
+        }
         try {
             \ClyoNutri\Core\Security\ClinicalAuthorization::assertWebAccess($actor, parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', $_SERVER['REQUEST_METHOD'], $db);
         } catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
             // v54.57 (UX-104): navegação no navegador recebe a página de erro com o layout e um caminho permitido.
+            // v54.68: o painel clínico não é a casa de todo perfil (ex.: superadmin depois do login ou ao voltar para
+            // /dashboard). Em navegação GET para /dashboard ou /, manda para a página inicial do perfil em vez do 403.
+            $homeForActor = \ClyoNutri\Core\Security\ClinicalAuthorization::homePath($actor);
+            $deniedPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
+            if (!$wantsJsonAuthError && $_SERVER['REQUEST_METHOD'] === 'GET' && in_array($deniedPath, ['/', '/dashboard'], true)
+                && $homeForActor !== $deniedPath && \ClyoNutri\Core\Security\ClinicalAuthorization::allowsWeb($actor, $homeForActor, 'GET')) {
+                \ClyoNutri\Core\Http\Response::redirect($homeForActor);
+            }
             if (!$wantsJsonAuthError && \ClyoNutri\Core\Http\ErrorPage::wantsHtml()) {
                 \ClyoNutri\Core\Http\ErrorPage::render(403, 'Acesso não permitido para o seu perfil', 'Esta página tem dados clínicos ou de gestão que o seu perfil nesta clínica não acessa. Nada foi alterado. Use um dos caminhos abaixo.');
                 return;
@@ -309,6 +331,45 @@ $requireAuth = function (callable $action) use ($db, $sessionReturnPath) {
             if ($wantsJsonAuthError) { header('Content-Type: application/json; charset=utf-8'); echo json_encode(['error'=>$contextMessage]); }
             else \ClyoNutri\Core\Http\ErrorPage::render(503, 'Não foi possível conferir o atendimento', $contextMessage, [['Abrir a agenda', '/agenda']]); // v54.57 (R55-01)
             return;
+        }
+        // NI2-863 (F-05): após o fim do teste grátis + carência, bloquear mutações operacionais/clínicas (mantendo leitura, exportação e assinatura).
+        $reqMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if (in_array($reqMethod, ['POST', 'PUT', 'PATCH', 'DELETE'], true) && !empty($actor['clinic_id'])) {
+            $isSubBypass = str_starts_with($reqUriPath, '/configuracoes/assinatura')
+                || str_starts_with($reqUriPath, '/privacidade/')
+                || str_starts_with($reqUriPath, '/admin')
+                || in_array($reqUriPath, ['/logout', '/aceite-termos', '/sessao/renovar'], true)
+                || str_ends_with($reqUriPath, '/exportar');
+            $isGuardedWrite = !$isSubBypass && (
+                str_starts_with($reqUriPath, '/pacientes')
+                || str_starts_with($reqUriPath, '/agenda')
+                || str_starts_with($reqUriPath, '/planos')
+                || str_starts_with($reqUriPath, '/consulta')
+                || str_starts_with($reqUriPath, '/financeiro')
+                || str_starts_with($reqUriPath, '/receitas')
+                || str_starts_with($reqUriPath, '/materiais')
+                || str_starts_with($reqUriPath, '/exames')
+                || str_starts_with($reqUriPath, '/api/workflow/')
+            );
+            if ($isGuardedWrite) {
+                $subAccess = (new \ClyoNutri\Domain\Subscription\SubscriptionService($db))->checkWriteAccess((int)$actor['clinic_id']);
+                if (!$subAccess['allowed']) {
+                    $asaasActive = (new \ClyoNutri\Domain\Billing\AsaasCheckoutService($db))->isEnabled();
+                    $ctaLabel = $asaasActive ? 'Assinar um plano' : 'Pedir ativação';
+                    $ctaHref = $asaasActive ? '/configuracoes/assinatura#plano' : '/configuracoes/assinatura#pedir-ativacao';
+                    if ($wantsJsonAuthError) {
+                        http_response_code(402);
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['error' => $subAccess['reason'], 'upgrade_url' => $ctaHref, 'cta_label' => $ctaLabel], JSON_UNESCAPED_UNICODE);
+                        return;
+                    }
+                    \ClyoNutri\Core\Http\ErrorPage::render(402, 'Período de teste encerrado — modo leitura', (string)$subAccess['reason'], [
+                        [$ctaLabel, $ctaHref],
+                        ['Voltar ao painel', '/dashboard'],
+                    ]);
+                    return;
+                }
+            }
         }
         // CSRF + Origin/Referer para mutações /api/ autenticadas por cookie de sessão (auditoria 14/10/2026).
         $csrfError = \ClyoNutri\Core\Security\SessionApiCsrfGuard::check(
@@ -478,6 +539,7 @@ $router->post('/pacientes/{id}/privacidade', $requireAuth([$dashCtrl, 'patientPr
 // Evolução no app da paciente: medidas liberadas e metas (NI2-135)
 $router->post('/pacientes/{id}/autorrelatos/permissoes', $requireAuth([$evolutionCtrl, 'permissions']));
 $router->post('/pacientes/{id}/metas', $requireAuth([$evolutionCtrl, 'createGoal']));
+$router->post('/pacientes/{id}/evolucao/liberar', $requireAuth([$evolutionCtrl, 'releaseEvolution']));
 // NI2-138: vínculo que libera o chat da paciente com o profissional.
 $chatLinkCtrl = new \ClyoNutri\Application\Controllers\ChatLinkController();
 $router->post('/pacientes/{id}/chat/vinculo', $requireAuth([$chatLinkCtrl, 'activate']));
@@ -490,6 +552,8 @@ $router->get('/pacientes/{id}', $requireAuth([$dashCtrl, 'profile360']));
 $router->post('/pacientes/{id}/convite-app', $requireAuth([new \ClyoNutri\Application\Controllers\PatientOnboardingController(), 'invite']));
 $router->post('/pacientes/{id}/iniciar-agora', $requireAuth([$dashCtrl, 'startCareNow'])); // NI2-705
 $router->get('/pacientes/{id}/preparar', $requireAuth([$dashCtrl, 'prepareConsultation'])); // NI2-712
+$router->get('/pacientes/{id}/diario', $requireAuth([$dashCtrl, 'patientFoodDiary'])); // NI2-880
+$router->post('/pacientes/{id}/diario/{entryId}/devolutiva', $requireAuth([$dashCtrl, 'submitPatientFoodDiaryFeedback'])); // NI2-880
 $router->get('/pacientes/{id}/plano', $requireAuth([$dashCtrl, 'patientPlansTab'])); // NI2-711
 $router->get('/pacientes/{id}/documentos', $requireAuth([$dashCtrl, 'patientDocumentsTab'])); // NI2-711
 $router->get('/pacientes/{id}/prontuario', $requireAuth([$dashCtrl, 'patientMedicalRecord']));
@@ -802,6 +866,7 @@ $router->post('/configuracoes/conta/exclusao/cancelar', $requireAuth([$subCtrl, 
 $router->get('/api/v1/subscription', $requireAuth([$subCtrl, 'apiGet']));
 $router->post('/api/v1/subscription/cancel', $requireAuth([$subCtrl, 'apiCancel']));
 $router->post('/configuracoes/assinatura/asaas', $requireAuth([$subCtrl, 'startAsaasCheckout']));
+$router->post('/configuracoes/assinatura/pedir-ativacao', $requireAuth([$subCtrl, 'requestActivation']));
 // Webhook público do Asaas: autenticação por asaas-access-token (sem sessão/CSRF), NI2-727.
 $router->post('/webhooks/asaas', [$asaasWebhookCtrl, 'receive']);
 
@@ -862,6 +927,7 @@ $router->post('/admin/usuarios/{id}/status', $requireAuth([$adminCtrl, 'updateUs
 $router->post('/admin/usuarios/{id}/revogar-sessoes', $requireAuth([$adminCtrl, 'revokeUserSessions']));
 $router->get('/admin/servicedesk', $requireAuth([$adminCtrl, 'serviceDesk']));
 $router->get('/admin/comercial', $requireAuth([$adminCtrl, 'commercial']));
+$router->post('/admin/comercial/ativar', $requireAuth([$adminCtrl, 'activateSubscription']));
 $router->post('/admin/pedidos-exclusao/{id}/analise', $requireAuth([$adminCtrl, 'reviewDeletionRequest']));
 $router->post('/admin/pedidos-exclusao/{id}/encerrar', $requireAuth([$adminCtrl, 'resolveDeletionRequest']));
 $router->get('/admin/acessos', $requireAuth([$adminCtrl, 'accessControl']));
@@ -1132,6 +1198,9 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
     $patients = $stmt->fetchAll();
     $stmt->closeCursor();
     if (count($patients) !== 1) {
+        if ($password !== '') {
+            password_verify($password, \ClyoNutri\Core\Auth\AuthService::DUMMY_BCRYPT_HASH);
+        }
         $patientLimiter?->failure('patient', $patientAccountKey, $patientIpKey);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial inválida ou acesso indisponível.']);
@@ -1302,6 +1371,18 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
     ]);
 
     \ClyoNutri\Core\Auth\MobileWebSession::start($token, $expiresAt);
+    try {
+        $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at) VALUES (:cid, :uid, 'AUTH_LOGIN_SUCCEEDED', 'patients', :rid, :ip, :ua, :details, :ca)")
+            ->execute([
+                'cid' => (int)$patient['clinic_id'],
+                'uid' => (int)$patient['id'],
+                'rid' => (string)$patient['id'],
+                'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+                'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+                'details' => json_encode(['channel' => 'api_patient', 'actor_type' => 'patient']),
+                'ca' => date('Y-m-d H:i:s'),
+            ]);
+    } catch (\Throwable) {}
     echo json_encode([
         'token' => $token,
         'expires_at' => $expiresAt,
@@ -1321,6 +1402,18 @@ $router->post('/api/v1/auth/patient-logout', function() use ($authenticatePatien
     $tokenId = (int)$auth['id'];
     $stmt = $db->prepare("DELETE FROM personal_access_tokens WHERE id = :id");
     $stmt->execute(['id' => $tokenId]);
+    try {
+        $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at) VALUES (:cid, :uid, 'AUTH_LOGOUT', 'patients', :rid, :ip, :ua, :details, :ca)")
+            ->execute([
+                'cid' => (int)$auth['clinic_id'],
+                'uid' => (int)$auth['patient_id'],
+                'rid' => (string)$auth['patient_id'],
+                'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+                'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+                'details' => json_encode(['channel' => 'api_patient', 'actor_type' => 'patient']),
+                'ca' => date('Y-m-d H:i:s'),
+            ]);
+    } catch (\Throwable) {}
     \ClyoNutri\Core\Auth\MobileWebSession::clear();
     echo json_encode(['message' => 'Token revogado com sucesso.']);
 });
@@ -2125,7 +2218,14 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
     $stmt->execute(['email' => $email]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($password, $user['password_hash'])) {
+    if (!$user) {
+        password_verify($password, \ClyoNutri\Core\Auth\AuthService::DUMMY_BCRYPT_HASH);
+        $loginLimiter->failure('staff', $email, $clientIpPro);
+        http_response_code(401);
+        echo json_encode(['error' => 'Credencial profissional inválida ou acesso indisponível.']);
+        return;
+    }
+    if (!password_verify($password, $user['password_hash'])) {
         $loginLimiter->failure('staff', $email, $clientIpPro);
         http_response_code(401);
         echo json_encode(['error' => 'Credencial profissional inválida ou acesso indisponível.']);
@@ -2160,6 +2260,18 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
     ]);
 
     \ClyoNutri\Core\Auth\MobileWebSession::start($token, $expiresAt);
+    try {
+        $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at) VALUES (:cid, :uid, 'AUTH_LOGIN_SUCCEEDED', 'users', :rid, :ip, :ua, :details, :ca)")
+            ->execute([
+                'cid' => (int)$user['clinic_id'],
+                'uid' => (int)$user['id'],
+                'rid' => (string)$user['id'],
+                'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+                'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+                'details' => json_encode(['channel' => 'api_professional', 'role' => (string)$user['role']]),
+                'ca' => date('Y-m-d H:i:s'),
+            ]);
+    } catch (\Throwable) {}
     echo json_encode([
         'token' => $token,
         'expires_at' => $expiresAt,
@@ -2181,6 +2293,18 @@ $router->post('/api/v1/auth/professional-logout', function() use ($authenticateP
     $tokenId = (int)$auth['id'];
     $stmt = $db->prepare("DELETE FROM personal_access_tokens WHERE id = :id");
     $stmt->execute(['id' => $tokenId]);
+    try {
+        $db->prepare("INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at) VALUES (:cid, :uid, 'AUTH_LOGOUT', 'users', :rid, :ip, :ua, :details, :ca)")
+            ->execute([
+                'cid' => (int)$auth['clinic_id'],
+                'uid' => (int)$auth['user_id'],
+                'rid' => (string)$auth['user_id'],
+                'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+                'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+                'details' => json_encode(['channel' => 'api_professional', 'role' => (string)$auth['user_role']]),
+                'ca' => date('Y-m-d H:i:s'),
+            ]);
+    } catch (\Throwable) {}
     \ClyoNutri\Core\Auth\MobileWebSession::clear();
     echo json_encode(['message' => 'Token profissional revogado com sucesso.']);
 });

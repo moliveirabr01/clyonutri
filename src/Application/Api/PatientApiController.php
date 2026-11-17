@@ -75,6 +75,7 @@ class PatientApiController
             $meal['items'] = $items;
             $meals[] = $meal;
         }
+        $plan['title'] = \ClyoNutri\Domain\MealPlan\PlanTitle::forPatient((string)($plan['title'] ?? ''));
         $plan['meals'] = $meals;
         return $plan;
     }
@@ -132,6 +133,7 @@ class PatientApiController
         if (!empty($plan['published_at'])) {
             $plan['published_at'] = $this->atom((string)$plan['published_at']);
         }
+        $plan['title'] = \ClyoNutri\Domain\MealPlan\PlanTitle::forPatient((string)($plan['title'] ?? ''));
         $plan['meals'] = $meals;
         return $plan;
     }

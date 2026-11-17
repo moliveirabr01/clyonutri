@@ -762,7 +762,7 @@ export default function PatientHomeScreen({ session, onLogout }: { session: Pati
               {recipe.recipe_summary && <Text style={styles.helperText}>{recipe.recipe_summary}</Text>}
               {recipe.instructions_override && <Text style={styles.mealItem}>Orientação do nutricionista: {recipe.instructions_override}</Text>}
               {!(selectedPrescription === recipe.id && recipeUnavailable) && <TouchableOpacity accessibilityRole="button" disabled={recipeDetailState.loading} style={[styles.navyButton, recipeDetailState.loading && { opacity: 0.6 }]} onPress={() => openRecipe(recipe)}>
-                <Text style={styles.retryButtonText}>Ver ingredientes e preparo</Text>
+                <Text style={styles.navyButtonText}>Ver ingredientes e preparo</Text>
               </TouchableOpacity>}
               {selectedPrescription === recipe.id && <>
                 {recipeDetailState.loading && <ActivityIndicator accessibilityLabel="Carregando receita" />}

@@ -1,0 +1,29 @@
+  PASS  day: exatamente um menu de configuração
+  PASS  day: atalho direto para ativação
+  PASS  day: botão usa componente e texto único
+  PASS  day: menu aponta para as três seções
+  PASS  week: exatamente um menu de configuração
+  PASS  week: atalho direto para ativação
+  PASS  week: botão usa componente e texto único
+  PASS  week: menu aponta para as três seções
+  PASS  month: exatamente um menu de configuração
+  PASS  month: atalho direto para ativação
+  PASS  month: botão usa componente e texto único
+  PASS  month: menu aponta para as três seções
+  PASS  Painel usa mesmo componente e classe
+  PASS  Ficha usa componente de nova consulta
+  PASS  Segundo clique envia ativação explícita pelo formulário existente
+  PASS  POST real do controller ativa e preserva parâmetros do formulário
+  PASS  Ativo oferece copiar link e configurar
+[agenda] próximo horário indisponível: ClyoNutri\Core\Security\TenantSecurityException
+  PASS  Sem permissão não vê controles: 2 ativo=não
+[agenda] próximo horário indisponível: ClyoNutri\Core\Security\TenantSecurityException
+  PASS  Sem permissão não vê controles: 2 ativo=sim
+  PASS  Sem permissão não vê controles: 3 ativo=não
+  PASS  Sem permissão não vê controles: 3 ativo=sim
+  PASS  Administrador ativo pode configurar
+  PASS  POST sem CSRF válido não muda configuração
+  PASS  Recepção não altera configuração pelo controller
+  PASS  Contraste da primária verde com branco atende AA: 5.64:1
+
+25 PASS, 0 FAIL

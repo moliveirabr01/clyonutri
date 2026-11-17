@@ -345,7 +345,7 @@ class RealtimeTranscriptionService
         $this->requireSession($sessionId, $clinicId);
 
         $stmt = $this->db->prepare("
-            SELECT sequence_number, speaker, text, is_final, confidence, created_at
+            SELECT id, sequence_number, speaker, text, is_final, confidence, created_at
             FROM consultation_transcription_segments
             WHERE session_id = :session_id AND sequence_number > :after_seq
             ORDER BY sequence_number ASC

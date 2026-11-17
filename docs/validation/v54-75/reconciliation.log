@@ -1,0 +1,21 @@
+  PASS  política suspensa preservada inclusive para MFA já cadastrado
+  PASS  política explícita reativa MFA
+  PASS  MFA profissional permanece opcional
+  PASS  plataforma tem destino administrativo
+  PASS  profissional tem destino clínico
+  PASS  notas e alergias persistem cifradas
+[clinical-encryption] campo notes ilegível na listagem (paciente 1)
+  PASS  listagem suporta valor ilegível sem expor cifra
+  PASS  leitura clínica continua falhando fechada
+  PASS  alerta histórico com cifra embutida é legível
+  PASS  cifra embutida ilegível recebe marcador neutro
+  PASS  exportação LGPD devolve notas legíveis
+  PASS  exportação de outra clínica é bloqueada
+  PASS  onboarding lê primeiro paciente decifrado
+  PASS  MailerFactory recebe mensagem real com link e OTP
+  PASS  driver log não é anunciado como e-mail entregue
+[transcription-consent] envio de OTP falhou: ClyoNutri\Core\Mail\MailException
+  PASS  falha de transporte mantém aceite disponível no portal
+  PASS  telefone sem e-mail não anuncia SMS inexistente
+
+17 PASS, 0 FAIL

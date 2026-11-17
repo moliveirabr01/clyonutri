@@ -75,13 +75,15 @@ try {
     $db->exec("INSERT INTO clinics (uuid, name, email) VALUES ('{$u2}', 'Clínica Beta Consultórios', 'beta-" . bin2hex(random_bytes(3)) . "@clinica.com')");
     $clinicIdBeta = (int)$db->lastInsertId();
 
+    // Profissionais donos de seus consultórios: o passo 3 configura o intervalo global da agenda.
+    // A recusa de alteração por membro sem gestão é coberta em ni2_868_870_871_872_regression_test.php.
     // Nutricionista Alfa
     $nutriUuidAlfa = 'user-onb-alfa-' . bin2hex(random_bytes(4));
     $nutriEmailAlfa = 'nutrialfa-' . bin2hex(random_bytes(3)) . '@clinica.com';
     $db->exec("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status)
                VALUES ('{$nutriUuidAlfa}', 'Dra. Beatriz Nutricionista Alfa', '{$nutriEmailAlfa}', 'hash_pw', 'nutritionist', 1, 'active')");
     $nutriIdAlfa = (int)$db->lastInsertId();
-    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role) VALUES ({$clinicIdAlfa}, {$nutriIdAlfa}, 'nutritionist')");
+    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role) VALUES ({$clinicIdAlfa}, {$nutriIdAlfa}, 'owner')");
     $db->exec("INSERT INTO professionals (user_id, crn, crn_region) VALUES ({$nutriIdAlfa}, '12345', 'CRN-3')");
     $profIdAlfa = (int)$db->lastInsertId();
 
@@ -91,7 +93,7 @@ try {
     $db->exec("INSERT INTO users (uuid, name, email, password_hash, role, is_verified, status)
                VALUES ('{$nutriUuidBeta}', 'Dr. Carlos Nutricionista Beta', '{$nutriEmailBeta}', 'hash_pw', 'nutritionist', 1, 'active')");
     $nutriIdBeta = (int)$db->lastInsertId();
-    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role) VALUES ({$clinicIdBeta}, {$nutriIdBeta}, 'nutritionist')");
+    $db->exec("INSERT INTO clinic_members (clinic_id, user_id, role) VALUES ({$clinicIdBeta}, {$nutriIdBeta}, 'owner')");
     $db->exec("INSERT INTO professionals (user_id, crn, crn_region) VALUES ({$nutriIdBeta}, '67890', 'CRN-3')");
     $profIdBeta = (int)$db->lastInsertId();
 

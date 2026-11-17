@@ -1,0 +1,25 @@
+  PASS  Duplicação persiste título, versão separada e origem
+  PASS  Origem preservada
+  PASS  Painel: 0 confirmadas
+  PASS  Painel: 0 realizadas
+  PASS  Painel: 1 confirmadas
+  PASS  Painel: 1 realizadas
+  PASS  Painel: 2 confirmadas
+  PASS  Painel: 2 realizadas
+  PASS  Comparação sem período anterior
+  PASS  Remove prefixos legados repetidos
+  PASS  Título legado vazio recebe nome legível
+  PASS  Publicação legada exige confirmação
+  PASS  Prefixo ainda presente é recusado
+  PASS  Demais validações seguem ativas após confirmar
+  PASS  Falha desfaz alteração do título e publicação
+  PASS  API: plano legado sem snapshot tem título limpo
+  PASS  API: snapshot legado tem título limpo
+  PASS  Snapshot histórico permanece imutável
+  PASS  API bloqueia paciente de outra clínica
+  PASS  Duplicação bloqueia plano de outra clínica
+  PASS  Publicação confirmada persiste título e versão 2
+  PASS  Novo snapshot entrega título confirmado ao paciente
+  PASS  Linha do tempo renderizada preserva ID só na referência de suporte
+
+23 PASS, 0 FAIL

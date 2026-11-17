@@ -1,0 +1,837 @@
+==> [core] tests/ni2_892_query_metrics_test.php
+  PASS  Prepare não conta como execução
+  PASS  Cada execute de statement reutilizado é contado
+  PASS  query mantém modo de fetch e retorno
+  PASS  query contado uma única vez
+  PASS  Erro SQL preservado
+  PASS  Consulta com erro também é contada
+  PASS  Métricas sem SQL e parâmetros
+  PASS  Metadata informa colunas presentes e ausentes
+  PASS  Metadados das colunas carregados uma vez por tabela
+  PASS  Catálogo de tabelas preserva presença/ausência
+  PASS  Catálogo de tabelas carregado uma vez
+  PASS  Cache isolado por conexão
+  PASS  Reset após DDL atualiza schema
+  PASS  Produção nunca habilita perfil mesmo com flag 1
+  PASS  Flag desligada não perfila
+  PASS  Busca sem jornada e sem abertura excepcional retorna null
+  PASS  Abertura excepcional mantém primeiro horário canônico
+  PASS  Busca mantém bloqueio explícito dentro de abertura excepcional
+  PASS  Janelas com leitura em lote são idênticas à leitura canônica
+  PASS  Busca não aceita profissional de outra clínica
+
+20 PASS, 0 FAIL
+==> [core] tests/ni2_893_finishing_test.php
+  PASS  Bloco de cancelamento somente para status cancelado: draft
+  PASS  Bloco de cancelamento somente para status cancelado: review
+  PASS  Bloco de cancelamento somente para status cancelado: issued
+  PASS  Bloco de cancelamento somente para status cancelado: cancelled
+  PASS  Cancelamento mostra data e motivo
+  PASS  Sala sem botão e sem campo de link
+  PASS  Controles de pedir aceite e revogação preservados
+  PASS  Rodapé renderiza a versão instalada registrada no JSON
+  PASS  Versão antiga fixa ausente do HTML
+  PASS  Comprovante público sem código sequencial e sem alvo de preenchimento
+  PASS  Comprovante preserva data, horário e modalidade
+  PASS  JavaScript renderizado do agendamento tem sintaxe válida
+
+12 PASS, 0 FAIL
+==> [core] tests/v5470_ni2_880_food_diary_web_test.php
+NI2-880 OK: diário web, devolutiva, aviso, auditoria, escape HTML, estado vazio, RBAC 403 e isolamento multi-tenant validados.
+==> [core] tests/v5469_ni2_879_and_cr360_fixes_test.php
+NI2-879 + CR360 OK: decifragem no Perfil 360, agregação payments e data real no prontuário/linha do tempo validados.
+==> [core] tests/v5468_ni2_878_subscription_test.php
+NI2-878 OK: trialState, expiredNotice, pedir-ativacao, RBAC 403 e ativacao manual validados.
+==> [core] tests/v5467_ni2_856_aud360_test.php
+=== 1. NI2-857 (F-01 P1): Financeiro vírgula decimal ===
+  PASS  NI2-857: 320,50 -> 32050 centavos
+  PASS  NI2-857: 1.250,00 -> 125000 centavos
+  PASS  NI2-857: 250 -> 25000 centavos
+  PASS  NI2-857: 250.5 -> 25050 centavos
+  PASS  NI2-857 negativo: texto -> 0, negativo detectável
+=== 2. NI2-858 (SEC-001 P1): Transcrição com OTP e alerta mesmo IP ===
+  PASS  NI2-858: link sem OTP é recusado
+  PASS  NI2-858: OTP inválido é recusado
+  PASS  NI2-858: aceite por OTP grava mechanism=otp
+  PASS  NI2-858: alerta mesmo IP gravado quando decider IP == requester IP
+=== 3. NI2-859 (SEC-004 P1): MFA TOTP RFC 6238 + Códigos de Recuperação + Rate Limit ===
+  PASS  NI2-859: superadmin exige MFA
+  PASS  NI2-859: nutritionist tem MFA opcional
+  PASS  NI2-859: TotpService valida código RFC 6238
+  PASS  NI2-859: replay do mesmo time-step é bloqueado
+  PASS  NI2-859: gera 8 códigos de recuperação
+  PASS  NI2-859: código de recuperação autentica
+  PASS  NI2-859: código de recuperação usado não funciona 2x
+  PASS  NI2-859: rate limit bloqueia após 5 tentativas erradas
+=== 4. NI2-866 (SEC-003/005/007 P2): Chave APP_KEY, e-mail do token, hash dummy ===
+  PASS  NI2-866 (SEC-003): token emitido para e-mail X não verifica e-mail Y
+  PASS  NI2-866 (SEC-003): token válido verifica o próprio e-mail
+  PASS  NI2-866 (SEC-005): usuário inexistente retorna null executando bcrypt constante
+=== 5. NI2-861 (F-03 P2) & NI2-862 (F-04 P2): Prontuário com artefatos e Cifragem em Repouso ===
+  PASS  NI2-862: patients.notes e patients.allergies gravados cifrados (enc:v1:)
+  PASS  NI2-862: leitura do paciente decifra transparentemente
+  PASS  NI2-861: anamneses.appointment_id gravado
+  PASS  NI2-862: chief_complaint, pathologies e medications_details cifrados no banco
+  PASS  NI2-861: anthropometric_assessments.appointment_id gravado
+  PASS  NI2-862: consultation_note_drafts.evolution_summary cifrado no banco
+  PASS  NI2-862: rascunho decifrado na leitura
+  PASS  NI2-862: clinical_records.content_json cifrado no banco
+  PASS  NI2-861/862: cadeia SHA-256 do prontuário permanece íntegra com cifragem
+  PASS  NI2-861: prontuário referencia anamnese e avaliação do atendimento
+=== 6. NI2-863 (F-05 P2): Regra de acesso após fim do trial ===
+  PASS  NI2-863: assinatura expired > 3 dias entra em modo leitura
+  PASS  NI2-863: ativação restaura acesso imediatamente
+=== 7. NI2-864 (F-06 P2) & NI2-871 (F-12) & NI2-872 (F-13/14) & NI2-874 (F-18/F-20) ===
+  PASS  NI2-864 (F-06): publicação sem confirmar medida estimada (revisar) é recusada
+  PASS  NI2-864 (F-06): publicação com confirm_estimated_measures=true funciona
+  PASS  NI2-871 (F-12): telemetria remove texto livre clínico
+  PASS  NI2-872 (F-13): WorkflowState traduz superseded para Substituído
+  PASS  NI2-872 (F-14): intervalo do onboarding sincronizado em booking_calendar_policies.buffer_after_minutes
+  PASS  NI2-874 (F-18): encaixe registra nota em appointment_status_history
+  PASS  NI2-874 (F-20): PatientInviteEmail remove prefixo Dra.
+  PASS  NI2-874 (F-20): SecurityNoticeEmail remove prefixo Dr.
+=== 8. NI2-865 (F-07 P2): Contratos de módulos críticos ===
+  PASS  NI2-865: AsaasConfig::fromEnv + AsaasClient sandbox instanciados sem erro
+  PASS  NI2-865 negativo: chave de produção em ambiente sandbox é bloqueada
+  PASS  NI2-865: AccountActionRateLimiter permite primeira tentativa
+
+43 PASS, 0 FAIL
+==> [core] tests/v5462_ni2_844_ux360_test.php
+=== 1. NI2-847 (UX-003): Campos numéricos com vírgula/ponto decimal, normalização m/cm e limites ===
+  PASS  NI2-847: recordAssessment aceita "72,4" kg e "1,7" m -> 72.4 kg e 170.0 cm
+  PASS  NI2-847: IMC (~25.05) e RCQ (0.78) calculados corretamente com vírgula decimal
+  PASS  NI2-847: altura '1,70' grava 170 cm
+  PASS  NI2-847: altura '1.70' grava 170 cm
+  PASS  NI2-847: altura '170' grava 170 cm
+  PASS  NI2-847: altura '170,0' grava 170 cm
+  PASS  NI2-847: EnergyCalculator::compute normaliza 1,7m == 170cm (1455.5 kcal)
+  PASS  NI2-847 negativo: peso "abc" recusa com InvalidAnthropometricDataException
+  PASS  NI2-847 negativo: cintura "abc" recusa com InvalidAnthropometricDataException (sem TypeError)
+  PASS  NI2-847 limite: peso "500" kg recusa fora da faixa (0.5 a 350 kg)
+  PASS  NI2-847 limite: altura "0" recusa fora da faixa
+=== 2. NI2-846 (UX-002): Ranking de busca de alimentos por relevância clínica ===
+  PASS  NI2-846: "frango grelhado" traz peito de frango em 1º lugar (Peito de frango grelhado)
+  PASS  NI2-846: "coracao de frango" traz coração de frango em 1º lugar (Frango, coração, grelhado)
+  PASS  NI2-846: detectPartHighlight destaca "coração" para parte/corte
+  PASS  NI2-846: detectPartHighlight destaca "peito" para parte/corte
+  PASS  NI2-846: 100% (12/12) das buscas clínicas frequentes trazem o alimento esperado no top 3
+=== 3. NI2-845 (UX-001) & NI2-855 (UX-019): Medida caseira padrão e aviso de item duplicado com soma ===
+  PASS  NI2-845: 'Pão, trigo, francês' tem medida caseira padrão 'unidade' (50 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Mamão, Formosa, cru' tem medida caseira padrão 'fatia' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Banana prata crua' tem medida caseira padrão 'unidade' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Ovo de galinha cozido' tem medida caseira padrão 'unidade' (50 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Arroz integral cozido' tem medida caseira padrão 'colher de sopa' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Feijão carioca cozido' tem medida caseira padrão 'concha' (86 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Peito de frango grelhado' tem medida caseira padrão 'filé' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Azeite de oliva extravirgem' tem medida caseira padrão 'colher de sopa' (13 g) sem exigir confirmação manual
+  PASS  NI2-847: EnergyTargetService::save normaliza height_cm="1,7" para 170 cm no plano
+  PASS  NI2-845: editor do plano renderiza barra de busca inline dentro do card da refeição
+  PASS  NI2-855 (UX-019): editor do plano avisa alimento duplicado na mesma refeição com botão de somar em 1 clique
+  PASS  NI2-855 (UX-019): merge_duplicate soma as porções (50g + 50g = 100g, 2 unidades) e remove a linha duplicada
+  PASS  NI2-845/NI2-855 segurança: outra clínica não consegue fundir itens do plano
+=== 4. NI2-852 (UX-009) & NI2-855 (UX-013): Fuso horário unificado e português correto ===
+  PASS  NI2-852 (UX-009): meal_plans grava updated_at no fuso local America/Sao_Paulo (2026-11-16 22:43:01), sem +3h UTC
+  PASS  NI2-855 (UX-013): revisão de adequação usa português correto ("O plano tem 1 refeição", nunca "1 refeição(ões)")
+  PASS  NI2-855 (UX-013): faixa operacional traduz status "published" para "publicado" (nunca exibe "published" cru)
+=== 5. NI2-848 (UX-004), NI2-849 (UX-005), NI2-854 (UX-012) & NI2-855 (UX-016): Atendimento unificado e Fechamento ===
+  PASS  NI2-848 (UX-004): sala de atendimento exibe barra única de etapas (Anamnese, Avaliação, Plano, Evolução, Fechamento)
+  PASS  NI2-848 (UX-004): sala de atendimento inclui painel lateral recolhível "Histórico clínico"
+  PASS  NI2-855 (UX-016): sala de atendimento exibe resumo da última avaliação antropométrica e botão para Avaliação
+  PASS  NI2-854 (UX-012): texto longo de LGPD da transcrição fica recolhido em <details> abaixo da evolução
+  PASS  NI2-848 (UX-004): cabeçalho do paciente tem 1 CTA primário 'Continuar atendimento' e a barra de etapas (encontrado: 1)
+  PASS  NI2-849 (UX-005): concluir a consulta exibe o Painel de Fechamento com agendamento de retorno em 1 clique e entrega de PDF
+  PASS  NI2-849 (UX-005): suggestFollowUpSlot sugere horário livre em ~30 dias (2026-12-16T22:38)
+=== 6. NI2-850 (UX-006): Onboarding em 3 passos sem cobrança forçada, CRN pré-preenchido e contadores coerentes ===
+  PASS  NI2-850 (UX-006): wizardSummary inicia com 3 passos totais e 0%
+  PASS  NI2-850 (UX-006): concluir Passo 1 de 3 atualiza wizardSummary para 1 de 3 (33%)
+  PASS  NI2-850 (UX-006): contador do checklist (4 de 4) bate exatamente com os 4 itens visíveis na lista principal
+=== 7. NI2-851 (UX-008): Preservação e reenvio de rascunho ===
+  PASS  NI2-851 (UX-008): ConsultationDraftService persiste rascunho versionado
+  PASS  NI2-851 (UX-008): rascunho recuperado integralmente após reconexão/relogin
+  PASS  NI2-851 (UX-008): consulta-rascunho.js e workflow-drafts.js escutam evento online para reenvio automático em <=5s e exibem banner de recuperação
+=== 8. NI2-853 (UX-010) & NI2-855 (UX-011): Combobox único na agenda, próximo horário válido e Iniciar em 1 clique ===
+  PASS  NI2-853 (UX-010): modal da agenda unifica busca e seleção em um único combobox visível
+  PASS  NI2-853 (UX-010): nova consulta pré-preenche próximo horário comercial válido (2026-11-17T08:00) com aviso de sugestão
+  PASS  NI2-855 (UX-011): botão "Iniciar" na agenda dispara POST /agenda/{id}/status (in_progress) em 1 clique
+=== 9. NI2-854 (UX-014, UX-015) & NI2-855 (UX-007, UX-013, UX-017, UX-018): Dashboard, Menu 7 itens, Saudação, Cadastro e Busca ===
+  PASS  NI2-855 (UX-007): DashboardOverview::firstName remove prefixos "Dra."/"Dr." para evitar "Olá, Dra."
+  PASS  NI2-855 (UX-007): cabeçalho mostra "Olá, Helena" (sem "Olá, Dra.")
+  PASS  NI2-854 (UX-014): dashboard destaca card "Continuar de onde parou" para consulta em andamento
+  PASS  v54.65 (UX-015): grupos Biblioteca nutricional e Gestão fixos, sem recolher
+  PASS  v54.65 (UX-015): menu enxuto, sem links mortos nem itens de configuração soltos (14 itens)
+  PASS  v54.65: Central de ajuda no rodapé do menu e Modelos de plano em /modelos
+  PASS  NI2-855 (UX-018): busca sem resultado em /pacientes oferece botão "Cadastrar «Paciente Inexistente XYZ»" com nome pré-preenchido
+  PASS  NI2-855 (UX-013): página /financeiro tem apenas 1 botão '+ Novo lançamento financeiro' sem duplicidade (encontrado: 1)
+  PASS  NI2-855 (UX-017): tela /register mostra placeholder "Mínimo de 8 caracteres", região sem truncamento e CTA "Criar meu consultório" >= 48px
+
+57 PASS, 0 FAIL
+==> [core] tests/v5461_ni2_830_consentimento_test.php
+=== NI2-830 consentimento verificável ===
+  PASS  migration 93 roda duas vezes sem erro (idempotente)
+  PASS  índices do token (UNIQUE) e do atendimento existem
+  PASS  o serviço não tem mais grantConsent(): nenhum caminho de código concede aceite pelo profissional
+  PASS  sem aceite: isConsentActive=false
+  PASS  linha legada "granted" da tabela antiga NÃO conta como aceite
+  PASS  startSession sem aceite do paciente é negado
+  PASS  pedido pendente com token de 20 caracteres base32 (100 bits)
+  PASS  token guardado só como hash SHA-256 (não aparece em claro em nenhuma coluna)
+  PASS  pedido pendente não libera a captação
+  PASS  startSession com pedido pendente é negado
+  PASS  validade do link ~15 min (900s)
+  PASS  visão do profissional não expõe hashes nem dados do aparelho do paciente
+  PASS  aceite com texto desatualizado/diferente é recusado
+  PASS  decisão diferente de accept/reject é recusada
+  PASS  token inexistente é recusado
+  PASS  tentativas inválidas não criaram aceite
+  PASS  SEG360-SEC-001: aceite sem OTP é recusado
+  PASS  paciente aceita pelo link: estado accepted + código de revogação
+  PASS  evidência vinculada a clínica + atendimento + paciente
+  PASS  evidência: versão, SHA do texto, mecanismo, origem do pedido e timestamp
+  PASS  IP guardado só como hash HMAC (64 hex), nunca em claro
+  PASS  IP do paciente não aparece em claro na evidência
+  PASS  com aceite do paciente, isConsentActive=true para este atendimento
+  PASS  aceite com validade de 6 h (expiração garantida)
+  PASS  trilha de auditoria: pedido + aceite pelo paciente
+  PASS  auditoria do aceite sem nome do paciente nem token
+  PASS  replay do mesmo token (aceitar) é recusado
+  PASS  replay do mesmo token (recusar) é recusado
+  PASS  replay não alterou o aceite vigente
+  PASS  consulta A2 do MESMO paciente não herda o aceite da A1
+  PASS  paciente B não herda o aceite do paciente A
+  PASS  atendimento da A1 com paciente B (inconsistência) não vale
+  PASS  paciente de outra clínica é negado (tenant)
+  PASS  clínica B não enxerga pedido de aceite da clínica A (outro atendimento)
+  PASS  clínica B não consegue pedir aceite para atendimento/paciente da clínica A
+  PASS  com aceite válido o segmento é gravado
+  PASS  paciente revoga com o código: aceite deixa de valer
+  PASS  revogação pausa a sessão aberta na hora
+  PASS  novo segmento depois da revogação é negado
+  PASS  nenhum segmento novo foi gravado após a revogação
+  PASS  retomar sessão sem aceite vigente é negado
+  PASS  iniciar de novo após revogação é negado
+  PASS  código de revogação não revoga duas vezes
+  PASS  código de revogação malformado é recusado
+  PASS  token expirado não aceita
+  PASS  estado do pedido vencido é "expired"
+  PASS  pedido expirado não libera captação
+  PASS  novo pedido aceito volta a liberar (após revogação anterior)
+  PASS  aceite com validade vencida deixa de valer
+  PASS  segmento com aceite vencido é negado
+  PASS  paciente recusa: sem aceite e sem código de revogação
+  PASS  iniciar após recusa é negado
+  PASS  mesmo token não vira aceite depois da recusa
+  PASS  portal: paciente A não decide o pedido do paciente B
+  PASS  portal: clínica diferente não decide
+  PASS  portal lista o pedido só para o paciente dono
+  PASS  página do paciente mostra só o primeiro nome
+  PASS  portal: o próprio paciente aceita
+  PASS  mecanismo registrado: patient_portal
+  PASS  profissional registra a revogação a pedido do paciente e a captação para
+  PASS  revogação registra quem revogou (professional)
+  PASS  atendimento cancelado não recebe pedido de aceite
+
+62 PASS, 0 FAIL
+==> [core] tests/v545_ni2_609_test.php
+== Seletor
+  PASS  lista geral não oferece unidade nem fatia
+  PASS  lista geral oferece g e ml
+  PASS  bloco tem espaço para as medidas do alimento
+== Conversor
+  PASS  unidades de contagem reconhecidas
+  PASS  pão sem medida: unidade recusada
+  PASS  arroz sem medida: fatia recusada
+  PASS  colher (padrão com confirmação), gramas e porção do próprio alimento continuam aceitos
+== Plano
+  PASS  item: 1 unidade de pão sem medida recusado mesmo confirmado
+  PASS  item em gramas aceito
+  PASS  substituição: fatia sem medida recusada
+  PASS  1 unidade de pão = 50 g da medida da clínica, sem estimativa
+  PASS  conversão mostra a fonte da medida
+  PASS  medidas do alimento trazem a origem
+== Item antigo (legado)
+PHP Deprecated:  Method ReflectionMethod::setAccessible() is deprecated since 8.5, as it has no effect since PHP 8.1 in /Users/moliveira/Nutri_II/tests/v545_ni2_609_test.php on line 60
+
+Deprecated: Method ReflectionMethod::setAccessible() is deprecated since 8.5, as it has no effect since PHP 8.1 in /Users/moliveira/Nutri_II/tests/v545_ni2_609_test.php on line 60
+  PASS  item antigo em unidade pode mudar a quantidade sem trocar a unidade
+  PASS  trocar para fatia sem medida é recusado
+
+15 PASS, 0 FAIL
+==> [core] tests/v5412_ni2_625_activation_test.php
+== regra
+  PASS  tudo feito: pronto, 6 de 6, 100%
+  PASS  link ligado sem horários: não pronto, nunca 100% (66%)
+  PASS  próximo passo: confirmar horários
+  PASS  agenda cheia/bloqueada: configuração válida, com aviso (não é falta de configuração)
+  PASS  agendamento online desligado: horários e link não se aplicam
+  PASS  sem paciente, consulta e plano: pronto para atender (primeiros passos não bloqueiam)
+  PASS  obrigatório pendente vem antes: perfil primeiro
+== banco
+  PASS  sem CRN: perfil pendente, não pronto
+  PASS  CRN preenchido: pronto; paciente, consulta e plano a fazer
+  PASS  paciente e consulta de outra clínica não contam
+  PASS  paciente conta; consulta cancelada não conta
+  PASS  consulta marcada: 3 de 4 (link desligado)
+  PASS  liga o link sem horários: volta a não pronto, próximo = horários
+
+13 PASS, 0 FAIL
+==> [core] tests/onboarding_guided_and_activation_e2e_test.php
+
+========================================================================
+>>> CLYONUTRI II — SUÍTE DE TESTES E2E DE ONBOARDING & ATIVAÇÃO (NI2-282) <<<
+    UX 360, Stepper Clínico, Persistência Real, Resiliência & Multi-Tenant
+========================================================================
+
+--> [1/8] Provisionando Clínicas Alfa e Beta com Nutricionistas Reais...
+  [PASS] [SETUP] Tenants Alfa (#1053) e Beta (#1054) provisionados ➔ Usuários #1054 e #1055
+
+--> [2/8] Verificando Inicialização Automática e Estado Virgin do Onboarding...
+  [PASS] [INITIAL_STATE] Progresso de onboarding inicializado em 0% no Passo 1 ➔ DB record ID #46
+
+--> [3/8] Testando Execução e Persistência do Passo 1 (Objetivos Clínicos)...
+  [PASS] [STEP_1] Passo 1 salvo: foco clínico e metas registrados com sucesso ➔ Progresso: 20%, Próximo: Passo 2
+
+--> [4/8] Testando Execução do Passo 2 e Sincronização com Tabela `professionals`...
+  [PASS] [STEP_2] Passo 2 salvo e sincronizado na tabela `professionals` ➔ CRN: CRN3-98765 • Especialidade: Nutrição Clínica Funcional & Ortomolecular
+
+--> [5/8] Testando Execução do Passo 3 (Preferências de Atendimento e Preço)...
+  [PASS] [STEP_3] Passo 3 salvo: preferências, dias, teleconsulta e valor ➔ Valor: R$ 320,00 • Duração: 60 min • Intervalo: 15 min
+
+--> [6/8] Testando Capacidade de Retomada (Resume) Após Logout / Nova Sessão...
+  [PASS] [RESUME] Retomada perfeita no Passo 4 sem perda de dados ou estado prévio ➔ Concluídos: [1, 2, 3] • 60%
+
+--> [7/8] Testando Criação do Primeiro Paciente Real (Passo 4) e Ativação Final (Passo 5)...
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] [STEP_4] Primeiro paciente real criado no banco com governança LGPD ➔ Paciente #269: Mariana Oliveira da Silva
+  [PASS] [IDEMPOTENCY] Reenvio do Passo 4 atualizou paciente existente sem duplicar registros ➔ Paciente #269
+  [PASS] [STEP_5] Onboarding 100% concluído e consultório ativado com sucesso ➔ completed_at: 2026-11-17 01:43:04
+
+--> [8/8] Testando Isolamento Multi-Tenant e Restrições de Acesso Ofensivo...
+  [PASS] [SECURITY] Isolamento multi-tenant comprovado: fail-closed em dados e pacientes ➔ Acesso cruzado bloqueado
+
+--> [9/9] Testando Controller Web, Proteção CSRF e Endpoint de Status JSON...
+  [PASS] [API_STATUS] Endpoint /api/v1/onboarding/status validado ➔ is_completed: true, progress_pct: 100%
+  [PASS] [CSRF_GUARD] submitStep bloqueia requisições com CSRF token inválido (Fail-closed) ➔ Rejeição 403 comprovada
+  [PASS] [WEB_VIEW] View do Onboarding renderizada em conformidade com o Design System ➔ Stepper, badges e shell presentes
+
+========================================================================
+>>> TODOS OS 9 GATES DE ONBOARDING & ATIVAÇÃO (NI2-282) FORAM APROVADOS! <<<
+========================================================================
+
+--> [CLEANUP] Executando teardown e limpeza rigorosa de fixtures...
+  [OK] Teardown concluído com sucesso.
+
+==> [core] tests/ni2_514_v42_units_test.php
+=== NI2-514 / NI2-523 v42 Units Test ===
+  [PASS] PlanTotalsBar sem meta não gera NaN e retorna status sem-meta
+  [PASS] PlanTotalsBar com meta zero trata como sem-meta sem divisão por zero
+  [PASS] PlanTotalsBar identifica abaixo (<95%) e ok (95%..105%)
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna null quando item principal tem 0 kcal
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna null quando substituto tem 0 kcal/100g
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna 100 g para mesma densidade energética
+  [PASS] EnergyCalculator emite alerta para adolescente (<18 anos) mesmo em Cunningham
+  [PASS] EnergyCalculator emite alerta clínico para idosos (>=65 anos)
+  [PASS] EnergyCalculator emite alerta clínico para gestantes/lactantes
+  [PASS] FoodSearchIndex::normalize remove acentos e caixa alta
+  [PASS] FoodSearchIndex::preparation reconhece Grelhado
+  [PASS] FoodSearchIndex::preparation reconhece Cru
+  [PASS] PatientImportService::mapHeader mapeia sinônimos de colunas em CSV com vírgula
+  [PASS] Valida ano bissexto (29/02/2024) e normaliza gênero F -> Feminino
+  [PASS] Rejeita data calendário inexistente (31/02/1990)
+
+Resultado NI2-514 v42 Units: 15 PASS, 0 FAIL
+==> [core] tests/ni2_514_v42_phase2_http_test.php
+=== NI2-514 / NI2-523 v42 Phase 2 HTTP, Inline Edit, Multi-Tenant & Accessibility Test ===
+  [PASS] NI2-521: updateSubstitution atualiza quantidade, orientação e recalcula kcal/macros da substituição
+  [PASS] Isolamento multi-tenant: Clínica 2 não consegue editar substituição de plano da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê modelos da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê regras de equivalência da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não acessa lote de importação CSV da Clínica 1
+  [PASS] NI2-522: Reenviar mesmo CSV enquanto prévia está aberta reutiliza o mesmo lote
+  [PASS] NI2-522: Desfazer importação remove o paciente recém-criado
+  [PASS] NI2-522: Permite gerar nova prévia de arquivo cujo lote anterior foi 100% desfeito
+  [PASS] NI2-521: Editor possui região aria-live="polite" para anunciar atualizações sem recarregar
+  [PASS] NI2-521: Editor possui controles inline (<details>) para editar refeição, item e substituição
+  [PASS] NI2-521: plan-live.js atualiza apenas os blocos data-live-swap preservando foco e rolagem
+  [PASS] NI2-521: Seletor de alimentos suporta navegação completa por teclado (ArrowDown, ArrowUp, Enter, Escape)
+
+Resultado NI2-514 v42 Phase 2 HTTP & Accessibility: 12 PASS, 0 FAIL
+==> [core] tests/ni2_519_520_v44_test.php
+=== NI2-519 / NI2-520 v44 — Correspondência por Sinônimo, Intenção de Preparo e Rotas (B1) ===
+  [PASS] Exibe "aipim = mandioca" quando o nome do alimento traz Mandioca
+  [PASS] Não exibe aviso de sinônimo quando o próprio termo digitado já está no nome
+  [PASS] Exibe "jerimum = abóbora" com acentuação correta
+  [PASS] Exibe "bergamota = tangerina" para busca regional sulista
+  [PASS] Busca por "aipim" sem preparo posiciona "Mandioca, cozida" antes de "Mandioca, crua"
+  [PASS] Busca por "aipim cru" filtra estritamente a versão crua
+  [PASS] B1: Rota /pacientes/importar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/modelo.csv registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/previa registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id} registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/confirmar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/descartar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/desfazer registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /alimentos/equivalencias registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /alimentos/buscas registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras/modelo.csv registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras/importar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/energia registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/paciente registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/refeicoes/{mealId}/editar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/salvar-como-modelo registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/usar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/arquivar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/padrao registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/aprovacao registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/visibilidade registrada tanto em public/index.php quanto em routes/web.php
+
+Resultado NI2-519/520 v44: 28 PASS, 0 FAIL
+==> [core] tests/v5425_ni2_220_test.php
+== B1/I4 regra única de autoria clínica (ClinicalAuthor)
+  PASS  dona com CRN é autora com o próprio CRN
+  PASS  colega com CRN é autora com o próprio CRN
+  PASS  administradora sem CRN não é autora clínica
+  PASS  recepção não é autora clínica mesmo com CRN cadastrado (papel conta)
+  PASS  profissional de outra clínica não é autora nesta
+  PASS  CRN em branco não vale como CRN
+  PASS  controlador usa a mesma regra (I4)
+  PASS  rascunho automático da anamnese usa a mesma regra (I4)
+== B1 conclusão de consulta: autoria de quem conclui
+  PASS  gestora sem CRN não conclui consulta
+  PASS  nada gravado no prontuário na tentativa da gestora
+  PASS  consulta continua em andamento
+  PASS  autoria informada diferente de quem conclui é recusada
+  PASS  evolução gravada com o CRN de quem concluiu (A2), não do profissional agendado
+  PASS  profissional agendado fica registrado à parte (scheduled_professional_id)
+  PASS  vírgula decimal aceita (68,5 kg)
+  PASS  antropometria da conclusão gravada com o mesmo autor (quem concluiu)
+  PASS  conclusão não usa o resolvedor antigo (que caía no CRN de terceiros)
+== B3 dados fora da faixa recusados, sem corte
+  PASS  peso 1000 kg e cintura 3 cm recusados com erro por campo
+  PASS  mensagens em português com a faixa aceita
+  PASS  nada gravado no registro imutável com medida inválida
+  PASS  consulta segue aberta para corrigir
+  PASS  texto no peso é recusado
+  PASS  infinito no peso é recusado
+  PASS  medidas vazias = não aferidas (opcionais)
+  PASS  anamnese recusa água 99999 ml, sono 30 h e opção desconhecida, com erro por campo
+  PASS  mensagens da anamnese com a faixa (sem cortar para 10.000 ou 24)
+  PASS  frequência 9 dias/semana e duração 2 min recusadas por campo
+  PASS  água precisa ser inteira
+  PASS  nenhuma anamnese gravada com dado inválido
+  PASS  erros por campo da anamnese voltam para a tela
+== B2 pergunta não feita = Não avaliado (NULL)
+  PASS  sem resposta, as perguntas fechadas ficam NULL (has_surgeries, medication_usage, supplement_usage, intolerance_assessment, alcohol_consumption, smoking_status, physical_activity, sleep_quality)
+  PASS  NULL é exibido como "Não avaliado"
+  PASS  resposta marcada mantém o rótulo
+  PASS  "Não avaliado" explícito vira NULL; negativa marcada fica gravada
+  PASS  migração 86: as 7 colunas aceitam NULL e não têm resposta padrão
+  PASS  resumo para prescrição não presume "não fumante" nem "sedentário"
+  PASS  linha anterior ao formulário estruturado (negativas vindas só do DEFAULT da 73) volta para NULL
+  PASS  linha do formulário estruturado fica como está (não dá para saber o que foi marcado)
+  PASS  texto clínico da linha antiga preservado
+  PASS  migração 86 idempotente (segunda execução não muda nada)
+  PASS  SQLite íntegro depois da migração
+== I1 rascunho preserva autoria e início
+  PASS  salvar o rascunho de novo não troca autora nem data de início
+  PASS  última edição registrada à parte (updated_by / updated_at)
+  PASS  ao concluir, a versão é de quem concluiu
+  PASS  origem do rascunho (quem começou e quando) fica no JSON da versão
+== I2 conferência de concorrência obrigatória no servidor
+  PASS  sem revisão lida ou chave da gravação, nada é gravado
+  PASS  checagem não é mais opcional (antes omitir os campos pulava a conferência)
+== I3 origem real no resumo
+  PASS  sem anamnese, a origem é o cadastro, sem versão nem data inventadas
+  PASS  resumo não fala em "Anamnese v1" quando a fonte é o cadastro
+  PASS  com anamnese, a origem é a versão real
+  PASS  tela do prontuário mostra a origem conforme o tipo
+== I5/I6/I8 rotas clínicas
+  PASS  resumo para prescrição exige papel clínico com CRN (I5)
+  PASS  resumo para prescrição não devolve texto de exceção (I5)
+  PASS  exportação registra quem exportou, sem cair no id 1 (I6)
+  PASS  exportação não mostra texto técnico (I8)
+  PASS  conclusão de consulta: falha técnica vira mensagem amigável + código (I8)
+  PASS  sala de consulta só exibe o código de suporte validado (I8)
+  PASS  log da falha leva classe, arquivo e linha, sem texto que possa ter dado clínico
+== I7 trilha clínica guarda o usuário
+  PASS  audit_logs.user_id = usuária que agiu
+== retificação mantém os dados estruturados
+  PASS  retificação leva consulta de origem, peso e cintura da versão anterior
+  PASS  texto novo prevalece
+  PASS  cadeia de registros continua válida (hash não mudou de algoritmo)
+== I10 texto do selo condiz com o que o hash garante
+  PASS  selo fala em encadeamento conferido e avisa que não é assinatura digital
+  PASS  sem promessa de autenticidade ou inviolabilidade
+== I9 telas no design system
+  PASS  views/clinical/medical_record.php: sem style="" inline
+  PASS  views/clinical/medical_record.php: sem cor fixa em hexadecimal
+  PASS  views/anamnesis/form_page.php: sem style="" inline
+  PASS  views/anamnesis/form_page.php: sem cor fixa em hexadecimal
+  PASS  views/anamnesis/version.php: sem style="" inline
+  PASS  views/anamnesis/version.php: sem cor fixa em hexadecimal
+  PASS  views/consultation/room.php: sem style="" inline
+  PASS  views/consultation/room.php: sem cor fixa em hexadecimal
+  PASS  public/assets/css/clinical-record.css: sem style="" inline
+  PASS  public/assets/css/clinical-record.css: sem cor fixa em hexadecimal
+  PASS  patientMedicalRecord usa views/clinical/medical_record.php e não tem marcação inline
+  PASS  patientAnamnesis usa views/anamnesis/form_page.php e não tem marcação inline
+  PASS  consultationRoom usa views/consultation/room.php e não tem marcação inline
+  PASS  formulário abre com "Não avaliado" como primeira opção das perguntas fechadas
+  PASS  water_intake_ml: faixa 0–10000 também no navegador
+  PASS  sleep_hours: faixa 0–24 também no navegador
+  PASS  sala de consulta: faixa de peso e cintura vem da mesma constante do servidor
+  PASS  sala de consulta manteve os ganchos de teste e o script de rascunho
+
+82 PASS, 0 FAIL
+==> [core] tests/v5426_consulta_contexto_test.php
+== sem agenda
+  PASS  sem consulta: item "Consulta" presente e diz "Nenhuma consulta agendada"
+== próxima, hoje e em andamento (mesma regra do cabeçalho)
+  PASS  agendada para daqui a 5 dias: "Próxima" com data
+  PASS  observações da agenda não aparecem no painel
+  PASS  cabeçalho e painel com o mesmo estado (upcoming)
+  PASS  confirmada para hoje: "Hoje às 23:30"
+  PASS  em andamento: "Em andamento" e link "Abrir consulta"
+  PASS  cabeçalho e painel com o mesmo estado (continue)
+  PASS  na própria tela da consulta não repete o link para ela mesma
+== última concluída
+  PASS  mostra a última consulta concluída (01/10/2026), não a anterior
+== isolamento
+  PASS  consulta de outro paciente da mesma clínica não aparece
+  PASS  agendamento gravado com outra clínica para o mesmo id de paciente é ignorado
+  PASS  paciente de outra clínica: painel inteiro vazio (nada da agenda dele)
+  PASS  clínica B vê só a própria consulta
+== agenda indisponível
+CLINICAL_CONTEXT_APPOINTMENT_UNAVAILABLE PDOException
+  PASS  sem a tabela da agenda: painel continua com alergias e diz "Agenda indisponível"
+== design system
+  PASS  item sem style="" e sem cor fixa (classes do painel)
+  PASS  plano: painel nos diálogos de alimento, substituição e publicação; fora do diálogo de refeição
+
+16 PASS, 0 FAIL
+==> [core] tests/ux_workflows.php
+{
+    "build": "v54.32",
+    "suite_origin": "v54.18",
+    "driver": "sqlite",
+    "passed": 30,
+    "failed": 0,
+    "tests": [
+        {
+            "test": "repetição idempotente retorna o mesmo registro",
+            "pass": true
+        },
+        {
+            "test": "mesma chave não aceita outro conteúdo",
+            "pass": true
+        },
+        {
+            "test": "revisão antiga não sobrescreve plano",
+            "pass": true
+        },
+        {
+            "test": "operação falha reverte tudo",
+            "pass": true
+        },
+        {
+            "test": "rollback não altera a revisão",
+            "pass": true
+        },
+        {
+            "test": "rascunho canônico retomado sem trocar vigente",
+            "pass": true
+        },
+        {
+            "test": "rascunho antigo de anamnese gera conflito",
+            "pass": true
+        },
+        {
+            "test": "PDF com hash não recebe estado de assinatura",
+            "pass": true
+        },
+        {
+            "test": "assinatura exige verificação explícita",
+            "pass": true
+        },
+        {
+            "test": "clínica B não lê estado A",
+            "pass": true
+        },
+        {
+            "test": "clínica B não altera plano A",
+            "pass": true
+        },
+        {
+            "test": "terça 08–18 gera slots reais",
+            "pass": true
+        },
+        {
+            "test": "agenda prévia e portal usam mesmos horários",
+            "pass": true
+        },
+        {
+            "test": "horário ocupado não é oferecido",
+            "pass": true
+        },
+        {
+            "test": "bloqueio exclui horários no motor",
+            "pass": true
+        },
+        {
+            "test": "exame retoma o pedido canônico",
+            "pass": true
+        },
+        {
+            "test": "exame em outra aba gera conflito",
+            "pass": true
+        },
+        {
+            "test": "medida sem porção não inventa peso",
+            "pass": true
+        },
+        {
+            "test": "falha de medida mantém estado do plano",
+            "pass": true
+        },
+        {
+            "test": "API adiciona refeição no rascunho",
+            "pass": true
+        },
+        {
+            "test": "API adiciona alimento validado",
+            "pass": true
+        },
+        {
+            "test": "edição de item funciona dentro da transação",
+            "pass": true
+        },
+        {
+            "test": "substituição mantém validação canônica",
+            "pass": true
+        },
+        {
+            "test": "substituição pode ser editada com revisão",
+            "pass": true
+        },
+        {
+            "test": "cópia de refeição é transacional",
+            "pass": true
+        },
+        {
+            "test": "cópia preserva substituições revalidadas",
+            "pass": true
+        },
+        {
+            "test": "rota do plano recusa refeição de outro plano",
+            "pass": true
+        },
+        {
+            "test": "remoção de substituição usa a mesma revisão",
+            "pass": true
+        },
+        {
+            "test": "remoção de item usa a mesma revisão",
+            "pass": true
+        },
+        {
+            "test": "receipts não armazenam respostas clínicas",
+            "pass": true
+        }
+    ]
+}
+==> [core] tests/ni2_703.php
+{
+    "suite": "NI2-703",
+    "synthetic": true,
+    "clinical_approval": false,
+    "driver": "sqlite",
+    "checks": [
+        {
+            "name": "starter validates diabetes",
+            "pass": true
+        },
+        {
+            "name": "starter validates gastrite",
+            "pass": true
+        },
+        {
+            "name": "starter validates hipertensao",
+            "pass": true
+        },
+        {
+            "name": "starter validates celiaca",
+            "pass": true
+        },
+        {
+            "name": "starter validates renal",
+            "pass": true
+        },
+        {
+            "name": "unsafe source rejected",
+            "pass": true
+        },
+        {
+            "name": "HTML guidance rejected",
+            "pass": true
+        },
+        {
+            "name": "confirmed diabetes produces a proposal",
+            "pass": true
+        },
+        {
+            "name": "GET never changes plan",
+            "pass": true
+        },
+        {
+            "name": "confirmed source and version retained",
+            "pass": true
+        },
+        {
+            "name": "confirmation mandatory on server",
+            "pass": true
+        },
+        {
+            "name": "empty selection rejected",
+            "pass": true
+        },
+        {
+            "name": "explicit confirmation persists one decision",
+            "pass": true
+        },
+        {
+            "name": "only reviewed final text reaches notes",
+            "pass": true
+        },
+        {
+            "name": "same receipt replays without duplication",
+            "pass": true
+        },
+        {
+            "name": "retry does not duplicate notes",
+            "pass": true
+        },
+        {
+            "name": "stale tab cannot reapply",
+            "pass": true
+        },
+        {
+            "name": "condition change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "compatible comorbidities produce separate proposals",
+            "pass": true
+        },
+        {
+            "name": "suspected renal never generates guidance",
+            "pass": true
+        },
+        {
+            "name": "suspected renal blocks other generic guidance",
+            "pass": true
+        },
+        {
+            "name": "blocked combination cannot be forced",
+            "pass": true
+        },
+        {
+            "name": "renal is individual assessment only",
+            "pass": true
+        },
+        {
+            "name": "resolved condition stops affecting new proposals",
+            "pass": true
+        },
+        {
+            "name": "disabled module is excluded",
+            "pass": true
+        },
+        {
+            "name": "overdue clinical review excluded",
+            "pass": true
+        },
+        {
+            "name": "allergy change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "plan notes change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "published plan proposals disabled",
+            "pass": true
+        },
+        {
+            "name": "published plan rejects apply",
+            "pass": true
+        },
+        {
+            "name": "cross clinic read denied",
+            "pass": true
+        },
+        {
+            "name": "actor without CRN denied",
+            "pass": true
+        },
+        {
+            "name": "global flag disables generation",
+            "pass": true
+        },
+        {
+            "name": "celiac restriction needs documentation",
+            "pass": true
+        },
+        {
+            "name": "documented celiac can be reviewed",
+            "pass": true
+        },
+        {
+            "name": "failed operations leave confirmation count unchanged",
+            "pass": true
+        },
+        {
+            "name": "decision retains author and source",
+            "pass": true
+        },
+        {
+            "name": "clinical confirmations exported for correct patient",
+            "pass": true
+        },
+        {
+            "name": "idempotency key omitted from export",
+            "pass": true
+        },
+        {
+            "name": "persistence fault rejected",
+            "pass": true
+        },
+        {
+            "name": "failed persistence rolls notes back",
+            "pass": true
+        },
+        {
+            "name": "failed persistence creates no decision",
+            "pass": true
+        },
+        {
+            "name": "publication remains a separate explicit action",
+            "pass": true
+        },
+        {
+            "name": "reviewed guidance survives immutable publication snapshot",
+            "pass": true
+        },
+        {
+            "name": "publication does not lose decision audit",
+            "pass": true
+        }
+    ]
+}
+==> [core] bin/compare_migrations_schema.php
+Tabelas no instalador: 172 | nas migrações: 172
+Só no instalador (0): 
+Só nas migrações (0): 
+
+Resumo bin/run-tests [core]: 19 suíte(s) OK, 0 falha(s).

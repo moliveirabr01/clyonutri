@@ -59,6 +59,7 @@ final class SubscriptionController
                 'idempotency_key' => bin2hex(random_bytes(16)),
                 'return' => isset($_GET['asaas']) ? (string)$_GET['asaas'] : null,
             ];
+            $pendingActivations = $this->service->pendingActivationRequestsForClinic($clinicId);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo 'Não foi possível carregar as informações da assinatura: ' . htmlspecialchars($e->getMessage());
@@ -80,6 +81,25 @@ final class SubscriptionController
         $content = ob_get_clean();
 
         require __DIR__ . '/../../../views/layouts/professional-shell.php';
+    }
+
+    public function requestActivation(): void
+    {
+        [$clinicId, $userId] = $this->actor();
+        $this->requireCsrf('#pedir-ativacao');
+
+        $planId = (int)($_POST['plan_id'] ?? 0);
+        $notes = isset($_POST['notes']) ? (string)$_POST['notes'] : null;
+
+        try {
+            $res = $this->service->requestManualActivation($clinicId, $userId, $planId, $notes);
+            $this->back('#pedir-ativacao', 'Pedido de ativação do plano ' . $res['plan_name'] . ' enviado. Nossa equipe recebeu a notificação e responderá em breve.');
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            $this->back('#pedir-ativacao', null, $e->getMessage());
+        } catch (\Throwable $e) {
+            error_log('request_activation_failed: ' . $e->getMessage());
+            $this->back('#pedir-ativacao', null, 'Não foi possível registrar o pedido de ativação agora. Tente novamente.');
+        }
     }
 
     public function cancel(): void

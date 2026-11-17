@@ -90,8 +90,8 @@ final class MealPlanVersionDiffService
         $rowA = $byVer[$versionNumberA];
         $rowB = $byVer[$versionNumberB];
 
-        $payloadA = json_decode((string)$rowA['payload_json'], true);
-        $payloadB = json_decode((string)$rowB['payload_json'], true);
+        $payloadA = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$rowA['payload_json'], true));
+        $payloadB = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$rowB['payload_json'], true));
         if (!is_array($payloadA) || !is_array($payloadB)) {
             throw new InvalidArgumentException("Snapshot da versão selecionada está inválido.");
         }

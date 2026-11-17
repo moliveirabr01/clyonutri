@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/moliveira/Nutri_II/tests/ni2_881_http_test.py", line 19, in <module>
+    if server.poll() is not None: raise RuntimeError('Servidor não iniciou: '+pathlib.Path(scratch+'/server.log').read_text())
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Servidor não iniciou: ClyoNutri: /Users/moliveira/Nutri_II
+Acesse http://127.0.0.1:18081
+[Mon Nov 16 22:49:34 2026] Failed to listen on 127.0.0.1:18081 (reason: Operation not permitted)
+

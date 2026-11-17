@@ -1,4 +1,5 @@
 <?php
+if (!(new \ClyoNutri\Domain\Prescription\PrescriptionAvailability(\ClyoNutri\Core\Database\Connection::getInstance()))->available(\ClyoNutri\Core\Auth\TenantContext::getClinicId())) return;
 try {
     $rxTimeline=(new \ClyoNutri\Domain\Prescription\PrescriptionService(\ClyoNutri\Core\Database\Connection::getInstance()))->overview((int)$rxPatientId)['prescriptions'];
 } catch (\Throwable $rxError) {$rxTimeline=null;}

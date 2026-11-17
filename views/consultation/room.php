@@ -145,11 +145,20 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
       <?php if ($canStart): ?>
       <section class="cn-start-consult cr-start<?= $isEarly ? ' cr-start--early' : '' ?>" data-testid="consult-start-panel">
         <h4>Esta consulta ainda não foi iniciada</h4>
-        <p>Agendada para <strong><?= date('d/m/Y \à\s H:i', strtotime($app['scheduled_at'])) ?></strong>. Ao iniciar, o horário real de início é registrado na trilha de auditoria.</p>
+        <p>Agendada para <strong><?= date('d/m/Y \à\s H:i', strtotime($app['scheduled_at'])) ?></strong>. Ao iniciar, o horário real de início é registrado no histórico da consulta.</p>
         <form method="POST" action="/agenda/<?= (int)$app['id'] ?>/status" data-no-dirty>
           <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
           <input type="hidden" name="status" value="in_progress">
-          <?php if ($isEarly): ?>
+          <?php $isDifferentDay = AppointmentService::isDifferentDay((string)$app['scheduled_at']); ?>
+          <?php if ($isDifferentDay): ?>
+            <p class="op-message op-message--warning" role="alert" data-testid="different-day-start-warning">
+              Esta consulta está agendada para outro dia (<strong><?= date('d/m/Y', strtotime((string)$app['scheduled_at'])) ?></strong>). Escolha como deseja prosseguir hoje:
+            </p>
+            <div class="u-flex u-flex-col u-gap-2 u-mb-3" role="radiogroup" aria-label="Escolha para atendimento fora do dia agendado">
+              <label class="cr-check"><input type="radio" name="out_of_day_action" value="reschedule_now" required> Remarcar esta consulta para agora</label>
+              <label class="cr-check"><input type="radio" name="out_of_day_action" value="create_today" required> Criar atendimento de hoje e manter o agendamento futuro</label>
+            </div>
+          <?php elseif ($isEarly): ?>
             <p class="op-message op-message--warning" role="alert" data-testid="early-start-warning">Início antecipado: faltam <?= htmlspecialchars(AppointmentService::humanUntil((string)$app['scheduled_at'])) ?> para o horário marcado.</p>
             <label class="cr-check"><input type="checkbox" name="confirm_early" value="1" required> Confirmo que quero iniciar antes do horário agendado</label>
           <?php endif; ?>
@@ -254,7 +263,7 @@ $drawerRecords = array_slice($profile['clinical_records'] ?? [], 0, 5);
 
     <?php if (!empty($app['history'])): ?>
       <section class="card cr-card" aria-labelledby="cr-trail-title">
-        <div class="cr-card__head"><h4 id="cr-trail-title">Trilha de auditoria desta consulta</h4></div>
+        <div class="cr-card__head"><h4 id="cr-trail-title">Histórico desta consulta</h4></div>
         <div class="cr-trail">
           <?php foreach ($app['history'] as $h): ?>
             <div class="cr-trail__row">

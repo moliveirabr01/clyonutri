@@ -31,7 +31,25 @@
     </div>
   <?php endif; ?>
 
-  <?php if ($subscription['status'] === 'trialing'): ?>
+  <?php
+    $trialState = (array)($subscription['trial_state'] ?? []);
+    $expiredNotice = $subscription['expired_notice'] ?? null;
+    $isExpiredByDate = in_array((string)($trialState['state'] ?? ''), ['grace', 'read_only'], true) || $subscription['status'] === 'expired';
+    $effectiveStatus = $isExpiredByDate ? 'expired' : (string)$subscription['status'];
+  ?>
+  <?php if (!empty($expiredNotice)): ?>
+    <!-- Banner de Período de Teste Expirado / Carência (NI2-878) -->
+    <div class="op-message <?= $expiredNotice['state'] === 'read_only' ? 'op-message--error' : 'op-message--info' ?> u-mb-6" role="alert" data-testid="subscription-expired-notice" data-trial-state="<?= htmlspecialchars($expiredNotice['state']) ?>">
+      <div class="u-font-bold u-text-body u-mb-1">
+        <?= htmlspecialchars($expiredNotice['title']) ?>
+      </div>
+      <p class="u-m-0 u-text-compact u-leading-body">
+        <?= htmlspecialchars($expiredNotice['message']) ?>
+        <a href="<?= htmlspecialchars($expiredNotice['cta_href']) ?>" class="u-font-bold u-underline"><?= htmlspecialchars($expiredNotice['cta_label']) ?></a>.
+        Para falar sobre planos, escreva para <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" class="u-color-inherit u-font-bold"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>.
+      </p>
+    </div>
+  <?php elseif ($effectiveStatus === 'trialing'): ?>
     <?php /* Banner do Período de Avaliação (NI2-450) */ ?>
     <div class="op-message op-message--info u-mb-6" role="status">
       <div class="u-font-bold u-text-body u-mb-1 u-flex u-items-center u-justify-between u-wrap u-gap-2">
@@ -40,21 +58,11 @@
           Período de Avaliação Gratuita (14 dias)
         </span>
         <span class="u-bg-semantic-warning-border u-color-semantic-warning-strong u-text-compact u-font-bold u-py-1 u-px-2 u-radius-pill">
-          <?= (int)$subscription['days_left_in_trial'] ?> dia(s) restante(s)
+          <?= (int)$subscription['days_left_in_trial'] ?> <?= \ClyoNutri\Application\View\UserText::count((int)$subscription['days_left_in_trial'], 'dia restante', 'dias restantes') ?>
         </span>
       </div>
       <p class="u-m-0 u-text-compact u-leading-body u-color-semantic-warning-strong">
-        Você está usufruindo do teste gratuito com todos os recursos do plano <strong><?= htmlspecialchars($subscription['plan_name']) ?></strong> liberados até <strong><?= !empty($subscription['trial_ends_at']) ? (new \DateTimeImmutable($subscription['trial_ends_at']))->format('d/m/Y') : '' ?></strong>, sem necessidade de cartão de crédito. Nenhuma cobrança é feita. <?= !empty($asaasOverview['enabled']) ? 'Para continuar depois do teste, escolha um plano abaixo.' : 'A contratação de um plano pelo sistema ainda não está disponível, e o sistema não bloqueia nada quando o teste termina.' ?> Seus dados continuam disponíveis para exportação.
-      </p>
-    </div>
-  <?php elseif ($subscription['status'] === 'expired'): ?>
-    <!-- Banner de Período de Teste Expirado -->
-    <div class="op-message op-message--error u-mb-6" role="alert">
-      <div class="u-font-bold u-text-body u-mb-1">
-        Seu período de teste de 14 dias terminou
-      </div>
-      <p class="u-m-0 u-text-compact u-leading-body u-color-semantic-error-strong">
-        Você continua usando o sistema normalmente, e seus pacientes e prontuários seguem salvos. <?= !empty($asaasOverview['enabled']) ? 'Escolha um plano abaixo para assinar.' : 'A contratação de um plano pelo sistema ainda não está disponível.' ?> Para falar sobre planos, escreva para <a href="mailto:<?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?>" class="u-color-inherit u-font-bold"><?= htmlspecialchars(\ClyoNutri\Core\Security\ContactInfo::supportEmail()) ?></a>.
+        Você está usufruindo do teste gratuito com todos os recursos do plano <strong><?= htmlspecialchars($subscription['plan_name']) ?></strong> liberados até <strong><?= !empty($subscription['trial_ends_at']) ? (new \DateTimeImmutable($subscription['trial_ends_at']))->format('d/m/Y') : '' ?></strong>, sem necessidade de cartão de crédito. Nenhuma cobrança é feita. <?= !empty($asaasOverview['enabled']) ? 'Para continuar depois do teste, escolha um plano abaixo.' : 'Para contratar ou ativar antes do fim do teste, peça ativação abaixo.' ?> Seus dados continuam disponíveis para exportação.
       </p>
     </div>
   <?php endif; ?>
@@ -76,11 +84,11 @@
           <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-error-light u-color-semantic-error-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Assinatura Cancelada
           </span>
-        <?php elseif ($subscription['status'] === 'trialing'): ?>
+        <?php elseif ($effectiveStatus === 'trialing'): ?>
           <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-warning-light u-color-semantic-warning-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Período de Avaliação (Trial)
           </span>
-        <?php elseif ($subscription['status'] === 'expired'): ?>
+        <?php elseif ($effectiveStatus === 'expired'): ?>
           <span class="u-inline-flex u-items-center u-gap-1 u-bg-semantic-error-light u-color-semantic-error-strong u-py-1 u-px-3 u-radius-pill u-font-semibold u-text-compact">
             ● Teste Expirado
           </span>
@@ -109,12 +117,11 @@
         <?php endif; ?>
       </div>
       <div>
-        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold"><?= in_array($subscription['status'], ['canceled', 'trialing', 'expired'], true) ? 'VIGÊNCIA' : 'PRÓXIMA COBRANÇA' ?></div>
+        <div class="u-text-compact u-color-neutral-gray-500 u-font-semibold"><?= in_array($effectiveStatus, ['canceled', 'trialing', 'expired'], true) ? 'VIGÊNCIA' : 'PRÓXIMA COBRANÇA' ?></div>
         <div class="u-text-card-title u-font-semibold u-color-botanical-forest-900 u-mt-1">
           <?php
-            // v54.50: a data exibida segue o campo que controla o acesso. Ativa = fim do período (próxima cobrança);
-            // teste/expirado = fim do teste; cancelada = acesso até o fim do período pago.
-            $stNow = (string)$subscription['status'];
+            // v54.50 / NI2-878: a data exibida segue o campo que controla o acesso e o estado real por data.
+            $stNow = $effectiveStatus;
             $endField = in_array($stNow, ['trialing', 'expired'], true)
               ? ($subscription['trial_ends_at'] ?? $subscription['current_period_end'] ?? null)
               : ($subscription['current_period_end'] ?? null);
@@ -196,6 +203,38 @@
 
   <?php require __DIR__ . '/_plano_asaas.php';
 require __DIR__ . '/_plano_trocar.php'; ?>
+
+  <?php if (empty($asaasOverview['enabled']) && $effectiveStatus !== 'active'): ?>
+    <section id="pedir-ativacao" class="card u-mb-6 u-scroll-margin" aria-labelledby="pedir-ativacao-titulo" data-testid="pedir-ativacao-card">
+      <h2 id="pedir-ativacao-titulo" class="u-text-h3 u-font-bold u-color-botanical-forest-900 u-mt-0 u-mb-1 u-mx-0">Pedir ativação do plano</h2>
+      <p class="u-color-neutral-gray-600 u-text-compact u-mt-0 u-mb-4 u-mx-0 u-leading-body">
+        O pagamento online ainda não está ativo neste ambiente. Escolha o plano desejado e envie um pedido para que nossa equipe ative a assinatura do consultório.
+      </p>
+      <?php if (!empty($pendingActivations)): ?>
+        <div class="op-message op-message--info u-mb-4 u-text-compact" role="status">
+          Pedido pendente registrado em <?= htmlspecialchars((new \DateTimeImmutable((string)$pendingActivations[0]['created_at']))->format('d/m/Y H:i')) ?> para o plano <strong><?= htmlspecialchars((string)$pendingActivations[0]['plan_name']) ?></strong>.
+        </div>
+      <?php endif; ?>
+      <form method="POST" action="/configuracoes/assinatura/pedir-ativacao" class="u-flex u-wrap u-gap-3 u-items-end">
+        <input type="hidden" name="_csrf_token" value="<?= \ClyoNutri\Core\Security\Csrf::token() ?>">
+        <div>
+          <label for="activation-plan-id" class="form-label">Plano desejado</label>
+          <select id="activation-plan-id" name="plan_id" class="form-control">
+            <?php foreach (($planOverview['options'] ?? []) as $opt): $p = $opt['plan']; ?>
+              <option value="<?= (int)$p['id'] ?>" <?= (int)$p['id'] === (int)$subscription['plan_id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars((string)$p['name']) ?> (<?= htmlspecialchars((string)$p['code']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div style="flex: 1 1 220px;">
+          <label for="activation-notes" class="form-label">Observação (opcional)</label>
+          <input type="text" id="activation-notes" name="notes" class="form-control" maxlength="500" placeholder="Ex.: pagamento via Pix ou transferência">
+        </div>
+        <button type="submit" class="btn btn-primary" data-testid="btn-pedir-ativacao">Pedir ativação</button>
+      </form>
+    </section>
+  <?php endif; ?>
 
   <!-- Histórico de Faturas & Conciliação Financeira -->
   <div class="card u-mb-6">

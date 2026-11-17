@@ -1,0 +1,1 @@
+PASS recipe detail HTTP: all six examples render full layout, string tags, version 1 and no PHP diagnostics.

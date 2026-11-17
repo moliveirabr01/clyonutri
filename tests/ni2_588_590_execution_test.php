@@ -96,7 +96,7 @@ $_GET = [];
 $dashCtrl = new DashboardController();
 $htmlAgendaView = $render(fn() => $dashCtrl->agenda());
 check(str_contains($htmlAgendaView, 'data-testid="agenda-to-settings-btn"'), 'Agenda exibe botao de atalho 1-clique para configuracoes');
-check(str_contains($htmlAgendaView, 'href="/configuracoes?tab=agenda"'), 'Atalho da agenda aponta diretamente para /configuracoes?tab=agenda');
+check(str_contains($htmlAgendaView, 'href="/configuracoes?tab=agenda&amp;secao=horarios"'), 'Menu da agenda aponta para a seção de horários');
 
 
 // -------------------------------------------------------------------------

@@ -28,7 +28,7 @@ $query=['timeline_type'=>$type,'timeline_from'=>$from,'timeline_to'=>$to];
 <?php if($timelineError): ?><p class="op-message op-message--error" role="alert">A data inicial deve ser anterior ou igual à final.</p><?php elseif(!$visible): ?><p>Nenhum registro encontrado neste resumo para os filtros selecionados.</p><?php else: ?>
 <ol class="cn-profile-timeline" data-testid="profile-timeline">
 <?php foreach($visible as $event): ?><li><span class="ds-pill ds-pill--neutral"><?= $et($event['type']) ?></span> <time datetime="<?= $et(date('c',strtotime($event['date']))) ?>"><?= $et(date('d/m/Y H:i',strtotime($event['date']))) ?></time>
-<a href="<?= $et($event['url']) ?>"><?= $et($event['title']) ?> · registro #<?= (int)$event['id'] ?></a>
+<a href="<?= $et($event['url']) ?>" title="Referência para suporte: <?= (int)$event['id'] ?>"><?= $et($event['title']) ?></a>
 <span class="ux52-event-state"><?= $et($event['state']) ?><?= $event['version']?' · v'.(int)$event['version']:'' ?></span></li><?php endforeach; ?></ol>
 <p><?= count($events) ?> registros neste resumo filtrado. Página <?= $page ?> de <?= $pages ?>.</p>
 <nav aria-label="Páginas do histórico"><?php if($page>1): ?><a class="btn btn-secondary" href="?<?= $et(http_build_query($query+['timeline_page'=>$page-1])) ?>#patient-timeline">Anteriores</a><?php endif; ?><?php if($page<$pages): ?><a class="btn btn-secondary" href="?<?= $et(http_build_query($query+['timeline_page'=>$page+1])) ?>#patient-timeline">Mais registros</a><?php endif; ?></nav>

@@ -1,0 +1,244 @@
+{
+  "checks": [
+    {
+      "name": "Cancelar por teclado devolve foco ao registro e não grava consumo",
+      "ok": true
+    },
+    {
+      "name": "Sequência original Cancelar → Plano abre no início e foca título",
+      "ok": true
+    },
+    {
+      "name": "Cancelar e reabrir preserva modo e texto do rascunho",
+      "ok": true
+    },
+    {
+      "name": "Trocar de seção preserva formulário aberto",
+      "ok": true
+    },
+    {
+      "name": "Receita mostra carregamento e impede abertura concorrente",
+      "ok": true
+    },
+    {
+      "name": "Receita válida mostra ingredientes, quantidades e preparo reais",
+      "ok": true
+    },
+    {
+      "name": "Reabrir receita não duplica prescrição",
+      "ok": true
+    },
+    {
+      "name": "Snapshot incompleto mostra indisponibilidade contextual",
+      "ok": true
+    },
+    {
+      "name": "Recuperação abre Chat sem enviar mensagem automaticamente",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Plano",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Plano",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Diário",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Diário",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Chat",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Chat",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 1280px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 1280px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Plano",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Plano",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Diário",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Diário",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Chat",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Chat",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 390px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 390px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Hoje",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Plano",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Plano",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Diário",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Diário",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Chat",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Chat",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Evolução",
+      "ok": true
+    },
+    {
+      "name": "Axe WCAG A/AA 360px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Sem overflow horizontal 360px Perfil",
+      "ok": true
+    },
+    {
+      "name": "Erro obrigatório associado semanticamente ao grupo",
+      "ok": true
+    },
+    {
+      "name": "Resposta por teclado resolve erro",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Hoje alcançável",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Plano alcançável",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Diário alcançável",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Chat alcançável",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Evolução alcançável",
+      "ok": true
+    },
+    {
+      "name": "Ampliação CSS 200%: seção Perfil alcançável",
+      "ok": true
+    },
+    {
+      "name": "Menu profissional mostra 2 avisos reais não lidos",
+      "ok": true
+    },
+    {
+      "name": "Formulário de avisos acessível no destino atual",
+      "ok": true
+    }
+  ],
+  "axe": {
+    "1280:Hoje": [],
+    "1280:Plano": [],
+    "1280:Diário": [],
+    "1280:Chat": [],
+    "1280:Evolução": [],
+    "1280:Perfil": [],
+    "390:Hoje": [],
+    "390:Plano": [],
+    "390:Diário": [],
+    "390:Chat": [],
+    "390:Evolução": [],
+    "390:Perfil": [],
+    "360:Hoje": [],
+    "360:Plano": [],
+    "360:Diário": [],
+    "360:Chat": [],
+    "360:Evolução": [],
+    "360:Perfil": []
+  }
+}

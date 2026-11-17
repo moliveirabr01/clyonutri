@@ -30,7 +30,7 @@ final class PatientHeader
             if (true) { // Always re-read tenant-scoped identity, including supplied context.
                 $st = $db->prepare('SELECT * FROM patients WHERE id = ? AND clinic_id = ?');
                 $st->execute([$patientId, $clinicId]);
-                $p = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+                $p = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($st->fetch(PDO::FETCH_ASSOC) ?: null);
                 if ($p === null) {
                     return ''; // paciente de outra clínica ou inexistente: nada é exibido
                 }

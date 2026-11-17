@@ -288,7 +288,7 @@ T::ok(str_contains($adequacyAlertsText, 'O plano tem 1 refeição;') && !str_con
     'NI2-855 (UX-013): revisão de adequação usa português correto ("O plano tem 1 refeição", nunca "1 refeição(ões)")');
 
 // Publica o plano com justificativa para meta e verifica _operational_strip.php (UX-013)
-$planSvc->publishPlan($planId, true, false, 'Alergia conferida na consulta.', true, 'Meta ajustada para início gradual.');
+$planSvc->publishPlan($planId, true, false, 'Alergia conferida na consulta.', true, 'Meta ajustada para início gradual.', true);
 $pRow = $pdo->query("SELECT * FROM patients WHERE id = {$patientA}")->fetch();
 $p = $pRow;
 $careStep = ['state' => 'none', 'appointment' => null];

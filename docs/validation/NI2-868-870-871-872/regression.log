@@ -1,0 +1,44 @@
+  PASS  868: retorno day preserva data e sucesso
+  PASS  868: erro também preserva contexto day
+  PASS  868: retorno week preserva data e sucesso
+  PASS  868: erro também preserva contexto week
+  PASS  868: retorno month preserva data e sucesso
+  PASS  868: erro também preserva contexto month
+  PASS  868: data inexistente e view externa não são aceitas
+  PASS  868: rejeita array e mês inválido
+  PASS  868: ações reais da agenda foram renderizadas
+  PASS  868: todos os formulários de status carregam view e data
+  PASS  870: prévia ativa continua idempotente
+  PASS  870: lote confirmado também permanece idempotente
+  PASS  870: rollback real remove 100% do lote
+  PASS  870: mesmo arquivo gera nova prévia após rollback
+  PASS  870: lote em processamento não é apagado
+  PASS  871: metadados persistidos de CLINICAL_RECORD_SAVED sem texto livre
+  PASS  871: metadados persistidos de ANAMNESIS_SAVED sem texto livre
+  PASS  871: metadados persistidos de ANTHROPOMETRY_SAVED sem texto livre
+  PASS  871: metadados persistidos de MEAL_PLAN_PUBLISHED sem texto livre
+  PASS  871: metadados persistidos de PRESCRIPTION_ISSUED sem texto livre
+  PASS  871: metadados persistidos de EXAM_REQUEST_ISSUED sem texto livre
+  PASS  871: metadados persistidos de PROTOCOL_SAVED sem texto livre
+  PASS  871: justificativa original permanece na auditoria clínica
+  PASS  872: alergia cifrada é decifrada na leitura clínica sem alterar armazenamento
+  PASS  872: falta de informação não é classificada como conflito
+  PASS  872: aviso nomeia alimento sem informação sem alegar conflito
+  PASS  872: aviso misto lista conflitos e alimentos sem informação
+  PASS  872: publicação ainda exige revisão clínica
+  PASS  871: versão publicada preserva justificativa clínica
+  PASS  871: publicação real emite somente indicador de override
+  PASS  872: status draft traduzido nas duas apresentações
+  PASS  872: status published traduzido nas duas apresentações
+  PASS  872: status superseded traduzido nas duas apresentações
+  PASS  872: status archived traduzido nas duas apresentações
+  PASS  872: salvar intervalo duas vezes é idempotente
+  PASS  872: intervalo não sobrescreve demais campos da política
+  PASS  872: ausência do campo não sobrescreve política existente
+  PASS  872: intervalo acima de 120 recusado
+  PASS  872: intervalo negativo recusado
+  PASS  872: consulta colada é bloqueada pelo intervalo efetivo
+  PASS  872: consulta após intervalo é aceita
+  PASS  872: profissional sem gestão não altera intervalo global
+
+42 PASS, 0 FAIL

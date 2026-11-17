@@ -1,0 +1,15 @@
+=== NI2-514 / NI2-523 v42 Phase 2 HTTP, Inline Edit, Multi-Tenant & Accessibility Test ===
+  [PASS] NI2-521: updateSubstitution atualiza quantidade, orientação e recalcula kcal/macros da substituição
+  [PASS] Isolamento multi-tenant: Clínica 2 não consegue editar substituição de plano da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê modelos da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê regras de equivalência da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não acessa lote de importação CSV da Clínica 1
+  [PASS] NI2-522: Reenviar mesmo CSV enquanto prévia está aberta reutiliza o mesmo lote
+  [PASS] NI2-522: Desfazer importação remove o paciente recém-criado
+  [PASS] NI2-522: Permite gerar nova prévia de arquivo cujo lote anterior foi 100% desfeito
+  [PASS] NI2-521: Editor possui região aria-live="polite" para anunciar atualizações sem recarregar
+  [PASS] NI2-521: Editor possui controles inline (<details>) para editar refeição, item e substituição
+  [PASS] NI2-521: plan-live.js atualiza apenas os blocos data-live-swap preservando foco e rolagem
+  [PASS] NI2-521: Seletor de alimentos suporta navegação completa por teclado (ArrowDown, ArrowUp, Enter, Escape)
+
+Resultado NI2-514 v42 Phase 2 HTTP & Accessibility: 12 PASS, 0 FAIL

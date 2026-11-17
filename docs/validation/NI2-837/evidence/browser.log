@@ -1,0 +1,35 @@
+PASS empty check-in: adjacent alert, focus, optional text retained, zero database writes
+PASS check-in network failure and retry: persisted exactly once, survives reload
+PASS 1280px: six sections focus/start, no horizontal overflow, logout target >=44px
+PASS 390px: six sections focus/start, no horizontal overflow, logout target >=44px
+PASS 360px: six sections focus/start, no horizontal overflow, logout target >=44px
+locator.check: Clicking the checkbox did not change its state
+Call log:
+[2m  - waiting for getByLabel('Ligar lembrete de check-in', { exact: true })[22m
+[2m    - locator resolved to <input role="switch" type="checkbox" aria-label="Ligar lembrete de check-in" class="r-appearance-30o5oe r-bottom-1p0dtai r-height-1pi2tsx r-left-1d2f490 r-margin-crgep1 r-padding-t60dpp r-position-u8s1d r-right-zchlnj r-top-ipm5af r-width-13qz1uu r-cursor-1ei5mc7"/>[22m
+[2m  - attempting click action[22m
+[2m    - waiting for element to be visible, enabled and stable[22m
+[2m    - element is visible, enabled and stable[22m
+[2m    - scrolling into view if needed[22m
+[2m    - done scrolling[22m
+[2m    - performing click action[22m
+[2m    - click action done[22m
+[2m    - waiting for scheduled navigations to finish[22m
+[2m    - navigations have finished[22m
+
+    at /Users/moliveira/Nutri_II/tests/ni2_837_patient_ux_browser_test.cjs:50:63 {
+  log: [
+    "  - waiting for getByLabel('Ligar lembrete de check-in', { exact: true })",
+    '    - locator resolved to <input role="switch" type="checkbox" aria-label="Ligar lembrete de check-in" class="r-appearance-30o5oe r-bottom-1p0dtai r-height-1pi2tsx r-left-1d2f490 r-margin-crgep1 r-padding-t60dpp r-position-u8s1d r-right-zchlnj r-top-ipm5af r-width-13qz1uu r-cursor-1ei5mc7"/>',
+    '  - attempting click action',
+    '    - waiting for element to be visible, enabled and stable',
+    '    - element is visible, enabled and stable',
+    '    - scrolling into view if needed',
+    '    - done scrolling',
+    '    - performing click action',
+    '    - click action done',
+    '    - waiting for scheduled navigations to finish',
+    '    - navigations have finished'
+  ],
+  name: 'Error'
+}

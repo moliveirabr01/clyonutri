@@ -20,7 +20,7 @@ require __DIR__ . '/patient_head.php';
   <?php if ($notice && !$errorCount): ?><p class="op-message op-message--info pc-notice" role="status"><?= $e($notice) ?></p><?php endif; ?>
   <?php if ($errorCount): ?>
     <div class="op-message op-message--error pc-error-summary" role="alert" tabindex="-1" id="pc-error-summary">
-      <h2>Faltam <?= $errorCount ?> resposta(s)</h2>
+      <h2><?= \ClyoNutri\Application\View\UserText::count((int)$errorCount, 'Falta {n} resposta', 'Faltam {n} respostas') ?></h2>
       <ul><?php foreach ($errors as $qid => $msg): ?><li><a href="#q-<?= $e($qid) ?>"><?= $e($qid === '_consent' ? 'Consentimento' : ($all[$qid]['text'] ?? $qid)) ?></a>: <?= $e($msg) ?></li><?php endforeach; ?></ul>
     </div>
   <?php endif; ?>

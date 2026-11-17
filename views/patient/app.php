@@ -400,7 +400,9 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             <strong>Entrar na teleconsulta</strong><span>A sala da sua próxima consulta online já está aberta.</span>
           </a>
           <?php endif; ?>
+          <?php if(!empty($portal['manipulados_available'])): ?>
           <a class="pp-card" href="/paciente/prescricoes"><strong>Prescrições</strong><span>Manipulados e suplementação, com o PDF assinado.</span></a>
+          <?php endif; ?>
           <a class="pp-card" href="/paciente/materiais" data-testid="patient-materials-link"><strong>Materiais</strong><span>Orientações, receitas e listas enviadas para você.</span></a>
         </nav>
         <?php if ($portal): ?>
@@ -433,32 +435,16 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </div>
 
         <div class="tabs-nav" role="tablist" aria-label="Como você quer entrar">
-          <button type="button" class="tab-btn" role="tab" id="tab-btn-first" aria-controls="tab-first" aria-selected="true">
+          <button type="button" class="tab-btn" role="tab" id="tab-btn-login" aria-controls="tab-login" aria-selected="true">
+            Entrar
+          </button>
+          <button type="button" class="tab-btn" role="tab" id="tab-btn-first" aria-controls="tab-first" aria-selected="false" tabindex="-1">
             Primeiro acesso
           </button>
-          <button type="button" class="tab-btn" role="tab" id="tab-btn-login" aria-controls="tab-login" aria-selected="false" tabindex="-1">
-            Já tenho cadastro
-          </button>
         </div>
 
-        <!-- Aba 1: Primeiro Acesso com Código -->
-        <div id="tab-first" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-first">
-          <form method="GET" action="/paciente/app">
-            <div class="form-group">
-              <label class="form-label" for="code-input">Código do convite</label>
-              <input class="form-control" id="code-input" type="text" name="code" required placeholder="Cole o código recebido do seu nutricionista" value="<?= htmlspecialchars((string)$codeVal) ?>" style="font-family: monospace; font-size: 0.85rem;" aria-describedby="code-help">
-              <span class="help-text" id="code-help">
-                O nutricionista gera este código privativo para você. Válido por 48 horas.
-              </span>
-            </div>
-            <button type="submit" class="btn-submit">
-              Continuar com o convite
-            </button>
-          </form>
-        </div>
-
-        <!-- Aba 2: Login com Credenciais -->
-        <div id="tab-login" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-login" hidden>
+        <!-- Aba 1: Login com Credenciais (padrão NI2-890) -->
+        <div id="tab-login" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-login">
           <form method="POST" action="/paciente/app/login">
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars(\ClyoNutri\Core\Security\Csrf::token()) ?>">
             <div class="form-group">
@@ -473,11 +459,30 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
               Entrar no portal
             </button>
           </form>
-          <div style="text-align: center; margin-top: 14px;">
+          <div style="text-align: center; margin-top: 14px; display: flex; flex-direction: column; gap: 6px;">
+            <a href="#tab-first" onclick="document.getElementById('tab-btn-first').click(); return false;" style="font-size: 0.85rem; color: var(--botanical-green-700); font-weight: 600;">
+              É seu primeiro acesso? Crie sua senha
+            </a>
             <a href="/paciente/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600);">
               Esqueci minha senha
             </a>
           </div>
+        </div>
+
+        <!-- Aba 2: Primeiro Acesso com Código -->
+        <div id="tab-first" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-first" hidden>
+          <form method="GET" action="/paciente/app">
+            <div class="form-group">
+              <label class="form-label" for="code-input">Código do convite</label>
+              <input class="form-control" id="code-input" type="text" name="code" required placeholder="Cole o código recebido do seu nutricionista" value="<?= htmlspecialchars((string)$codeVal) ?>" style="font-family: monospace; font-size: 0.85rem;" aria-describedby="code-help">
+              <span class="help-text" id="code-help">
+                O nutricionista gera este código privativo para você. Válido por 48 horas.
+              </span>
+            </div>
+            <button type="submit" class="btn-submit">
+              Continuar com o convite
+            </button>
+          </form>
         </div>
 
         <!-- Destaques -->

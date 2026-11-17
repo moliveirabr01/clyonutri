@@ -297,6 +297,9 @@ try { axe = require(process.env.AXE_MODULE || 'axe-core'); } catch (e) {}
 
   // Publica o plano com revisão de adequação preservada
   await actClick('button[data-show="modal-publish-plan"]', true);
+  if (await p.locator('#modal-publish-plan input[name="confirm_estimated_measures"]').count()) {
+    await p.locator('#modal-publish-plan input[name="confirm_estimated_measures"]').check(); actionsTotal++; actionsPlan++;
+  }
   if (await p.locator('#modal-publish-plan input[name="allow_adequacy_override"]').count()) {
     await p.locator('#modal-publish-plan input[name="allow_adequacy_override"]').check(); actionsTotal++; actionsPlan++;
     await actFill('#modal-publish-plan [name="adequacy_override_reason"]', 'Meta inicial gradual acordada com a paciente.', true);

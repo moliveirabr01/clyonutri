@@ -1,0 +1,22 @@
+  PASS  Prepare não conta como execução
+  PASS  Cada execute de statement reutilizado é contado
+  PASS  query mantém modo de fetch e retorno
+  PASS  query contado uma única vez
+  PASS  Erro SQL preservado
+  PASS  Consulta com erro também é contada
+  PASS  Métricas sem SQL e parâmetros
+  PASS  Metadata informa colunas presentes e ausentes
+  PASS  Metadados das colunas carregados uma vez por tabela
+  PASS  Catálogo de tabelas preserva presença/ausência
+  PASS  Catálogo de tabelas carregado uma vez
+  PASS  Cache isolado por conexão
+  PASS  Reset após DDL atualiza schema
+  PASS  Produção nunca habilita perfil mesmo com flag 1
+  PASS  Flag desligada não perfila
+  PASS  Busca sem jornada e sem abertura excepcional retorna null
+  PASS  Abertura excepcional mantém primeiro horário canônico
+  PASS  Busca mantém bloqueio explícito dentro de abertura excepcional
+  PASS  Janelas com leitura em lote são idênticas à leitura canônica
+  PASS  Busca não aceita profissional de outra clínica
+
+20 PASS, 0 FAIL

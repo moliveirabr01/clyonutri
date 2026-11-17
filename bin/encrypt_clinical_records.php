@@ -13,6 +13,18 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// v54.68: carrega o .env (antes caía no SQLite padrão e, sem APP_ENV, na chave DEV-ONLY). Sem .env, para.
+$envPath = __DIR__ . '/../.env';
+if (!is_file($envPath)) {
+    fwrite(STDERR, "ERRO: .env não encontrado em {$envPath}. Nada foi alterado.\n");
+    exit(1);
+}
+\ClyoNutri\Core\Security\Env::load($envPath);
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 use ClyoNutri\Core\Database\Connection;
 use ClyoNutri\Core\Security\ClinicalEncryptionService;
 
@@ -70,6 +82,51 @@ foreach ($rows as $row) {
         }
     } else {
         $totalSkipped++;
+    }
+}
+
+// NI2-862 (F-04): Cifrar também patients (notes, allergies), consultation_note_drafts (evolution_summary) e clinical_records (content_json).
+$extraTables = [
+    ['table' => 'patients', 'fields' => ['notes', 'allergies']],
+    ['table' => 'consultation_note_drafts', 'fields' => ['evolution_summary']],
+    ['table' => 'clinical_records', 'fields' => ['content_json']],
+];
+foreach ($extraTables as $spec) {
+    $tbl = $spec['table'];
+    $cols = [];
+    foreach ($spec['fields'] as $f) {
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($db, $tbl, $f)) {
+            $cols[] = $f;
+        }
+    }
+    if ($cols === []) {
+        continue;
+    }
+    $selCols = implode(', ', $cols);
+    $stExtra = $db->query("SELECT id, {$selCols} FROM {$tbl} ORDER BY id ASC");
+    foreach ($stExtra->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $totalScanned++;
+        $updates = [];
+        foreach ($cols as $f) {
+            $val = $row[$f] ?? null;
+            if ($val !== null && $val !== '' && !ClinicalEncryptionService::isEncrypted((string)$val)) {
+                $updates[$f] = ClinicalEncryptionService::encrypt((string)$val);
+            }
+        }
+        if ($updates !== []) {
+            $totalEncrypted++;
+            if (!$dryRun) {
+                $setParts = [];
+                $params = ['id' => (int)$row['id']];
+                foreach ($updates as $f => $encVal) {
+                    $setParts[] = "{$f} = :{$f}";
+                    $params[$f] = $encVal;
+                }
+                $db->prepare("UPDATE {$tbl} SET " . implode(', ', $setParts) . " WHERE id = :id")->execute($params);
+            }
+        } else {
+            $totalSkipped++;
+        }
     }
 }
 

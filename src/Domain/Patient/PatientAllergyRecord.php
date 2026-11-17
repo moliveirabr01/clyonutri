@@ -31,7 +31,7 @@ final class PatientAllergyRecord
             . ($hasAssessment ? ', allergy_assessment' : ', NULL AS allergy_assessment');
         $st = $db->prepare("SELECT {$cols} FROM patients WHERE clinic_id = :clinic_id AND id = :patient_id");
         $st->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
-        $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $row = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($st->fetch(PDO::FETCH_ASSOC) ?: []) ?? [];
         $allergies = trim((string)($row['allergies'] ?? ''));
         $assessment = trim((string)($row['allergy_assessment'] ?? ''));
         if ($assessment === 'denied') {

@@ -13,6 +13,20 @@ final class ClinicalAuthorization
             && in_array($actor['member_role']??'', ['owner','admin','nutritionist'], true);
     }
 
+    /**
+     * v54.68: página inicial de cada perfil (a mesma regra de allowsWeb). Perfil de plataforma sem vínculo clínico
+     * vai para o console, suporte para a fila, recepção para a agenda; os demais para o painel.
+     */
+    public static function homePath(array $actor): string
+    {
+        $role = (string)($actor['user_role'] ?? '');
+        if ($role === 'receptionist') return '/agenda';
+        if (self::isClinical($actor)) return '/dashboard';
+        if (in_array($role, ['operator', 'support_agent'], true)) return '/suporte/fila';
+        if (RoleModel::isPlatformConsole($role)) return '/admin/dashboard';
+        return '/dashboard';
+    }
+
     public static function assertWebAccess(array $actor, string $path, string $method, PDO $db): void
     {
         if (!self::allowsWeb($actor, $path, $method)) {

@@ -75,6 +75,10 @@ if ($screen === 'professional_session'): ?>
       <form method="post" action="/consentimento-transcricao/<?= $e($token) ?>" data-testid="consent-form">
         <input type="hidden" name="_csrf_token" value="<?= $e($csrf) ?>">
         <input type="hidden" name="terms_sha256" value="<?= $e($view['terms_sha256']) ?>">
+        <div class="u-mb-3">
+          <label for="consent-otp" class="u-block u-font-semibold u-mb-1">Código de verificação (OTP de 6 dígitos enviado ao paciente) *</label>
+          <input id="consent-otp" type="text" name="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" data-testid="consent-otp">
+        </div>
         <div class="tc-controls">
           <button type="submit" name="decision" value="accept" class="tc-btn tc-btn-primary" data-testid="consent-accept">Aceito a transcrição desta consulta</button>
           <button type="submit" name="decision" value="reject" class="tc-btn" data-testid="consent-reject">Não aceito</button>

@@ -55,7 +55,7 @@ $src = $clinicalSummary['source'] ?? null;
       <?= (int)($integrity['total_records'] ?? 0) ?> versões registradas; as anteriores são preservadas.
       Cada versão guarda um código SHA-256 ligado à versão anterior, o que permite detectar alteração ou remoção feita fora do sistema.
       Não é assinatura digital (ICP-Brasil) e não substitui backup nem o controle de acesso ao banco.
-      <?php if (!empty($integrity['legacy_records'])): ?>Título e justificativa de <?= (int)$integrity['legacy_records'] ?> registro(s) antigo(s) não fazem parte desta conferência.<?php endif; ?>
+      <?php if (!empty($integrity['legacy_records'])): ?>Título e justificativa de <?= (int)$integrity['legacy_records'] ?> <?= \ClyoNutri\Application\View\UserText::count((int)$integrity['legacy_records'], 'registro antigo', 'registros antigos') ?> não fazem parte desta conferência.<?php endif; ?>
     </p>
     <?php if ($canSeeAudit && !empty($integrity['latest_hash'])): ?>
       <details class="cr-tech">
@@ -123,7 +123,7 @@ $src = $clinicalSummary['source'] ?? null;
                 <span class="badge cr-badge--version">v<?= (int)$rec['version'] ?></span>
                 <h4><?= htmlspecialchars($rec['title']) ?></h4>
                 <?php if ($rec['is_retracted']): ?><span class="badge badge-warning">Superado / retificado</span><?php endif; ?>
-                <?php if ($rec['supersedes_id']): ?><span class="badge badge-info">Retificação do registro #<?= (int)$rec['supersedes_id'] ?></span><?php endif; ?>
+                <?php if ($rec['supersedes_id']): ?><span class="badge badge-info" title="Referência para suporte: <?= (int)$rec['supersedes_id'] ?>">Correção de uma anotação anterior</span><?php endif; ?>
               </div>
               <p class="cr-entry__meta">Por <strong><?= htmlspecialchars($rec['professional_name']) ?></strong> em <?= date('d/m/Y \à\s H:i', strtotime($rec['created_at'])) ?></p>
             </div>
@@ -164,6 +164,27 @@ $src = $clinicalSummary['source'] ?? null;
                 <?php if ($view['appointment_id'] !== null && isset($consultLinkIds[$view['appointment_id']])): ?>
                   <a href="/consulta/<?= (int)$view['appointment_id'] ?>" class="cr-entry__origin-link">Ver consulta</a>
                 <?php endif; ?>
+              </p>
+            <?php endif; ?>
+            <?php
+              $rawRecContent = is_array($rec['content'] ?? null) ? $rec['content'] : [];
+              $refBadges = [];
+              if (!empty($rawRecContent['anamnesis_version'])) {
+                  $refBadges[] = 'Anamnese v' . (int)$rawRecContent['anamnesis_version'];
+              }
+              if (!empty($rawRecContent['assessment_ids']) && is_array($rawRecContent['assessment_ids'])) {
+                  $refBadges[] = 'Avaliação #' . implode(', #', array_map('intval', $rawRecContent['assessment_ids']));
+              }
+              if (!empty($rawRecContent['meal_plan_version'])) {
+                  $refBadges[] = 'Plano alimentar v' . (int)$rawRecContent['meal_plan_version'] . (!empty($rawRecContent['meal_plan_id']) ? ' (#' . (int)$rawRecContent['meal_plan_id'] . ')' : '');
+              }
+              if (!empty($rawRecContent['pending_steps_acknowledged']) && is_array($rawRecContent['pending_steps_acknowledged'])) {
+                  $refBadges[] = 'Pendências cientes: ' . implode(', ', array_map('strval', $rawRecContent['pending_steps_acknowledged']));
+              }
+            ?>
+            <?php if ($refBadges !== []): ?>
+              <p class="cr-entry__origin u-text-caption" data-testid="cr-entry-artifacts">
+                <strong>Artefatos do atendimento:</strong> <?= htmlspecialchars(implode(' · ', $refBadges)) ?>
               </p>
             <?php endif; ?>
           </div>
@@ -258,3 +279,10 @@ $src = $clinicalSummary['source'] ?? null;
     document.getElementById('modal-revise-record').style.display = 'flex';
   }
 </script>
+<?php
+if (isset($diaryPanel)) {
+    $diaryReturnTo = '/pacientes/' . $pid . '/prontuario#diario-paciente';
+    $diaryFilterAction = '/pacientes/' . $pid . '/prontuario';
+    require __DIR__ . '/../patients/_food_diary_block.php';
+}
+?>

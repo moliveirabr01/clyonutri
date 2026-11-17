@@ -160,7 +160,7 @@ final class ProductionEvent
         $this->schemaVersion = $schemaVersion;
 
         // Sanitização compulsória na criação
-        $this->metadata = $this->sanitizeMetadata($metadata);
+        $this->metadata = $this->sanitizeMetadata(ProductionEventService::stripClinicalFreeText($metadata, ProductionEventService::clinicalContext($category,$resourceType,$eventType)));
     }
 
     public static function create(

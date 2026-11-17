@@ -8,14 +8,28 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
 NAME="${1:?uso: build_hostgator_zip.sh <nome-sem-extensao> <tag>}"
 TAG="${2:-}"
+[[ "$NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Nome de pacote inválido" >&2; exit 2; }
+
+# NI2-860 (F-02): Gate obrigatório de testes antes de montar o pacote.
+echo "==> Executando gate de testes (bin/run-tests core)..."
+bash "$ROOT/bin/run-tests" core
+
+# NI2-873 (F-16): Garante vendor/ reprodutível quando composer estiver disponível e registra hash no manifesto.
+if [ ! -f "$ROOT/vendor/autoload.php" ]; then
+  composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+fi
+VENDOR_HASH="$(shasum -a 256 "$ROOT/composer.lock" 2>/dev/null | awk '{print $1}' || sha256sum "$ROOT/composer.lock" 2>/dev/null | awk '{print $1}' || echo 'unknown')"
+
 STAGE="$ROOT/release/$NAME"; rm -rf "$STAGE"; mkdir -p "$STAGE"
-ITEMS=(.htaccess index.php artisan composer.json composer.lock .env.example app bin bootstrap config database docs public routes scripts src storage vendor views tests)
+ITEMS=(.htaccess index.php composer.json composer.lock .env.example app bin bootstrap config database public routes src storage vendor views)
 for i in "${ITEMS[@]}"; do
-  [ -e "$i" ] && rsync -a \
+  [ -e "$i" ] || continue
+  rsync -a \
     --exclude='.DS_Store' \
     --exclude='.env' \
     --exclude='.env.*' \
     --exclude='*.sqlite' \
+    --exclude='*.log' \
     --exclude='*.zip' \
     --exclude='*.bundle' \
     --exclude='*.bak' \
@@ -32,26 +46,20 @@ for i in "${ITEMS[@]}"; do
     --exclude='*.tar.gz' \
     --exclude='*.tgz' \
     --exclude='storage/logs/*.log' \
-    "$i" "$STAGE/" || true
+    "$i" "$STAGE/"
 done
 [ -f ".env.example" ] && cp .env.example "$STAGE/.env.example"
-[ -n "$TAG" ] && [ -f "LEIA-ME-HOSTGATOR-$TAG.md" ] && cp "LEIA-ME-HOSTGATOR-$TAG.md" "$STAGE/" || true
-# documentos herdados na raiz (LEIA-ME de versões anteriores, comparações, validações) e a ficha da versão
-for f in LEIA-ME-HOSTGATOR-v*.md COMPARACAO-*.txt VALIDACAO-V*.txt RELEASE_INFO.json; do
-  [ -f "$f" ] && cp "$f" "$STAGE/" || true
-done
-# docs/: só entrega e evidências documentais (sem binários pesados, builds mobile ou vídeos)
-[ -d "$STAGE/docs" ] && find "$STAGE/docs" -mindepth 1 -maxdepth 1 ! -name delivery ! -name evidencias ! -name validation ! -name benchmark-webdiet ! -name adr ! -name .htaccess -exec rm -rf {} +
-# docs/delivery: remove builds mobile e artefatos compilados pesados (.apk, eas-android, etc)
-rm -rf "$STAGE/docs/delivery/patient-mobile-reference/eas-android" "$STAGE/docs/delivery/patient-mobile-reference"/*.zip "$STAGE/docs/delivery/patient-mobile-reference"/*.apk 2>/dev/null || true
-# tests/: remove caches e dependências transitórias (node_modules, binários wasm, relatórios)
-rm -rf "$STAGE/tests/teleconsulta_navegador/node_modules" "$STAGE/tests/homologation/node_modules" 2>/dev/null || true
-find "$STAGE/tests" -type d -name "node_modules" -prune -exec rm -rf {} + 2>/dev/null || true
-# evidências: sem logs, imagens, capturas nem os registros "antes" (FAIL de propósito, só serviam de prova da correção)
-if [ -d "$STAGE/docs/evidencias" ]; then
-  find "$STAGE/docs/evidencias" -type f \( -name '*.log' -o -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webm' -o -name '*.mp4' -o -iname '*antes*' -o -iname '*before*' \) -delete
-  find "$STAGE/docs/evidencias" -mindepth 1 -type d -empty -delete
+# Only current deployment instructions; API schema remains a runtime dependency.
+if [ -n "$TAG" ] && [ -f "release/LEIA-ME-HOSTGATOR-$TAG.md" ]; then
+  cp "release/LEIA-ME-HOSTGATOR-$TAG.md" "$STAGE/"
 fi
+[ ! -f RELEASE_INFO.json ] || cp RELEASE_INFO.json "$STAGE/"
+mkdir -p "$STAGE/docs/api"
+[ ! -f docs/api/openapi_v1.json ] || cp docs/api/openapi_v1.json "$STAGE/docs/api/"
+[ ! -f docs/.htaccess ] || cp docs/.htaccess "$STAGE/docs/"
+# Development/test runners are never deployed.
+rm -f "$STAGE/bin/run-tests" "$STAGE/bin/serve-local.sh" "$STAGE/bin/homologation_gate.sh" "$STAGE/bin/build_release.sh"
+rm -rf "$STAGE/bin/homologation"
 # storage/ só leva a estrutura (sem logs, sessões, bancos ou uploads locais)
 [ -d "$STAGE/storage" ] && find "$STAGE/storage" -type f ! -name .htaccess ! -name .gitignore ! -name index.html -delete
 rm -rf "$STAGE/storage/e2e-report" # NI2-632: relatórios do portão de release ficam fora do pacote
@@ -75,6 +83,8 @@ BAD=$(find "$STAGE" -type f ! -perm -044 | wc -l | tr -d ' ')
 if find "$STAGE" -name '.env*' ! -name '.env.example' | grep -q .; then echo "ERRO: .env real no pacote"; exit 1; fi
 if find "$STAGE" \( -name '*.pem' -o -name '*.key' -o -name '*.bundle' -o -name '*.bak' -o -name '*.sqlite' -o -name 'id_rsa*' \) | grep -q .; then echo "ERRO: chave, bundle, backup ou banco local no pacote"; exit 1; fi
 [ -f "$STAGE/vendor/autoload.php" ] || { echo "ERRO: vendor/ não está no pacote (o HostGator não roda composer)"; exit 1; }
+php "$STAGE/bin/build_identity.php" --generate
+php "$STAGE/bin/build_identity.php" --verify
 mkdir -p release; rm -f "$ROOT/release/$NAME.zip"
 if command -v zip >/dev/null 2>&1; then
   (cd "$STAGE" && zip -r -q "$ROOT/release/$NAME.zip" .)

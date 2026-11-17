@@ -34,12 +34,12 @@ $c = O::compareCount(3, 1, 'vs. ontem'); T::ok($c['tone'] === 'up' && $c['label'
 $c = O::compareCount(1, 4, 'vs. ontem'); T::ok($c['tone'] === 'down' && $c['label'] === '↓ 3 vs. ontem' && str_contains($c['sr'], '3 a menos'), 'queda: ↓ 3 vs. ontem');
 $c = O::compareCount(2, 2, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem variação', 'igual: sem variação');
 $c = O::compareCount(0, 0, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem variação', 'zero e zero: sem variação (sem seta)');
-$c = O::compareCount(5, 0, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem base anterior', 'anterior 0: sem base anterior (não mostra +∞ nem %)');
-$c = O::compareCount(5, null, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem base anterior', 'anterior desconhecido: sem base anterior');
+$c = O::compareCount(5, 0, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'Sem dados do período anterior para comparar', 'anterior 0: sem base anterior (não mostra +∞ nem %)');
+$c = O::compareCount(5, null, 'vs. ontem'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'Sem dados do período anterior para comparar', 'anterior desconhecido: sem base anterior');
 $c = O::comparePoints(62.5, 58.3, 'vs. 30 dias anteriores'); T::ok($c['tone'] === 'up' && $c['label'] === '↑ 4,2 p.p. vs. 30 dias anteriores', 'adesão em p.p. com vírgula');
 $c = O::comparePoints(50.0, 61.0, 'vs. 30 dias anteriores'); T::ok($c['tone'] === 'down' && str_starts_with($c['label'], '↓ 11,0 p.p.'), 'adesão em queda');
-$c = O::comparePoints(58.3, null, 'x'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem base anterior', 'adesão sem período anterior: neutro');
-$c = O::comparePoints(null, 40.0, 'x'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'sem base anterior', 'adesão sem dado atual: neutro');
+$c = O::comparePoints(58.3, null, 'x'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'Sem dados do período anterior para comparar', 'adesão sem período anterior: neutro');
+$c = O::comparePoints(null, 40.0, 'x'); T::ok($c['tone'] === 'neutral' && $c['label'] === 'Sem dados do período anterior para comparar', 'adesão sem dado atual: neutro');
 $c = O::comparePoints(58.31, 58.29, 'x'); T::ok($c['label'] === 'sem variação', 'diferença < 0,05 p.p.: sem variação');
 
 fwrite(STDOUT, "=== Agenda da semana: dados reais, sem canceladas, isolada por clínica ===\n");

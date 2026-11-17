@@ -1,0 +1,76 @@
+=== Saudação e data (fuso do consultório) ===
+  PASS  09:15 → Bom dia
+  PASS  12:00 → Boa tarde
+  PASS  17:59 → Boa tarde
+  PASS  18:00 → Boa noite
+  PASS  23:30 UTC = 20:30 em São Paulo → Boa noite (não usa o fuso do servidor)
+  PASS  13:30 UTC = 10:30 em São Paulo → Bom dia
+  PASS  data por extenso em pt-BR
+  PASS  domingo e março com acento
+  PASS  primeiro nome em caixa de título
+  PASS  sem nome: sem vocativo
+  PASS  acento preservado
+=== Comparação (neutra sem base; nunca inventa valor) ===
+  PASS  aumento: ↑ 2 vs. ontem
+  PASS  queda: ↓ 3 vs. ontem
+  PASS  igual: sem variação
+  PASS  zero e zero: sem variação (sem seta)
+  FAIL  anterior 0: sem base anterior (não mostra +∞ nem %)
+  FAIL  anterior desconhecido: sem base anterior
+  PASS  adesão em p.p. com vírgula
+  PASS  adesão em queda
+  FAIL  adesão sem período anterior: neutro
+  FAIL  adesão sem dado atual: neutro
+  PASS  diferença < 0,05 p.p.: sem variação
+=== Agenda da semana: dados reais, sem canceladas, isolada por clínica ===
+  PASS  semana de segunda a domingo
+  FAIL  sábado vazio some; domingo com consulta aparece: 2026-11-09,2026-11-10,2026-11-11,2026-11-12,2026-11-13,2026-11-14,2026-11-15
+  PASS  total = 8 (sem cancelada, sem outra clínica, sem limites da semana): 8
+  PASS  hoje: 6 consultas, 4 visíveis, "+2 neste dia"
+  PASS  cancelada fora da agenda
+  PASS  segunda marcada como passada
+  PASS  paciente de outra clínica não aparece na quarta (JOIN por clínica)
+  PASS  nenhum nome da clínica B na agenda da clínica A
+  PASS  clínica B vê só a própria consulta
+  PASS  rótulo da semana: 09 – 15 nov
+  PASS  semana que cruza o mês: 30 nov – 06 dez
+  PASS  semana sem consulta: 5 dias úteis vazios (estado vazio real)
+  PASS  card da semana (getWeekStats) conta 9: inclui a consulta com paciente inconsistente
+  PASS  semana anterior: 1 consulta (domingo 08/11), base real da comparação
+  PASS  ontem: 1 consulta, base real da comparação "vs. ontem"
+=== Novos pacientes e adesão do período anterior ===
+  PASS  clínica A: 2 novos nos últimos 30 dias, 1 nos 30 anteriores: {"current":2,"previous":1}
+  PASS  clínica B isolada (1 novo, sem base anterior)
+  PASS  sem check-in no período anterior: null (selo neutro)
+  PASS  adesão anterior da clínica A = 65,0 (só a janela [-60, -30), só a clínica A)
+  PASS  clínica B: 0,0 é dado real (não confunde com "sem dado")
+  PASS  adesão atual (serviço existente) = 90,0
+  PASS  selo do card de adesão: ↑ 25,0 p.p. vs. 30 dias anteriores
+=== Contrato da tela (fonte) ===
+  PASS  data-testid attention-panel preservado
+  PASS  data-testid attention-count preservado
+  PASS  data-testid attention-item preservado
+  PASS  data-testid attention-more preservado
+  PASS  data-testid attention-see-all preservado
+  PASS  data-testid appointments-today-count preservado
+  PASS  data-testid appointments-week-count preservado
+  PASS  data-testid active-patients-count preservado
+  PASS  data-testid average-adherence-value preservado
+  PASS  data-testid draft-patients-count preservado
+  PASS  data-testid draft-plans-total preservado
+  PASS  data-testid quick-new-patient preservado
+  PASS  data-testid practice-readiness preservado
+  PASS  data-testid activation-banner preservado
+  PASS  data-testid onboarding-banner preservado
+  PASS  data-testid dashboard-trial-expired preservado
+  PASS  lista acionável mostra 4 itens
+  PASS  nenhum nome fixo na nova tela
+  PASS  CSS novo sem cor hex (só tokens da marca)
+  PASS  CSS do painel só carregado no Painel geral
+
+59 PASS, 5 FAIL
+  - anterior 0: sem base anterior (não mostra +∞ nem %)
+  - anterior desconhecido: sem base anterior
+  - adesão sem período anterior: neutro
+  - adesão sem dado atual: neutro
+  - sábado vazio some; domingo com consulta aparece: 2026-11-09,2026-11-10,2026-11-11,2026-11-12,2026-11-13,2026-11-14,2026-11-15

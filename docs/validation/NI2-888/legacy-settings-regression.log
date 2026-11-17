@@ -1,0 +1,42 @@
+======================================================================
+TEST SUITE: Execucao NI2-588 ate NI2-590 (Rodada 2 UX)
+======================================================================
+
+--- NI2-588: Abas modulares em Configurações & Atalho da Agenda ---
+ [PASS] Navegacao por abas exibe data-testid="tab-perfil"
+ [PASS] Aba perfil renderiza secao de dados cadastrais (#settings-profile)
+ [PASS] Aba perfil NÃO renderiza secao da agenda (isolamento de escopo)
+ [PASS] Aba perfil NÃO renderiza regras do paciente no app
+ [PASS] Aba perfil NÃO renderiza troca de senha
+ [PASS] Navegacao por abas exibe data-testid="tab-agenda"
+ [PASS] Aba agenda renderiza secao de disponibilidade e agendamento
+ [PASS] Aba agenda renderiza formulario de autoagendamento
+ [PASS] Aba agenda NÃO renderiza dados cadastrais
+ [PASS] Navegacao por abas exibe data-testid="tab-paciente-app"
+ [PASS] Aba paciente-app renderiza acoes da paciente no app
+ [PASS] Aba paciente-app renderiza regras do chat
+ [PASS] Aba paciente-app NÃO renderiza dados cadastrais
+ [PASS] Aba paciente-app NÃO renderiza disponibilidade
+ [PASS] Navegacao por abas exibe data-testid="tab-conta"
+ [PASS] Aba conta renderiza secao de conta e seguranca
+ [PASS] Aba conta renderiza campos de alteracao de senha
+ [PASS] Aba conta NÃO renderiza dados cadastrais
+ [PASS] Tab inexistente aplica fallback seguro para perfil
+ [PASS] Agenda exibe botao de atalho 1-clique para configuracoes
+ [PASS] Menu da agenda aponta para a seção de horários
+
+--- NI2-589: Link no Nome do Paciente, Typeahead & Toast ---
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+ [PASS] Tabela de pacientes possui link com data-testid="patient-row-link-[id]"
+ [PASS] Nome do paciente na listagem e link direto para o perfil /pacientes/[id]
+ [PASS] Exibe toast de sucesso apos cadastro de paciente
+ [PASS] Toast contem botao de atalho direto data-testid="toast-open-patient-btn"
+ [PASS] Botao do toast aponta diretamente para o perfil do novo paciente
+ [PASS] Texto do botao no toast especifica o nome do paciente cadastrado
+ [PASS] Campo de busca presente na tela de pacientes
+ [PASS] Script de busca reativa client-side filtra com >= 3 caracteres
+
+--- NI2-590: Perfil 360 - 1ª Dobra e Navegação Unificada ---
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+ [PASS] Perfil 360 exibe badge de status de alergias na 1ª dobra
+ [FAIL] Badge destaca alergia registrada do paciente

@@ -12,7 +12,7 @@ $badge = ['draft' => 'badge-neutral', 'review' => 'badge-warning', 'issued' => '
 $examReturn=!empty($examAppointmentId)?'?atendimento='.(int)$examAppointmentId:'';
 $newUrl = '/pacientes/' . (int)$examPatientId . '/exames/novo' . (!empty($examAppointmentId) ? '?atendimento=' . (int)$examAppointmentId : '');
 ?>
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <section class="card ex-timeline-card" aria-labelledby="exam-timeline-title" data-testid="exam-timeline">
   <div class="card__header ex-timeline-card__head">
     <h3 id="exam-timeline-title">Solicitações de exames laboratoriais<?= !empty($examAppointmentId) ? ' desta consulta' : '' ?> (<?= count($examTimeline) ?>)</h3>

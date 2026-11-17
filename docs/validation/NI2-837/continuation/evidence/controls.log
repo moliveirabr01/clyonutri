@@ -1,0 +1,12 @@
+PASS 1280px Encerrar sessão: target 48px, contrast 11.98:1, focus outline none 3px
+AssertionError [ERR_ASSERTION]: Visible keyboard focus
+    at /Users/moliveira/Nutri_II/tests/ni2_837_controls_browser_test.cjs:6:252
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processImmediate (node:internal/timers:541:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

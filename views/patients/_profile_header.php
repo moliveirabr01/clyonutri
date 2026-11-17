@@ -15,9 +15,18 @@ $stepState = (string)($careStep['state'] ?? 'none');
 $stepWhen = $stepApp ? date('d/m/Y', strtotime($stepApp['scheduled_at'])) . ' às ' . date('H:i', strtotime($stepApp['scheduled_at'])) : '';
 $age = $p['birth_date'] ? (new \DateTimeImmutable($p['birth_date']))->diff(new \DateTimeImmutable('today'))->y . ' anos' : 'idade não informada';
 $draftAnamnesis = !empty($clinicalSummary['draft_in_progress']);
+$pendingDiaryCount = 0;
+try {
+    $pendingDiaryCount = (new \ClyoNutri\Domain\FoodDiary\FoodDiaryService(\ClyoNutri\Core\Database\Connection::getInstance()))->countPendingDiaries(\ClyoNutri\Core\Auth\TenantContext::getClinicId(), $pid);
+} catch (\Throwable $e) {
+    $pendingDiaryCount = 0;
+}
+$atendimentoHint = $stepState === 'continue'
+    ? 'atendimento em andamento'
+    : ($pendingDiaryCount > 0 ? ($pendingDiaryCount === 1 ? '1 diário sem leitura' : $pendingDiaryCount . ' diários sem leitura') : null);
 $tabs = [
     'resumo' => ['Resumo', '/pacientes/' . $pid, null],
-    'atendimento' => ['Atendimento', '/pacientes/' . $pid . '/prontuario', $stepState === 'continue' ? 'atendimento em andamento' : null],
+    'atendimento' => ['Atendimento', '/pacientes/' . $pid . '/prontuario', $atendimentoHint],
     'plano' => ['Plano', '/pacientes/' . $pid . '/plano', $activePlan && ($activePlan['status'] ?? '') === 'draft' ? 'plano em rascunho' : null], // NI2-711
     'anamnese' => ['Anamnese', '/pacientes/' . $pid . '/anamnese', $draftAnamnesis ? 'alteração em andamento' : null],
     // NI2-708: a aba leva à antropometria/avaliações físicas; "Evolução" fica reservada à evolução clínica (prontuário).
@@ -68,14 +77,14 @@ $tabs = [
       <?php elseif ($stepState === 'unavailable'): ?>
         <?php /* NI2-692: agenda falhou — não inventar horários; alergias/contexto já renderizados acima. */ ?>
         <p class="op-message op-message--warning u-m-0" role="status" data-testid="care-step-unavailable">Agenda temporariamente indisponível. O contexto clínico (alergias) permanece visível.</p>
-        <a class="btn btn-secondary" href="/agenda?novo=1&amp;paciente=<?= $pid ?>&amp;de=paciente" data-testid="care-schedule">Agendar</a>
+        <?= \ClyoNutri\Application\View\NewConsultationButton::link('/agenda?novo=1&paciente='.$pid.'&de=paciente','care-schedule') ?>
       <?php else: ?>
         <?php /* NI2-705: atendimento imediato sem passar pela agenda; agendar continua disponível. */ ?>
         <form method="POST" action="/pacientes/<?= $pid ?>/iniciar-agora" class="u-m-0" data-no-dirty data-confirm="<?= $e('Iniciar agora um atendimento de ' . $p['name'] . ' sem agendamento?') ?>">
           <input type="hidden" name="_csrf_token" value="<?= $e($csrfToken) ?>">
           <button type="submit" class="btn btn-primary" data-testid="care-start-now">Iniciar agora</button>
         </form>
-        <a class="btn btn-secondary" href="/agenda?novo=1&amp;paciente=<?= $pid ?>&amp;de=paciente" data-testid="care-schedule">Agendar</a>
+        <?= \ClyoNutri\Application\View\NewConsultationButton::link('/agenda?novo=1&paciente='.$pid.'&de=paciente','care-schedule') ?>
       <?php endif; ?>
       <details class="patient-header__more" data-profile-tools>
         <summary class="btn btn-secondary" data-testid="patient-more">Mais ações</summary>

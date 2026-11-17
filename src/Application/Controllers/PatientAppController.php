@@ -268,7 +268,8 @@ final class PatientAppController
     {
         $pid = (int)$session['patient_id'];
         $api = new \ClyoNutri\Application\Api\PatientApiController($db);
-        $out = ['patient_name' => (string)$session['patient_name'], 'clinic_name' => (string)$session['clinic_name'], 'plan' => null, 'next' => null, 'water_today' => 0, 'water_goal' => null];
+        $manipuladosAvailable=(new \ClyoNutri\Domain\Prescription\PrescriptionAvailability($db))->available((int)$session['clinic_id']);
+        $out = ['manipulados_available'=>$manipuladosAvailable, 'patient_name' => (string)$session['patient_name'], 'clinic_name' => (string)$session['clinic_name'], 'plan' => null, 'next' => null, 'water_today' => 0, 'water_goal' => null];
         try { $out['plan'] = $api->getDailyMealPlan($pid); } catch (\Throwable $e) { error_log('[portal] plano: ' . get_class($e)); }
         try { $out['next'] = $api->portal()->getNextAppointment($pid); } catch (\Throwable $e) { error_log('[portal] consulta: ' . get_class($e)); }
         try { $out['water_today'] = $api->getHydrationTodayTotal($pid); $out['water_goal'] = $api->getPrescribedWaterGoal($pid); } catch (\Throwable $e) { error_log('[portal] água: ' . get_class($e)); }

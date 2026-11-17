@@ -96,6 +96,12 @@ final class StaffNotificationService
             'body' => '{clinic} trocou do plano {from} para o {to}. Já vale desde agora. A cobrança é manual: combine a diferença com a clínica. Protocolo {protocol}.',
             'permission' => 'billing.read', 'roles' => ['superadmin'], 'link' => '/admin/comercial#trocas-de-plano',
         ],
+        'subscription.activation_requested' => [
+            'group' => 'assinaturas', 'label' => 'Pedido de ativação de plano',
+            'title' => 'Pedido de ativação: {plan}',
+            'body' => '{clinic} pediu ativação do plano {plan} ({code}) por {requester}.',
+            'permission' => 'billing.read', 'roles' => ['superadmin', 'finance_admin', 'support_agent'], 'link' => '/admin/comercial#pedidos-ativacao',
+        ],
         'helpdesk.ticket_created' => [
             'group' => 'suporte', 'label' => 'Novo chamado no Service Desk',
             'title' => 'Novo chamado no Service Desk',
@@ -474,6 +480,33 @@ final class StaffNotificationService
             ], 'plan_change:' . $h['protocol']);
         } catch (\Throwable $e) {
             error_log('[ClyoNutri][staff-notify] falha no aviso de troca de plano: ' . get_class($e));
+            return ['recipients' => 0, 'created' => 0, 'duplicates' => 0, 'error' => true];
+        }
+    }
+
+    /** Pedido de ativação manual registrado quando Asaas não está configurado (NI2-878). */
+    public function notifyActivationRequested(int $requestId): array
+    {
+        try {
+            $st = $this->db->prepare('SELECT r.id, r.plan_code, c.name AS clinic_name, p.name AS plan_name, u.name AS requester_name
+                FROM subscription_activation_requests r
+                JOIN clinics c ON c.id = r.clinic_id
+                JOIN saas_plans p ON p.id = r.plan_id
+                JOIN users u ON u.id = r.requested_by_user_id
+                WHERE r.id = ?');
+            $st->execute([$requestId]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$r) {
+                return ['recipients' => 0, 'created' => 0, 'duplicates' => 0];
+            }
+            return $this->notify('subscription.activation_requested', [
+                'clinic' => $r['clinic_name'],
+                'plan' => $r['plan_name'],
+                'code' => $r['plan_code'],
+                'requester' => $r['requester_name'],
+            ], 'activation_req:' . $r['id']);
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][staff-notify] falha no aviso de pedido de ativação: ' . get_class($e));
             return ['recipients' => 0, 'created' => 0, 'duplicates' => 0, 'error' => true];
         }
     }

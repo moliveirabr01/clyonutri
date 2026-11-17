@@ -63,8 +63,9 @@ final class PatientTranscriptionConsentController
         }
         $decision = is_string($_POST['decision'] ?? null) ? $_POST['decision'] : '';
         $sha = is_string($_POST['terms_sha256'] ?? null) ? $_POST['terms_sha256'] : '';
+        $otp = is_string($_POST['otp'] ?? null) ? $_POST['otp'] : null;
         try {
-            $res = $this->service->decideByToken($token, $decision, $sha, $this->ip(), $this->ua());
+            $res = $this->service->decideByToken($token, $decision, $sha, $this->ip(), $this->ua(), $otp);
         } catch (DomainException $e) {
             $this->render(410, ['mode' => 'link', 'screen' => 'unavailable', 'message' => $e->getMessage()]);
             return;

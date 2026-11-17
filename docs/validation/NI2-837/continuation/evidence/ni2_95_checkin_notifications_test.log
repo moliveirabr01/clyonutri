@@ -1,0 +1,54 @@
+PASS [C0] Sem check-in diário (NI2-96) o lembrete fica indisponível e a categoria não aparece para a paciente
+PASS [C0] Ligar o lembrete sem check-in diário no app é recusado com texto claro
+PASS [C1] Com check-in diário o lembrete aparece, desligado, às 20:00
+PASS [C1] Categoria "Check-in diário" da paciente: celular ligado, e-mail desligado por padrão
+PASS [C1] Profissional: e-mail de check-in recebido ligado por padrão e sem chave de lembrete
+PASS [C2] Ninguém ligou o lembrete: o cron não cria nada
+PASS [C3] Hora fora do formato é recusada
+PASS [C3] Ligar com valor que não é verdadeiro/falso é recusado
+PASS [C3] Profissional não tem lembrete de check-in
+PASS [C3] Recusa não grava nada
+PASS [C3] Paciente liga o lembrete às 19:00 (e o e-mail) e a resposta mostra o que ficou salvo
+PASS [C3] Salvar de novo não duplica a linha
+PASS [C4] Antes da hora escolhida não lembra (e quem já fez o check-in não recebe)
+PASS [C4] Na hora escolhida sai um lembrete para a Ana
+PASS [C4] Bia marcou 08:00: às 19:05 a janela de 3 h já passou, não lembra fora de hora
+PASS [C4] Caio deixou desligado: nada
+PASS [C4] Rodar o cron de novo no mesmo dia não duplica (idempotente)
+FAIL [C5] Lembrete com texto neutro
+PASS [C5] Push sai com texto curto e categoria checkin (o app abre em Hoje)
+PASS [C5] E-mail (ligado pela Ana) sai com o mesmo texto neutro
+PASS [C5] Nada de nome, notas, adesão ou energia no aviso, no push ou no e-mail
+PASS [C6] Bia e Caio entram na fila às 19:40
+PASS [C6] Bia fez o check-in antes da entrega: e-mail e push pulados (checkin_done), nada sai
+PASS [C6] Lembrete de ontem não sai depois da meia-noite (expired)
+PASS [C7] Lembrete das 22:30 com silêncio 22:00–07:00 é pulado (quiet_hours), não fica para depois
+PASS [C7] O aviso continua na caixa do app (só não toca)
+PASS [C8] Cada check-in novo vira um aviso para o profissional responsável
+FAIL [C8] Aviso para a Nutri a (vínculo ativo), com link para o Perfil 360 da paciente
+PASS [C8] Sem vínculo, vai para quem publicou o plano mais recente
+PASS [C8] Outra clínica: só o profissional de lá recebe
+PASS [C8] Aparece na caixa de avisos do profissional (/avisos)
+PASS [C8] Push não se aplica a profissional (no_app)
+PASS [C8] E-mail do profissional sai (opt-out) e é neutro
+PASS [C8] Texto do profissional não supõe gênero (sem "uma paciente")
+PASS [C8] Sem nome, notas, adesão, energia ou fome em aviso ou e-mail
+PASS [C9] Cron de novo: nada duplicado
+PASS [C9] Paciente corrigiu o check-in no mesmo dia: não gera outro aviso
+PASS [C9] Segundo check-in do dia para a mesma Nutri: fica na caixa, sem outro e-mail (daily_email_limit)
+PASS [C9] No dia seguinte o e-mail volta a sair
+PASS [C9] Nutri que desligou o e-mail de check-in só vê na caixa (preference_off)
+PASS [C9] Check-in antigo (fora de ontem/hoje) não gera aviso atrasado
+PASS [C10] safeReason guarda só códigos curtos
+PASS [C10] Falha de e-mail grava só o código (mail_error) e tenta de novo depois
+PASS [C10] Todo motivo gravado em entregas, recibos e aparelhos é um código
+PASS [C10] Nenhum motivo leva e-mail, texto do aviso ou nota
+PASS [C10] Logs de erro dos avisos registram só a classe da exceção
+PASS [C11] Exportação LGPD leva a escolha do lembrete de check-in
+PASS [C11] Anonimização apaga o lembrete e os avisos de check-in da paciente na caixa do profissional
+PASS [C11] Paciente anonimizada não gera mais aviso nem lembrete
+PASS [C12] Cron agenda os avisos de check-in antes de drenar a fila e mostra a linha Check-in
+PASS [C12] Configurações do profissional têm o opt-out do e-mail de check-in
+PASS [C12] App da paciente mostra o lembrete só quando disponível
+
+Resultado NI2-95 check-in: 50 passaram, 2 falharam

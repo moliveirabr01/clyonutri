@@ -5,7 +5,7 @@ $badge = ['draft' => 'badge-neutral', 'review' => 'badge-warning', 'issued' => '
 $labels = \ClyoNutri\Domain\LaboratoryExam\ExamRequestService::STATUS_LABELS;
 $fmt = static fn($v) => $v ? date('d/m/Y H:i', strtotime((string)$v)) : '';
 ?>
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <?= \ClyoNutri\Application\View\PatientHeader::render(\ClyoNutri\Core\Database\Connection::getInstance(), (int)$patient['id'], 'exames') // NI2-661 ?>
 <div class="clinical-journey ex-page">
   <div class="ex-head">
@@ -36,13 +36,13 @@ $fmt = static fn($v) => $v ? date('d/m/Y H:i', strtotime((string)$v)) : '';
         <?php foreach ($requests as $r): ?>
           <tr>
             <td class="ex-mono"><?= $e($r['request_number']) ?><?= (int)($r['version_number'] ?? 1) > 1 ? '<br><span class="ex-muted">versão ' . (int)$r['version_number'] . '</span>' : '' ?><?= !empty($r['appointment_scheduled_at']) ? '<br><span class="ex-muted">consulta ' . $e($fmt($r['appointment_scheduled_at'])) . '</span>' : '' ?></td>
-            <td><?= $e($r['issued_at'] ? $fmt($r['issued_at']) : $fmt($r['updated_at'] ?: $r['created_at'])) ?></td>
+            <td class="ex-date"><?= $e($r['issued_at'] ? $fmt($r['issued_at']) : $fmt($r['updated_at'] ?: $r['created_at'])) ?></td>
             <td><?= $e($r['professional_name']) ?><?php if ($r['professional_crn'] !== ''): ?><br><span class="ex-muted"><?= $e($r['professional_crn']) ?></span><?php endif; ?></td>
             <td><?= (int)$r['total_items'] ?></td>
             <td><span class="badge <?= $badge[$r['status']] ?? 'badge-neutral' ?>"><?= $e($labels[$r['status']] ?? $r['status']) ?></span></td>
             <?php $rc = $resultCounts[(int)$r['id']] ?? ['accepted' => 0, 'pending' => 0]; ?>
             <td><?= (int)$rc['accepted'] ?><?php if ($rc['pending'] > 0): ?> <a class="badge badge-warning" href="/pacientes/<?= (int)$patient['id'] ?>/exames/<?= (int)$r['id'] ?>#laudos"><?= (int)$rc['pending'] ?> para revisar</a><?php endif; ?></td>
-            <td class="text-right">
+            <td class="text-right ex-table-actions">
               <a class="btn btn-outline" href="/pacientes/<?= (int)$patient['id'] ?>/exames/<?= (int)$r['id'] ?>">Abrir</a>
               <?php if (in_array($r['status'], ['issued', 'cancelled'], true)): ?>
                 <a class="btn btn-secondary" href="/pacientes/<?= (int)$patient['id'] ?>/exames/<?= (int)$r['id'] ?>/imprimir" target="_blank" rel="noopener">Imprimir</a>

@@ -129,6 +129,8 @@ final class SubscriptionService
         // Métricas de uso real (sem dados de saúde)
         $sub['usage'] = $this->getUsageMetrics($clinicId);
         $sub['invoices'] = $this->getInvoices($clinicId, (int)$sub['id']);
+        $sub['trial_state'] = $this->trialState($clinicId);
+        $sub['expired_notice'] = $this->expiredNotice($clinicId);
 
         return $sub;
     }
@@ -594,6 +596,548 @@ final class SubscriptionService
             'canceled_at' => $canceledAt,
             'effective_until' => $subscription['current_period_end'],
             'message' => 'Assinatura cancelada. Seu acesso continuará liberado até ' . $effectiveUntilFormatted . ', fim do ciclo faturado.'
+        ];
+    }
+
+    public const EXPIRED_GRACE_DAYS = 3;
+
+    /**
+     * NI2-878: regra única de estado do teste/assinatura baseada em data (sem depender de cron).
+     * Retorna state: active | trial | grace | read_only | none.
+     *
+     * @return array{
+     *   state:string,
+     *   status:string,
+     *   trial_ends_at:?string,
+     *   grace_ends_at:?string,
+     *   current_period_end:?string,
+     *   days_remaining:int,
+     *   days_left_in_trial:int,
+     *   grace_days:int,
+     *   expired:bool,
+     *   in_grace:bool,
+     *   read_only:bool,
+     *   reason:?string
+     * }
+     */
+    public function trialState(int $clinicId, ?int $nowTimestamp = null): array
+    {
+        $graceRaw = \ClyoNutri\Core\Security\Env::get('TRIAL_EXPIRED_GRACE_DAYS');
+        $graceDays = is_numeric($graceRaw) ? max(0, (int)$graceRaw) : self::EXPIRED_GRACE_DAYS;
+        $nowTs = $nowTimestamp ?? time();
+
+        if (!\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'clinic_subscriptions')) {
+            return [
+                'state' => 'none',
+                'status' => 'none',
+                'trial_ends_at' => null,
+                'grace_ends_at' => null,
+                'current_period_end' => null,
+                'days_remaining' => 0,
+                'days_left_in_trial' => 0,
+                'grace_days' => $graceDays,
+                'expired' => false,
+                'in_grace' => false,
+                'read_only' => false,
+                'reason' => null,
+            ];
+        }
+
+        $st = $this->db->prepare('SELECT status, trial_ends_at, current_period_end, updated_at FROM clinic_subscriptions WHERE clinic_id = :c ORDER BY id DESC LIMIT 1');
+        $st->execute(['c' => $clinicId]);
+        $sub = $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$sub) {
+            return [
+                'state' => 'none',
+                'status' => 'none',
+                'trial_ends_at' => null,
+                'grace_ends_at' => null,
+                'current_period_end' => null,
+                'days_remaining' => 0,
+                'days_left_in_trial' => 0,
+                'grace_days' => $graceDays,
+                'expired' => false,
+                'in_grace' => false,
+                'read_only' => false,
+                'reason' => null,
+            ];
+        }
+
+        $status = (string)($sub['status'] ?? '');
+        $trialEndsAt = !empty($sub['trial_ends_at']) ? (string)$sub['trial_ends_at'] : null;
+        $periodEnd = !empty($sub['current_period_end']) ? (string)$sub['current_period_end'] : null;
+
+        if ($status === 'active') {
+            return [
+                'state' => 'active',
+                'status' => $status,
+                'trial_ends_at' => $trialEndsAt,
+                'grace_ends_at' => null,
+                'current_period_end' => $periodEnd,
+                'days_remaining' => 0,
+                'days_left_in_trial' => 0,
+                'grace_days' => $graceDays,
+                'expired' => false,
+                'in_grace' => false,
+                'read_only' => false,
+                'reason' => null,
+            ];
+        }
+
+        if ($status === 'canceled') {
+            $periodTs = $periodEnd !== null ? strtotime($periodEnd) : false;
+            if ($periodTs !== false && $periodTs >= $nowTs) {
+                return [
+                    'state' => 'active',
+                    'status' => $status,
+                    'trial_ends_at' => $trialEndsAt,
+                    'grace_ends_at' => null,
+                    'current_period_end' => $periodEnd,
+                    'days_remaining' => 0,
+                    'days_left_in_trial' => 0,
+                    'grace_days' => $graceDays,
+                    'expired' => false,
+                    'in_grace' => false,
+                    'read_only' => false,
+                    'reason' => null,
+                ];
+            }
+            return [
+                'state' => 'read_only',
+                'status' => $status,
+                'trial_ends_at' => $trialEndsAt,
+                'grace_ends_at' => null,
+                'current_period_end' => $periodEnd,
+                'days_remaining' => 0,
+                'days_left_in_trial' => 0,
+                'grace_days' => $graceDays,
+                'expired' => true,
+                'in_grace' => false,
+                'read_only' => true,
+                'reason' => 'Sua assinatura foi cancelada e o acesso está em modo leitura (leitura e exportação continuam liberadas).',
+            ];
+        }
+
+        $refRaw = (string)($sub['trial_ends_at'] ?? $sub['current_period_end'] ?? $sub['updated_at'] ?? '');
+        $refTs = $refRaw !== '' ? strtotime($refRaw) : false;
+
+        if ($status === 'trialing' && ($refTs === false || $refTs > $nowTs)) {
+            $daysLeft = $refTs !== false ? max(1, (int)ceil(($refTs - $nowTs) / 86400)) : 0;
+            return [
+                'state' => 'trial',
+                'status' => $status,
+                'trial_ends_at' => $trialEndsAt,
+                'grace_ends_at' => null,
+                'current_period_end' => $periodEnd,
+                'days_remaining' => $daysLeft,
+                'days_left_in_trial' => $daysLeft,
+                'grace_days' => $graceDays,
+                'expired' => false,
+                'in_grace' => false,
+                'read_only' => false,
+                'reason' => null,
+            ];
+        }
+
+        // Expirado pela data (mesmo que status ainda seja 'trialing') ou status='expired'
+        $baseEndTs = $refTs !== false ? $refTs : $nowTs;
+        $graceEndTs = $baseEndTs + ($graceDays * 86400);
+        $graceEndsAt = date('Y-m-d H:i:s', $graceEndTs);
+
+        if ($graceDays > 0 && $refTs !== false && $nowTs <= $graceEndTs) {
+            $daysRemaining = max(1, (int)ceil(($graceEndTs - $nowTs) / 86400));
+            return [
+                'state' => 'grace',
+                'status' => $status,
+                'trial_ends_at' => $trialEndsAt,
+                'grace_ends_at' => $graceEndsAt,
+                'current_period_end' => $periodEnd,
+                'days_remaining' => $daysRemaining,
+                'days_left_in_trial' => 0,
+                'grace_days' => $graceDays,
+                'expired' => true,
+                'in_grace' => true,
+                'read_only' => false,
+                'reason' => "Seu período de teste terminou. Você tem {$daysRemaining} dia(s) de carência antes do modo leitura.",
+            ];
+        }
+
+        return [
+            'state' => 'read_only',
+            'status' => $status,
+            'trial_ends_at' => $trialEndsAt,
+            'grace_ends_at' => $graceEndsAt,
+            'current_period_end' => $periodEnd,
+            'days_remaining' => 0,
+            'days_left_in_trial' => 0,
+            'grace_days' => $graceDays,
+            'expired' => true,
+            'in_grace' => false,
+            'read_only' => true,
+            'reason' => 'Seu período de teste terminou há mais de ' . $graceDays . ' dia(s). A conta está em modo leitura (leitura e exportação de dados continuam liberadas). Assine ou peça ativação de um plano para voltar a criar ou editar registros.',
+        ];
+    }
+
+    /**
+     * NI2-878: aviso único de fim de teste (carência ou modo leitura), independente do cron.
+     *
+     * @return ?array{
+     *   state:string,
+     *   title:string,
+     *   message:string,
+     *   trial_ends_at:?string,
+     *   grace_ends_at:?string,
+     *   days_remaining:int,
+     *   asaas_enabled:bool,
+     *   cta_label:string,
+     *   cta_href:string
+     * }
+     */
+    public function expiredNotice(int $clinicId, ?bool $asaasEnabled = null, ?int $nowTimestamp = null): ?array
+    {
+        $ts = $this->trialState($clinicId, $nowTimestamp);
+        if (!in_array($ts['state'], ['grace', 'read_only'], true)) {
+            return null;
+        }
+        $asaas = $asaasEnabled ?? (new \ClyoNutri\Domain\Billing\AsaasCheckoutService($this->db, $this))->isEnabled();
+        $endDateFmt = !empty($ts['trial_ends_at']) ? date('d/m/Y', strtotime((string)$ts['trial_ends_at'])) : null;
+        $graceDateFmt = !empty($ts['grace_ends_at']) ? date('d/m/Y', strtotime((string)$ts['grace_ends_at'])) : null;
+
+        if ($ts['state'] === 'grace') {
+            $title = 'Seu período de teste terminou' . ($endDateFmt ? ' em ' . $endDateFmt : '') . ' (carência ativa)';
+            $message = 'Você está no período de carência de ' . $ts['days_remaining'] . ' dia(s)'
+                . ($graceDateFmt ? ' (até ' . $graceDateFmt . ')' : '')
+                . '. Seus dados continuam salvos e o sistema segue liberado temporariamente. '
+                . ($asaas ? 'Escolha um plano para assinar agora.' : 'Peça a ativação do seu plano para continuar sem interrupções.');
+        } else {
+            $title = 'Período de teste encerrado' . ($endDateFmt ? ' em ' . $endDateFmt : '') . ' — modo leitura';
+            $message = 'O prazo de carência terminou e a conta entrou em modo leitura. Você ainda pode consultar e exportar todos os seus dados. '
+                . ($asaas ? 'Assine um plano para voltar a criar e editar registros.' : 'Peça a ativação de um plano para liberar a criação e edição de registros.');
+        }
+
+        return [
+            'state' => $ts['state'],
+            'title' => $title,
+            'message' => $message,
+            'trial_ends_at' => $ts['trial_ends_at'],
+            'grace_ends_at' => $ts['grace_ends_at'],
+            'days_remaining' => $ts['days_remaining'],
+            'asaas_enabled' => $asaas,
+            'cta_label' => $asaas ? 'Assinar um plano' : 'Pedir ativação',
+            'cta_href' => $asaas ? '/configuracoes/assinatura#plano' : '/configuracoes/assinatura#pedir-ativacao',
+        ];
+    }
+
+    /**
+     * NI2-863 (F-05) / NI2-878: regra única de acesso após o fim do teste grátis.
+     * @return array{allowed:bool,read_only:bool,in_grace:bool,state:string,status:string,grace_days:int,reason:?string}
+     */
+    public function checkWriteAccess(int $clinicId, ?int $nowTimestamp = null): array
+    {
+        $ts = $this->trialState($clinicId, $nowTimestamp);
+        return [
+            'allowed' => !$ts['read_only'],
+            'read_only' => $ts['read_only'],
+            'in_grace' => $ts['in_grace'],
+            'state' => $ts['state'],
+            'status' => $ts['status'],
+            'grace_days' => $ts['grace_days'],
+            'reason' => $ts['reason'],
+        ];
+    }
+
+    /**
+     * NI2-878: registra pedido de ativação manual quando o Asaas não está configurado,
+     * notifica o backoffice (/admin/notificacoes) e envia e-mail ao suporte.
+     */
+    public function requestManualActivation(
+        int $clinicId,
+        int $userId,
+        int $planId,
+        ?string $notes = null,
+        ?\ClyoNutri\Core\Mail\Mailer $mailer = null
+    ): array {
+        if (!$this->canManageSubscription($clinicId, $userId)) {
+            throw new \DomainException('Apenas titulares ou administradores podem pedir a ativação do plano.');
+        }
+
+        $stPlan = $this->db->prepare('SELECT id, code, name, price_cents FROM saas_plans WHERE id = ? AND is_active = 1 LIMIT 1');
+        $stPlan->execute([$planId]);
+        $plan = $stPlan->fetch(PDO::FETCH_ASSOC);
+        if (!$plan) {
+            throw new \InvalidArgumentException('Plano selecionado não encontrado ou inativo.');
+        }
+
+        $cleanNotes = $notes !== null ? trim(mb_substr($notes, 0, 500)) : null;
+        if ($cleanNotes === '') {
+            $cleanNotes = null;
+        }
+
+        $nowStr = (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
+        $ins = $this->db->prepare(
+            'INSERT INTO subscription_activation_requests (clinic_id, plan_id, plan_code, requested_by_user_id, notes, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $ins->execute([$clinicId, (int)$plan['id'], (string)$plan['code'], $userId, $cleanNotes, 'pending', $nowStr]);
+        $requestId = (int)$this->db->lastInsertId();
+
+        $aud = $this->db->prepare('INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $aud->execute([
+            $clinicId,
+            $userId,
+            'SUBSCRIPTION_ACTIVATION_REQUESTED',
+            'subscription_activation_requests',
+            (string)$requestId,
+            json_encode(['plan_id' => (int)$plan['id'], 'plan_code' => $plan['code'], 'notes' => $cleanNotes], JSON_UNESCAPED_UNICODE),
+            $nowStr,
+        ]);
+
+        (new \ClyoNutri\Domain\Notification\StaffNotificationService($this->db))->notifyActivationRequested($requestId);
+
+        $supportEmail = \ClyoNutri\Core\Security\ContactInfo::supportEmail();
+        try {
+            $clinicStmt = $this->db->prepare('SELECT name FROM clinics WHERE id = ?');
+            $clinicStmt->execute([$clinicId]);
+            $clinicName = (string)($clinicStmt->fetchColumn() ?: ('Clínica #' . $clinicId));
+
+            $userStmt = $this->db->prepare('SELECT name, email FROM users WHERE id = ?');
+            $userStmt->execute([$userId]);
+            $requester = $userStmt->fetch(PDO::FETCH_ASSOC) ?: ['name' => 'Usuário #' . $userId, 'email' => ''];
+
+            $textBody = "Pedido #{$requestId}\nClínica: {$clinicName} (ID {$clinicId})\nPlano solicitado: {$plan['name']} ({$plan['code']})\nSolicitante: {$requester['name']} ({$requester['email']})\nObservações: " . ($cleanNotes ?? 'Nenhuma') . "\n\nAtive em /admin/comercial#assinantes.";
+            $msg = new \ClyoNutri\Core\Mail\MailMessage(
+                toAddress: $supportEmail,
+                toName: 'Suporte ClyoNutri',
+                subject: "[ClyoNutri] Pedido de ativação de plano — {$clinicName} ({$plan['code']})",
+                htmlBody: nl2br(htmlspecialchars($textBody, ENT_QUOTES, 'UTF-8')),
+                textBody: $textBody,
+                replyTo: !empty($requester['email']) && filter_var($requester['email'], FILTER_VALIDATE_EMAIL) ? (string)$requester['email'] : null
+            );
+            ($mailer ?? \ClyoNutri\Core\Mail\MailerFactory::fromEnv())->send($msg);
+        } catch (\Throwable $e) {
+            error_log('activation_request_email_failed: ' . $e->getMessage());
+        }
+
+        return [
+            'id' => $requestId,
+            'clinic_id' => $clinicId,
+            'plan_id' => (int)$plan['id'],
+            'plan_code' => (string)$plan['code'],
+            'plan_name' => (string)$plan['name'],
+            'status' => 'pending',
+            'created_at' => $nowStr,
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function pendingActivationRequestsForClinic(int $clinicId): array
+    {
+        if (!\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'subscription_activation_requests')) {
+            return [];
+        }
+        $st = $this->db->prepare(
+            'SELECT r.*, p.name AS plan_name FROM subscription_activation_requests r
+             JOIN saas_plans p ON p.id = r.plan_id
+             WHERE r.clinic_id = ? AND r.status = ? ORDER BY r.id DESC LIMIT 5'
+        );
+        $st->execute([$clinicId, 'pending']);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listActivationRequestsForAdmin(int $limit = 20): array
+    {
+        if (!\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'subscription_activation_requests')) {
+            return [];
+        }
+        $limit = max(1, min(100, $limit));
+        $st = $this->db->query(
+            "SELECT r.*, c.name AS clinic_name, p.name AS plan_name, u.name AS requester_name, u.email AS requester_email
+             FROM subscription_activation_requests r
+             JOIN clinics c ON c.id = r.clinic_id
+             JOIN saas_plans p ON p.id = r.plan_id
+             JOIN users u ON u.id = r.requested_by_user_id
+             WHERE r.status = 'pending'
+             ORDER BY r.id DESC LIMIT {$limit}"
+        );
+        return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+    }
+
+    /**
+     * NI2-878: ativação / troca manual de plano pelo console (/admin/comercial).
+     * Libera escrita na hora, grava histórico em subscription_plan_changes e audita SUBSCRIPTION_MANUALLY_ACTIVATED.
+     */
+    public function activateManuallyByAdmin(
+        int $clinicId,
+        int $planId,
+        string $validUntilDate,
+        string $reason,
+        int $actorUserId,
+        string $ip = '127.0.0.1',
+        ?string $userAgent = null
+    ): array {
+        $reasonTrim = trim($reason);
+        if ($reasonTrim === '') {
+            throw new \InvalidArgumentException('Informe o motivo da ativação manual.');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($validUntilDate))) {
+            throw new \InvalidArgumentException('Data de validade inválida. Use o formato YYYY-MM-DD.');
+        }
+        $validDt = \DateTimeImmutable::createFromFormat('Y-m-d', trim($validUntilDate));
+        if (!$validDt || $validDt->format('Y-m-d') !== trim($validUntilDate)) {
+            throw new \InvalidArgumentException('Data de validade inválida.');
+        }
+        $periodEndStr = $validDt->format('Y-m-d') . ' 23:59:59';
+
+        $stPlan = $this->db->prepare('SELECT * FROM saas_plans WHERE id = ? LIMIT 1');
+        $stPlan->execute([$planId]);
+        $plan = $stPlan->fetch(PDO::FETCH_ASSOC);
+        if (!$plan) {
+            throw new \InvalidArgumentException('Plano alvo não encontrado.');
+        }
+
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
+        $nowStr = $now->format('Y-m-d H:i:s');
+
+        $this->db->beginTransaction();
+        try {
+            $stSub = $this->db->prepare(
+                'SELECT cs.*, p.code AS plan_code FROM clinic_subscriptions cs
+                 LEFT JOIN saas_plans p ON p.id = cs.plan_id
+                 WHERE cs.clinic_id = ? LIMIT 1'
+            );
+            $stSub->execute([$clinicId]);
+            $currentSub = $stSub->fetch(PDO::FETCH_ASSOC);
+
+            if (!$currentSub) {
+                $ins = $this->db->prepare(
+                    'INSERT INTO clinic_subscriptions (clinic_id, plan_id, status, billing_cycle, price_cents, started_at, current_period_start, current_period_end, trial_ends_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $ins->execute([
+                    $clinicId,
+                    (int)$plan['id'],
+                    'active',
+                    (string)$plan['billing_cycle'],
+                    (int)$plan['price_cents'],
+                    $nowStr,
+                    $nowStr,
+                    $periodEndStr,
+                    $nowStr,
+                    $nowStr,
+                ]);
+                $subId = (int)$this->db->lastInsertId();
+                $fromPlanId = (int)$plan['id'];
+                $fromPlanCode = (string)$plan['code'];
+                $fromPriceCents = (int)$plan['price_cents'];
+                $prevStatus = 'none';
+            } else {
+                $subId = (int)$currentSub['id'];
+                $fromPlanId = (int)$currentSub['plan_id'];
+                $fromPlanCode = (string)($currentSub['plan_code'] ?? $plan['code']);
+                $fromPriceCents = (int)($currentSub['price_cents'] ?? 0);
+                $prevStatus = (string)($currentSub['status'] ?? '');
+
+                $upd = $this->db->prepare(
+                    'UPDATE clinic_subscriptions
+                     SET plan_id = ?, status = ?, billing_cycle = ?, price_cents = ?,
+                         current_period_start = ?, current_period_end = ?,
+                         canceled_at = NULL, cancellation_protocol = NULL, cancellation_reason_category = NULL, cancellation_feedback = NULL,
+                         updated_at = ?
+                     WHERE id = ? AND clinic_id = ?'
+                );
+                $upd->execute([
+                    (int)$plan['id'],
+                    'active',
+                    (string)$plan['billing_cycle'],
+                    (int)$plan['price_cents'],
+                    $nowStr,
+                    $periodEndStr,
+                    $nowStr,
+                    $subId,
+                    $clinicId,
+                ]);
+            }
+
+            $protocol = 'ACT-' . $now->format('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'subscription_plan_changes')) {
+                $insChange = $this->db->prepare(
+                    'INSERT INTO subscription_plan_changes
+                     (clinic_id, subscription_id, protocol, change_type, from_plan_id, to_plan_id, from_plan_code, to_plan_code,
+                      from_price_cents, to_price_cents, subscription_status, billing_mode, usage_json, idempotency_key, requested_by, effective_at, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $insChange->execute([
+                    $clinicId,
+                    $subId,
+                    $protocol,
+                    'manual_activation',
+                    $fromPlanId,
+                    (int)$plan['id'],
+                    $fromPlanCode,
+                    (string)$plan['code'],
+                    $fromPriceCents,
+                    (int)$plan['price_cents'],
+                    'active',
+                    'manual_admin',
+                    json_encode(['reason' => $reasonTrim, 'valid_until' => $validDt->format('Y-m-d')], JSON_UNESCAPED_UNICODE),
+                    null,
+                    $actorUserId,
+                    $nowStr,
+                    $nowStr,
+                ]);
+            }
+
+            if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'subscription_activation_requests')) {
+                $updReq = $this->db->prepare(
+                    'UPDATE subscription_activation_requests
+                     SET status = ?, processed_by_user_id = ?, processed_at = ?
+                     WHERE clinic_id = ? AND status = ?'
+                );
+                $updReq->execute(['activated', $actorUserId, $nowStr, $clinicId, 'pending']);
+            }
+
+            $aud = $this->db->prepare(
+                'INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $aud->execute([
+                $clinicId,
+                $actorUserId,
+                'SUBSCRIPTION_MANUALLY_ACTIVATED',
+                'clinic_subscriptions',
+                (string)$subId,
+                $ip,
+                $userAgent !== null ? mb_substr($userAgent, 0, 255) : null,
+                json_encode([
+                    'protocol' => $protocol,
+                    'actor_user_id' => $actorUserId,
+                    'previous_status' => $prevStatus,
+                    'from_plan_code' => $fromPlanCode,
+                    'to_plan_code' => (string)$plan['code'],
+                    'valid_until' => $validDt->format('Y-m-d'),
+                    'reason' => $reasonTrim,
+                ], JSON_UNESCAPED_UNICODE),
+                $nowStr,
+            ]);
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        return [
+            'subscription_id' => $subId,
+            'clinic_id' => $clinicId,
+            'plan_code' => (string)$plan['code'],
+            'plan_name' => (string)$plan['name'],
+            'status' => 'active',
+            'current_period_end' => $periodEndStr,
+            'protocol' => $protocol,
         ];
     }
 

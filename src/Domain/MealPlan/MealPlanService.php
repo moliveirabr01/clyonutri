@@ -73,18 +73,20 @@ class MealPlanService
         $this->db->beginTransaction();
         try {
             $nowLocal = date('Y-m-d H:i:s');
+            $hasPlanApptCol = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'meal_plans', 'appointment_id');
+            $planApptId = $patientId !== null ? \ClyoNutri\Application\View\AttendanceContext::currentAppointmentId($patientId) : null;
             $stmt = $this->db->prepare("
                 INSERT INTO meal_plans (
-                    clinic_id, patient_id, professional_id, title, notes,
+                    clinic_id, patient_id, professional_id," . ($hasPlanApptCol ? " appointment_id," : "") . " title, notes,
                     status, version, parent_plan_id, daily_energy_kcal,
                     protein_g, carbohydrate_g, lipid_g, fiber_g, created_at, updated_at
                 ) VALUES (
-                    :clinic_id, :patient_id, :professional_id, :title, :notes,
+                    :clinic_id, :patient_id, :professional_id," . ($hasPlanApptCol ? " :appointment_id," : "") . " :title, :notes,
                     'draft', 1, :parent_plan_id, 0.0,
                     0.0, 0.0, 0.0, 0.0, :now_c, :now_u
                 )
             ");
-            $stmt->execute([
+            $createParams = [
                 'clinic_id' => $clinicId,
                 'patient_id' => $patientId,
                 'professional_id' => $professionalId,
@@ -93,7 +95,11 @@ class MealPlanService
                 'parent_plan_id' => $parentPlanId,
                 'now_c' => $nowLocal,
                 'now_u' => $nowLocal,
-            ]);
+            ];
+            if ($hasPlanApptCol) {
+                $createParams['appointment_id'] = $planApptId;
+            }
+            $stmt->execute($createParams);
             $planId = (int)$this->db->lastInsertId();
 
             if (!empty($meals)) {
@@ -796,7 +802,7 @@ class MealPlanService
                 $mealCarb += (float)$item['carbohydrate_g'];
                 $mealLip += (float)$item['lipid_g'];
                 $mealFib += (float)$item['fiber_g'];
-                $item['allergen_alert'] = !empty($item['allergen_alert_json']) ? json_decode((string)$item['allergen_alert_json'], true) : null;
+                $item['allergen_alert'] = !empty($item['allergen_alert_json']) ? \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$item['allergen_alert_json'], true)) : null;
 
                 $sStmt = $this->db->prepare("
                     SELECT s.*, f.name AS food_name, f.category AS food_category, f.allergens
@@ -808,7 +814,7 @@ class MealPlanService
                 $sStmt->execute(['item_id' => $item['id']]);
                 $subs = $sStmt->fetchAll();
                 foreach ($subs as &$subRow) {
-                    $subRow['allergen_alert'] = !empty($subRow['allergen_alert_json']) ? json_decode((string)$subRow['allergen_alert_json'], true) : null;
+                    $subRow['allergen_alert'] = !empty($subRow['allergen_alert_json']) ? \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$subRow['allergen_alert_json'], true)) : null;
                 }
                 unset($subRow);
                 $item['substitutions'] = $subs;
@@ -849,11 +855,30 @@ class MealPlanService
         // Validação clínica de alergênicos contra a anamnese do paciente (fail-closed)
         $foodIds = [];
         $estimated = [];
+        $unreviewedEstimated = [];
+        $unreviewedStmt = null;
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasTable($this->db, 'food_household_measures')) {
+            $unreviewedStmt = $this->db->prepare("SELECT source FROM food_household_measures WHERE food_id = :fid AND LOWER(TRIM(measure_name)) = LOWER(TRIM(:u)) AND source LIKE '%revisar%' LIMIT 1");
+        }
         foreach ($plan['meals'] as $m) {
             foreach ($m['items'] as $it) {
                 $foodIds[] = (int)$it['food_id'];
                 if (!empty($it['weight_is_estimated'])) {
                     $estimated[] = ['food_name' => $it['food_name'], 'amount' => (float)$it['amount'], 'measure_unit' => $it['measure_unit'], 'weight_grams' => $it['weight_grams'] !== null ? (float)$it['weight_grams'] : null];
+                }
+                if ($unreviewedStmt !== null) {
+                    $unreviewedStmt->execute(['fid' => (int)$it['food_id'], 'u' => (string)$it['measure_unit']]);
+                    $src = $unreviewedStmt->fetchColumn();
+                    if ($src !== false) {
+                        $unreviewedEstimated[] = [
+                            'item_id' => (int)$it['id'],
+                            'food_name' => (string)$it['food_name'],
+                            'amount' => (float)$it['amount'],
+                            'measure_unit' => (string)$it['measure_unit'],
+                            'weight_grams' => $it['weight_grams'] !== null ? (float)$it['weight_grams'] : null,
+                            'source' => (string)$src,
+                        ];
+                    }
                 }
                 foreach ($it['substitutions'] as $sub) {
                     $foodIds[] = (int)$sub['food_id'];
@@ -893,6 +918,7 @@ class MealPlanService
             'is_ready_to_publish' => $hasPatient && count($plan['meals']) > 0 && $hasPublishableContent,
             'allergen_safety' => $allergenSafety,
             'estimated_weights' => $estimated,
+            'unreviewed_estimated_measures' => $unreviewedEstimated,
             'target_comparison' => $targetComparison,
             'adequacy' => [
                 'alerts' => $adequacyAlerts,
@@ -976,19 +1002,28 @@ class MealPlanService
         bool $returnDetails = false,
         ?string $overrideReason = null,
         bool $allowAdequacyOverride = false,
-        ?string $adequacyOverrideReason = null
+        ?string $adequacyOverrideReason = null,
+        bool $confirmEstimatedMeasures = false,
+        ?string $confirmedTitle = null
     ): bool|array
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertMealPlanBelongsToClinic($planId, $clinicId, $this->db);
 
-        $head = $this->db->prepare("SELECT patient_id, status FROM meal_plans WHERE id = :id AND clinic_id = :c");
+        $head = $this->db->prepare("SELECT patient_id, status, title FROM meal_plans WHERE id = :id AND clinic_id = :c");
         $head->execute(['id' => $planId, 'c' => $clinicId]);
         $planHead = $head->fetch(PDO::FETCH_ASSOC);
         if (!$planHead) {
             throw new InvalidArgumentException("Plano alimentar não encontrado.");
         }
         self::assertPublishableStatus((string)$planHead['status']);
+        $publicationTitle = null;
+        if (PlanTitle::needsConfirmation((string)$planHead['title'])) {
+            if ($confirmedTitle === null || trim($confirmedTitle) === '' || mb_strlen($confirmedTitle) > 255 || PlanTitle::needsConfirmation($confirmedTitle)) {
+                throw new InvalidArgumentException('Confirme o título que o paciente verá antes de publicar. Remova o prefixo [Cópia].');
+            }
+            $publicationTitle = trim($confirmedTitle);
+        }
         if (empty($planHead['patient_id'])) {
             // NI2-514: a avaliação de alergia e o consentimento dependem do paciente; sem ele não há publicação.
             throw new InvalidArgumentException("Atribua um paciente ao plano antes de publicar. A conferência de alergias usa a anamnese dele.");
@@ -1008,10 +1043,10 @@ class MealPlanService
             // Primeira escrita: draft -> published. Se outra requisição já publicou ou mudou o status, para aqui.
             $claim = $this->db->prepare("
                 UPDATE meal_plans
-                SET status = 'published', published_at = :published_at, updated_at = :updated_at
+                SET status = 'published', title = COALESCE(:publication_title, title), published_at = :published_at, updated_at = :updated_at
                 WHERE id = :id AND clinic_id = :clinic_id AND status = 'draft'
             ");
-            $claim->execute(['published_at' => $publishedAt, 'updated_at' => $publishedAt, 'id' => $planId, 'clinic_id' => $clinicId]);
+            $claim->execute(['publication_title' => $publicationTitle, 'published_at' => $publishedAt, 'updated_at' => $publishedAt, 'id' => $planId, 'clinic_id' => $clinicId]);
             if ($claim->rowCount() !== 1) {
                 $st = $this->db->prepare("SELECT status FROM meal_plans WHERE id = :id AND clinic_id = :c");
                 $st->execute(['id' => $planId, 'c' => $clinicId]);
@@ -1062,6 +1097,10 @@ class MealPlanService
                     throw new InvalidArgumentException("Para publicar com alerta de alérgeno, descreva a justificativa clínica (mínimo de 10 caracteres).");
                 }
                 $overrideUsed = true;
+            }
+
+            if (!empty($preview['unreviewed_estimated_measures']) && !$confirmEstimatedMeasures) {
+                throw new InvalidArgumentException('Este plano usa medidas caseiras estimadas ("Estimativa ClyoNutri (revisar)"). Revise o peso e marque a confirmação antes de publicar.');
             }
 
             // NI2-587: adequação à meta (energia e macronutrientes) e estrutura mínima, sobre o estado já travado.
@@ -1116,18 +1155,21 @@ class MealPlanService
             $plan['adequacy_override_reason'] = $adequacyOverrideUsed ? $adqReason : null;
             $snapshotPayload = json_encode($plan, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
+            $hasVerApptCol = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'meal_plan_versions', 'appointment_id');
+            $verApptId = \ClyoNutri\Application\View\AttendanceContext::currentAppointmentId($patientId)
+                ?? (!empty($plan['appointment_id']) ? (int)$plan['appointment_id'] : null);
             $insVer = $this->db->prepare("
                 INSERT INTO meal_plan_versions (
-                    clinic_id, meal_plan_id, patient_id, professional_id,
+                    clinic_id, meal_plan_id, patient_id, professional_id," . ($hasVerApptCol ? " appointment_id," : "") . "
                     version_number, title, daily_energy_kcal, payload_json,
                     status, published_at, created_at, published_by_user_id, allergen_override_reason
                 ) VALUES (
-                    :clinic_id, :meal_plan_id, :patient_id, :professional_id,
+                    :clinic_id, :meal_plan_id, :patient_id, :professional_id," . ($hasVerApptCol ? " :appointment_id," : "") . "
                     :version_number, :title, :daily_energy_kcal, :payload_json,
                     'published', :published_at, :created_at, :published_by, :override_reason
                 )
             ");
-            $insVer->execute([
+            $verParams = [
                 'clinic_id' => $clinicId,
                 'meal_plan_id' => $planId,
                 'patient_id' => $patientId,
@@ -1140,7 +1182,11 @@ class MealPlanService
                 'created_at' => $publishedAt,
                 'published_by' => $actorUserId,
                 'override_reason' => $overrideUsed ? $reason : null,
-            ]);
+            ];
+            if ($hasVerApptCol) {
+                $verParams['appointment_id'] = $verApptId;
+            }
+            $insVer->execute($verParams);
 
             $upPlan = $this->db->prepare("UPDATE meal_plans SET version = :version WHERE id = :id AND clinic_id = :clinic_id");
             $upPlan->execute(['version' => $nextVersionNumber, 'id' => $planId, 'clinic_id' => $clinicId]);
@@ -1234,7 +1280,7 @@ class MealPlanService
 
         $cleanTitle = $newTitle !== null && trim($newTitle) !== ''
             ? trim($newTitle)
-            : "[Cópia] " . $orig['title'];
+            : PlanTitle::forPatient((string)$orig['title']);
 
         // Preparar estrutura profunda de refeições, itens e substituições
         $clonedMeals = [];
@@ -1279,6 +1325,7 @@ class MealPlanService
             $clonedMeals,
             $planId
         );
+        $this->db->prepare('UPDATE meal_plans SET version = :v WHERE id = :id AND clinic_id = :c')->execute(['v' => (int)$orig['version'] + 1, 'id' => (int)$copy['plan_id'], 'c' => $clinicId]);
         // NI2-514: a meta de energia acompanha a cópia (com a origem registrada); o profissional pode recalcular.
         (new EnergyTargetService($this->db))->copyTarget($planId, (int)$copy['plan_id']);
         // NI2-519 (v43): a nova versão mantém o modelo de origem, o método e a meta de referência.
@@ -1385,7 +1432,7 @@ class MealPlanService
             return null;
         }
 
-        $row['payload'] = json_decode($row['payload_json'], true);
+        $row['payload'] = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$row['payload_json'], true));
         unset($row['payload_json']);
         return $row;
     }

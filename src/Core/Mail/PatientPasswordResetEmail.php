@@ -13,7 +13,7 @@ final class PatientPasswordResetEmail
     public static function build(string $toAddress, string $toName, string $resetUrl, int $validityMinutes, ?string $replyTo = null): MailMessage
     {
         $name = trim($toName) !== '' ? trim($toName) : 'Olá';
-        $firstName = explode(' ', $name)[0];
+        $firstName = \ClyoNutri\Domain\Dashboard\DashboardOverview::firstName($name) ?: explode(' ', $name)[0]; // F-20 (v54.68)
         $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $subject = 'Criar uma nova senha no app do Clyo Nutri';

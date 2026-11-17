@@ -33,10 +33,12 @@
 
   function parseDecimal(raw) {
     if (raw === null || raw === undefined) return { empty: true };
-    let s = String(raw).trim();
+    let s = String(raw).trim().replace(/^R\$\s*/i, '');
     if (s === '') return { empty: true };
-    if (/^-?\d{1,3}(\.\d{3})+,\d+$/.test(s)) {
+    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
       s = s.replace(/\./g, '');
+    } else if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
+      s = s.replace(/,/g, '');
     }
     s = s.replace(',', '.');
     if (!/^[+-]?\d+(\.\d+)?$/.test(s)) {
@@ -53,9 +55,29 @@
     return num.toFixed(decimals).replace('.', ',');
   }
 
+  function formatBrl(num) {
+    return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function describeField(el, num) {
     const name = el.getAttribute('name') || '';
     const kind = el.getAttribute('data-decimal-field') || '';
+    if (kind === 'money') {
+      const minAttr = el.getAttribute('data-min') ?? el.getAttribute('min');
+      const maxAttr = el.getAttribute('data-max') ?? el.getAttribute('max');
+      const min = minAttr !== null && minAttr !== '' ? Number(minAttr) : 0.01;
+      const max = maxAttr !== null && maxAttr !== '' ? Number(maxAttr) : 500000;
+      if (num < min || num > max) {
+        return {
+          valid: false,
+          error: `Informe um valor entre ${formatBrl(min)} e ${formatBrl(max)}.`
+        };
+      }
+      return {
+        valid: true,
+        text: `Interpretado: ${formatBrl(num)}`
+      };
+    }
     if (name === 'height_cm' || kind === 'height') {
       let cm = num;
       let meters = num / 100;

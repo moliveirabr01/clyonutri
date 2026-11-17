@@ -46,7 +46,8 @@ class ConsultationDraftService
         $weight = mb_substr(trim((string)($fields['weight_kg'] ?? '')), 0, 20);
         $waist = mb_substr(trim((string)($fields['waist_cm'] ?? '')), 0, 20);
         $now = ($this->fixedNow ?? new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
-        $p = ['n' => $notes, 'w' => $weight, 'x' => $waist, 'at' => $now, 'a' => $appointmentId, 'u' => $userId, 'c' => $clinicId];
+        $encryptedNotes = $notes !== '' ? \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt($notes) : '';
+        $p = ['n' => $encryptedNotes, 'w' => $weight, 'x' => $waist, 'at' => $now, 'a' => $appointmentId, 'u' => $userId, 'c' => $clinicId];
 
         $current = $this->row($appointmentId, $userId, $clinicId);
         if ($current === null) {
@@ -149,6 +150,9 @@ class ConsultationDraftService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             return null;
+        }
+        if (isset($row['evolution_summary']) && is_string($row['evolution_summary']) && $row['evolution_summary'] !== '') {
+            $row['evolution_summary'] = \ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt($row['evolution_summary']);
         }
         $row['version'] = (int)$row['version'];
         return $row;

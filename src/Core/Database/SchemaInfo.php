@@ -1,71 +1,58 @@
 <?php
 
 declare(strict_types=1);
-
 namespace ClyoNutri\Core\Database;
-
 use PDO;
 
-/**
- * Consulta de estrutura com cache por conexão. Usada onde o código novo precisa conviver com um banco
- * que ainda não recebeu a migração manual (deploy na HostGator: código e SQL sobem em passos separados).
- */
+/** Request-local schema snapshots. Weak keys prevent reuse across disposed connections. */
 final class SchemaInfo
 {
-    /** @var array<string, bool> */
-    private static array $cache = [];
+    private static ?\WeakMap $cache = null;
 
     public static function hasColumn(PDO $db, string $table, string $column): bool
     {
-        $key = spl_object_id($db) . ':' . $table . '.' . $column;
-        if (array_key_exists($key, self::$cache)) {
-            return self::$cache[$key];
-        }
-        try {
-            if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-                $found = false;
-                foreach ($db->query('PRAGMA table_info(' . preg_replace('/[^A-Za-z0-9_]/', '', $table) . ')')->fetchAll(PDO::FETCH_ASSOC) as $col) {
-                    if (($col['name'] ?? '') === $column) {
-                        $found = true;
-                        break;
-                    }
+        self::$cache ??= new \WeakMap();
+        $entry = self::$cache[$db] ?? [];
+        if (!array_key_exists($table, $entry['columns'] ?? [])) {
+            $columns = [];
+            try {
+                if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                    $rows = $db->query('PRAGMA table_info(' . preg_replace('/[^A-Za-z0-9_]/', '', $table) . ')')->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($rows as $row) $columns[(string)$row['name']] = true;
+                } else {
+                    $st = $db->prepare('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t');
+                    $st->execute(['t' => $table]);
+                    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $name) $columns[(string)$name] = true;
                 }
-            } else {
-                $st = $db->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c');
-                $st->execute(['t' => $table, 'c' => $column]);
-                $found = (int)$st->fetchColumn() > 0;
+            } catch (\Throwable) {
+                // Compatibility probe: unavailable schema metadata means the optional feature is absent.
             }
-        } catch (\Throwable) {
-            $found = false;
+            $entry['columns'][$table] = $columns;
+            self::$cache[$db] = $entry;
         }
-        return self::$cache[$key] = $found;
+        return isset($entry['columns'][$table][$column]);
     }
 
     public static function hasTable(PDO $db, string $table): bool
     {
-        $key = spl_object_id($db) . ':' . $table;
-        if (array_key_exists($key, self::$cache)) {
-            return self::$cache[$key];
-        }
-        try {
-            if ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-                $st = $db->prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :t");
-                $st->execute(['t' => $table]);
-                $found = (bool)$st->fetchColumn();
-            } else {
-                $st = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t');
-                $st->execute(['t' => $table]);
-                $found = (int)$st->fetchColumn() > 0;
+        self::$cache ??= new \WeakMap();
+        $entry = self::$cache[$db] ?? [];
+        if (!isset($entry['tables'])) {
+            $names = [];
+            try {
+                $sql = $db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+                    ? "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    : 'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()';
+                foreach ($db->query($sql)->fetchAll(PDO::FETCH_COLUMN) as $name) $names[(string)$name] = true;
+            } catch (\Throwable) {
+                // Old deployments may not expose metadata; optional features must keep their fallback.
             }
-        } catch (\Throwable) {
-            $found = false;
+            $entry['tables'] = $names;
+            self::$cache[$db] = $entry;
         }
-        return self::$cache[$key] = $found;
+        return isset($entry['tables'][$table]);
     }
 
-    /** Testes que migram no meio do processo. */
-    public static function reset(): void
-    {
-        self::$cache = [];
-    }
+    /** Required after DDL/migrations in the same process. */
+    public static function reset(): void { self::$cache = new \WeakMap(); }
 }

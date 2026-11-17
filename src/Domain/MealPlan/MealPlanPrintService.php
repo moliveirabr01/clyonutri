@@ -52,7 +52,7 @@ class MealPlanPrintService
             $stmt->execute(['id' => $planId, 'c' => $clinicId]);
             $version = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($version) {
-                $snapshot = json_decode((string)$version['payload_json'], true);
+                $snapshot = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptEmbeddedDeep(json_decode((string)$version['payload_json'], true));
                 if (is_array($snapshot) && isset($snapshot['meals'])) {
                     $plan = $snapshot;
                 }

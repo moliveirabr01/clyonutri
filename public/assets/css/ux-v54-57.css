@@ -30,7 +30,7 @@
   .dash-greeting__actions{margin-left:0;width:100%}
   .dash-search{flex:1 1 100%}
   .dash-search__input{min-width:0;flex:1}
-  .dash-new-appointment{flex:1 1 100%;justify-content:center}
+  .dash-greeting__actions .new-consultation-cta{flex:1 1 100%;justify-content:center}
 }
 
 /* v54.57 (UX-121): links isolados que viram bloco (itens de flex, breadcrumb, estado do rascunho) com alvo ≥ 24 px — WCAG 2.5.8 */

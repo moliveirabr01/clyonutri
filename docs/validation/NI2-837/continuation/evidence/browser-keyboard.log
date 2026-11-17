@@ -1,0 +1,15 @@
+PASS Cancelar por teclado devolve foco ao registro e não grava consumo
+PASS Sequência original Cancelar → Plano abre no início e foca título
+PASS Cancelar e reabrir preserva modo e texto do rascunho
+PASS Trocar de seção preserva formulário aberto
+PASS Receita mostra carregamento e impede abertura concorrente
+locator.waitFor: Timeout 12000ms exceeded.
+Call log:
+[2m  - waiting for getByText('Receita completa TESTE', { exact: true }).locator('..').getByText('Separar o arroz em duas porções.', { exact: true }) to be visible[22m
+
+    at /Users/moliveira/Nutri_II/tests/ni2_837_continuation_browser_test.cjs:29:75 {
+  log: [
+    "  - waiting for getByText('Receita completa TESTE', { exact: true }).locator('..').getByText('Separar o arroz em duas porções.', { exact: true }) to be visible"
+  ],
+  name: 'TimeoutError'
+}

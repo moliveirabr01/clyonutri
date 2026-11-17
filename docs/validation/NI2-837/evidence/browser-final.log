@@ -1,0 +1,7 @@
+PASS empty check-in: adjacent alert, focus, optional text retained, zero database writes
+PASS check-in network failure and retry: persisted exactly once, survives reload
+PASS 1280px: six sections focus/start, no horizontal overflow, logout target >=44px
+PASS 390px: six sections focus/start, no horizontal overflow, logout target >=44px
+PASS 360px: six sections focus/start, no horizontal overflow, logout target >=44px
+PASS reminder: no-channel warning, explicit enable, server persistence after reload
+PASS diary: actual plan description persisted and rendered after reload

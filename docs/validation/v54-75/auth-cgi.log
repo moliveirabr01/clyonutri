@@ -1,0 +1,6 @@
+PASS CGI: administrador entra sem loop com MFA suspenso e navega ao console
+PASS CGI: administrador continua sem acesso clínico
+PASS CGI: usuário sem clínica recebe erro legível sem sessão quebrada
+PASS CGI: profissional continua sem acesso ao console
+PASS CGI: sessão anterior é encaminhada ao cadastro MFA sem loop
+PASS CGI: TOTP válido, oito códigos, CSRF, confirmação única e auditoria persistida

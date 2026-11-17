@@ -18,7 +18,7 @@ use PDOStatement;
  * usa utf8mb4_0900_ai_ci, divergindo do SQL de instalação e quebrando comparações de
  * texto entre tabelas ("Illegal mix of collations").
  */
-class MySqlCompatPdo extends PDO
+class MySqlCompatPdo extends ProfiledPdo
 {
     private const INDEX_IF_NOT_EXISTS = '/^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+`?(\w+)`?\s+ON\s+`?(\w+)`?/i';
     public const COLLATION = 'utf8mb4_unicode_ci';

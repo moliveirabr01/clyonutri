@@ -23,7 +23,7 @@ if (!empty($old['exam_order'])) { $orderIds = \ClyoNutri\Domain\LaboratoryExam\E
 $apptId = (int)($old['appointment_id'] ?? 0);
 $typeLabel = ['first_visit' => 'Primeira consulta', 'follow_up' => 'Retorno', 'return' => 'Retorno'];
 ?>
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <?= \ClyoNutri\Application\View\PatientHeader::render(\ClyoNutri\Core\Database\Connection::getInstance(), (int)$patient['id'], 'exames') // NI2-629/661 ?>
 <div class="clinical-journey ex-page">
   <a class="ex-back" href="<?= $request ? "/pacientes/{$pid}/exames/" . (int)$request['id'] : "/pacientes/{$pid}/exames" ?>">← Voltar</a>
@@ -100,7 +100,7 @@ $typeLabel = ['first_visit' => 'Primeira consulta', 'follow_up' => 'Retorno', 'r
         <?php endforeach; ?>
       </div>
       <div class="op-message op-message--info ex-none" id="exam-none" role="status">Nenhum exame laboratorial encontrado com esse termo. Exames de imagem e procedimentos invasivos não fazem parte do catálogo.</div>
-      <p class="ex-count" id="exam-count" aria-live="polite"><?= count($selected) ?> exame(s) selecionado(s)</p>
+      <p class="ex-count" id="exam-count" aria-live="polite"><?= count($selected) ?> <?= \ClyoNutri\Application\View\UserText::count(count($selected), 'exame selecionado', 'exames selecionados') ?></p>
       <p class="ex-muted">Não achou o exame? <a href="/exames/catalogo#personalizados">Proponha no catálogo</a> · <a href="/exames/catalogo">Gerenciar favoritos</a></p>
     </section>
 

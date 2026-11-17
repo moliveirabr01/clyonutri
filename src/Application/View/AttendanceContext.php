@@ -58,6 +58,18 @@ final class AttendanceContext
         self::$selected=$row;
     }
 
+    public static function currentAppointmentId(?int $patientId = null): ?int
+    {
+        if (self::$selected === null) {
+            return null;
+        }
+        if ($patientId !== null && (int)(self::$selected['patient_id'] ?? 0) !== $patientId) {
+            return null;
+        }
+        $id = (int)(self::$selected['id'] ?? 0);
+        return $id > 0 ? $id : null;
+    }
+
     /**
      * v54.57 (UX-101): depois de concluir um registro clínico com o atendimento selecionado (?atendimento=ID), vincula
      * as etapas correspondentes ao atendimento (CareProgress::confirmFromAttendance). Nunca derruba a gravação.

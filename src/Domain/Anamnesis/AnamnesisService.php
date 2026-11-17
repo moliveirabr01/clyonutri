@@ -400,10 +400,15 @@ class AnamnesisService
                 $vStmt->execute(['patient_id' => $patientId, 'clinic_id' => $clinicId]);
                 $nextVersion = (int)$vStmt->fetchColumn();
 
+                $hasApptCol = \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anamneses', 'appointment_id');
+                $resolvedApptId = isset($data['appointment_id']) && is_numeric($data['appointment_id']) && (int)$data['appointment_id'] > 0
+                    ? (int)$data['appointment_id']
+                    : \ClyoNutri\Application\View\AttendanceContext::currentAppointmentId($patientId);
+
                 if ($hasStructured) {
                     $stmt = $this->db->prepare("
                         INSERT INTO anamneses (
-                            clinic_id, patient_id, professional_id, version,
+                            clinic_id, patient_id, professional_id, version," . ($hasApptCol ? " appointment_id," : "") . "
                             chief_complaint, objectives, family_history, pathologies,
                             has_surgeries, surgeries_details, medication_usage, medications_details,
                             supplement_usage, supplements_details, intolerance_assessment,
@@ -415,7 +420,7 @@ class AnamnesisService
                             referenced_exams, clinical_history, water_intake_ml, is_draft, notes,
                             structured_data_json, created_at
                         ) VALUES (
-                            :clinic_id, :patient_id, :professional_id, :version,
+                            :clinic_id, :patient_id, :professional_id, :version," . ($hasApptCol ? " :appointment_id," : "") . "
                             :chief_complaint, :objectives, :family_history, :pathologies,
                             :has_surgeries, :surgeries_details, :medication_usage, :medications_details,
                             :supplement_usage, :supplements_details, :intolerance_assessment,
@@ -428,7 +433,7 @@ class AnamnesisService
                             :structured_data_json, :created_at
                         )
                     ");
-                    $stmt->execute([
+                    $params = [
                         'clinic_id' => $clinicId,
                         'patient_id' => $patientId,
                         'professional_id' => $professionalId,
@@ -469,22 +474,26 @@ class AnamnesisService
                         'notes' => $cleanData['notes'],
                         'structured_data_json' => $cleanData['structured_data_json'],
                         'created_at' => $createdAt,
-                    ]);
+                    ];
+                    if ($hasApptCol) {
+                        $params['appointment_id'] = $resolvedApptId;
+                    }
+                    $stmt->execute($params);
                 } else {
                     $stmt = $this->db->prepare("
                         INSERT INTO anamneses (
-                            clinic_id, patient_id, professional_id, version,
+                            clinic_id, patient_id, professional_id, version," . ($hasApptCol ? " appointment_id," : "") . "
                             objectives, routine, food_preferences, restrictions,
                             allergies, allergy_assessment, symptoms, habits, clinical_history,
                             water_intake_ml, is_draft, notes, created_at
                         ) VALUES (
-                            :clinic_id, :patient_id, :professional_id, :version,
+                            :clinic_id, :patient_id, :professional_id, :version," . ($hasApptCol ? " :appointment_id," : "") . "
                             :objectives, :routine, :food_preferences, :restrictions,
                             :allergies, :allergy_assessment, :symptoms, :habits, :clinical_history,
                             :water_intake_ml, :is_draft, :notes, :created_at
                         )
                     ");
-                    $stmt->execute([
+                    $params2 = [
                         'clinic_id' => $clinicId,
                         'patient_id' => $patientId,
                         'professional_id' => $professionalId,
@@ -502,7 +511,11 @@ class AnamnesisService
                         'is_draft' => $isDraft ? 1 : 0,
                         'notes' => $cleanData['notes'],
                         'created_at' => $createdAt,
-                    ]);
+                    ];
+                    if ($hasApptCol) {
+                        $params2['appointment_id'] = $resolvedApptId;
+                    }
+                    $stmt->execute($params2);
                 }
                 $id = (int)$this->db->lastInsertId();
             }
@@ -808,7 +821,7 @@ class AnamnesisService
             $pAssessment = $pRec['assessment'];
             $nStmt = $this->db->prepare("SELECT notes FROM patients WHERE clinic_id = :clinic_id AND id = :patient_id");
             $nStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $patientId]);
-            $pNotes = trim((string)($nStmt->fetchColumn() ?: ''));
+            $pNotes = trim((string)(\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)($nStmt->fetchColumn() ?: '')) ?? '')); // N-01
 
             if ($pAllergies !== '' || $pAssessment === 'denied') {
                 $pState = $pAllergies !== '' ? 'recorded' : 'denied';
@@ -1015,40 +1028,12 @@ class AnamnesisService
 
     private function hasColumn(string $column): bool
     {
-        try {
-            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
-                $st = $this->db->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
-                $st->execute(['anamneses', $column]);
-                return (int)$st->fetchColumn() > 0;
-            }
-            foreach ($this->db->query('PRAGMA table_info(anamneses)')->fetchAll(PDO::FETCH_ASSOC) as $col) {
-                if (($col['name'] ?? '') === $column) {
-                    return true;
-                }
-            }
-        } catch (\Throwable $e) {
-            return false;
-        }
-        return false;
+        return \ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anamneses', $column);
     }
 
     private function hasStructuredColumns(): bool
     {
-        try {
-            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
-                $st = $this->db->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
-                $st->execute(['anamneses', 'chief_complaint']);
-                return (int)$st->fetchColumn() > 0;
-            }
-            foreach ($this->db->query('PRAGMA table_info(anamneses)')->fetchAll(PDO::FETCH_ASSOC) as $col) {
-                if (($col['name'] ?? '') === 'chief_complaint') {
-                    return true;
-                }
-            }
-        } catch (\Throwable $e) {
-            return false;
-        }
-        return false;
+        return $this->hasColumn('chief_complaint');
     }
 
     private function sanitizeText(?string $text, string $label): ?string

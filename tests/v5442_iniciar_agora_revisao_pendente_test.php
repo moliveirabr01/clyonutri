@@ -27,7 +27,7 @@ try {
     [$c, $b] = $req('/pacientes/1');
     $ok($c === 200, 'perfil do paciente TESTE abre');
     $ok(str_contains($b, 'data-testid="care-start-now"') && str_contains($b, 'action="/pacientes/1/iniciar-agora"'), 'perfil sem consulta mostra "Iniciar agora" (POST /pacientes/1/iniciar-agora)');
-    $ok((bool)preg_match('/href="\/agenda\?novo=1&amp;paciente=1&amp;de=paciente" data-testid="care-schedule">Agendar</', $b), '"Agendar" continua levando à agenda com o paciente');
+    $ok((bool)preg_match('/href="\/agenda\?novo=1&amp;paciente=1&amp;de=paciente" data-testid="care-schedule">\+ Nova consulta</', $b), '"Agendar" continua levando à agenda com o paciente');
     $ok(!str_contains($b, '>Novo atendimento<'), 'rótulo ambíguo "Novo atendimento" saiu');
     $tok = $csrf($b);
     [$c] = $req('/pacientes/1/iniciar-agora', ['_csrf_token' => 'x']);

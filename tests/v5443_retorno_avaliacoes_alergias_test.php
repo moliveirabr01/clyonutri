@@ -59,7 +59,7 @@ try {
     $wk = []; foreach (['seg','ter','qua','qui','sex','sab','dom'] as $d) $wk[$d] = ['enabled' => true, 'start' => '08:00', 'end' => '23:00', 'break_start' => '12:00', 'break_end' => '13:00'];
     $pdo->prepare("UPDATE onboarding_progress SET practice_preferences = ? WHERE user_id = 1 AND clinic_id = 1")->execute([json_encode(['weekly_availability' => $wk, 'default_duration_minutes' => 60, 'working_days' => array_keys($wk)])]);
     [$c, $b] = $req('/pacientes/1');
-    $ok((bool)preg_match('/href="\/agenda\?novo=1&amp;paciente=1&amp;de=paciente" data-testid="care-schedule">Agendar</', $b), 'perfil sem consulta: "Agendar" leva à agenda no contexto do paciente');
+    $ok((bool)preg_match('/href="\/agenda\?novo=1&amp;paciente=1&amp;de=paciente" data-testid="care-schedule">\+ Nova consulta</', $b), 'perfil sem consulta: "Agendar" leva à agenda no contexto do paciente');
     [$c, $b] = $req('/agenda?novo=1&paciente=1&de=paciente');
     $ok(str_contains($b, 'name="return_to" value="patient"') && str_contains($b, '<option value="first_visit" selected'), 'paciente sem consulta realizada: tipo padrão Primeira consulta, volta ao perfil');
     $pdo->exec("UPDATE appointments SET status='completed', scheduled_at='2026-10-20 10:00:00' WHERE id=1");

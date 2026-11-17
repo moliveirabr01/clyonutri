@@ -22,7 +22,7 @@
   var statusEl = document.getElementById('consulta-draft-status');
   var names = ['evolution_summary', 'weight_kg', 'waist_cm'];
   var storageKey = KEY_PREFIX + scope;
-  var timer = null, saving = null, dirty = false, submitting = false, inConflict = false;
+  var timer = null, saving = null, dirty = false, submitting = false, inConflict = false, retryCount = 0;
 
   function purgeStaleOrForeignBackups() {
     try {
@@ -196,6 +196,7 @@
         }
         version = res.body.version;
         inConflict = false;
+        retryCount = 0;
         if (statusEl) delete statusEl.dataset.authExpired;
         if (!dirty) {
           clearLocalBackup();
@@ -208,8 +209,10 @@
         backupLocally(payload);
         var cid = err && err.correlationId ? ' (ref. ' + err.correlationId + ')' : '';
         say('Erro ao salvar o rascunho' + cid + '. Seu texto está preservado nesta aba; tentaremos novamente.', 'error', 'erro', err && err.correlationId);
-        if (!submitting) {
-          timer = setTimeout(save, 5000);
+        if (!submitting && retryCount < 5) {
+          var delay = Math.min(30000, 3000 * Math.pow(2, retryCount));
+          retryCount++;
+          timer = setTimeout(save, delay);
         }
         return false;
       })

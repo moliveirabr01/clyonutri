@@ -1,0 +1,10 @@
+PASS CGI: login real e sessão persistente
+PASS CGI: day confirmed redirect + persistência
+PASS CGI: day cancelled redirect + persistência
+PASS CGI: day no_show redirect + persistência
+PASS CGI: week confirmed redirect + persistência
+PASS CGI: week cancelled redirect + persistência
+PASS CGI: week no_show redirect + persistência
+PASS CGI: month confirmed redirect + persistência
+PASS CGI: month cancelled redirect + persistência
+PASS CGI: month no_show redirect + persistência

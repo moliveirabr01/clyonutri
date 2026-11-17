@@ -1,0 +1,6 @@
+{
+    "mail_driver": "smtp",
+    "external_delivery_configured": true,
+    "configuration_problem_count": 0,
+    "push_enabled": false
+}

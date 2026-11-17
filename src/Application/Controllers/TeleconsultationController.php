@@ -488,7 +488,13 @@ class TeleconsultationController
     private function requireCsrfHeader(): void
     {
         if (!Csrf::validate(isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? (string)$_SERVER['HTTP_X_CSRF_TOKEN'] : null)) {
-            throw new TenantSecurityException('Sessão da página expirada. Recarregue a página.');
+            if (!headers_sent()) {
+                header('Cache-Control: no-store');
+                header('Content-Type: application/json; charset=utf-8');
+            }
+            http_response_code(419);
+            echo json_encode(['error' => 'Sessão da página expirada. Recarregue a página.', 'code' => 'CSRF_INVALID'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
     }
 

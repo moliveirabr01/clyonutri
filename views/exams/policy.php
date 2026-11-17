@@ -7,7 +7,7 @@
 $e = static fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 $d = static fn($v) => $v ? date('d/m/Y', strtotime((string)$v)) : '';
 ?>
-<link rel="stylesheet" href="/assets/css/exames.css?v=v54-30">
+<link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <div class="clinical-journey ex-page">
   <a class="ex-back" href="/exames/catalogo">← Catálogo de exames</a>
   <div class="ex-head">

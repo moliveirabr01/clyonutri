@@ -1,0 +1,85 @@
+====================================================================
+SUÍTE DE TESTES: PLANO ALIMENTAR & PRESCRIÇÃO NUTRICIONAL (NI2-9)
+Histórias: NI2-76, NI2-77, NI2-78, NI2-79, NI2-80
+====================================================================
+
+--> Configurando ambiente de teste e sementes...
+
+--> [NI2-76] Testando criação de plano, organização de refeições e validação de horários...
+  [PASS] Plano alimentar criado com ID 31
+  [PASS] Plano inicia com status 'draft'
+  [PASS] Quatro refeições adicionadas com sucesso
+  [PASS] Horário em formato incorreto (25:99) rejeitado com InvalidArgumentException
+  [PASS] Refeição atualizada com novo nome, horário e orientações
+  [PASS] Reordenação de refeições executada com sucesso
+  [PASS] Refeição extra removida com sucesso do plano
+
+--> [NI2-77] Testando alimentos, cálculo proporcional determinístico e cascata de totais...
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Totais do plano recalculados em cascata: 458.8 kcal (esperado ~458.8 kcal)
+  [PASS] Total de proteínas consolidado no plano: 46.95g
+  [PASS] Total de carboidratos consolidado no plano: 55.75g
+  [PASS] Edição do item recalcula plano imediatamente: 506.5 kcal
+  [PASS] Tentativa de prescrever quantidade negativa rejeitada fail-closed
+
+--> [NI2-78] Testando substituições vinculadas e isolamento de consumo alternativo...
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Substituição vinculada ao item cadastrada com ID 9
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Substituição de proteína vinculada ao peito de frango
+  [PASS] Substituições NÃO inflam a soma diária do plano: total permanece 506.5 kcal
+  [PASS] Refeição recuperada no preview
+  [PASS] Item do arroz contém exatamente 1 substituição configurada
+  [PASS] Nome da substituição exibido com precisão
+  [PASS] Substituição removida com sucesso mantendo item principal intacto
+
+--> [NI2-79] Testando revisão, validações clínicas, snapshot imutável e acesso do paciente...
+  [PASS] Publicação de plano alimentar vazio bloqueada fail-closed
+  [PASS] Mensagem de erro cita especificamente o alérgeno 'peixe'
+  [PASS] Publicação com conflito alergênico bloqueada preventivamente
+  [PASS] Override de alérgeno sem justificativa clínica é recusado
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Plano publicado com sucesso após validação clínica
+  [PASS] Primeira versão publicada registrada como v1
+  [PASS] Snapshot imutável gravado em meal_plan_versions
+  [PASS] Snapshot contém payload JSON completo de refeições e itens
+  [PASS] Trilha de auditoria MEAL_PLAN_PUBLISHED gerada com detalhes do paciente e versão
+  [PASS] Alterações em plano publicado bloqueadas por imutabilidade
+  [PASS] API do paciente localiza plano alimentar publicado
+  [PASS] Versão entregue ao paciente é a versão 1 ativa
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Rascunhos são estritamente invisíveis ao paciente; plano publicado v1 mantido
+
+--> [NI2-80] Testando duplicação de plano, clonagem profunda e integridade retroativa...
+  [PASS] Novo rascunho criado com ID independente 34
+  [PASS] Novo plano duplicado inicia como 'draft'
+  [PASS] Linhagem parent_plan_id preservada apontando para o plano de origem #31
+  [PASS] Todas as refeições foram clonadas para o novo draft
+  [PASS] Itens e porções clonados com precisão
+  [PASS] Substituições vinculadas clonadas com precisão
+  [PASS] Plano original permanece PUBLICADO e inalterado
+  [PASS] Apenas o novo rascunho teve seus totais recalculados (576.5 kcal vs original 506.5 kcal)
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Nova versão duplicada publicada como v2
+  [PASS] Plano anterior marcado como 'superseded' no histórico
+  [PASS] Paciente agora tem acesso à versão v2 vigente
+  [PASS] ID do plano ativo do paciente atualizado para #34
+
+--> [Pen-Test] Testando isolamento estrito entre clínicas (Clínica A vs Clínica B)...
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Tenant B bloqueado ao tentar visualizar plano da Clínica A
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Tenant B bloqueado ao tentar alterar plano da Clínica A
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Tenant B bloqueado ao tentar duplicar plano da Clínica A
+[ProductionEventService] Falha de persistência de evento: SQLSTATE[HY000]: General error: 1 no such table: production_events
+  [PASS] Tenant B bloqueado ao tentar prescrever para paciente da Clínica A
+
+====================================================================
+RESULTADOS DOS TESTES DE PLANO ALIMENTAR & PRESCRIÇÃO (NI2-9):
+  TOTAL EXECUTADOS : 48
+  PASSOU           : 48
+  FALHOU           : 0
+====================================================================

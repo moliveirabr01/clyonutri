@@ -25,7 +25,7 @@ final class SecurityNoticeEmail
         ?string $replyTo = null
     ): MailMessage {
         $name = trim($toName) !== '' ? trim($toName) : 'Olá';
-        $firstName = explode(' ', $name)[0];
+        $firstName = \ClyoNutri\Domain\Dashboard\DashboardOverview::firstName($name) ?: explode(' ', $name)[0];
         $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $footer = $replyTo !== null

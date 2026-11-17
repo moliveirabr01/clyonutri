@@ -6,12 +6,16 @@
  */
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $st = (string)$planSummary['status'];
-$stLabel = ['trialing' => 'Em avaliação', 'active' => 'Ativa', 'expired' => 'Teste encerrado', 'canceled' => 'Cancelada'][$st] ?? $st;
-$stClass = $st === 'active' ? 'badge-success' : ($st === 'canceled' ? 'badge-danger' : 'badge-warning');
+$trialState = (array)($planSummary['trial_state'] ?? []);
+$expiredNotice = $planSummary['expired_notice'] ?? null;
+$isTrialExpiredByDate = in_array((string)($trialState['state'] ?? ''), ['grace', 'read_only'], true) || $st === 'expired';
+$effectiveSt = $isTrialExpiredByDate ? 'expired' : $st;
+$stLabel = ['trialing' => 'Em avaliação', 'active' => 'Ativa', 'expired' => 'Teste encerrado', 'canceled' => 'Cancelada'][$effectiveSt] ?? $effectiveSt;
+$stClass = $effectiveSt === 'active' ? 'badge-success' : ($effectiveSt === 'canceled' ? 'badge-danger' : 'badge-warning');
 $usage = (array)($planSummary['usage'] ?? []);
 // NI2-614: "8 de 10" com limite; "8 (sem limite)" sem limite (antes saía "8 de sem limite").
 $usageOf = static fn($used, $max): string => (int)$max > 0 ? (int)$used . ' de ' . (int)$max : (int)$used . ' (sem limite)';
-$end = in_array($st, ['trialing', 'expired'], true) ? ($planSummary['trial_ends_at'] ?? $planSummary['current_period_end'] ?? null) : ($planSummary['current_period_end'] ?? null);
+$end = in_array($effectiveSt, ['trialing', 'expired'], true) ? ($planSummary['trial_ends_at'] ?? $planSummary['current_period_end'] ?? null) : ($planSummary['current_period_end'] ?? null);
 ?>
 <section id="seu-plano" class="card u-mb-6 u-accent-top u-accent-brand-copper-500" aria-labelledby="seu-plano-titulo">
   <div class="u-flex u-justify-between u-items-start u-wrap u-gap-3">
@@ -24,9 +28,13 @@ $end = in_array($st, ['trialing', 'expired'], true) ? ($planSummary['trial_ends_
 
   <?php if ($planCanManage): ?>
     <p class="u-mt-2 u-mb-0 u-mx-0 u-color-neutral-gray-600 u-text-compact">
-      <?= $e(\ClyoNutri\Domain\Subscription\PlanChangeService::formatBrl((int)($planSummary['catalog_price_cents'] ?? $planSummary['price_cents'] ?? 0))) ?> por mês de referência<?= $end ? ', ' . ($st === 'trialing' ? 'teste até ' : ($st === 'expired' ? 'teste encerrado em ' : ($st === 'canceled' ? 'acesso até ' : 'período até '))) . $e((new \DateTimeImmutable((string)$end))->format('d/m/Y')) : '' ?>.
+      <?= $e(\ClyoNutri\Domain\Subscription\PlanChangeService::formatBrl((int)($planSummary['catalog_price_cents'] ?? $planSummary['price_cents'] ?? 0))) ?> por mês de referência<?= $end ? ', ' . ($effectiveSt === 'trialing' ? 'teste até ' : ($effectiveSt === 'expired' ? 'teste encerrado em ' : ($effectiveSt === 'canceled' ? 'acesso até ' : 'período até '))) . $e((new \DateTimeImmutable((string)$end))->format('d/m/Y')) : '' ?>.
     </p>
-    <?php if ($st === 'expired'): ?><p class="op-message op-message--info u-mt-2 u-mb-0 u-mx-0 u-text-compact u-color-semantic-warning-strong" role="status" data-testid="plan-expired-note">O sistema continua liberado e seus dados seguem salvos. A contratação de um plano pelo sistema ainda não está disponível.</p><?php endif; ?>
+    <?php if (!empty($expiredNotice)): ?>
+      <p class="op-message op-message--info u-mt-2 u-mb-0 u-mx-0 u-text-compact u-color-semantic-warning-strong" role="status" data-testid="plan-expired-note">
+        <?= $e($expiredNotice['message']) ?> <a href="<?= $e($expiredNotice['cta_href']) ?>" class="u-font-semibold u-underline"><?= $e($expiredNotice['cta_label']) ?></a>
+      </p>
+    <?php endif; ?>
     <div class="u-grid u-cols-auto-md u-gap-2 u-mt-3 u-text-compact u-color-neutral-gray-700">
       <div class="u-bg-neutral-gray-50 u-radius-input u-py-2 u-px-3">Profissionais <strong><?= $e($usageOf($usage['active_professionals'] ?? 0, $planSummary['max_professionals'] ?? 0)) ?></strong></div>
       <div class="u-bg-neutral-gray-50 u-radius-input u-py-2 u-px-3">Pacientes ativos <strong><?= $e($usageOf($usage['active_patients'] ?? 0, $planSummary['max_patients'] ?? 0)) ?></strong></div>

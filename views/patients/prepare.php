@@ -73,3 +73,10 @@ if ((int)($pendingExamCount ?? 0) > 0) $pendingBits[] = (int)$pendingExamCount .
     <a class="btn btn-outline" href="/pacientes/<?= $pid ?>">← Voltar ao resumo</a>
   </div>
 </section>
+<?php
+if (isset($diaryPanel)) {
+    $diaryReturnTo = '/pacientes/' . $pid . '/preparar#diario-paciente';
+    $diaryFilterAction = '/pacientes/' . $pid . '/preparar';
+    require __DIR__ . '/_food_diary_block.php';
+}
+?>

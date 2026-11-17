@@ -33,18 +33,69 @@ final class ClinicalEncryptionService
     public const DEV_ONLY_FALLBACK_KEY = 'clyonutri-DEV-ONLY-clinical-key-not-for-production';
 
     public const ANAMNESIS_ENCRYPTED_FIELDS = [
+        'chief_complaint',
         'objectives',
+        'family_history',
+        'pathologies',
+        'surgeries_details',
+        'medications_details',
+        'supplements_details',
         'routine',
         'food_preferences',
         'restrictions',
         'allergies',
         'symptoms',
         'habits',
+        'alcohol_details',
+        'smoking_details',
+        'sleep_notes',
+        'referenced_exams',
         'clinical_history',
         'notes',
         // v54.46 / CR2-NI2-001: o snapshot JSON duplica todo o conteúdo clínico — cifrado junto.
         'structured_data_json',
     ];
+
+    public const PATIENT_ENCRYPTED_FIELDS = [
+        'notes',
+        'allergies',
+    ];
+
+    public static function decryptPatientRow(?array $row): ?array
+    {
+        if ($row === null) {
+            return null;
+        }
+        foreach (self::PATIENT_ENCRYPTED_FIELDS as $field) {
+            if (array_key_exists($field, $row) && is_string($row[$field]) && $row[$field] !== '') {
+                $row[$field] = self::decrypt($row[$field]);
+            }
+        }
+        return $row;
+    }
+
+    /**
+     * v54.68: para listagens (lista de pacientes, painel), um registro que não decifra (chave trocada,
+     * dado corrompido) não pode derrubar a página inteira. O campo vira null e o erro vai para o log.
+     * Telas clínicas e a trava de alérgenos continuam usando decryptPatientRow (falha fechada).
+     */
+    public static function decryptPatientRowForListing(?array $row): ?array
+    {
+        if ($row === null) {
+            return null;
+        }
+        foreach (self::PATIENT_ENCRYPTED_FIELDS as $field) {
+            if (array_key_exists($field, $row) && is_string($row[$field]) && $row[$field] !== '') {
+                try {
+                    $row[$field] = self::decrypt($row[$field]);
+                } catch (\Throwable $e) {
+                    error_log('[clinical-encryption] campo ' . $field . ' ilegível na listagem (paciente ' . (int)($row['id'] ?? 0) . ')');
+                    $row[$field] = null;
+                }
+            }
+        }
+        return $row;
+    }
 
     private static ?string $overrideKey = null;
 
@@ -189,6 +240,39 @@ final class ClinicalEncryptionService
         }
 
         return $plaintext;
+    }
+
+    /**
+     * v54.68 / N-01: textos gravados pela v54.67 podem conter um valor cifrado embutido (ex.: alerta de
+     * alérgeno "não mapeada ('enc:v1:…')"). Decifra cada ocorrência para exibição; se não decifrar,
+     * troca por um marcador neutro — nunca devolve o texto cifrado para a tela.
+     */
+    public static function decryptEmbedded(?string $text): ?string
+    {
+        if ($text === null || !str_contains($text, self::PREFIX)) {
+            return $text;
+        }
+        return preg_replace_callback('#enc:v1:[A-Za-z0-9+/=]+#', static function (array $m): string {
+            try {
+                return (string)self::decrypt($m[0]);
+            } catch (\Throwable) {
+                return '[conteúdo protegido]';
+            }
+        }, $text);
+    }
+
+    /** Aplica decryptEmbedded em todas as strings de um array decodificado de JSON (snapshots, alertas). */
+    public static function decryptEmbeddedDeep(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return self::decryptEmbedded($value);
+        }
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $value[$k] = self::decryptEmbeddedDeep($v);
+            }
+        }
+        return $value;
     }
 
     /**

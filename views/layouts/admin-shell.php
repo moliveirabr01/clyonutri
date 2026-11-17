@@ -1,3 +1,14 @@
+<?php
+// NI2-893: show the metadata of the installed package, without a fixed version.
+$adminReleaseVersion = 'Versão indisponível';
+$adminReleasePath = dirname(__DIR__, 2) . '/RELEASE_INFO.json';
+if (is_readable($adminReleasePath)) {
+    $adminReleaseInfo = json_decode((string)file_get_contents($adminReleasePath), true);
+    if (is_array($adminReleaseInfo) && is_string($adminReleaseInfo['version'] ?? null) && trim($adminReleaseInfo['version']) !== '') {
+        $adminReleaseVersion = trim($adminReleaseInfo['version']);
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -899,7 +910,7 @@
           <span class="admin-sidebar__status-dot"></span>
           <span>SaaS produção</span>
         </div>
-        <span>v2.0 admin</span>
+        <span data-testid="admin-installed-version"><?= htmlspecialchars($adminReleaseVersion, ENT_QUOTES, 'UTF-8') ?></span>
       </div>
     </aside>
 

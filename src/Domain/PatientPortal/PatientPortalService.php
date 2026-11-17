@@ -176,7 +176,7 @@ class PatientPortalService
 
         return [
             'plan_id' => (int)$plan['id'],
-            'plan_title' => $plan['title'],
+            'plan_title' => \ClyoNutri\Domain\MealPlan\PlanTitle::forPatient((string)$plan['title']),
             'version' => (int)$plan['version'],
             'substitutions' => $substitutions,
             'recipes' => $recipes,

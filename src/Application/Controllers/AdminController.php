@@ -1025,6 +1025,70 @@ final class AdminController
         );
     }
 
+    /**
+     * NI2-878: ativação / troca manual de plano no console comercial.
+     * Restrito estritamente a superadmin e finance_admin (403 caso contrário).
+     */
+    public function activateSubscription(): void
+    {
+        $authUser = $this->getAuthorizedUser();
+        if (!in_array($authUser->getUserRole(), [PlatformPolicy::ROLE_SUPERADMIN, PlatformPolicy::ROLE_FINANCE_ADMIN], true)) {
+            $this->auditLogger->log(
+                'ADMIN_ACCESS_DENIED',
+                'platform_permission',
+                'billing.manage',
+                [
+                    'operator_id' => $authUser->getUserId(),
+                    'role' => $authUser->getUserRole(),
+                    'uri' => $_SERVER['REQUEST_URI'] ?? '/admin/comercial/ativar',
+                ]
+            );
+            http_response_code(403);
+            if ($this->isApiOrJsonRequest()) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => 'Acesso negado: apenas superadmin ou finance_admin podem ativar planos manualmente.'], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            echo 'Acesso negado (403): apenas superadmin ou finance_admin podem ativar planos manualmente.';
+            return;
+        }
+
+        $this->requireAdminCsrf('/admin/comercial#assinantes');
+
+        $clinicId = (int)($_POST['clinic_id'] ?? 0);
+        $planId = (int)($_POST['plan_id'] ?? 0);
+        $validUntil = trim((string)($_POST['valid_until'] ?? ''));
+        $reason = trim((string)($_POST['reason'] ?? ''));
+
+        if ($clinicId <= 0 || $planId <= 0) {
+            $_SESSION['flash_error'] = 'Selecione uma clínica e um plano válidos.';
+            http_response_code(303);
+            header('Location: /admin/comercial#assinantes');
+            return;
+        }
+
+        try {
+            $res = (new \ClyoNutri\Domain\Subscription\SubscriptionService($this->db))->activateManuallyByAdmin(
+                $clinicId,
+                $planId,
+                $validUntil,
+                $reason,
+                $authUser->getUserId(),
+                $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+                $_SERVER['HTTP_USER_AGENT'] ?? null
+            );
+            $_SESSION['flash_success'] = 'Plano ' . $res['plan_name'] . ' ativado manualmente até ' . date('d/m/Y', strtotime($validUntil)) . ' (protocolo ' . $res['protocol'] . ').';
+        } catch (\InvalidArgumentException|\DomainException $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+        } catch (\Throwable $e) {
+            error_log('admin_activate_subscription_failed: ' . $e->getMessage());
+            $_SESSION['flash_error'] = 'Não foi possível ativar o plano agora.';
+        }
+
+        http_response_code(303);
+        header('Location: /admin/comercial#assinantes');
+    }
+
     public function commercial(): void
     {
         $authUser = $this->getAuthorizedUser('billing.read');
@@ -1109,6 +1173,14 @@ final class AdminController
             error_log('admin_comercial_v37_failed: ' . $e->getMessage());
         }
 
+        $canActivatePlans = in_array($authUser->getUserRole(), [PlatformPolicy::ROLE_SUPERADMIN, PlatformPolicy::ROLE_FINANCE_ADMIN], true);
+        $activationRequests = [];
+        try {
+            $activationRequests = (new \ClyoNutri\Domain\Subscription\SubscriptionService($this->db))->listActivationRequestsForAdmin(20);
+        } catch (\Throwable $e) {
+            error_log('admin_comercial_activation_reqs_failed: ' . $e->getMessage());
+        }
+
         $pagination = $subPagination;
         $paginationBase = '/admin/comercial';
         $paginationFragment = '#assinantes';
@@ -1122,6 +1194,7 @@ final class AdminController
                 'planOptions', 'filterPlan', 'filterStatus', 'statusCounts', 'subscriberRows',
                 'llAvailable', 'llShowWho', 'llByClinic', 'llTrackingStart', 'canOpenClinics',
                 'planChangesList', 'planChangesLast30', 'deletionRequests', 'deletionOpenCount', 'canManageDeletions',
+                'canActivatePlans', 'activationRequests',
                 'activeClinicsCount',
                 'activeSubscriptions',
                 'canceledSubscriptions',

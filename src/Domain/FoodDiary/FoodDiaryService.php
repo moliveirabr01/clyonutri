@@ -251,6 +251,31 @@ class FoodDiaryService
         $row = $this->db->prepare('SELECT * FROM food_diary_entries WHERE id = :id AND clinic_id = :c');
         $row->execute(['id' => $id, 'c' => $clinicId]);
 
+        // NI2-880: notifica o(s) profissional(is) da clínica na caixa de Avisos (/avisos), sem bloquear o registro.
+        try {
+            $notif = new \ClyoNutri\Domain\Notification\NotificationService($this->db);
+            if ($notif->available()) {
+                $profStmt = $this->db->prepare(
+                    "SELECT DISTINCT p.id FROM professionals p
+                     JOIN clinic_members cm ON cm.user_id = p.user_id AND cm.clinic_id = :c AND cm.status = 'active'
+                     WHERE cm.role IN ('owner', 'admin', 'nutritionist')"
+                );
+                $profStmt->execute(['c' => $clinicId]);
+                foreach ($profStmt->fetchAll(PDO::FETCH_COLUMN) as $profId) {
+                    $notif->publish(
+                        $clinicId,
+                        'food_diary.entry_created',
+                        'professional',
+                        (int)$profId,
+                        'food_diary:' . $id . ':' . (int)$profId,
+                        '/pacientes/' . $patientId . '/diario'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][food-diary] aviso de novo registro falhou: ' . get_class($e));
+        }
+
         return $this->patientEntry($row->fetch(PDO::FETCH_ASSOC)) + ['idempotent_replay' => false];
     }
 
@@ -493,5 +518,123 @@ class FoodDiaryService
         } catch (\Throwable $e) {
             error_log('[ClyoNutri][food-diary] auditoria de leitura falhou: ' . get_class($e));
         }
+    }
+
+    /**
+     * NI2-880: registra envio de devolutiva clínica em audit_logs.
+     */
+    public function auditFeedbackSent(int $clinicId, int $userId, int $patientId, int $entryId, bool $replaced = false): void
+    {
+        try {
+            $this->db->prepare("
+                INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details)
+                VALUES (:cid, :uid, 'FOOD_DIARY_FEEDBACK_SENT', 'food_diary', :rid, :ip, :ua, :details)
+            ")->execute([
+                'cid' => $clinicId,
+                'uid' => $userId,
+                'rid' => (string)$entryId,
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+                'ua' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? 'Web'), 0, 255),
+                'details' => json_encode(['patient_id' => $patientId, 'replaced' => $replaced], JSON_UNESCAPED_UNICODE),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][food-diary] auditoria de devolutiva falhou: ' . get_class($e));
+        }
+    }
+
+    /**
+     * NI2-880: visão web do diário do paciente para Preparar consulta e aba Atendimento.
+     * Reusa listPatientEntries() e countPendingDiaries(), calcula adesão dos check-ins no período
+     * e registra FOOD_DIARY_VIEWED em audit_logs.
+     */
+    public function professionalWebPanel(int $patientId, int $userId, ?string $fromDate = null, ?string $toDate = null, bool $showAll = false): array
+    {
+        $clinicId = TenantContext::getClinicId();
+        \ClyoNutri\Core\Security\TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
+
+        $sinceDefault = null;
+        if (!$showAll && ($fromDate === null || trim($fromDate) === '')) {
+            $lcStmt = $this->db->prepare(
+                "SELECT COALESCE(MAX(h.created_at), MAX(a.scheduled_at)) AS ref_dt
+                 FROM appointments a
+                 LEFT JOIN appointment_status_history h ON h.appointment_id = a.id AND h.to_status = 'completed'
+                 WHERE a.clinic_id = ? AND a.patient_id = ? AND a.status = 'completed'"
+            );
+            $lcStmt->execute([$clinicId, $patientId]);
+            $lastRef = $lcStmt->fetchColumn();
+            $sinceDefault = $lastRef ? substr((string)$lastRef, 0, 10) : date('Y-m-d', strtotime('-30 days'));
+            $fromDate = $sinceDefault;
+        }
+
+        $opts = ['limit' => 50];
+        if ($fromDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($fromDate))) {
+            $opts['from'] = trim($fromDate);
+        } else {
+            $fromDate = null;
+        }
+        if ($toDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($toDate))) {
+            $opts['to'] = trim($toDate);
+        } else {
+            $toDate = null;
+        }
+
+        $list = $this->listPatientEntries($patientId, $opts);
+        $entries = $list['entries'];
+
+        // Enriquecer com photo_path apenas quando houver (para exibição segura na web do profissional)
+        if ($entries !== []) {
+            $eIds = array_map(static fn(array $e): int => (int)$e['id'], $entries);
+            $ph = implode(',', array_fill(0, count($eIds), '?'));
+            $pStmt = $this->db->prepare("SELECT id, photo_path FROM food_diary_entries WHERE clinic_id = ? AND patient_id = ? AND id IN ({$ph})");
+            $pStmt->execute(array_merge([$clinicId, $patientId], $eIds));
+            $photoMap = [];
+            foreach ($pStmt->fetchAll(PDO::FETCH_ASSOC) as $pr) {
+                if (!empty($pr['photo_path'])) {
+                    $photoMap[(int)$pr['id']] = (string)$pr['photo_path'];
+                }
+            }
+            foreach ($entries as &$entry) {
+                $entry['photo_path'] = $photoMap[(int)$entry['id']] ?? null;
+            }
+            unset($entry);
+        }
+
+        // Adesão média dos check-ins no período
+        $adhSql = 'SELECT COUNT(*) AS total_checkins, AVG(meal_adherence_pct) AS avg_adherence FROM checkins WHERE clinic_id = ? AND patient_id = ?';
+        $adhParams = [$clinicId, $patientId];
+        if ($fromDate !== null) {
+            $adhSql .= ' AND checkin_date >= ?';
+            $adhParams[] = $fromDate;
+        }
+        if ($toDate !== null) {
+            $adhSql .= ' AND checkin_date <= ?';
+            $adhParams[] = $toDate;
+        }
+        $adhStmt = $this->db->prepare($adhSql);
+        $adhStmt->execute($adhParams);
+        $adhRow = $adhStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $avgAdherence = isset($adhRow['avg_adherence']) && $adhRow['avg_adherence'] !== null
+            ? (int)round((float)$adhRow['avg_adherence'])
+            : null;
+
+        $pendingCount = $this->countPendingDiaries($clinicId, $patientId);
+        $this->auditProfessionalRead($clinicId, $userId, $patientId, [
+            'source' => 'web_panel',
+            'count' => count($entries),
+            'from' => $fromDate,
+            'to' => $toDate,
+        ]);
+
+        return [
+            'entries' => $entries,
+            'count' => count($entries),
+            'pending_count' => $pendingCount,
+            'from' => $fromDate,
+            'to' => $toDate,
+            'show_all' => $showAll,
+            'since_label' => $fromDate ? date('d/m', strtotime($fromDate)) : 'o início',
+            'avg_adherence_pct' => $avgAdherence,
+            'checkins_count' => (int)($adhRow['total_checkins'] ?? 0),
+        ];
     }
 }

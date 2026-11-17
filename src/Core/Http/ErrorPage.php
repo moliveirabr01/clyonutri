@@ -103,7 +103,8 @@ final class ErrorPage
             return [['Ir para o portal do paciente', '/paciente/app']];
         }
         if ($actor !== null) {
-            return [['Ir para o painel', '/dashboard'], ['Ir para a agenda', '/agenda'], ['Ver pacientes', '/pacientes']];
+            // v54.68: perfis de plataforma também recebem um caminho (o filtro allowed() tira o que o perfil não abre).
+            return [['Ir para o painel', '/dashboard'], ['Ir para a agenda', '/agenda'], ['Ver pacientes', '/pacientes'], ['Ir para o console administrativo', '/admin/dashboard'], ['Ir para a fila de suporte', '/suporte/fila']];
         }
         return [['Entrar', '/login'], ['Página inicial', '/']];
     }

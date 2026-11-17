@@ -1,0 +1,65 @@
+=== NI2-830 consentimento verificável ===
+  PASS  migration 93 roda duas vezes sem erro (idempotente)
+  PASS  índices do token (UNIQUE) e do atendimento existem
+  PASS  o serviço não tem mais grantConsent(): nenhum caminho de código concede aceite pelo profissional
+  PASS  sem aceite: isConsentActive=false
+  PASS  linha legada "granted" da tabela antiga NÃO conta como aceite
+  PASS  startSession sem aceite do paciente é negado
+  PASS  pedido pendente com token de 20 caracteres base32 (100 bits)
+  PASS  token guardado só como hash SHA-256 (não aparece em claro em nenhuma coluna)
+  PASS  pedido pendente não libera a captação
+  PASS  startSession com pedido pendente é negado
+  PASS  validade do link ~15 min (900s)
+  PASS  visão do profissional não expõe hashes nem dados do aparelho do paciente
+  PASS  aceite com texto desatualizado/diferente é recusado
+  PASS  decisão diferente de accept/reject é recusada
+  PASS  token inexistente é recusado
+  PASS  tentativas inválidas não criaram aceite
+  PASS  SEG360-SEC-001: aceite sem OTP é recusado
+  PASS  paciente aceita pelo link: estado accepted + código de revogação
+  PASS  evidência vinculada a clínica + atendimento + paciente
+  PASS  evidência: versão, SHA do texto, mecanismo, origem do pedido e timestamp
+  PASS  IP guardado só como hash HMAC (64 hex), nunca em claro
+  PASS  IP do paciente não aparece em claro na evidência
+  PASS  com aceite do paciente, isConsentActive=true para este atendimento
+  PASS  aceite com validade de 6 h (expiração garantida)
+  PASS  trilha de auditoria: pedido + aceite pelo paciente
+  PASS  auditoria do aceite sem nome do paciente nem token
+  PASS  replay do mesmo token (aceitar) é recusado
+  PASS  replay do mesmo token (recusar) é recusado
+  PASS  replay não alterou o aceite vigente
+  PASS  consulta A2 do MESMO paciente não herda o aceite da A1
+  PASS  paciente B não herda o aceite do paciente A
+  PASS  atendimento da A1 com paciente B (inconsistência) não vale
+  PASS  paciente de outra clínica é negado (tenant)
+  PASS  clínica B não enxerga pedido de aceite da clínica A (outro atendimento)
+  PASS  clínica B não consegue pedir aceite para atendimento/paciente da clínica A
+  PASS  com aceite válido o segmento é gravado
+  PASS  paciente revoga com o código: aceite deixa de valer
+  PASS  revogação pausa a sessão aberta na hora
+  PASS  novo segmento depois da revogação é negado
+  PASS  nenhum segmento novo foi gravado após a revogação
+  PASS  retomar sessão sem aceite vigente é negado
+  PASS  iniciar de novo após revogação é negado
+  PASS  código de revogação não revoga duas vezes
+  PASS  código de revogação malformado é recusado
+  PASS  token expirado não aceita
+  PASS  estado do pedido vencido é "expired"
+  PASS  pedido expirado não libera captação
+  PASS  novo pedido aceito volta a liberar (após revogação anterior)
+  PASS  aceite com validade vencida deixa de valer
+  PASS  segmento com aceite vencido é negado
+  PASS  paciente recusa: sem aceite e sem código de revogação
+  PASS  iniciar após recusa é negado
+  PASS  mesmo token não vira aceite depois da recusa
+  PASS  portal: paciente A não decide o pedido do paciente B
+  PASS  portal: clínica diferente não decide
+  PASS  portal lista o pedido só para o paciente dono
+  PASS  página do paciente mostra só o primeiro nome
+  PASS  portal: o próprio paciente aceita
+  PASS  mecanismo registrado: patient_portal
+  PASS  profissional registra a revogação a pedido do paciente e a captação para
+  PASS  revogação registra quem revogou (professional)
+  PASS  atendimento cancelado não recebe pedido de aceite
+
+62 PASS, 0 FAIL

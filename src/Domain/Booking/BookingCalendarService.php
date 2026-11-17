@@ -71,7 +71,7 @@ final class BookingCalendarService
         $st->execute($date!==null?[$clinicId,$date]:[$clinicId]);return $st->fetchAll(PDO::FETCH_ASSOC);
     }
     /** Open exceptions replace the weekly windows; closures always win. Buffers must fit the resulting windows. */
-    public function windows(int $clinicId,int $professionalId,string $date,array $weekly,bool $strict=true): array
+    public function windows(int $clinicId,int $professionalId,string $date,array $weekly,bool $strict=true,?array $rules=null): array
     {
         self::date($date);$day=new DateTimeImmutable($date,self::tz());
         $keys=['seg','ter','qua','qui','sex','sab','dom'];$row=$weekly[$keys[(int)$day->format('N')-1]]??[];
@@ -82,7 +82,8 @@ final class BookingCalendarService
             $windows=[[$ts($row['start']),$ts($row['end'])]];
             if (!empty($row['break_start']) && !empty($row['break_end'])) $blocked[] = [$ts($row['break_start']),$ts($row['break_end'])];
         }
-        foreach ($this->rules($clinicId,$date) as $rule) {
+        $rules ??= $this->rules($clinicId,$date);
+        foreach ($rules as $rule) {
             if ($rule['professional_id']!==null && (int)$rule['professional_id']!==$professionalId) continue;
             $range=$rule['start_time']!==null?[$ts($rule['start_time']),$ts($rule['end_time'])]:[$day->getTimestamp(),$day->modify('+1 day')->getTimestamp()];
             if ($rule['kind']==='open') {
@@ -93,7 +94,7 @@ final class BookingCalendarService
             $windows=$ownOpen ?: $clinicOpen;
             // Special opening replaces weekly breaks, but explicit calendar closures still win.
             $blocked=[];
-            foreach ($this->rules($clinicId,$date) as $rule) {
+            foreach ($rules as $rule) {
                 if ($rule['kind']==='open' || ($rule['professional_id']!==null && (int)$rule['professional_id']!==$professionalId)) continue;
                 $blocked[]=$rule['start_time']!==null?[$ts($rule['start_time']),$ts($rule['end_time'])]:[$day->getTimestamp(),$day->modify('+1 day')->getTimestamp()];
             }

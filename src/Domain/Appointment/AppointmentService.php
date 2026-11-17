@@ -98,6 +98,7 @@ class AppointmentService
         $duration = max(15, min(240, $duration));
         $this->assertAvailability($professionalId,$parsedDate,$duration);
 
+        $overbookConflict = null;
         if (!$allowConflict) {
             if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
                 $lockStmt = $this->db->prepare("SELECT id FROM professionals WHERE id = :id FOR UPDATE");
@@ -114,6 +115,8 @@ class AppointmentService
                     $conflict
                 );
             }
+        } else {
+            $overbookConflict = $this->findConflict($clinicId, $professionalId, $parsedDate, $duration);
         }
 
         $stmt = $this->db->prepare("
@@ -139,20 +142,31 @@ class AppointmentService
 
         $id = (int)$this->db->lastInsertId();
 
-        // Registrar trilha de auditoria inicial
+        // Registrar trilha de auditoria inicial (F-18: registrar encaixe autorizado quando sobrepõe consulta)
+        $historyNote = $overbookConflict !== null
+            ? 'Agendamento inicial criado (encaixe autorizado sobre #' . (int)($overbookConflict['id'] ?? 0) . ')'
+            : 'Agendamento inicial criado';
         $this->recordStatusHistory(
             $clinicId,
             $id,
             null,
             self::STATUS_SCHEDULED,
             $userId ?? TenantContext::getUserId(),
-            'Agendamento inicial criado'
+            $historyNote
         );
+        if ($overbookConflict !== null) {
+            try {
+                (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_OVERBOOK_AUTHORIZED', 'appointments', (string)$id, [
+                    'overbooked_appointment_id' => (int)($overbookConflict['id'] ?? 0),
+                    'scheduled_at' => $parsedDate,
+                    'professional_id' => $professionalId,
+                ]);
+            } catch (\Throwable) {}
+        }
         // NI2-138: consulta marcada com o profissional = acompanhamento ativo; o vínculo libera o chat.
         (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, $patientId, $professionalId, 'appointment');
 
         (new \ClyoNutri\Domain\Notification\AppointmentConfirmationPublisher($this->db))->publish($clinicId, $id);
-        $this->notifyPatientAppointment($clinicId, $patientId, 'appointment.scheduled', $id, $parsedDate, 'scheduled.' . strtotime($parsedDate));
 
         return [
             'id' => $id,
@@ -172,13 +186,13 @@ class AppointmentService
      * Cria a consulta no horário atual e já a coloca em andamento (sem disparar confirmação ao paciente).
      * Idempotente: se o paciente já tem consulta em andamento, devolve essa consulta.
      */
-    public function startNow(int $patientId, int $professionalId, ?int $userId = null): array
+    public function startNow(int $patientId, int $professionalId, ?int $userId = null, ?string $note = null): array
     {
         $clinicId = TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
         TenantGuard::assertProfessionalBelongsToClinic($professionalId, $clinicId, $this->db);
         $userId ??= TenantContext::getUserId();
-        return $this->atomic(function () use ($clinicId, $patientId, $professionalId, $userId): array {
+        return $this->atomic(function () use ($clinicId, $patientId, $professionalId, $userId, $note): array {
             $q = $this->db->prepare("SELECT id FROM appointments WHERE clinic_id = ? AND patient_id = ? AND status = 'in_progress' ORDER BY id DESC LIMIT 1");
             $q->execute([$clinicId, $patientId]);
             if ($existing = $q->fetchColumn()) {
@@ -191,7 +205,7 @@ class AppointmentService
             $type = ((int)$c->fetchColumn()) > 0 ? 'follow_up' : 'first_visit';
             $duration = (int)($this->practicePreferences($professionalId)['default_duration_minutes'] ?? 60);
             $duration = max(15, min(240, $duration ?: 60));
-            $note = 'Atendimento iniciado agora pelo perfil do paciente (sem agendamento prévio).';
+            $note = $note ?? 'Atendimento iniciado agora pelo perfil do paciente (sem agendamento prévio).';
             $this->db->prepare("INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, status, type, notes, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
                 ->execute([$clinicId, $patientId, $professionalId, $now, $duration, self::STATUS_SCHEDULED, $type, $note]);
@@ -321,8 +335,7 @@ class AppointmentService
         if ($ok && !$this->db->inTransaction() && $before !== null && (string)($before['status'] ?? '') !== $newStatus) {
             if ($newStatus === self::STATUS_CANCELLED) {
                 $this->notifyPatientAppointment($clinicId, (int)$before['patient_id'], 'appointment.cancelled_by_clinic', $appointmentId, (string)$before['scheduled_at'], 'clinic_cancelled');
-            } elseif ($newStatus === self::STATUS_CONFIRMED) {
-                $this->notifyPatientAppointment($clinicId, (int)$before['patient_id'], 'appointment.confirmed_by_clinic', $appointmentId, (string)$before['scheduled_at'], 'clinic_confirmed');
+
             }
         }
         return $ok;
@@ -695,17 +708,22 @@ class AppointmentService
                 $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, 'Início do atendimento clínico', $userId);
             }
 
+            // NI2-861 (F-03): referenciar anamnese, avaliação antropométrica e versão de plano produzidos no atendimento.
+            $artifactRefs = $this->collectConsultationArtifactRefs($clinicId, (int)$appointment['patient_id'], $appointmentId);
+
             // Append no Prontuário com SHA-256 e trilha criptográfica
+            // NI2-879: título e data clínica usam a data real de conclusão (hoje), nunca scheduled_at futuro.
+            $concludedAt = date('Y-m-d H:i:s');
             $clinicalService = new ClinicalRecordService($this->db);
-            $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . date('d/m/Y', strtotime($appointment['scheduled_at'])) . ")";
+            $recordTitle = "Evolução Clínica — Consulta #" . $appointmentId . " (" . date('d/m/Y', strtotime($concludedAt)) . ")";
             $recordContent = array_merge([
                 'appointment_id' => $appointmentId,
                 'scheduled_at' => $appointment['scheduled_at'],
                 'type' => $appointment['type'],
                 'evolution_summary' => $evolutionSummary,
-                'concluded_at' => date('Y-m-d H:i:s'),
+                'concluded_at' => $concludedAt,
                 'recorded_by' => $author,
-            ], (int)$appointment['professional_id'] !== $author ? ['scheduled_professional_id' => (int)$appointment['professional_id']] : [], $clinicalDetails);
+            ], $artifactRefs, (int)$appointment['professional_id'] !== $author ? ['scheduled_professional_id' => (int)$appointment['professional_id']] : [], $clinicalDetails);
 
             $record = $clinicalService->appendRecord(
                 (int)$appointment['patient_id'],
@@ -829,6 +847,45 @@ class AppointmentService
     /**
      * Retorna os detalhes completos da consulta.
      */
+    /**
+     * NI2-861 (F-03): coleta referências dos artefatos clínicos produzidos durante a consulta.
+     * @return array{anamnesis_id:?int,anamnesis_version:?int,assessment_ids:list<int>,meal_plan_id:?int,meal_plan_version_id:?int,meal_plan_version:?int}
+     */
+    private function collectConsultationArtifactRefs(int $clinicId, int $patientId, int $appointmentId): array
+    {
+        $refs = [
+            'anamnesis_id' => null,
+            'anamnesis_version' => null,
+            'assessment_ids' => [],
+            'meal_plan_id' => null,
+            'meal_plan_version_id' => null,
+            'meal_plan_version' => null,
+        ];
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anamneses', 'appointment_id')) {
+            $st = $this->db->prepare('SELECT id, version FROM anamneses WHERE clinic_id = ? AND patient_id = ? AND appointment_id = ? ORDER BY is_draft ASC, version DESC, id DESC LIMIT 1');
+            $st->execute([$clinicId, $patientId, $appointmentId]);
+            if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                $refs['anamnesis_id'] = (int)$row['id'];
+                $refs['anamnesis_version'] = (int)$row['version'];
+            }
+        }
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'anthropometric_assessments', 'appointment_id')) {
+            $st = $this->db->prepare('SELECT id FROM anthropometric_assessments WHERE clinic_id = ? AND patient_id = ? AND appointment_id = ? ORDER BY id ASC');
+            $st->execute([$clinicId, $patientId, $appointmentId]);
+            $refs['assessment_ids'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+        }
+        if (\ClyoNutri\Core\Database\SchemaInfo::hasColumn($this->db, 'meal_plan_versions', 'appointment_id')) {
+            $st = $this->db->prepare('SELECT id, meal_plan_id, version_number FROM meal_plan_versions WHERE clinic_id = ? AND patient_id = ? AND appointment_id = ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$clinicId, $patientId, $appointmentId]);
+            if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                $refs['meal_plan_version_id'] = (int)$row['id'];
+                $refs['meal_plan_id'] = (int)$row['meal_plan_id'];
+                $refs['meal_plan_version'] = (int)$row['version_number'];
+            }
+        }
+        return $refs;
+    }
+
     public function getAppointment(int $appointmentId): ?array
     {
         $clinicId = TenantContext::getClinicId();
@@ -861,6 +918,67 @@ class AppointmentService
     {
         $ts = strtotime($scheduledAt);
         return $ts !== false && $ts - ($now ?? time()) > self::EARLY_START_TOLERANCE_MINUTES * 60;
+    }
+
+    /** NI2-879: verdadeiro quando a consulta está agendada para outro dia civil (ex.: data futura). */
+    public static function isDifferentDay(string $scheduledAt, ?int $now = null): bool
+    {
+        $ts = strtotime($scheduledAt);
+        if ($ts === false) {
+            return false;
+        }
+        return date('Y-m-d', $ts) !== date('Y-m-d', $now ?? time());
+    }
+
+    /**
+     * NI2-879: remarca a consulta futura para agora, grava no histórico e inicia o atendimento.
+     */
+    public function rescheduleForNowAndStart(int $appointmentId, int $userId, ?string $notes = null): void
+    {
+        $clinicId = TenantContext::getClinicId();
+        $nowStr = date('Y-m-d H:i:s');
+
+        $ownsTx = !$this->db->inTransaction();
+        if ($ownsTx) {
+            $this->db->beginTransaction();
+        }
+        try {
+            $app = $this->lockAppointment($appointmentId, $clinicId);
+            if (!$app) {
+                throw new InvalidArgumentException('Consulta não encontrada.');
+            }
+            $origFmt = date('d/m/Y H:i', strtotime((string)$app['scheduled_at']));
+            $upd = $this->db->prepare('UPDATE appointments SET scheduled_at = :now, updated_at = :now WHERE id = :id AND clinic_id = :clinic_id');
+            $upd->execute(['now' => $nowStr, 'id' => $appointmentId, 'clinic_id' => $clinicId]);
+
+            $histNote = trim(($notes ?? '') . " Remarcada para agora (agendada originalmente para {$origFmt}).");
+            $this->updateStatus($appointmentId, self::STATUS_IN_PROGRESS, $histNote, $userId);
+
+            if ($ownsTx) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownsTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * NI2-879: cria um novo atendimento para hoje (encaixe imediato) e inicia, mantendo o agendamento futuro intacto.
+     */
+    public function createTodayWalkInKeepingFuture(int $futureAppointmentId, int $userId, ?string $notes = null): int
+    {
+        $clinicId=TenantContext::getClinicId();
+        $future=$this->getAppointment($futureAppointmentId);
+        if(!$future) throw new InvalidArgumentException('Consulta não encontrada.');
+        if(!in_array($future['status'],[self::STATUS_SCHEDULED,self::STATUS_CONFIRMED],true)) throw new InvalidAppointmentTransitionException('O agendamento de origem não está mais agendado.');
+        // Same immediate-care path as the patient header: outside working hours, idempotent, no scheduled notice.
+        $note=trim(($notes??'').' Atendimento de hoje iniciado mantendo o agendamento #'.$futureAppointmentId.' para '.date('d/m/Y H:i',strtotime((string)$future['scheduled_at'])).'.');
+        $res=$this->startNow((int)$future['patient_id'],(int)$future['professional_id'],$userId,$note);
+        if($res['created']) (new \ClyoNutri\Core\Audit\AuditLogger($this->db))->log('APPOINTMENT_TODAY_KEEPING_FUTURE','appointments',(string)$res['id'],['future_appointment_id'=>$futureAppointmentId,'future_scheduled_at'=>(string)$future['scheduled_at']]);
+        return (int)$res['id'];
     }
 
     public static function humanUntil(string $scheduledAt, ?int $now = null): string

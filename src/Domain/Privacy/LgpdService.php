@@ -86,6 +86,7 @@ class LgpdService
         if (!$patient) {
             return null;
         }
+        $patient = ClinicalEncryptionService::decryptPatientRow($patient); // N-01: titular recebe texto claro
 
         // Anamneses
         $aStmt = $this->db->prepare("SELECT * FROM anamneses WHERE patient_id = :id AND clinic_id = :clinic_id");

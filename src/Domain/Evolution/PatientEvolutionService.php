@@ -200,6 +200,7 @@ final class PatientEvolutionService
                 'self_report_count' => count($self),
                 'total_entries' => count($clinical) + count($self),
                 'has_data' => (count($clinical) + count($self)) > 0,
+                'empty_message' => (count($clinical) + count($self)) === 0 ? 'Seu nutricionista ainda não compartilhou medidas' : null,
             ],
         ];
     }
@@ -229,12 +230,92 @@ final class PatientEvolutionService
         $message = trim((string)($in['message_for_patient'] ?? ''));
         if (mb_strlen($message) > self::GOAL_MESSAGE_MAX) throw new InvalidArgumentException('A mensagem para a paciente deve ter no máximo ' . self::GOAL_MESSAGE_MAX . ' caracteres.');
         $now = $this->now()->format('Y-m-d H:i:s');
-        $this->db->prepare("INSERT INTO patient_goals (clinic_id, patient_id, professional_id, metric_type, target_value, unit, direction, target_date, message_for_patient, status, created_by_user_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)")
-            ->execute([$clinicId, $patientId, $professionalId, $type, round($target, $m['decimals']), $m['unit'], $direction, $date === '' ? null : $date, $message === '' ? null : $message, $userId, $now, $now]);
-        $id = (int)$this->db->lastInsertId();
-        $this->audit->log('PATIENT_GOAL_CREATED', 'patient_goals', (string)$id, ['patient_id' => $patientId, 'metric_type' => $type, 'direction' => $direction]);
+        $allowSelf = !empty($in['allow_self_report']);
+        $shareAssessments = !empty($in['share_clinical_assessments']);
+
+        $own = !$this->db->inTransaction();
+        if ($own) $this->db->beginTransaction();
+        try {
+            $this->db->prepare("INSERT INTO patient_goals (clinic_id, patient_id, professional_id, metric_type, target_value, unit, direction, target_date, message_for_patient, status, created_by_user_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)")
+                ->execute([$clinicId, $patientId, $professionalId, $type, round($target, $m['decimals']), $m['unit'], $direction, $date === '' ? null : $date, $message === '' ? null : $message, $userId, $now, $now]);
+            $id = (int)$this->db->lastInsertId();
+            $this->audit->log('PATIENT_GOAL_CREATED', 'patient_goals', (string)$id, ['patient_id' => $patientId, 'metric_type' => $type, 'direction' => $direction]);
+
+            if ($allowSelf) {
+                $updPerm = $this->db->prepare('UPDATE patient_self_metric_permissions SET enabled = 1, updated_by_user_id = ?, updated_at = ? WHERE clinic_id = ? AND patient_id = ? AND metric_type = ?');
+                $updPerm->execute([$userId, $now, $clinicId, $patientId, $type]);
+                if ($updPerm->rowCount() === 0) {
+                    $this->db->prepare('INSERT INTO patient_self_metric_permissions (clinic_id, patient_id, metric_type, enabled, updated_by_user_id, updated_at) VALUES (?, ?, ?, 1, ?, ?)')
+                        ->execute([$clinicId, $patientId, $type, $userId, $now]);
+                }
+            }
+
+            $sharedRows = 0;
+            if ($shareAssessments) {
+                $col = $m['clinical_column'];
+                $updAss = $this->db->prepare("UPDATE anthropometric_assessments SET is_shared = 1, shared_at = ?, shared_by_user_id = ? WHERE clinic_id = ? AND patient_id = ? AND {$col} IS NOT NULL AND (is_shared = 0 OR is_shared IS NULL)");
+                $updAss->execute([$now, $userId, $clinicId, $patientId]);
+                $sharedRows = $updAss->rowCount();
+            }
+
+            if ($allowSelf || $shareAssessments) {
+                $this->audit->log('PATIENT_EVOLUTION_SHARED', 'patients', (string)$patientId, [
+                    'goal_id' => $id,
+                    'metric_type' => $type,
+                    'allow_self_report' => $allowSelf,
+                    'share_clinical_assessments' => $shareAssessments,
+                    'shared_assessments_count' => $sharedRows,
+                ]);
+            }
+
+            if ($own) $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($own && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
         return $this->goal($patientId, $id);
+    }
+
+    /**
+     * NI2-883: libera em um clique autorrelato e avaliações clínicas para o paciente.
+     */
+    public function releaseAllForPatient(int $patientId, int $userId): array
+    {
+        $clinicId = $this->guard($patientId);
+        $now = $this->now()->format('Y-m-d H:i:s');
+        $goals = $this->goals($patientId, true);
+        $metricsToEnable = $goals !== []
+            ? array_values(array_unique(array_column($goals, 'metric_type')))
+            : ['weight_kg'];
+
+        $own = !$this->db->inTransaction();
+        if ($own) $this->db->beginTransaction();
+        try {
+            foreach ($metricsToEnable as $type) {
+                if (!SelfMetricCatalog::has($type)) continue;
+                $updPerm = $this->db->prepare('UPDATE patient_self_metric_permissions SET enabled = 1, updated_by_user_id = ?, updated_at = ? WHERE clinic_id = ? AND patient_id = ? AND metric_type = ?');
+                $updPerm->execute([$userId, $now, $clinicId, $patientId, $type]);
+                if ($updPerm->rowCount() === 0) {
+                    $this->db->prepare('INSERT INTO patient_self_metric_permissions (clinic_id, patient_id, metric_type, enabled, updated_by_user_id, updated_at) VALUES (?, ?, ?, 1, ?, ?)')
+                        ->execute([$clinicId, $patientId, $type, $userId, $now]);
+                }
+            }
+            $updAss = $this->db->prepare('UPDATE anthropometric_assessments SET is_shared = 1, shared_at = ?, shared_by_user_id = ? WHERE clinic_id = ? AND patient_id = ? AND (is_shared = 0 OR is_shared IS NULL)');
+            $updAss->execute([$now, $userId, $clinicId, $patientId]);
+            $sharedRows = $updAss->rowCount();
+
+            $this->audit->log('PATIENT_EVOLUTION_SHARED', 'patients', (string)$patientId, [
+                'source' => 'one_click_release',
+                'enabled_metrics' => $metricsToEnable,
+                'shared_assessments_count' => $sharedRows,
+            ]);
+            if ($own) $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($own && $this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+        return ['enabled_metrics' => $metricsToEnable, 'shared_assessments' => $sharedRows];
     }
 
     public function closeGoal(int $patientId, int $goalId, string $status, int $userId): array
@@ -288,6 +369,18 @@ final class PatientEvolutionService
 
     // ------------------------------------------------------------------ visão do profissional
 
+    public static function hasActiveGoal(int $clinicId, int $patientId, ?PDO $db = null): bool
+    {
+        try {
+            $pdo = $db ?? Connection::getInstance();
+            $st = $pdo->prepare("SELECT 1 FROM patient_goals WHERE clinic_id = ? AND patient_id = ? AND status = 'active' LIMIT 1");
+            $st->execute([$clinicId, $patientId]);
+            return $st->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /** Painel do profissional: permissões, autorrelatos recentes (com rótulo e fonte) e metas. */
     public function professionalPanel(int $patientId): array
     {
@@ -295,11 +388,27 @@ final class PatientEvolutionService
         $s = $this->db->prepare('SELECT id, recorded_at, metric_type, value, unit, notes FROM patient_self_metrics WHERE clinic_id = ? AND patient_id = ? ORDER BY recorded_at DESC, id DESC LIMIT 50');
         $s->execute([$clinicId, $patientId]);
         $reports = array_map(function (array $r) { $r['label'] = SelfMetricCatalog::label((string)$r['metric_type']); $r['value'] = (float)$r['value']; return $r; }, $s->fetchAll(PDO::FETCH_ASSOC));
+        $enabled = $this->enabledMetricTypes($patientId);
+        $goals = $this->goals($patientId, false);
+        $activeGoalsCount = count(array_filter($goals, static fn(array $g): bool => ($g['status'] ?? '') === 'active'));
+        $assCounts = $this->db->prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN is_shared = 1 THEN 1 ELSE 0 END) AS shared FROM anthropometric_assessments WHERE clinic_id = ? AND patient_id = ?');
+        $assCounts->execute([$clinicId, $patientId]);
+        $ac = $assCounts->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'shared' => 0];
+        $totalAss = (int)($ac['total'] ?? 0);
+        $sharedAss = (int)($ac['shared'] ?? 0);
+
         return [
             'catalog' => array_map([SelfMetricCatalog::class, 'describe'], array_keys(SelfMetricCatalog::METRICS)),
-            'enabled' => $this->enabledMetricTypes($patientId),
+            'enabled' => $enabled,
             'self_reports' => $reports,
-            'goals' => $this->goals($patientId, false),
+            'goals' => $goals,
+            'app_visibility' => [
+                'has_enabled_metrics' => $enabled !== [],
+                'shared_assessments_count' => $sharedAss,
+                'total_assessments_count' => $totalAss,
+                'active_goals_count' => $activeGoalsCount,
+                'has_missing_release' => ($enabled === []) || ($totalAss > 0 && $sharedAss < $totalAss),
+            ],
         ];
     }
 }

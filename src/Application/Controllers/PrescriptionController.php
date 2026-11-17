@@ -44,6 +44,13 @@ final class PrescriptionController
         $this->headers();
         try {
             $data=$this->service->overview((int)($params['id']??0));
+            if (empty($data['catalog'])) {
+                $title='Prescrições';$activeNav='pacientes';$clinicName=$data['actor']['clinic_name'];$userName=$data['actor']['name'];
+                http_response_code(200);
+                ob_start();require dirname(__DIR__,3).'/views/prescriptions/unavailable.php';$content=ob_get_clean();
+                require dirname(__DIR__,3).'/views/layouts/professional-shell.php';
+                return;
+            }
             if (!$old && empty($params['rxId']) && !empty($_GET['modelo'])) $old=$this->service->template((int)$params['id'],(int)$_GET['modelo']);
             $rx=!empty($params['rxId'])?$this->service->detail((int)$params['id'],(int)$params['rxId']):null;
             $title='Prescrições de manipulados e suplementação';$activeNav='pacientes';$clinicName=$data['actor']['clinic_name'];$userName=$data['actor']['name'];$csrf=Csrf::token();

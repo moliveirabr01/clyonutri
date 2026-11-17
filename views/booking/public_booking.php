@@ -414,13 +414,10 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           Consulta Agendada com Sucesso!
         </h2>
         <p style="color: var(--neutral-gray-600, #475467); font-size: 0.95rem; margin: 0 0 24px 0;">
-          Seu agendamento foi registrado. Acompanhe o status e os detalhes no Portal do Paciente.
+          Seu agendamento foi registrado. Caso o consultório libere seu acesso ao Portal do Paciente, você receberá o convite por e-mail.
         </p>
 
         <div style="background: var(--neutral-gray-50, #F9FAFB); border: 1px solid var(--neutral-gray-200, #E5E7EB); border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 24px;">
-          <div style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin-bottom: 4px;">Código da Consulta</div>
-          <div id="receipt-id" style="font-size: 1.1rem; font-weight: 700; color: var(--botanical-forest-900, #0F3E17); margin-bottom: 12px;"></div>
-
           <div style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin-bottom: 4px;">Data e Horário</div>
           <div id="receipt-datetime" style="font-size: 1.05rem; font-weight: 600; color: var(--botanical-forest-900, #0F3E17); margin-bottom: 12px;"></div>
 
@@ -434,8 +431,8 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: center;">
-          <a href="/paciente/app" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 12px 24px;">
-            Acessar Portal do Paciente
+          <a href="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/agendar') ?>" class="btn-submit" style="text-decoration: none; display: inline-block; width: auto; padding: 12px 24px;">
+            Fazer novo agendamento
           </a>
         </div>
       </section>
@@ -738,7 +735,6 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
         .then(function(result) {
           if (state.timerInterval) clearInterval(state.timerInterval);
 
-          document.getElementById('receipt-id').textContent = '#' + result.appointment_id;
           document.getElementById('receipt-datetime').textContent =
             state.selectedDate.split('-').reverse().join('/') + ' às ' + state.selectedSlotTime;
           document.getElementById('receipt-modality').textContent =

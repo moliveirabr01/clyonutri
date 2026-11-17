@@ -69,7 +69,7 @@ final class DashboardOverview
     public static function compareCount(int $current, ?int $previous, string $periodLabel): array
     {
         if ($previous === null || ($previous === 0 && $current > 0)) {
-            return ['tone' => 'neutral', 'label' => 'sem base anterior', 'sr' => "Sem base de comparação $periodLabel."];
+            return ['tone' => 'neutral', 'label' => 'Sem dados do período anterior para comparar', 'sr' => "Sem base de comparação $periodLabel."];
         }
         if ($current === $previous) {
             return ['tone' => 'neutral', 'label' => 'sem variação', 'sr' => "Igual $periodLabel."];
@@ -90,7 +90,7 @@ final class DashboardOverview
     public static function comparePoints(?float $current, ?float $previous, string $periodLabel): array
     {
         if ($current === null || $previous === null) {
-            return ['tone' => 'neutral', 'label' => 'sem base anterior', 'sr' => "Sem base de comparação $periodLabel."];
+            return ['tone' => 'neutral', 'label' => 'Sem dados do período anterior para comparar', 'sr' => "Sem base de comparação $periodLabel."];
         }
         $diff = round($current - $previous, 1);
         if (abs($diff) < 0.05) {

@@ -32,7 +32,7 @@ $metaFields = static function (string $prefix, array $v = []) use ($e): string {
 <section class="card ex-card" id="laudos" aria-labelledby="laudos-titulo">
   <h2 id="laudos-titulo">Laudos e resultados</h2>
   <?php if ($pending): ?>
-    <div class="op-message op-message--info ex-msg ex-msg-warning" role="status"><strong><?= count($pending) ?> laudo(s) enviado(s) pela paciente aguardando sua revisão.</strong> Enquanto não for aceito, o laudo não conta como resultado recebido.</div>
+    <div class="op-message op-message--info ex-msg ex-msg-warning" role="status"><strong><?= count($pending) ?> <?= \ClyoNutri\Application\View\UserText::count(count($pending), 'laudo enviado pelo paciente aguardando sua revisão.', 'laudos enviados pelo paciente aguardando sua revisão.') ?></strong> Enquanto não for aceito, o laudo não conta como resultado recebido.</div>
   <?php endif; ?>
 
   <table class="table ex-table ex-coverage" aria-label="Situação por exame">

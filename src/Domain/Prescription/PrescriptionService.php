@@ -22,7 +22,12 @@ final class PrescriptionService
     public function overview(int $patient): array
     {
         [$clinic,,$actor,$p]=$this->context($patient);
-        return ['templates'=>$this->repo->rows('SELECT id,name FROM rx_templates WHERE clinic_id=? AND professional_id=? ORDER BY name LIMIT 100',[$clinic,$actor['professional_id']]),'patient'=>$p,'actor'=>$actor,'prescriptions'=>$this->repo->rows('SELECT id,status,version_number,created_at,issued_at FROM rx_prescriptions WHERE clinic_id=? AND patient_id=? AND professional_id=? ORDER BY id DESC LIMIT 100',[$clinic,$patient,$actor['professional_id']]),'catalog'=>$this->repo->rows("SELECT DISTINCT i.id,i.name,i.category,r.constraints_json FROM rx_ingredients i JOIN rx_ingredient_rules r ON r.ingredient_id=i.id AND r.clinic_id=i.clinic_id JOIN rx_policy_versions p ON p.id=r.policy_id AND p.clinic_id=i.clinic_id WHERE i.clinic_id=? AND i.enabled=1 AND r.decision='allow' AND p.enabled=1 AND p.effective_from<=? AND p.effective_until>=? AND i.category IN ('supplement','magistral_supplement','phytotherapy') ORDER BY i.name LIMIT 500",[$clinic,gmdate('Y-m-d'),gmdate('Y-m-d')])];
+        $catalog=(new PrescriptionAvailability($this->repo->db))->catalog($clinic);
+        return [
+            'patient'=>$p,'actor'=>$actor,'catalog'=>$catalog,
+            'templates'=>$catalog ? $this->repo->rows('SELECT id,name FROM rx_templates WHERE clinic_id=? AND professional_id=? ORDER BY name LIMIT 100',[$clinic,$actor['professional_id']]) : [],
+            'prescriptions'=>$catalog ? $this->repo->rows('SELECT id,status,version_number,created_at,issued_at FROM rx_prescriptions WHERE clinic_id=? AND patient_id=? AND professional_id=? ORDER BY id DESC LIMIT 100',[$clinic,$patient,$actor['professional_id']]) : [],
+        ];
     }
     public function detail(int $patient,int $id): array
     {
@@ -191,6 +196,7 @@ final class PrescriptionService
     public function patientList(int $clinic,int $patient): array
     {
         $this->patientIdentity($clinic,$patient);
+        if (!(new PrescriptionAvailability($this->repo->db))->available($clinic)) return [];
         return $this->repo->rows("SELECT id,version_number,status,issued_at,cancelled_at FROM rx_prescriptions WHERE clinic_id=? AND patient_id=? AND issued_at IS NOT NULL ORDER BY id DESC LIMIT 100",[$clinic,$patient]);
     }
     public function patientDownload(int $clinic,int $patient,int $id,bool $signature=false): array

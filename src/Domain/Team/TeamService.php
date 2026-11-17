@@ -313,7 +313,7 @@ final class TeamService
 
     private function linkFor(string $token): string
     {
-        $path = '/recuperar-senha/' . rawurlencode($token);
+        $path = '/convite/' . rawurlencode($token);
         $base = rtrim(trim((string)($this->appUrl ?? Env::get('APP_URL') ?? '')), '/');
         if (!preg_match('#^https?://[^/\s]+#i', $base)) {
             return $path;

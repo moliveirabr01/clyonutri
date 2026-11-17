@@ -33,10 +33,18 @@ class AuthController
 
     public function showLogin(): void
     {
+        // v54.71: sessão sem consultório (não passa no middleware) não conta como logada: limpa e mostra o login,
+        // em vez de redirecionar e voltar para cá em loop.
+        if (!empty($_SESSION['user_id']) && empty($_SESSION['clinic_id'])) {
+            foreach (['user_id', 'clinic_id', 'user_role', 'user_name', 'user_email', 'clinic_name', 'auth_version', 'mfa_verified_at', 'mfa_pending'] as $k) {
+                unset($_SESSION[$k]);
+            }
+        }
         // Se já autenticado, redireciona conforme papel canônico
         if (!empty($_SESSION['user_id'])) {
             $role = (string)($_SESSION['user_role'] ?? '');
             $destination = match ($role) {
+                'superadmin', 'admin_operacional', 'finance_admin', 'security_auditor' => '/admin', // v54.68
                 'operator', 'support_agent' => '/suporte/fila',
                 'receptionist' => '/agenda',
                 default => '/dashboard',
@@ -124,6 +132,14 @@ class AuthController
                 error_log('NI2-606 login check: ' . $e->getMessage());
             }
         }
+        // v54.71: sem consultório ativo vinculado não há sessão possível (o middleware exige clinic_id). Antes o login
+        // "dava certo" e o navegador ficava em loop /admin ↔ /login?error=session_expired.
+        if (empty($user['clinic_id'])) {
+            $_SESSION['flash_error'] = 'Seu usuário não está vinculado a um consultório ativo. Fale com o suporte da Clyo Nutri para regularizar o acesso.';
+            $_SESSION['old_email'] = $email;
+            header('Location: /login');
+            exit;
+        }
 
         // SEC-F005: Encerramento de sessões concorrentes (Single Active Session)
         $terminateOtherSessions = !empty($_POST['terminate_other_sessions'])
@@ -135,14 +151,6 @@ class AuthController
 
         // Sessão segura inicializada e regenerada (prevenção de session fixation)
         session_regenerate_id(true);
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['auth_version'] = (int)$user['auth_version'];
-        $_SESSION['clinic_id'] = $user['clinic_id'];
-        $_SESSION['user_name'] = $user['name'];
-        $_SESSION['user_role'] = $user['role'];
-        $_SESSION['user_email'] = $user['email'];
-        $_SESSION['clinic_name'] = $user['clinic_name'] ?? 'Minha Clínica';
-
         $destination = match ($user['role']) {
             'superadmin', 'admin_operacional', 'finance_admin', 'security_auditor' => '/admin',
             'operator', 'support_agent' => '/suporte/fila',
@@ -157,8 +165,215 @@ class AuthController
             $destination = $back;
         }
 
+        // NI2-859 (SEG360-SEC-004): MFA obrigatório para papéis de plataforma e opcional para profissionais.
+        $mfaService = new \ClyoNutri\Core\Auth\MfaService($this->authService->getDb());
+        $mfaStatus = $mfaService->status((int)$user['id']);
+        if ($mfaStatus['enabled'] || $mfaStatus['required']) {
+            $_SESSION['mfa_pending'] = [
+                'user_id' => (int)$user['id'],
+                'auth_version' => (int)$user['auth_version'],
+                'clinic_id' => $user['clinic_id'],
+                'name' => $user['name'],
+                'role' => $user['role'],
+                'email' => $user['email'],
+                'clinic_name' => $user['clinic_name'] ?? 'Minha Clínica',
+                'destination' => $destination,
+                'needs_setup' => !$mfaStatus['enabled'],
+            ];
+            header('Location: /login/mfa');
+            exit;
+        }
+
+        $this->establishUserSession($user, null);
         header('Location: ' . $destination);
         exit;
+    }
+
+    private function establishUserSession(array $user, ?string $mfaMethod): void
+    {
+        $_SESSION['user_id'] = $user['id'] ?? $user['user_id'];
+        $_SESSION['auth_version'] = (int)($user['auth_version'] ?? 1);
+        $_SESSION['clinic_id'] = $user['clinic_id'] ?? null;
+        $_SESSION['user_name'] = $user['name'] ?? '';
+        $_SESSION['user_role'] = $user['role'] ?? '';
+        $_SESSION['user_email'] = $user['email'] ?? '';
+        $_SESSION['clinic_name'] = $user['clinic_name'] ?? 'Minha Clínica';
+        if ($mfaMethod !== null) {
+            $_SESSION['mfa_verified_at'] = time();
+        }
+        $this->auditAuthEvent('AUTH_LOGIN_SUCCEEDED', (int)$_SESSION['user_id'], $_SESSION['clinic_id'] ? (int)$_SESSION['clinic_id'] : null, [
+            'channel' => 'web',
+            'role' => (string)$_SESSION['user_role'],
+            'mfa_method' => $mfaMethod,
+        ]);
+    }
+
+    private function auditAuthEvent(string $action, int $userId, ?int $clinicId, array $details): void
+    {
+        try {
+            $db = $this->authService->getDb();
+            $prevClinic = TenantContext::hasClinic() ? TenantContext::getClinicId() : null;
+            $prevUser = TenantContext::getUser();
+            if ($clinicId !== null && $clinicId > 0) {
+                TenantContext::set($clinicId, ['id' => $userId, 'role' => (string)($details['role'] ?? '')]);
+            }
+            $details['user_agent'] = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 160);
+            (new \ClyoNutri\Core\Audit\AuditLogger($db))->log($action, 'auth', (string)$userId, $details);
+            if ($prevClinic !== null) {
+                TenantContext::set($prevClinic, $prevUser ?? []);
+            } else {
+                TenantContext::clear();
+            }
+        } catch (\Throwable $e) {
+            error_log('[auth-audit] ' . get_class($e));
+        }
+    }
+
+    /**
+     * v54.69: sessão já autenticada sem MFA verificado (ex.: aberta antes da v54.67, quando o MFA passou a ser
+     * exigido no /admin). Sem isto, /admin → /login/mfa → /login → /admin entrava em loop. Monta o desafio a partir
+     * da própria sessão (step-up), sem pedir a senha de novo.
+     */
+    private function pendingFromSession(): ?array
+    {
+        if (empty($_SESSION['user_id'])) {
+            return null;
+        }
+        $role = (string)($_SESSION['user_role'] ?? '');
+        $status = (new \ClyoNutri\Core\Auth\MfaService($this->authService->getDb()))->status((int)$_SESSION['user_id']);
+        if (!$status['enabled'] && !$status['required']) {
+            return null;
+        }
+        $_SESSION['mfa_pending'] = [
+            'user_id' => (int)$_SESSION['user_id'],
+            'auth_version' => (int)($_SESSION['auth_version'] ?? 1),
+            'clinic_id' => $_SESSION['clinic_id'] ?? null,
+            'name' => (string)($_SESSION['user_name'] ?? ''),
+            'role' => $role,
+            'email' => (string)($_SESSION['user_email'] ?? ''),
+            'clinic_name' => (string)($_SESSION['clinic_name'] ?? 'Minha Clínica'),
+            'destination' => \ClyoNutri\Core\Security\RoleModel::isPlatformConsole($role) ? '/admin' : '/dashboard',
+            'needs_setup' => !$status['enabled'],
+            'step_up' => true,
+        ];
+        return $_SESSION['mfa_pending'];
+    }
+
+    public function showMfaChallenge(): void
+    {
+        $pending = $_SESSION['mfa_pending'] ?? null;
+        if ((!is_array($pending) || empty($pending['user_id'])) && empty($_SESSION['mfa_verified_at'])) {
+            $pending = $this->pendingFromSession();
+        }
+        if (!is_array($pending) || empty($pending['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+        if (!empty($pending['needs_setup']) && empty($pending['setup_secret'])) {
+            $mfa = (new \ClyoNutri\Core\Auth\MfaService($this->authService->getDb()))->beginEnrollment((string)$pending['email']);
+            $_SESSION['mfa_pending']['setup_secret'] = $mfa['secret'];
+            $_SESSION['mfa_pending']['provisioning_uri'] = $mfa['provisioning_uri'];
+            $pending = $_SESSION['mfa_pending'];
+        }
+        $csrfToken = Csrf::token();
+        $error = $_SESSION['mfa_error'] ?? null;
+        unset($_SESSION['mfa_error']);
+        require __DIR__ . '/../../../views/auth/mfa.php';
+    }
+
+    public function verifyMfaChallenge(): void
+    {
+        if (!Csrf::validate($_POST['_csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo 'Sessão de verificação inválida. Reabra o formulário.';
+            return;
+        }
+        $pending = $_SESSION['mfa_pending'] ?? null;
+        if ((!is_array($pending) || empty($pending['user_id'])) && empty($_SESSION['mfa_verified_at'])) {
+            $pending = $this->pendingFromSession();
+        }
+        if (!is_array($pending) || empty($pending['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+        $code = trim((string)($_POST['code'] ?? ''));
+        $mfaService = new \ClyoNutri\Core\Auth\MfaService($this->authService->getDb());
+        $userId = (int)$pending['user_id'];
+
+        if (!empty($pending['needs_setup'])) {
+            try {
+                $res = $mfaService->confirmEnrollment($userId, (string)($pending['setup_secret'] ?? ''), $code);
+                $_SESSION['mfa_recovery_codes_once'] = $res['recovery_codes'];
+                $method = 'totp_setup';
+            } catch (\Throwable $e) {
+                $_SESSION['mfa_error'] = $e->getMessage();
+                header('Location: /login/mfa');
+                exit;
+            }
+        } else {
+            $check = $mfaService->verifyChallenge($userId, $code, (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'));
+            if (!$check['ok']) {
+                $_SESSION['mfa_error'] = $check['error'] ?? 'Código MFA inválido.';
+                if ($check['locked']) {
+                    header('Retry-After: ' . max(1, (int)$check['retry_after']));
+                }
+                header('Location: /login/mfa');
+                exit;
+            }
+            $method = $check['method'];
+        }
+
+        unset($_SESSION['mfa_pending']);
+        session_regenerate_id(true);
+        $this->establishUserSession($pending, $method);
+        $destination = (string)($pending['destination'] ?? '/dashboard');
+        if (!empty($_SESSION['mfa_recovery_codes_once'])) {
+            // v54.68 / N-03: os códigos de recuperação aparecem uma única vez, logo após o cadastro do MFA.
+            $_SESSION['mfa_recovery_next'] = $destination;
+            header('Location: /login/mfa/codigos');
+            exit;
+        }
+        header('Location: ' . $destination);
+        exit;
+    }
+
+    /** v54.68 / N-03: tela única com os códigos de recuperação recém-gerados. */
+    public function showRecoveryCodes(): void
+    {
+        $codes = $_SESSION['mfa_recovery_codes_once'] ?? null;
+        if (empty($_SESSION['user_id']) || !is_array($codes) || $codes === []) {
+            header('Location: ' . (empty($_SESSION['user_id']) ? '/login' : self::homeForRole((string)($_SESSION['user_role'] ?? ''))));
+            exit;
+        }
+        header('Cache-Control: no-store, max-age=0');
+        $csrfToken = Csrf::token();
+        $error = $_SESSION['mfa_error'] ?? null;
+        unset($_SESSION['mfa_error']);
+        require __DIR__ . '/../../../views/auth/mfa_recovery_codes.php';
+    }
+
+    public function confirmRecoveryCodes(): void
+    {
+        if (empty($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+        if (!Csrf::validate($_POST['_csrf_token'] ?? '') || empty($_POST['saved'])) {
+            $_SESSION['mfa_error'] = 'Confirme que guardou os códigos em local seguro para continuar.';
+            header('Location: /login/mfa/codigos');
+            exit;
+        }
+        $next = (string)($_SESSION['mfa_recovery_next'] ?? self::homeForRole((string)($_SESSION['user_role'] ?? '')));
+        unset($_SESSION['mfa_recovery_codes_once'], $_SESSION['mfa_recovery_next']);
+        $this->auditAuthEvent('AUTH_MFA_RECOVERY_CODES_ACKNOWLEDGED', (int)$_SESSION['user_id'],
+            !empty($_SESSION['clinic_id']) ? (int)$_SESSION['clinic_id'] : null, ['role' => (string)($_SESSION['user_role'] ?? '')]);
+        header('Location: ' . (str_starts_with($next, '/') && !str_starts_with($next, '//') ? $next : self::homeForRole((string)($_SESSION['user_role'] ?? ''))));
+        exit;
+    }
+
+    private static function homeForRole(string $role): string
+    {
+        return \ClyoNutri\Core\Security\RoleModel::isPlatformConsole($role) && !in_array($role, ['admin'], true) ? '/admin/dashboard' : '/dashboard';
     }
 
     /**
@@ -191,6 +406,15 @@ class AuthController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
             $this->logoutConfirm();
             return;
+        }
+
+        if (!empty($_SESSION['user_id'])) {
+            $this->auditAuthEvent(
+                'AUTH_LOGOUT',
+                (int)$_SESSION['user_id'],
+                !empty($_SESSION['clinic_id']) ? (int)$_SESSION['clinic_id'] : null,
+                ['channel' => 'web', 'role' => (string)($_SESSION['user_role'] ?? '')]
+            );
         }
 
         \ClyoNutri\Core\Auth\AuthContext::clear();
@@ -463,6 +687,94 @@ class AuthController
     }
 
     /**
+     * NI2-890: Tela própria de aceite de convite da equipe (/convite/{token}).
+     */
+    public function showTeamInvite(array $params = []): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            header('Location: /dashboard');
+            exit;
+        }
+        if (!headers_sent()) {
+            header('Referrer-Policy: no-referrer');
+            header('Cache-Control: no-store');
+        }
+        $token = trim((string)($params['token'] ?? $_GET['token'] ?? ''));
+        $csrfToken = Csrf::token();
+        $error = $_SESSION['flash_error'] ?? null;
+        unset($_SESSION['flash_error']);
+
+        $tokenData = $this->resetService->validateToken($token, 'invite');
+        $isValidToken = ($tokenData !== null);
+
+        require __DIR__ . '/../../../views/auth/team-invite.php';
+    }
+
+    /**
+     * NI2-890: Aceite de convite da equipe com senha + aceite obrigatório dos termos + auditoria TEAM_INVITE_ACCEPTED.
+     */
+    public function acceptTeamInvite(array $params = []): void
+    {
+        $tokenParam = trim((string)($params['token'] ?? $_POST['token'] ?? ''));
+        if (!Csrf::validate((string)($_POST['_csrf_token'] ?? ''))) {
+            $_SESSION['flash_error'] = 'Token de segurança expirado. Tente novamente.';
+            header("Location: /convite/{$tokenParam}");
+            exit;
+        }
+        if (empty($_POST['terms_accepted'])) {
+            $_SESSION['flash_error'] = 'Você precisa aceitar os Termos de Uso e a Política de Privacidade para ativar o acesso.';
+            header("Location: /convite/{$tokenParam}");
+            exit;
+        }
+        $password = (string)($_POST['password'] ?? '');
+        $passwordConfirmation = (string)($_POST['password_confirmation'] ?? '');
+        if ($password === '' || $password !== $passwordConfirmation) {
+            $_SESSION['flash_error'] = 'A confirmação de senha não coincide com a senha informada.';
+            header("Location: /convite/{$tokenParam}");
+            exit;
+        }
+
+        try {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $tokenInfo = $this->resetService->validateToken($tokenParam, 'invite');
+            $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua, 'invite');
+            $userId = (int)($res['user_id'] ?? 0);
+            $clinicId = $tokenInfo['clinic_id'] ?? null;
+
+            $termsVersion = class_exists(\ClyoNutri\Domain\Legal\LegalDocuments::class)
+                ? (string)(\ClyoNutri\Domain\Legal\LegalDocuments::VERSION ?? '1.0')
+                : '1.0';
+            $aud = Connection::getInstance()->prepare(
+                'INSERT INTO audit_logs (clinic_id, user_id, action, resource, resource_id, ip_address, user_agent, details)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $aud->execute([
+                $clinicId,
+                $userId,
+                'TEAM_INVITE_ACCEPTED',
+                'users',
+                (string)$userId,
+                $ip,
+                $ua !== null ? mb_substr($ua, 0, 255) : null,
+                json_encode(['terms_accepted' => true, 'terms_version' => $termsVersion], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            $_SESSION['flash_success'] = 'Convite aceito e senha criada. Já dá para entrar.';
+            header('Location: /login');
+            exit;
+        } catch (\InvalidArgumentException $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+            header("Location: /convite/{$tokenParam}");
+            exit;
+        } catch (\Throwable $e) {
+            $_SESSION['flash_error'] = 'Não foi possível concluir o aceite do convite. Peça um novo convite ao responsável.';
+            header("Location: /convite/{$tokenParam}");
+            exit;
+        }
+    }
+
+    /**
      * Exibe o formulário para criação da nova senha com base no token.
      */
     public function showResetPassword(array $params = []): void
@@ -482,7 +794,7 @@ class AuthController
         $error = $_SESSION['flash_error'] ?? null;
         unset($_SESSION['flash_error']);
 
-        $tokenData = $this->resetService->validateToken($token);
+        $tokenData = $this->resetService->validateToken($token, 'reset');
         $isValidToken = ($tokenData !== null);
 
         require __DIR__ . '/../../../views/auth/reset-password.php';
@@ -525,7 +837,7 @@ class AuthController
         try {
             $ip = $_SERVER['REMOTE_ADDR'] ?? null;
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
-            $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua);
+            $res = $this->resetService->resetPassword($tokenParam, $password, $ip, $ua, 'reset');
 
             // NI2-481 P1c: aviso de segurança de senha alterada (não bloqueia o fluxo se o e-mail falhar).
             try {

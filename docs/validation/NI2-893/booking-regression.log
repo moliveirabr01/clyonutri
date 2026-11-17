@@ -1,0 +1,21 @@
+====================================================================
+   CLYONUTRI II — SELF-SERVICE BOOKING TEST SUITE (NI2-433 / NI2-434)
+   Disponibilidade, Reserva Temporária (Hold) & Agendamento Canônico
+====================================================================
+
+  [PASS] Sem configuração da clínica, autoagendamento fica desligado (opt-in)
+  [PASS] Desligado: nenhum horário é oferecido
+  [PASS] Desligado: profissional não aparece na página pública
+  [PASS] Ligado só na clínica 1: profissional da clínica 2 continua fora
+  [PASS] Termo vigente de assistência clínica disponível para o aceite
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 FOREIGN KEY constraint failed in /Users/moliveira/Nutri_II/tests/self_service_booking_test.php:113
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/self_service_booking_test.php(113): PDO->exec('DELETE FROM app...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/self_service_booking_test.php on line 113
+
+Fatal error: Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 FOREIGN KEY constraint failed in /Users/moliveira/Nutri_II/tests/self_service_booking_test.php:113
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/self_service_booking_test.php(113): PDO->exec('DELETE FROM app...')
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/self_service_booking_test.php on line 113

@@ -1,0 +1,10 @@
+PASS 1280px Encerrar sessão: target 48px, contrast 11.98:1, focus outline solid 3px
+PASS 1280px Atualizar receitas: target 44px, contrast 11.11:1, focus outline solid 3px
+PASS 1280px Abrir receita: target 48px, contrast 11.98:1, focus outline solid 3px
+PASS 390px Encerrar sessão: target 48px, contrast 11.98:1, focus outline solid 3px
+PASS 390px Atualizar receitas: target 44px, contrast 11.11:1, focus outline solid 3px
+PASS 390px Abrir receita: target 48px, contrast 11.98:1, focus outline solid 3px
+PASS 360px Encerrar sessão: target 48px, contrast 11.98:1, focus outline solid 3px
+PASS 360px Atualizar receitas: target 44px, contrast 11.11:1, focus outline solid 3px
+PASS 360px Abrir receita: target 48px, contrast 11.98:1, focus outline none 3px
+PASS arrow keys select, move focus and wrap within meal radio group

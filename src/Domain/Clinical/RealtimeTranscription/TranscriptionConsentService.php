@@ -27,6 +27,8 @@ class TranscriptionConsentService
 {
     public const MECH_LINK = 'patient_link';
     public const MECH_PORTAL = 'patient_portal';
+    public const MECH_OTP = 'otp';
+    private const OTP_MAX_ATTEMPTS = 5;
 
     private PDO $db;
     private AuditLogger $auditLogger;
@@ -65,7 +67,7 @@ class TranscriptionConsentService
      * Pede o aceite ao paciente. NÃO concede nada: cria um pedido pendente e devolve o token em claro uma única vez.
      * Cancela pedidos pendentes anteriores do mesmo atendimento. Se já existe aceite válido, não cria outro.
      */
-    public function createRequest(int $appointmentId, int $patientId, int $userId, string $origin = 'professional_session'): array
+    public function createRequest(int $appointmentId, int $patientId, int $userId, string $origin = 'professional_session', string $requestIp = '0.0.0.0'): array
     {
         $clinicId = (int)TenantContext::getClinicId();
         TenantGuard::assertPatientBelongsToClinic($patientId, $clinicId, $this->db);
@@ -86,23 +88,36 @@ class TranscriptionConsentService
             ->execute(['c' => $clinicId, 'a' => $appointmentId, 'p' => $patientId]);
 
         $token = self::newToken();
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $otpHash = password_hash($otp, PASSWORD_DEFAULT);
         $expires = gmdate('Y-m-d H:i:s', time() + TranscriptionConsentTerms::REQUEST_TTL_SECONDS);
+        $reqIpHash = self::hashIp($requestIp);
         $this->db->prepare("INSERT INTO consultation_ai_consent_requests
-            (clinic_id, appointment_id, patient_id, requested_by_user_id, token_hash, terms_version, terms_sha256, status, request_origin, expires_at_utc, created_at)
-            VALUES (:c, :a, :p, :u, :th, :tv, :ts, 'pending', :o, :e, :n)")
+            (clinic_id, appointment_id, patient_id, requested_by_user_id, token_hash, otp_hash, otp_expires_at_utc, otp_attempts, requested_ip_hash, same_ip_alert, terms_version, terms_sha256, status, request_origin, expires_at_utc, created_at)
+            VALUES (:c, :a, :p, :u, :th, :oh, :oe, 0, :rih, 0, :tv, :ts, 'pending', :o, :e, :n)")
             ->execute([
                 'c' => $clinicId, 'a' => $appointmentId, 'p' => $patientId, 'u' => $userId,
-                'th' => self::hashToken($token), 'tv' => TranscriptionConsentTerms::VERSION, 'ts' => TranscriptionConsentTerms::sha256(),
+                'th' => self::hashToken($token), 'oh' => $otpHash, 'oe' => $expires, 'rih' => $reqIpHash,
+                'tv' => TranscriptionConsentTerms::VERSION, 'ts' => TranscriptionConsentTerms::sha256(),
                 'o' => substr($origin, 0, 40), 'e' => $expires, 'n' => $now,
             ]);
         $id = (int)$this->db->lastInsertId();
 
+        $deliveryChannel = $this->dispatchConsentOtp($clinicId, $patientId, $token, $otp);
+
         $this->auditLogger->log('AI_TRANSCRIPTION_CONSENT_REQUESTED', 'appointment', (string)$appointmentId, [
             'request_id' => $id, 'patient_id' => $patientId, 'user_id' => $userId,
             'version' => TranscriptionConsentTerms::VERSION, 'origin' => $origin, 'expires_at_utc' => $expires,
+            'delivery_channel' => $deliveryChannel,
         ]);
 
-        return ['created' => true, 'token' => $token, 'consent' => $this->present($this->requestById($id))];
+        return [
+            'created' => true,
+            'token' => $token,
+            'otp' => $otp,
+            'delivery_channel' => $deliveryChannel,
+            'consent' => $this->present($this->requestById($id)),
+        ];
     }
 
     /** Revogação pelo profissional (a pedido do paciente): registra quem revogou e para a captação. */
@@ -140,16 +155,33 @@ class TranscriptionConsentService
     }
 
     /**
-     * Decisão do paciente pelo link. Uso único: só um UPDATE condicionado a status='pending' e validade vence a corrida.
+     * Decisão do paciente pelo link com validação obrigatória de OTP (SEC-001 / NI2-858).
+     * Uso único: só um UPDATE condicionado a status='pending' e validade vence a corrida.
      * @return array{state:string,revoke_token:?string,consent:array}
      */
-    public function decideByToken(string $token, string $decision, string $postedTermsSha, string $ip, string $userAgent): array
+    public function decideByToken(string $token, string $decision, string $postedTermsSha, string $ip, string $userAgent, ?string $otp = null): array
     {
         $row = $this->requestByToken($token);
         if ($row === null) {
             throw new DomainException('Link inválido ou expirado.');
         }
-        return $this->decide($row, $decision, $postedTermsSha, self::MECH_LINK, $ip, $userAgent);
+        if ($decision === 'accept') {
+            $attempts = (int)($row['otp_attempts'] ?? 0);
+            if ($attempts >= self::OTP_MAX_ATTEMPTS) {
+                throw new DomainException('Muitas tentativas inválidas de código OTP. Peça um novo pedido de aceite ao profissional.');
+            }
+            $now = gmdate('Y-m-d H:i:s');
+            if (empty($row['otp_expires_at_utc']) || (string)$row['otp_expires_at_utc'] <= $now) {
+                throw new DomainException('Código OTP expirado. Peça um novo pedido de aceite ao profissional.');
+            }
+            $otpClean = trim((string)$otp);
+            if (!preg_match('/^\d{6}$/', $otpClean) || empty($row['otp_hash']) || !password_verify($otpClean, (string)$row['otp_hash'])) {
+                $this->db->prepare('UPDATE consultation_ai_consent_requests SET otp_attempts = otp_attempts + 1 WHERE id = :id')
+                    ->execute(['id' => (int)$row['id']]);
+                throw new DomainException('Código de verificação (OTP) obrigatório ou inválido.');
+            }
+        }
+        return $this->decide($row, $decision, $postedTermsSha, self::MECH_OTP, $ip, $userAgent);
     }
 
     /** Decisão do paciente autenticado no portal. O pedido precisa ser do mesmo paciente e da mesma clínica. */
@@ -223,13 +255,16 @@ class TranscriptionConsentService
         $now = gmdate('Y-m-d H:i:s');
         $accept = $decision === 'accept';
         $revokeToken = $accept ? bin2hex(random_bytes(16)) : null;
+        $decisionIpHash = self::hashIp($ip);
+        $reqIpHash = (string)($row['requested_ip_hash'] ?? '');
+        $sameIpAlert = ($reqIpHash !== '' && hash_equals($reqIpHash, $decisionIpHash)) ? 1 : 0;
         $st = $this->db->prepare("UPDATE consultation_ai_consent_requests
             SET status = :s, decided_at_utc = :n, decision_mechanism = :m, decision_ip_hash = :ip, decision_user_agent = :ua,
-                valid_until_utc = :vu, revoke_token_hash = :rt
+                same_ip_alert = :sia, valid_until_utc = :vu, revoke_token_hash = :rt
             WHERE id = :id AND status = 'pending' AND expires_at_utc > :n2");
         $st->execute([
             's' => $accept ? 'accepted' : 'rejected', 'n' => $now, 'm' => $mechanism,
-            'ip' => self::hashIp($ip), 'ua' => self::cleanUa($userAgent),
+            'ip' => $decisionIpHash, 'ua' => self::cleanUa($userAgent), 'sia' => $sameIpAlert,
             'vu' => $accept ? gmdate('Y-m-d H:i:s', time() + TranscriptionConsentTerms::CONSENT_VALIDITY_SECONDS) : null,
             'rt' => $revokeToken !== null ? self::hashToken($revokeToken) : null,
             'id' => (int)$row['id'], 'n2' => $now,
@@ -242,11 +277,17 @@ class TranscriptionConsentService
                 : 'Este link já foi usado, expirou ou foi cancelado. Peça um novo ao profissional.');
         }
 
-        $this->withAuditContext($row, function () use ($row, $accept, $mechanism): void {
+        $this->withAuditContext($row, function () use ($row, $accept, $mechanism, $sameIpAlert): void {
             $this->auditLogger->log($accept ? 'AI_TRANSCRIPTION_CONSENT_ACCEPTED_BY_PATIENT' : 'AI_TRANSCRIPTION_CONSENT_REJECTED_BY_PATIENT', 'appointment', (string)$row['appointment_id'], [
                 'request_id' => (int)$row['id'], 'patient_id' => (int)$row['patient_id'],
-                'version' => (string)$row['terms_version'], 'mechanism' => $mechanism, 'origin' => 'patient_' . ($mechanism === self::MECH_PORTAL ? 'portal' : 'public_link'),
+                'version' => (string)$row['terms_version'], 'mechanism' => $mechanism, 'origin' => 'patient_' . ($mechanism === self::MECH_PORTAL ? 'portal' : 'otp'),
+                'same_ip_alert' => $sameIpAlert === 1,
             ]);
+            if ($sameIpAlert === 1) {
+                $this->auditLogger->log('AI_TRANSCRIPTION_CONSENT_SAME_IP_ALERT', 'appointment', (string)$row['appointment_id'], [
+                    'request_id' => (int)$row['id'], 'patient_id' => (int)$row['patient_id'], 'mechanism' => $mechanism,
+                ]);
+            }
         });
 
         return ['state' => $accept ? 'accepted' : 'rejected', 'revoke_token' => $revokeToken, 'consent' => $this->present($this->requestById((int)$row['id']))];
@@ -285,7 +326,7 @@ class TranscriptionConsentService
             JOIN appointments a ON a.id = r.appointment_id AND a.clinic_id = r.clinic_id AND a.patient_id = r.patient_id
             WHERE r.clinic_id = :c AND r.appointment_id = :a AND r.patient_id = :p
               AND r.status = 'accepted' AND r.revoked_at_utc IS NULL AND r.valid_until_utc > :n
-              AND r.decision_mechanism IN ('patient_link', 'patient_portal')
+              AND r.decision_mechanism IN ('otp', 'patient_portal')
             ORDER BY r.id DESC LIMIT 1");
         $st->execute(['c' => $clinicId, 'a' => $appointmentId, 'p' => $patientId, 'n' => gmdate('Y-m-d H:i:s')]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -356,6 +397,7 @@ class TranscriptionConsentService
             'accepted_at_utc' => $row['status'] === 'accepted' || $row['status'] === 'revoked' ? ($row['decided_at_utc'] ?? null) : null,
             'valid_until_utc' => $row['valid_until_utc'] ?? null,
             'mechanism' => $row['decision_mechanism'] ?? null,
+            'same_ip_alert' => !empty($row['same_ip_alert']),
             'revoked_at_utc' => $row['revoked_at_utc'] ?? null,
             'revoked_by' => $row['revoked_by'] ?? null,
         ];
@@ -429,6 +471,50 @@ class TranscriptionConsentService
     private static function hashIp(string $ip): string
     {
         return hash_hmac('sha256', $ip, (string)(Env::get('APP_KEY') ?: 'clyonutri-local'));
+    }
+
+    private function dispatchConsentOtp(int $clinicId, int $patientId, string $token, string $otp): string
+    {
+        $st = $this->db->prepare('SELECT name, email FROM patients WHERE id = :id AND clinic_id = :c LIMIT 1');
+        $st->execute(['id' => $patientId, 'c' => $clinicId]);
+        $patient = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $email = trim((string)($patient['email'] ?? ''));
+        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return 'portal';
+        }
+        try {
+            $base = rtrim((string)(Env::get('APP_URL') ?: 'https://clyonutri.com.br'), '/');
+            $link = $base . '/consentimento-transcricao/' . $token;
+            $name = trim((string)($patient['name'] ?? ''));
+            $first = $name !== '' ? (preg_split('/\s+/u', $name)[0] ?? '') : '';
+            $hello = $first !== '' ? 'Olá, ' . $first . '.' : 'Olá.';
+            $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $subject = 'Código para autorizar a transcrição da consulta · Clyo Nutri';
+            $text = "{$hello}\n\n"
+                . "Seu nutricionista pediu autorização para transcrever a consulta.\n"
+                . "Para aceitar, abra o link abaixo e informe o código {$otp} (válido por 15 minutos):\n{$link}\n\n"
+                . "Você também pode responder pelo portal do paciente. Se não reconhece este pedido, ignore este e-mail.\n\n"
+                . "Equipe Clyo Nutri\n";
+            $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>' . $e($subject) . '</title></head>'
+                . '<body style="margin:0;padding:24px 12px;background:#FAF9F4;font-family:Arial,Helvetica,sans-serif;color:#0F3E17;">'
+                . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:12px;">'
+                . '<tr><td style="background:#0F3E17;padding:24px 32px;color:#FFFFFF;font-size:20px;font-weight:bold;">Clyo Nutri</td></tr>'
+                . '<tr><td style="padding:32px;font-size:16px;line-height:1.5;">'
+                . '<p style="margin:0 0 16px;">' . $e($hello) . '</p>'
+                . '<p style="margin:0 0 16px;">Seu nutricionista pediu autorização para transcrever a consulta. Para aceitar, abra o termo e informe o código abaixo.</p>'
+                . '<p style="margin:0 0 16px;font-size:24px;font-weight:bold;letter-spacing:4px;">' . $e($otp) . '</p>'
+                . '<p style="margin:0 0 24px;font-size:14px;">O código vale por <strong>15 minutos</strong>.</p>'
+                . '<p style="margin:0 0 24px;"><a href="' . $e($link) . '" style="display:inline-block;padding:14px 28px;background:#39734A;color:#FFFFFF;font-weight:bold;text-decoration:none;border-radius:8px;">Abrir termo de aceite</a></p>'
+                . '<p style="margin:0;font-size:14px;color:#5A6B85;">Você também pode responder pelo portal do paciente. Se não reconhece este pedido, ignore este e-mail.</p>'
+                . '</td></tr></table></body></html>';
+            \ClyoNutri\Core\Mail\MailerFactory::fromEnv()->send(
+                new \ClyoNutri\Core\Mail\MailMessage($email, $name, $subject, $html, $text)
+            );
+            return \ClyoNutri\Core\Mail\MailerFactory::describe()['delivers'] ? 'email' : 'portal';
+        } catch (\Throwable $e) {
+            error_log('[transcription-consent] envio de OTP falhou: ' . get_class($e));
+            return 'portal';
+        }
     }
 
     private static function cleanUa(string $ua): string

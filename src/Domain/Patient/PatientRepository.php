@@ -47,9 +47,14 @@ class PatientRepository
             'birth_date' => $data['birth_date'] ?? null,
             'gender' => $data['gender'] ?? null,
             'status' => $data['status'] ?? 'active',
-            'notes' => $data['notes'] ?? null,
+            'notes' => isset($data['notes']) && trim((string)$data['notes']) !== ''
+                ? \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt((string)$data['notes'])
+                : ($data['notes'] ?? null),
         ];
         if ($withAllergy) {
+            if (!empty($allergy['allergies'])) {
+                $allergy['allergies'] = \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt((string)$allergy['allergies']);
+            }
             $params += $allergy;
         }
         $stmt->execute($params);
@@ -111,8 +116,15 @@ class PatientRepository
                     array_key_exists('allergy_assessment', $data) ? $data['allergy_assessment'] : ($patient['allergy_assessment'] ?? null)
                 );
             }
-            $stmt->execute($fields + ['id' => $id, 'clinic_id' => TenantContext::getClinicId()]);
             $changed = array_keys(array_filter($fields, static fn($v, $k) => $v !== ($patient[$k] ?? null), ARRAY_FILTER_USE_BOTH));
+            $dbFields = $fields;
+            if (isset($dbFields['notes']) && is_string($dbFields['notes']) && trim($dbFields['notes']) !== '') {
+                $dbFields['notes'] = \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt($dbFields['notes']);
+            }
+            if (!empty($dbFields['allergies']) && is_string($dbFields['allergies'])) {
+                $dbFields['allergies'] = \ClyoNutri\Core\Security\ClinicalEncryptionService::encrypt($dbFields['allergies']);
+            }
+            $stmt->execute($dbFields + ['id' => $id, 'clinic_id' => TenantContext::getClinicId()]);
             $this->audit('PATIENT_UPDATED', $id, ['fields' => $changed]);
             if ($ownsTx) $this->db->commit();
             return true;
@@ -190,7 +202,7 @@ class PatientRepository
         ");
         $stmt->execute(['id' => $id, 'clinic_id' => $clinicId]);
         $patient = $stmt->fetch();
-        return $patient ?: null;
+        return $patient ? \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($patient) : null;
     }
 
     public function listAll(): array
@@ -200,7 +212,10 @@ class PatientRepository
             SELECT * FROM patients WHERE clinic_id = :clinic_id ORDER BY name ASC
         ");
         $stmt->execute(['clinic_id' => $clinicId]);
-        return $stmt->fetchAll();
+        return array_map(
+            static fn(array $r): array => \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRowForListing($r) ?? $r,
+            $stmt->fetchAll()
+        );
     }
 
     public function paginate(string $query = '', string $status = '', int $page = 1, int $perPage = 25): array
@@ -230,7 +245,11 @@ class PatientRepository
         $offset = ($page - 1) * $perPage;
         $stmt = $this->db->prepare("SELECT id,name,email,phone,status FROM patients WHERE $where ORDER BY name,id LIMIT $perPage OFFSET $offset");
         $stmt->execute($args);
-        return ['patients'=>$stmt->fetchAll(), 'total'=>$total, 'pages'=>$pages, 'page'=>$page];
+        $rows = array_map(
+            static fn(array $r): array => \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($r) ?? $r,
+            $stmt->fetchAll()
+        );
+        return ['patients'=>$rows, 'total'=>$total, 'pages'=>$pages, 'page'=>$page];
     }
 
     public function birthdays(string $today): array
@@ -260,7 +279,10 @@ class PatientRepository
             'clinic_id' => $clinicId,
             'q' => '%' . $clean . '%',
         ]);
-        return $stmt->fetchAll();
+        return array_map(
+            static fn(array $r): array => \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptPatientRow($r) ?? $r,
+            $stmt->fetchAll()
+        );
     }
 
     public function getProfile360(int $id): ?array
@@ -276,7 +298,7 @@ class PatientRepository
             SELECT * FROM anamneses WHERE patient_id = :patient_id AND clinic_id = :clinic_id ORDER BY version DESC
         ");
         $aStmt->execute(['patient_id' => $id, 'clinic_id' => $clinicId]);
-        $anamneses = $aStmt->fetchAll();
+        $anamneses = \ClyoNutri\Core\Security\ClinicalEncryptionService::decryptAnamnesisRows($aStmt->fetchAll());
 
         // Antropometrias
         $antStmt = $this->db->prepare("
@@ -303,18 +325,52 @@ class PatientRepository
         ");
         $crStmt->execute(['clinic_id' => $clinicId, 'patient_id' => $id]);
         $clinicalRecords = array_map(function ($row) {
-            $row['content'] = json_decode($row['content_json'] ?? '{}', true);
+            $plainJson = \ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)($row['content_json'] ?? ''));
+            $row['content_json'] = $plainJson;
+            $row['content'] = json_decode($plainJson ?: '{}', true);
             return $row;
         }, $crStmt->fetchAll());
 
         $appointments = $this->relatedRows('appointments', $id, 'scheduled_at');
+        if ($appointments !== []) {
+            $appIds = array_map(static fn(array $a): int => (int)$a['id'], $appointments);
+            $ph = implode(',', array_fill(0, count($appIds), '?'));
+            $histStmt = $this->db->prepare("SELECT appointment_id, to_status, created_at FROM appointment_status_history WHERE appointment_id IN ({$ph}) AND to_status IN ('in_progress', 'completed') ORDER BY id ASC");
+            $histStmt->execute($appIds);
+            $startedMap = [];
+            $completedMap = [];
+            foreach ($histStmt->fetchAll(PDO::FETCH_ASSOC) as $h) {
+                $aid = (int)$h['appointment_id'];
+                if ($h['to_status'] === 'in_progress') {
+                    $startedMap[$aid] = (string)$h['created_at'];
+                } elseif ($h['to_status'] === 'completed') {
+                    $completedMap[$aid] = (string)$h['created_at'];
+                }
+            }
+            foreach ($appointments as &$appRow) {
+                $aid = (int)$appRow['id'];
+                $appRow['started_at'] = $startedMap[$aid] ?? null;
+                $appRow['completed_at'] = $completedMap[$aid] ?? null;
+            }
+            unset($appRow);
+        }
+
         $checkins = $this->relatedRows('checkins', $id, 'checkin_date');
         $receivables = $this->relatedRows('receivables', $id, 'due_date');
-        foreach ($receivables as &$receivable) {
-            $paid = $this->db->prepare('SELECT COALESCE(SUM(amount_cents),0) FROM payments WHERE clinic_id = ? AND receivable_id = ?');
-            $paid->execute([$clinicId, $receivable['id']]); $receivable['paid_cents'] = (int)$paid->fetchColumn();
+        if ($receivables !== []) {
+            $recIds = array_map(static fn(array $r): int => (int)$r['id'], $receivables);
+            $ph = implode(',', array_fill(0, count($recIds), '?'));
+            $paidStmt = $this->db->prepare("SELECT receivable_id, COALESCE(SUM(amount_cents),0) AS paid_cents FROM payments WHERE clinic_id = ? AND receivable_id IN ({$ph}) GROUP BY receivable_id");
+            $paidStmt->execute(array_merge([$clinicId], $recIds));
+            $paidMap = [];
+            foreach ($paidStmt->fetchAll(PDO::FETCH_ASSOC) as $pr) {
+                $paidMap[(int)$pr['receivable_id']] = (int)$pr['paid_cents'];
+            }
+            foreach ($receivables as &$receivable) {
+                $receivable['paid_cents'] = $paidMap[(int)$receivable['id']] ?? 0;
+            }
+            unset($receivable);
         }
-        unset($receivable);
         $timeline = [];
         $sources = [['Consulta',$appointments,'scheduled_at'], ['Check-in',$checkins,'checkin_date'], ['Cobrança',$receivables,'created_at'],
             ['Prontuário',$clinicalRecords,'created_at'], ['Anamnese',$anamneses,'created_at'], ['Avaliação',$assessments,'assessed_at'], ['Plano alimentar',$mealPlans,'created_at']];
@@ -337,7 +393,16 @@ class PatientRepository
                     'Prontuário'=>!empty($row['is_retracted'])?'Retificado':'Registrado',
                     default=>'Registrado',
                 };
-                $timeline[]=['id'=>$rid,'type'=>$type,'date'=>$row[$dateField], 'title'=>$row['title']??$row['description']??$type,
+                $entryDate = $row[$dateField];
+                $entryTitle = $row['title'] ?? $row['description'] ?? $type;
+                if ($type === 'Consulta' && ($row['status'] ?? '') === 'completed') {
+                    $realDate = $row['completed_at'] ?? $row['started_at'] ?? $row['scheduled_at'];
+                    $entryDate = $realDate;
+                    if (!empty($row['scheduled_at']) && substr((string)$realDate, 0, 10) !== substr((string)$row['scheduled_at'], 0, 10)) {
+                        $entryTitle .= ' (agendada para ' . date('d/m', strtotime((string)$row['scheduled_at'])) . ')';
+                    }
+                }
+                $timeline[]=['id'=>$rid,'type'=>$type,'date'=>$entryDate, 'title'=>$entryTitle,
                     'url'=>$url,'state'=>$state,'version'=>(int)($row['version']??0)];
             }
         }

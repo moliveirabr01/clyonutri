@@ -88,7 +88,7 @@ foreach ($history as $h) {
 <?php endif; ?>
 <?php if ($unreadableConcluded): ?>
   <div class="op-message op-message--warning" role="status" data-testid="anamnese-versao-ilegivel">
-    Parte do conteúdo da(s) versão(ões) concluída(s) v<?= htmlspecialchars(implode(', v', $unreadableConcluded)) ?> não pôde ser lida com a chave atual e aparece em branco. A versão não foi alterada. Informe o suporte para conferir a chave de criptografia.
+    Parte do conteúdo <?= \ClyoNutri\Application\View\UserText::count(count($unreadableConcluded), 'da versão concluída', 'das versões concluídas') ?> v<?= htmlspecialchars(implode(', v', $unreadableConcluded)) ?> não pôde ser lida com a chave atual e aparece em branco. A versão não foi alterada. Informe o suporte para conferir a chave de criptografia.
   </div>
 <?php endif; ?>
 <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), $pid, 'anamnese') // NI2-661 ?>

@@ -54,7 +54,7 @@ Fx::act($a2);
 T::throws(fn() => $svc->completeConsultation($app1, 'Evolução TESTE', [], $a2['user_id'], $a['professional_id']), 'autoria informada diferente de quem conclui é recusada', 'CRN');
 $res = $svc->completeConsultation($app1, 'Evolução TESTE concluída pela colega', ['weight_kg' => '68,5', 'waist_cm' => '80'], $a2['user_id'], $a2['professional_id']);
 $row = $pdo->query('SELECT professional_id, content_json FROM clinical_records WHERE id = ' . (int)$res['clinical_record_id'])->fetch();
-$content = json_decode((string)$row['content_json'], true);
+$content = json_decode((string)\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)$row['content_json']), true);
 T::ok((int)$row['professional_id'] === $a2['professional_id'], 'evolução gravada com o CRN de quem concluiu (A2), não do profissional agendado');
 T::ok((int)($content['recorded_by'] ?? 0) === $a2['professional_id'] && (int)($content['scheduled_professional_id'] ?? 0) === $a['professional_id'], 'profissional agendado fica registrado à parte (scheduled_professional_id)');
 T::ok(abs((float)$content['weight_kg'] - 68.5) < 0.001 && abs((float)$content['waist_cm'] - 80.0) < 0.001, 'vírgula decimal aceita (68,5 kg)');
@@ -200,7 +200,7 @@ T::ok((int)$uid === $a2['user_id'], 'audit_logs.user_id = usuária que agiu');
 echo "== retificação mantém os dados estruturados\n";
 Fx::act($a);
 $rv = $crs->reviseRecord((int)$res['clinical_record_id'], $p, $a['professional_id'], 'Correção TESTE de digitação da evolução', ['type' => 'revised_note', 'text' => 'Evolução TESTE corrigida']);
-$rc = json_decode((string)$pdo->query('SELECT content_json FROM clinical_records WHERE id = ' . (int)($rv['id'] ?? $rv['record_id']))->fetchColumn(), true);
+$rc = json_decode((string)\ClyoNutri\Core\Security\ClinicalEncryptionService::decrypt((string)$pdo->query('SELECT content_json FROM clinical_records WHERE id = ' . (int)($rv['id'] ?? $rv['record_id']))->fetchColumn()), true);
 T::ok((int)($rc['appointment_id'] ?? 0) === $app1 && abs((float)($rc['weight_kg'] ?? 0) - 68.5) < 0.001 && isset($rc['waist_cm']), 'retificação leva consulta de origem, peso e cintura da versão anterior');
 T::ok(($rc['text'] ?? '') === 'Evolução TESTE corrigida', 'texto novo prevalece');
 T::ok($crs->verifyIntegrity($p)['is_valid'] === true, 'cadeia de registros continua válida (hash não mudou de algoritmo)');
@@ -226,7 +226,7 @@ foreach (['water_intake_ml' => ['0', '10000'], 'sleep_hours' => ['0', '24']] as 
     T::ok((bool)preg_match('/name="' . $f . '"[^>]*min="' . $mn . '"[^>]*max="' . $mx . '"|min="' . $mn . '"[^>]*max="' . $mx . '"[^>]*name="' . $f . '"/', $form), "{$f}: faixa {$mn}–{$mx} também no navegador");
 }
 T::ok(str_contains($roomView, 'CONSULT_WEIGHT_RANGE[1]') && str_contains($roomView, 'CONSULT_WAIST_RANGE[1]'), 'sala de consulta: faixa de peso e cintura vem da mesma constante do servidor');
-foreach (['consult-start-panel', 'early-start-warning', 'consult-start', 'consult-closed', 'consult-submit-error', 'draft-status', 'data-consult-draft', 'data-draft-pause', 'consulta-rascunho.js?v=v54-18', 'dc9-weight_kg', 'dc10-waist_cm'] as $hook) {
+foreach (['consult-start-panel', 'early-start-warning', 'consult-start', 'consult-closed', 'consult-submit-error', 'draft-status', 'data-consult-draft', 'data-draft-pause', 'consulta-rascunho.js', 'dc9-weight_kg', 'dc10-waist_cm'] as $hook) {
     if (!str_contains($roomView, $hook)) T::ok(false, "sala de consulta manteve o gancho {$hook}");
 }
 T::ok(true, 'sala de consulta manteve os ganchos de teste e o script de rascunho');
