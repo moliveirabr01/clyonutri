@@ -130,8 +130,12 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </button>
         </form>
+      <?php elseif (!empty($linkBlocked)): ?>
+        <a href="/recuperar-senha" class="btn btn-secondary" data-testid="reset-blocked" style="display: inline-block; width: 100%; text-decoration: none; text-align: center;">
+          Pedir um novo link de recuperação
+        </a>
       <?php else: ?>
-        <div class="token-expired-card">
+        <div class="token-expired-card" data-testid="reset-invalid">
           <div style="font-size: 1.8rem; margin-bottom: var(--space-2); color: var(--botanical-forest-900);"><?= \ClyoNutri\Application\View\Icon::svg('hourglass', 28) ?></div>
           <h2 style="font-size: 1.05rem; font-weight: 700; color: var(--semantic-warning-strong, #7A4A00); margin: 0 0 var(--space-2) 0;">
             Link inválido ou expirado

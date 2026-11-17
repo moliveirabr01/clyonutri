@@ -24,6 +24,8 @@ class AuthController
     private AuthService $authService;
     private PasswordResetService $resetService;
     private ?RegistrationRateLimiter $registrationLimiter;
+    /** CR875-14: a última checagem de link parou no limite de tentativas (a tela mostra só o aviso de espera). */
+    private bool $tokenLinkBlocked = false;
 
     public function __construct(?AuthService $authService = null, ?PasswordResetService $resetService = null, ?RegistrationRateLimiter $registrationLimiter = null)
     {
@@ -709,6 +711,7 @@ class AuthController
         // CR875-14: mesmo limite de tentativas com link inválido da tela de nova senha.
         [$tokenData, $error] = $this->checkTokenLink($token, 'invite', $error);
         $isValidToken = ($tokenData !== null);
+        $linkBlocked = $this->tokenLinkBlocked;
 
         require __DIR__ . '/../../../views/auth/team-invite.php';
     }
@@ -804,6 +807,7 @@ class AuthController
 
         [$tokenData, $error] = $this->checkTokenLink($token, 'reset', $error);
         $isValidToken = ($tokenData !== null);
+        $linkBlocked = $this->tokenLinkBlocked;
 
         require __DIR__ . '/../../../views/auth/reset-password.php';
     }
@@ -817,9 +821,11 @@ class AuthController
     private function checkTokenLink(string $token, string $scope, ?string $error): array
     {
         $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+        $this->tokenLinkBlocked = false;
         try {
             $limiter = new \ClyoNutri\Core\Security\TokenLinkRateLimiter(Connection::getInstance());
             if ($limiter->blocked($scope, $ip)) {
+                $this->tokenLinkBlocked = true;
                 if (!headers_sent()) {
                     http_response_code(429);
                     header('Retry-After: ' . \ClyoNutri\Core\Security\TokenLinkRateLimiter::WINDOW_SECONDS);

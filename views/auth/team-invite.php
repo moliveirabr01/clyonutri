@@ -26,8 +26,10 @@ $minLen = (int)($tokenData['password_min_length'] ?? 8);
       </div>
     <?php endif; ?>
 
-    <?php if (empty($isValidToken)): ?>
-      <p class="u-text-body u-color-neutral-gray-700 u-mb-4">
+    <?php if (!empty($linkBlocked)): ?>
+      <a href="/login" class="btn btn-secondary" data-testid="team-invite-blocked">Ir para entrar</a>
+    <?php elseif (empty($isValidToken)): ?>
+      <p class="u-text-body u-color-neutral-gray-700 u-mb-4" data-testid="team-invite-invalid">
         Este convite é inválido, já foi usado ou expirou. Peça ao responsável pela clínica para enviar um novo convite.
       </p>
       <a href="/login" class="btn btn-secondary">Ir para entrar</a>

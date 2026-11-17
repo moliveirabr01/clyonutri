@@ -51,6 +51,7 @@ try {
     [$c11, $b11, $h11] = $att('/convite/' . bin2hex(random_bytes(32)));
     $ok(count(array_filter($codes, fn($x) => $x === 429)) === 0, 'as 10 primeiras tentativas inválidas não são bloqueadas (' . implode(',', array_unique($codes)) . ')');
     $ok($c11 === 429 && stripos($h11, 'Retry-After:') !== false && str_contains($b11, 'tentativas'), "11ª tentativa inválida de convite: HTTP $c11 com Retry-After e aviso em português");
+    $ok(!str_contains($b11, 'Este convite é inválido') && str_contains($b11, 'team-invite-blocked'), 'tela travada mostra só o aviso de espera (sem o texto de convite inválido abaixo)');
     [$cv] = $att('/convite/' . $invite);
     $ok($cv === 429, "do mesmo IP travado, até o link válido espera (HTTP $cv)");
     $att('/recuperar-senha/' . bin2hex(random_bytes(32)));
@@ -64,10 +65,15 @@ try {
     [$cpg, $bpg] = $att('/convite/' . $invite);
     $ok($cp === 302 && $before === $after0 && $cpg === 429 && str_contains($bpg, 'tentativas'), "POST de aceite com IP travado não cria senha (HTTP $cp → tela com 429 e aviso)");
     // 3) reset: mesmo limite separado
+    $clearLimiter();
+    [, $b10x] = $att('/convite/' . bin2hex(random_bytes(32)));
+    [, $r10x] = $att('/recuperar-senha/' . bin2hex(random_bytes(32)));
+    $ok(str_contains($b10x, 'Este convite é inválido') && !str_contains($b10x, 'tentativas') && str_contains($r10x, 'Link inválido ou expirado') && !str_contains($r10x, 'tentativas'), 'link inválido sem trava continua com o texto de link inválido (convite e nova senha)');
     $clearLimiter(); $rcodes = [];
     for ($i = 0; $i < 10; $i++) { [$rcodes[]] = $att('/recuperar-senha/' . bin2hex(random_bytes(32))); }
     [$r11, $rb11] = $att('/recuperar-senha/' . bin2hex(random_bytes(32)));
     $ok(!in_array(429, $rcodes, true) && $r11 === 429 && str_contains($rb11, 'tentativas'), "nova senha: 10 inválidos passam, 11º HTTP $r11");
+    $ok(!str_contains($rb11, 'Link inválido ou expirado') && str_contains($rb11, 'reset-blocked'), 'nova senha travada: só o aviso de espera e o botão de pedir novo link (sem o cartão de link inválido)');
     // 4) troca de tipo: convite em /recuperar-senha e reset em /convite não abrem
     $clearLimiter();
     $user = $mk();
