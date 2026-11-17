@@ -1,0 +1,3 @@
+tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php
+tests/recipe_culinary_domain_and_prescription_e2e_test.php
+tests/example_recipe_public_catalog_test.php

@@ -1,0 +1,6 @@
+PASS              2.8s  tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php
+PASS              1.1s  tests/auditoria_2026_10_14_xss_food_name_js_test.php
+PASS              0.4s  tests/example_recipe_public_catalog_test.php
+PASS              0.2s  tests/recipe_culinary_domain_and_prescription_e2e_test.php
+
+Resumo bin/run-tests [full]: 4 PASS, 0 FAIL, 0 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 6s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-175825.tsv

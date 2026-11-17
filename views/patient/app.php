@@ -460,7 +460,7 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             </button>
           </form>
           <div style="text-align: center; margin-top: 14px; display: flex; flex-direction: column; gap: 6px;">
-            <a href="#tab-first" onclick="document.getElementById('tab-btn-first').click(); return false;" style="font-size: 0.85rem; color: var(--botanical-green-700); font-weight: 600;">
+            <a href="#tab-first" data-patient-first-access style="font-size: 0.85rem; color: var(--botanical-green-700); font-weight: 600;">
               É seu primeiro acesso? Crie sua senha
             </a>
             <a href="/paciente/recuperar-senha" style="font-size: 0.8rem; color: var(--brand-copper-600);">
@@ -532,6 +532,14 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
           else if (e.key === 'Home') next = tabs[0];
           else if (e.key === 'End') next = tabs[tabs.length - 1];
           if (next) { e.preventDefault(); select(next, true); }
+        });
+      });
+      document.querySelectorAll('[data-patient-first-access]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+          var firstTab = document.getElementById('tab-btn-first');
+          if (!firstTab) return;
+          e.preventDefault();
+          select(firstTab, true);
         });
       });
     })();

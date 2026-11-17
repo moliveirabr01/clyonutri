@@ -27,6 +27,9 @@ if ((int)ini_get('zend.assertions') !== 1) {
     exit(2);
 }
 
+if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite') {
+    throw new RuntimeException('Use o runner com banco SQLite isolado em ambiente de teste.');
+}
 $db = Connection::getInstance();
 $passed = 0;
 function ok(bool $cond, string $msg): void
@@ -76,7 +79,9 @@ try {
     ok(count($mailer->sent) === 1, 'um e-mail enviado para usuário ativo');
     $msg = $mailer->sent[0];
     ok($msg->toAddress === $active, 'destinatário é o e-mail do usuário');
-    ok(str_contains($msg->subject, 'Redefinição de senha'), 'assunto em pt-BR');
+    echo '  Assunto efetivo: ' . $msg->subject . "\n";
+    ok($msg->subject === 'Crie uma nova senha no Clyo Nutri', 'assunto atual em pt-BR, claro e sem dados do titular');
+    ok(str_contains($msg->htmlBody, '<title>' . htmlspecialchars($msg->subject, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</title>'), 'título HTML corresponde ao assunto enviado');
     $token = $tokenFromMail($msg);
     ok($token !== null, 'texto contém link APP_URL/recuperar-senha/{token} (sem barra dupla)');
     ok(str_contains($msg->htmlBody, htmlspecialchars($appUrl . '/recuperar-senha/' . $token, ENT_QUOTES)), 'HTML contém o mesmo link');
@@ -150,7 +155,7 @@ try {
     $failing = new ArrayMailer();
     $failing->fail = true;
     $svcFail = new PasswordResetService($db, $failing, $appUrl);
-    $prevLog = ini_set('error_log', sys_get_temp_dir() . '/clyonutri_reset_test_error.log');
+    $prevLog = ini_set('error_log', dirname((string)getenv('DB_DATABASE')) . '/clyonutri_reset_test_error.log');
     $rf = $svcFail->requestReset($active, '10.9.0.5', 'test');
     ini_set('error_log', (string)$prevLog);
     ok($rf['success'] === true && $rf['message'] === $generic, 'falha de envio mantém resposta genérica');
@@ -162,7 +167,7 @@ try {
     putenv('APP_URL');
     unset($_ENV['APP_URL'], $_SERVER['APP_URL']);
     $m2 = new ArrayMailer();
-    $prevLog = ini_set('error_log', sys_get_temp_dir() . '/clyonutri_reset_test_error.log');
+    $prevLog = ini_set('error_log', dirname((string)getenv('DB_DATABASE')) . '/clyonutri_reset_test_error.log');
     $rn = (new PasswordResetService($db, $m2))->requestReset($active, '10.9.0.6', 'test');
     ini_set('error_log', (string)$prevLog);
     ok(count($m2->sent) === 0 && $rn['message'] === $generic, 'sem APP_URL: não envia link com Host e mantém resposta genérica');
@@ -170,7 +175,7 @@ try {
     echo "--- Controller e driver de log ---\n";
     $ctrl = (string)file_get_contents(__DIR__ . '/../src/Application/Controllers/AuthController.php');
     ok(!preg_match("/\\\$res\\['token'\\]/", $ctrl), 'controller não usa token da resposta');
-    $logFile = sys_get_temp_dir() . '/clyonutri_mail_test_' . bin2hex(random_bytes(4)) . '.log';
+    $logFile = dirname((string)getenv('DB_DATABASE')) . '/clyonutri_mail_test_' . bin2hex(random_bytes(4)) . '.log';
     ob_start();
     (new LogMailer($logFile))->send(PasswordResetEmail::build($active, 'Ana', $appUrl . '/recuperar-senha/abc', 30));
     $stdout = ob_get_clean();
@@ -180,6 +185,13 @@ try {
     try { new MailMessage($active, "Ana\r\nBcc: x@y.z", 'Assunto', '', ''); } catch (InvalidArgumentException) { $injected = true; }
     ok($injected, 'quebra de linha em cabeçalho é rejeitada');
 
+    // NI2-901: cenário independente após a janela do limite expirar. A sequência anterior
+    // esgotou legitimamente as cinco tentativas; não desligar o limitador no produto.
+    $limitedMailer = new ArrayMailer();
+    $limited = (new PasswordResetService($db, $limitedMailer, $appUrl))->requestReset($active, '10.9.0.8', 'test');
+    ok($limited['email_sent'] === false && $limitedMailer->sent === [] && $limited['message'] === $generic, 'limite real bloqueia novos envios com resposta genérica');
+    $db->prepare("UPDATE login_attempts SET window_started_at=? WHERE scope='password_reset' AND bucket_key=?")
+        ->execute([gmdate('Y-m-d H:i:s', time()-901), hash('sha256', 'password_reset|email|' . $active)]);
     echo "--- Envio agendado para depois da resposta (timing) ---\n";
     putenv('APP_URL=' . $appUrl);
     $db->prepare('DELETE FROM audit_logs WHERE details LIKE ?')->execute(['%' . $active . '%']);

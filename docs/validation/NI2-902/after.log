@@ -1,0 +1,28 @@
+PASS Composer resolve Connection/ProfiledPdo e dependências
+PASS convite canônico gerado
+PASS convite persiste somente hash
+PASS primeiro acesso persiste credencial e gera token
+PASS senha do primeiro acesso persistida com hash
+PASS aceite legal persistido
+PASS convite consumido não pode ser reutilizado
+PASS diário persiste refeição
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS timeline contém refeição do paciente
+PASS sem plano publicado não inventa substituições ou receitas
+PASS métrica não liberada é recusada
+PASS peso é autorrelato, não medição clínica
+PASS evolução separa autorrelatos dos registros clínicos
+PASS documento registra metadados e token de acesso
+PASS próxima consulta pertence ao paciente
+PASS confirmação persistida
+PASS chat registra mensagem do paciente
+PASS reenvio de refeição é idempotente
+PASS reenvio de hidratação não duplica registro
+PASS tokens esperados presentes
+PASS propriedades mínimas de toque/acessibilidade no fonte
+PASS outra clínica não lista documentos
+PASS outra clínica não lê diário
+Resultado portal local: 27 verificações PASS. HTTP/browser/mobile e upload de arquivo não homologados.

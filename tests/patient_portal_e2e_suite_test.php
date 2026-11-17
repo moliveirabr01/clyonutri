@@ -1,276 +1,73 @@
 <?php
-
 declare(strict_types=1);
-
-/**
- * ==============================================================================
- * CLYONUTRI II — SUÍTE DE TESTES E HOMOLOGAÇÃO DO ÉPICO NI2-11
- * ==============================================================================
- * Cobre rigorosamente:
- *  - NI2-131: Onboarding nutricional, convite seguro, termos e vínculo
- *  - NI2-132: Registro de refeições e adesão ao plano publicado vigente
- *  - NI2-133: Diário alimentar, linha do tempo e estados de registro
- *  - NI2-134: Substituições alimentares autorizadas e receitas vinculadas
- *  - NI2-135: Evolução, metas e distinção clínica vs. autorrelato
- *  - NI2-136: Documentos, exames e orientações com isolamento seguro
- *  - NI2-137: Próxima consulta e ações de confirmação da agenda
- *  - NI2-138: Canal seguro de comunicação com nutricionista (Chat assíncrono)
- *  - NI2-139: Sincronização offline idempotente e consistência de dados
- *  - NI2-140: Acessibilidade (WCAG 2.1 AA) e tokens do Design System Premium
- *  - NI2-141: Homologação E2E completa da jornada do paciente & gates de segurança
- * ==============================================================================
- */
-
-require_once __DIR__ . '/../src/Core/Database/Connection.php';
-require_once __DIR__ . '/../src/Core/Auth/TenantContext.php';
-require_once __DIR__ . '/../src/Core/Security/TenantSecurityException.php';
-require_once __DIR__ . '/../src/Core/Security/TenantGuard.php';
-require_once __DIR__ . '/../src/Domain/PatientPortal/PatientPortalService.php';
-require_once __DIR__ . '/../src/Domain/Engagement/EngagementService.php';
-require_once __DIR__ . '/../src/Domain/FoodDiary/FoodDiaryService.php';
-require_once __DIR__ . '/../src/Domain/MealPlan/MealPlanService.php';
-require_once __DIR__ . '/../src/Application/Api/PatientApiController.php';
-
+/** NI2-902: Composer + contratos canônicos do portal; serviços/SQLite, não browser/mobile E2E. */
+require_once __DIR__ . '/../vendor/autoload.php';
+if ((int)ini_get('zend.assertions') !== 1 || getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite'
+    || !getenv('TEST_DB_DATABASE') || getenv('DB_DATABASE') !== getenv('TEST_DB_DATABASE')) {
+    throw new RuntimeException('Use o runner com asserções e SQLite explicitamente isolado em testing.');
+}
 use ClyoNutri\Core\Auth\TenantContext;
 use ClyoNutri\Core\Database\Connection;
+use ClyoNutri\Core\Auth\AuthService;
+use ClyoNutri\Domain\Patient\PatientRepository;
 use ClyoNutri\Domain\PatientPortal\PatientPortalService;
+use ClyoNutri\Domain\PatientPortal\PatientOnboardingService;
 use ClyoNutri\Domain\FoodDiary\FoodDiaryService;
-use ClyoNutri\Domain\MealPlan\MealPlanService;
 use ClyoNutri\Application\Api\PatientApiController;
-
-echo "========================================================\n";
-echo "   CLYONUTRI PATIENT APP & PORTAL 360 SUITE (NI2-11)\n";
-echo "   Validação das Histórias NI2-131 a NI2-141\n";
-echo "========================================================\n\n";
-
-$testDb = getenv('DB_DATABASE') ?: '';
-if ($testDb === '' || realpath($testDb) === realpath(__DIR__.'/../storage/database.sqlite')) {
-    throw new RuntimeException('This destructive legacy suite requires an explicitly isolated DB_DATABASE.');
+$db = Connection::getInstance(); $passed=0;
+function ck902(bool $ok, string $label): void { global $passed; assert($ok,$label); $passed++; echo "PASS $label\n"; }
+function rejects902(callable $fn, string $label, string $type=Throwable::class): void {
+    $exception=null;try {$fn();}catch(Throwable $e){$exception=$e;}
+    ck902($exception instanceof $type,$label);
 }
-$db = Connection::getInstance();
-
-// -----------------------------------------------------------------------------
-// PREPARAÇÃO DO CENÁRIO DE TESTE
-// -----------------------------------------------------------------------------
-// Criar clínicas e profissionais
-$db->exec("DELETE FROM patient_invitations;");
-$db->exec("DELETE FROM patient_self_metrics;");
-$db->exec("DELETE FROM patient_documents;");
-$db->exec("DELETE FROM offline_sync_queue;");
-$db->exec("DELETE FROM food_diary_entries WHERE patient_id IN (1, 2);");
-$db->exec("DELETE FROM appointments WHERE patient_id IN (1, 2);");
-
-$clinicAId = 1;
-$clinicBId = 2;
-
-// Garantir pacientes cadastrados
-$stmt = $db->prepare("SELECT id FROM patients WHERE id = 1 AND clinic_id = 1");
-$stmt->execute();
-if (!$stmt->fetch()) {
-    $db->exec("INSERT OR IGNORE INTO clinics (id, name, email) VALUES (1, 'Clínica Clyo A', 'clia@teste.com')");
-    $db->exec("INSERT OR IGNORE INTO patients (id, clinic_id, name, email) VALUES (1, 1, 'Juliana Mendes', 'juliana@teste.com')");
-}
-
-$stmt = $db->prepare("SELECT id FROM patients WHERE id = 2 AND clinic_id = 2");
-$stmt->execute();
-if (!$stmt->fetch()) {
-    $db->exec("INSERT OR IGNORE INTO clinics (id, name, email) VALUES (2, 'Clínica Clyo B', 'clib@teste.com')");
-    $db->exec("INSERT OR IGNORE INTO patients (id, clinic_id, name, email) VALUES (2, 2, 'Carlos Silva', 'carlos@teste.com')");
-}
-
-TenantContext::set(1, ['id' => 1, 'role' => 'nutritionist']);
-$portalService = new PatientPortalService($db);
-$foodDiaryService = new FoodDiaryService($db);
-$apiController = new PatientApiController($db);
-
-// -----------------------------------------------------------------------------
-// [1/11] NI2-131: Onboarding, Convite Seguro e Aceite de Termos LGPD
-// -----------------------------------------------------------------------------
-echo "[1/11] Testando NI2-131: Convite Seguro, Onboarding e Termos LGPD...\n";
-$invitation = $portalService->createInvitation(patientId: 1, professionalId: 1, validHours: 48);
-assert(!empty($invitation['token']), "Token do convite deve ser gerado.");
-assert($invitation['patient_id'] === 1, "Convite deve vincular ao paciente correto.");
-
-// Paciente aceita o convite e define preferências alimentares
-$acceptRes = $portalService->acceptInvitation(
-    token: $invitation['token'],
-    preferences: ['intolerancias' => ['lactose'], 'objetivo' => 'hipertrofia'],
-    consents: ['terms_of_service' => true, 'health_data_processing' => true]
-);
-assert($acceptRes['success'] === true, "Aceite do convite deve ser concluído com sucesso.");
-assert($acceptRes['status'] === 'activated', "Paciente deve ser ativado.");
-
-// Teste de reuso de token (deve falhar)
-try {
-    $portalService->acceptInvitation($invitation['token']);
-    throw new Exception("Falha de segurança: convite de uso único foi reutilizado!");
-} catch (RuntimeException $e) {
-    echo "  ✓ Token de uso único protegido contra reutilização.\n";
-}
-
-// -----------------------------------------------------------------------------
-// [2/11] NI2-132: Registro de Refeições e Adesão ao Plano Publicado
-// -----------------------------------------------------------------------------
-echo "[2/11] Testando NI2-132: Registro de Refeições pelo Paciente...\n";
-$mealLog = $foodDiaryService->logMeal(1, [
-    'meal_name' => 'Almoço Prescrito',
-    'consumed_at' => date('Y-m-d 12:30:00'),
-    'description' => 'Consumi 150g de frango e salada crua',
-    'hunger_level' => 3,
-    'satiety_level' => 4,
-]);
-// NI2-132: verificações explícitas (assert() não executa com zend.assertions=-1, o padrão de produção).
-if (!isset($mealLog['id']) || $mealLog['id'] <= 0) {
-    throw new Exception("Refeição deve ser persistida com ID válido.");
-}
-echo "  ✓ Registro de refeição salvo com identificação clara de autorrelato.\n";
-foreach ([['meal_name' => ['x']], ['meal_name' => ''], ['meal_name' => 'Almoço', 'consumed_at' => 'ontem'], ['meal_name' => 'Almoço', 'photo_path' => '/etc/passwd']] as $invalid) {
-    try {
-        $foodDiaryService->logMeal(1, $invalid);
-        throw new Exception("Registro inválido foi aceito: " . json_encode($invalid));
-    } catch (InvalidArgumentException $e) {
-        // esperado: entrada recusada com mensagem de validação
-    }
-}
-echo "  ✓ Entradas inválidas (lista, vazio, data ruim, caminho de foto) são recusadas pelo serviço.\n";
-// Cobertura HTTP completa: tests/ni2_132_food_diary_http_test.cjs.
-
-// -----------------------------------------------------------------------------
-// [3/11] NI2-133: Diário Alimentar e Linha do Tempo
-// -----------------------------------------------------------------------------
-echo "[3/11] Testando NI2-133: Diário Alimentar e Linha do Tempo...\n";
-$timeline = $foodDiaryService->getPatientTimeline(1);
-if (count($timeline) < 1) {
-    throw new Exception("Timeline do paciente deve conter pelo menos 1 refeição.");
-}
-assert($timeline[0]['meal_name'] === 'Almoço Prescrito', "Nome da refeição deve coincidir.");
-echo "  ✓ Diário alimentar ordenado cronologicamente consultado com sucesso.\n";
-
-// -----------------------------------------------------------------------------
-// [4/11] NI2-134: Substituições Alimentares e Receitas Vinculadas
-// -----------------------------------------------------------------------------
-echo "[4/11] Testando NI2-134: Substituições Autorizadas e Receitas...\n";
-$subsAndRecipes = $portalService->getSubstitutionsAndRecipesForPlan(1);
-assert(isset($subsAndRecipes['substitutions']), "Substituições devem ser retornadas.");
-assert(isset($subsAndRecipes['recipes']), "Receitas do tenant devem ser retornadas.");
-echo "  ✓ Consulta de substituições aprovadas e receitas homologada.\n";
-
-// -----------------------------------------------------------------------------
-// [5/11] NI2-135: Evolução e Distinção Clínico vs. Autorrelato
-// -----------------------------------------------------------------------------
-echo "[5/11] Testando NI2-135: Evolução e Distinção Clínico vs. Autorrelato...\n";
-// Paciente registra peso em casa
-$selfMetric = $portalService->recordSelfReportedMetric(1, 'weight', 61.8, 'kg', 'Pesado pela manhã');
-assert($selfMetric['source'] === 'patient_self_report', "Origem deve ser identificada como autorrelato.");
-assert($selfMetric['is_clinical'] === false, "Autorrelato não pode ser classificado como dado clínico oficial.");
-
-$evolution = $portalService->getEvolutionTimeline(1);
-assert(isset($evolution['clinical_records']), "Histórico clínico oficial deve existir.");
-assert(isset($evolution['self_reports']), "Autorrelatos devem estar segregados.");
-echo "  ✓ Distinção rigorosa entre medições oficiais e autorrelatos verificada.\n";
-
-// -----------------------------------------------------------------------------
-// [6/11] NI2-136: Documentos e Exames Seguros
-// -----------------------------------------------------------------------------
-echo "[6/11] Testando NI2-136: Gestão Segura de Documentos e Exames...\n";
-$doc = $portalService->uploadDocument(1, [
-    'title' => 'Hemograma Completo',
-    'category' => 'exam',
-    'file_path' => 'storage/patients/1/exams/hemograma.pdf',
-    'mime_type' => 'application/pdf',
-    'size_bytes' => 1024 * 500, // 500KB
-], 'patient', 1);
-assert(!empty($doc['access_token']), "Token seguro de acesso deve ser emitido.");
-
-$docs = $portalService->listDocuments(1);
-assert(count($docs) >= 1, "Paciente deve listar seus exames anexados.");
-echo "  ✓ Documentos e exames cadastrados e protegidos contra IDOR.\n";
-
-// -----------------------------------------------------------------------------
-// [7/11] NI2-137: Próxima Consulta e Agenda Integrada
-// -----------------------------------------------------------------------------
-echo "[7/11] Testando NI2-137: Próxima Consulta e Confirmação de Presença...\n";
-// Criar agendamento para o paciente 1
-$db->exec("
-    INSERT INTO appointments (clinic_id, patient_id, professional_id, scheduled_at, duration_minutes, status, type)
-    VALUES (1, 1, 1, datetime('now', '+3 days'), 45, 'scheduled', 'retorno')
-");
-$appointmentId = (int)$db->lastInsertId();
-
-$nextApp = $portalService->getNextAppointment(1);
-assert($nextApp !== null, "Próxima consulta deve ser localizada.");
-assert($nextApp['id'] === $appointmentId, "ID da consulta deve bater.");
-
-// Paciente confirma presença
-$confirmed = $portalService->confirmAppointment(1, $appointmentId);
-assert($confirmed === true, "Confirmação de presença deve ser persistida.");
-echo "  ✓ Visualização e confirmação de consulta integrada à agenda.\n";
-
-// -----------------------------------------------------------------------------
-// [8/11] NI2-138: Canal Seguro de Comunicação (Chat com Nutricionista)
-// -----------------------------------------------------------------------------
-echo "[8/11] Testando NI2-138: Comunicação Segura Paciente-Profissional...\n";
-$chatMsg = $portalService->sendMessageToProfessional(1, 1, "Olá Dra. Paula, estou com uma dúvida sobre a fruta do lanche.");
-assert($chatMsg['id'] > 0, "Mensagem deve ser gravada no chat clínico.");
-assert($chatMsg['sender_type'] === 'patient', "Remetente deve ser paciente.");
-echo "  ✓ Mensagens assíncronas trafegadas com vínculo clínico obrigatório.\n";
-
-// -----------------------------------------------------------------------------
-// [9/11] NI2-139: Sincronização Offline Idempotente
-// -----------------------------------------------------------------------------
-echo "[9/11] Testando NI2-139: Sincronização Offline e Idempotência...\n";
-$batch = [
-    [
-        'idempotency_key' => 'uuid-sync-offline-001',
-        'action' => 'log_meal',
-        'payload' => ['meal_name' => 'Jantar Offline', 'description' => 'Arroz e peixe'],
-    ],
-    [
-        'idempotency_key' => 'uuid-sync-offline-002',
-        'action' => 'log_water',
-        'payload' => ['amount_ml' => 300],
-    ],
-];
-
-// Primeira execução do lote offline
-$syncRes1 = $portalService->syncOfflineBatch(1, $batch);
-assert($syncRes1['synced_count'] === 2, "2 operações devem ser processadas no primeiro envio.");
-assert($syncRes1['items'][0]['status'] === 'processed', "Item 1 deve ser processado.");
-
-// Segunda execução do mesmo lote (simulando reenvio de conexão instável)
-$syncRes2 = $portalService->syncOfflineBatch(1, $batch);
-assert($syncRes2['items'][0]['status'] === 'already_processed', "Idempotência deve bloquear duplicação.");
-echo "  ✓ Sincronização offline idempotente validada com zero registros duplicados.\n";
-
-// -----------------------------------------------------------------------------
-// [10/11] NI2-140: Acessibilidade (WCAG 2.1 AA) e Tokens de Design System
-// -----------------------------------------------------------------------------
-echo "[10/11] Testando NI2-140: Acessibilidade e Design System Premium...\n";
-$mobileScreen = file_get_contents(__DIR__ . '/../mobile/src/screens/PatientHomeScreen.tsx');
-$mobileTokens = file_get_contents(__DIR__ . '/../mobile/src/theme/tokens.ts');
-// Cores vêm dos tokens do DS. O cobre #E67A3F reprova com texto branco (2,91:1); botão usa copper-600 #B94F1F (5,0:1).
-// O cálculo de contraste de todos os pares está em tests/ni2_140_patient_app_design_a11y_test.php.
-assert(str_contains($mobileTokens, "navy: '#0F2747'"), "Cor Navy Premium (#0F2747) deve estar nos tokens.");
-assert(str_contains($mobileTokens, "copper: '#B94F1F'"), "Cor Copper do botão (#B94F1F) deve estar nos tokens.");
-assert(!str_contains($mobileScreen, "'#E67A3F'"), "A tela não pode usar #E67A3F (reprovado no contraste com texto branco).");
-assert(str_contains($mobileScreen, 'minHeight: 44'), "Alvos de toque acessíveis (minHeight: 44) devem ser respeitados.");
-assert(str_contains($mobileScreen, 'accessibilityRole'), "Propriedades de acessibilidade devem estar configuradas.");
-echo "  ✓ Layout mobile do paciente em conformidade com WCAG 2.1 AA e Design System Premium.\n";
-
-// -----------------------------------------------------------------------------
-// [11/11] NI2-141: Homologação E2E Integrada e Barreira Cross-Tenant
-// -----------------------------------------------------------------------------
-echo "[11/11] Testando NI2-141: Barreira de Isolamento Cross-Tenant no Portal...\n";
-TenantContext::set(2, ['id' => 2, 'role' => 'patient']); // Contexto do Tenant 2 (Clínica B)
-try {
-    // Paciente do Tenant 2 tenta acessar documentos do Paciente 1 (Tenant 1)
-    $portalService->listDocuments(1);
-    throw new Exception("Falha grave de segurança: vazamento cross-tenant no portal!");
-} catch (\ClyoNutri\Core\Security\TenantSecurityException $e) {
-    echo "  ✓ Bloqueio cross-tenant garantido: paciente não acessa prontuário de outro tenant (HTTP {$e->getCode()}).\n";
-}
-
-echo "\n========================================================\n";
-echo "   RESULTADO FINAL DO ÉPICO NI2-11: APROVADO 100%\n";
-echo "   Todas as 11 histórias (NI2-131 a NI2-141) homologadas!\n";
-echo "========================================================\n";
+ck902($db instanceof \ClyoNutri\Core\Database\ProfiledPdo, 'Composer resolve Connection/ProfiledPdo e dependências');
+$auth=new AuthService($db);
+$a=$auth->registerNutritionist('Nutri Portal A TESTE','portal902a@example.test','TestePortal@2026','Clínica Portal A TESTE','90201','CRN-3');
+$b=$auth->registerNutritionist('Nutri Portal B TESTE','portal902b@example.test','TestePortal@2026','Clínica Portal B TESTE','90202','CRN-3');
+$clinicA=(int)$a['clinic_id'];$clinicB=(int)$b['clinic_id'];$userA=(int)$a['user_id'];$userB=(int)$b['user_id'];
+$st=$db->prepare('SELECT id FROM professionals WHERE user_id=?');$st->execute([$userA]);$profA=(int)$st->fetchColumn();
+TenantContext::set($clinicA,['id'=>$userA,'role'=>'nutritionist']);
+$patient=(new PatientRepository($db))->create(['name'=>'Paciente Portal A TESTE','email'=>'paciente902@example.test','phone'=>'21999990000']);$pid=(int)$patient['id'];
+$portal=new PatientPortalService($db);$diary=new FoodDiaryService($db);$api=new PatientApiController($db);
+// 1: fluxo de primeiro acesso atual (token só como hash no banco, senha e aceite legais).
+$onboarding=new PatientOnboardingService($db);$inv=$onboarding->create($clinicA,$userA,$pid);$code=$inv['invitation_code'];
+ck902(strlen($code)===64,'convite canônico gerado');
+$st=$db->prepare('SELECT token_hash FROM patient_app_invitations WHERE clinic_id=? AND patient_id=?');$st->execute([$clinicA,$pid]);ck902($st->fetchColumn()===hash('sha256',$code),'convite persiste somente hash');
+$accepted=$onboarding->complete(['invitation_code'=>$code,'name'=>$patient['name'],'email'=>$patient['email'],'phone'=>$patient['phone'],'password'=>'Paciente902@2026','password_confirmation'=>'Paciente902@2026'],['channel'=>'app','ip'=>'127.0.0.1','user_agent'=>'TESTE']);
+ck902((int)$accepted['patient']['id']===$pid&&!empty($accepted['token']),'primeiro acesso persiste credencial e gera token');
+$st=$db->prepare('SELECT password_hash FROM patients WHERE id=?');$st->execute([$pid]);ck902(password_verify('Paciente902@2026',$st->fetchColumn()),'senha do primeiro acesso persistida com hash');
+$st=$db->prepare('SELECT COUNT(*) FROM patient_consents WHERE clinic_id=? AND patient_id=?');$st->execute([$clinicA,$pid]);ck902((int)$st->fetchColumn()>0,'aceite legal persistido');
+rejects902(fn()=>$onboarding->preview($code),'convite consumido não pode ser reutilizado',DomainException::class);
+// 2/3: registro e timeline reais, com validações negativas.
+$meal=$diary->logMeal($pid,['meal_name'=>'Almoço TESTE','consumed_at'=>date('Y-m-d 12:30:00'),'description'=>'Arroz e salada TESTE']);
+ck902((int)$meal['id']>0,'diário persiste refeição');
+foreach([['meal_name'=>['x']],['meal_name'=>''],['meal_name'=>'Almoço','consumed_at'=>'ontem'],['meal_name'=>'Almoço','photo_path'=>'/etc/passwd']] as $invalid) rejects902(fn()=>$diary->logMeal($pid,$invalid),'diário rejeita entrada inválida',InvalidArgumentException::class);
+$timeline=$diary->getPatientTimeline($pid);ck902(count($timeline)===1&&$timeline[0]['meal_name']==='Almoço TESTE','timeline contém refeição do paciente');
+// 4: ausência real de prescrição não produz substituições fictícias.
+$sub=$portal->getSubstitutionsAndRecipesForPlan($pid);ck902($sub['plan']===null&&$sub['substitutions']===[]&&$sub['recipes']===[],'sem plano publicado não inventa substituições ou receitas');
+// 5: autorrelato só após liberação do profissional.
+rejects902(fn()=>$portal->recordSelfReportedMetric($pid,'weight_kg',61.8,'kg'),'métrica não liberada é recusada',\ClyoNutri\Domain\Evolution\SelfMetricNotEnabledException::class);
+(new \ClyoNutri\Domain\Evolution\PatientEvolutionService($db))->setEnabledMetrics($pid,['weight_kg'],$userA);
+$metric=$portal->recordSelfReportedMetric($pid,'weight_kg',61.8,'kg','TESTE');ck902($metric['source']==='patient_self_report'&&$metric['is_clinical']===false,'peso é autorrelato, não medição clínica');
+$evo=$portal->getEvolutionTimeline($pid);ck902(isset($evo['clinical_records'],$evo['self_reports'])&&count($evo['self_reports'])===1,'evolução separa autorrelatos dos registros clínicos');
+// 6: registro/listagem de metadados de documento; não testa upload HTTP de arquivo.
+$doc=$portal->uploadDocument($pid,['title'=>'Exame TESTE','category'=>'exam','file_path'=>'storage/teste902/exame.pdf','mime_type'=>'application/pdf','size_bytes'=>1024],'patient',$pid);
+ck902(!empty($doc['access_token'])&&count($portal->listDocuments($pid))===1,'documento registra metadados e token de acesso');
+// 7: consulta futura e confirmação, sem outra agenda compartilhada na fixture.
+$db->prepare("INSERT INTO appointments(clinic_id,patient_id,professional_id,scheduled_at,duration_minutes,status,type) VALUES(?,?,?,datetime('now','+3 days'),45,'scheduled','follow_up')")->execute([$clinicA,$pid,$profA]);$appointment=(int)$db->lastInsertId();
+ck902((int)$portal->getNextAppointment($pid)['id']===$appointment,'próxima consulta pertence ao paciente');ck902($portal->confirmAppointment($pid,$appointment),'confirmação persistida');
+// 8: chat persiste mensagem vinculada à clínica.
+$message=$portal->sendMessageToProfessional($pid,$profA,'Dúvida de TESTE');ck902((int)$message['id']>0&&$message['sender_type']==='patient','chat registra mensagem do paciente');
+// 9: reenvio offline atual usa as chaves das operações canônicas, sem offline_sync_queue legada.
+$payload=['meal_name'=>'Jantar Offline TESTE','consumed_at'=>date('Y-m-d 19:00:00'),'description'=>'TESTE','idempotency_key'=>'ni2902-refeicao'];
+$first=$diary->logMeal($pid,$payload);$again=$diary->logMeal($pid,$payload);ck902($first['id']===$again['id'],'reenvio de refeição é idempotente');
+$api->logHydration($pid,300,['idempotency_key'=>'ni2902-agua','source'=>'app']);$api->logHydration($pid,300,['idempotency_key'=>'ni2902-agua','source'=>'app']);
+$st=$db->prepare('SELECT COUNT(*) FROM hydration_logs WHERE clinic_id=? AND patient_id=?');$st->execute([$clinicA,$pid]);ck902((int)$st->fetchColumn()===1,'reenvio de hidratação não duplica registro');
+// 10: inspeção de tokens/propriedades; não é homologação WCAG/mobile.
+$screen=file_get_contents(__DIR__.'/../mobile/src/screens/PatientHomeScreen.tsx');$tokens=file_get_contents(__DIR__.'/../mobile/src/theme/tokens.ts');
+ck902(str_contains($tokens,"navy: '#0F2747'")&&str_contains($tokens,"copper: '#B94F1F'"),'tokens esperados presentes');ck902(str_contains($screen,'minHeight: 44')&&str_contains($screen,'accessibilityRole'),'propriedades mínimas de toque/acessibilidade no fonte');
+// 11: a mesma conexão/serviços continuam bloqueando outra clínica.
+TenantContext::set($clinicB,['id'=>$userB,'role'=>'nutritionist']);
+rejects902(fn()=>$portal->listDocuments($pid),'outra clínica não lista documentos',\ClyoNutri\Core\Security\TenantSecurityException::class);
+rejects902(fn()=>$diary->getPatientTimeline($pid),'outra clínica não lê diário',\ClyoNutri\Core\Security\TenantSecurityException::class);
+echo "Resultado portal local: $passed verificações PASS. HTTP/browser/mobile e upload de arquivo não homologados.\n";

@@ -33,7 +33,7 @@ $outcomeBadgeClass = match($event['outcome'] ?? 'success') {
   </div>
 
   <div style="display: flex; gap: 0.75rem;">
-    <form action="/admin/eventos/<?= htmlspecialchars($event['event_id']) ?>/criar-incidente" method="POST" onsubmit="return confirm('Confirmar abertura de chamado de incidente no Service Desk com evidências sanitizadas?');">
+    <form action="/admin/eventos/<?= htmlspecialchars($event['event_id']) ?>/criar-incidente" method="POST" data-confirm="Confirmar abertura de chamado de incidente no Service Desk com evidências sanitizadas?">
       <?= \ClyoNutri\Core\Security\Csrf::input() ?>
       <button type="submit" class="btn btn--danger btn--sm">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>

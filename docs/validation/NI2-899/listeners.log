@@ -1,0 +1,7 @@
+PASS confirmação recusada bloqueia envio
+PASS confirmação aceita permite envio
+PASS atalho ativa painel, ARIA, tabindex e foco
+PASS retorno à aba login
+PASS teclado Home/End preservado
+PASS destino ausente preserva fallback do link
+PASS views conectam atributos declarativos sem handlers inline

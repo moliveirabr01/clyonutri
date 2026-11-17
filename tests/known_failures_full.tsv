@@ -4,11 +4,8 @@
 tests/agenda_and_consultation_lifecycle_test.php	DESATUALIZADO-TESTE: resposta/tela mudou (str_contains em null); reescrever contra o fluxo atual
 tests/agenda_review_regression_test.php	FIXTURE: encaixe às 23:30 fora da jornada; precisa de disponibilidade 24h na fixture
 tests/anthropometry_lifecycle_and_evaluation_test.php	DESATUALIZADO-TESTE: cálculos e resumo PASS; falta só o texto da tela de evolução (layout mudou)
-tests/assisted_navigation_audit_test.php	INVESTIGAR: medida caseira gramas via JOIN diferente de 100 g; pode ser dado do catálogo ou defeito
 tests/aud_remediation_360_security_and_backoffice_test.php	FIXTURE: espera assinatura ativa pré-existente no banco
 tests/auditoria_2026_10_14_csrf_session_api_test.php	FIXTURE: cria assinatura que o seed já criou (UNIQUE clinic_subscriptions)
-tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php	INVESTIGAR: sai com erro sem mensagem; escopo de alimento/receita por clínica
-tests/auditoria_2026_10_14_xss_food_name_js_test.php	INVESTIGAR: sai com erro sem mensagem; XSS em nome de alimento
 tests/benchmark_360_competitive_suite_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem; suíte de benchmark com contagens antigas
 tests/helpdesk_and_service_desk_e2e_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem
 tests/helpdesk_indicators_performance_benchmark_test.php	FIXTURE: FK: presume usuários/consultórios do banco de desenvolvimento
@@ -19,8 +16,6 @@ tests/ni2_256_f01_auth_roles_servicedesk_test.php	DESATUALIZADO-TESTE: título d
 tests/ni2_25_design_tokens_test.php	DESATUALIZADO-TESTE: tokens de cor declarados e não usados no CSS
 tests/ni2_347_admin_console_e2e_test.php	DESATUALIZADO-TESTE: casca visual do backoffice renomeada
 tests/ni2_412_ux_v3_test.php	DESATUALIZADO-TESTE: link Próxima semana mudou
-tests/ni2_427_https_transport_test.php	INVESTIGAR: proxy confiável + X-Forwarded-Proto; revisar junto com NI2-885 (HTTPS/HSTS)
-tests/ni2_429_csp_headers_test.php	INVESTIGAR: 2 atributos on*= em telas (CSP)
 tests/ni2_437_preconsultation_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem
 tests/ni2_469_inventory_architecture_attack_surface_test.php	DECISAO-MAICON: política de 1 dependência de terceiros; composer.json cresceu
 tests/ni2_471_audit_credentials_sessions_test.php	DESATUALIZADO-TESTE: procura texto antigo; Secure e timeout continuam no index.php (NI2-427/NI2-604); RegistrationRateLimiter::maxAttempts removido
@@ -37,12 +32,9 @@ tests/ni2_597_600_execution_test.php	DESATUALIZADO-TESTE: atalho /ajuda no menu 
 tests/ni2_695_revoke.php	DESATUALIZADO-TESTE: script auxiliar da jornada NI2-695; coberto por ni2_695_journeys (core)
 tests/ni2_695_role.php	DESATUALIZADO-TESTE: script auxiliar da jornada NI2-695; coberto por ni2_695_journeys (core)
 tests/ni2_754_perf_360_concurrency_and_resilience_test.php	AMBIENTE: disputa de slot em SQLite sequencial não gera conflito; concorrência real fica no MySQL (infra-mysql)
-tests/ni2_9_code_review_regression_test.php	INVESTIGAR: impressão do plano não mostra o peso gravado da medida caseira
 tests/onda_2_experience_foundations_e2e_test.php	DESATUALIZADO-TESTE: procura texto no JS de modais
 tests/onda_3_productivity_e2e_test.php	DESATUALIZADO-TESTE: chat agora exige vínculo liberado no perfil
 tests/onda_4_operation_and_promise_e2e_test.php	DESATUALIZADO-TESTE: assinatura agora exige CPF/CNPJ do consultório
-tests/password_reset_email_test.php	INVESTIGAR: assunto do e-mail de redefinição não contém "Redefinição de senha"
-tests/patient_portal_e2e_suite_test.php	INVESTIGAR: autoload do teste não acha ProfiledPdo
 tests/px_04_adherence_real_calculation_and_empty_state_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem
 tests/px_07_accessible_clinical_fields_dom_test.php	INVESTIGAR: label for=anamnesis_allergies ausente (acessibilidade)
 tests/px_12_financial_empty_state_and_operations_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem

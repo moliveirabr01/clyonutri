@@ -1,0 +1,4 @@
+KNOWN             0.1s  tests/patient_portal_e2e_suite_test.php
+               ↳ INVESTIGAR: autoload do teste não acha ProfiledPdo · Fatal error: Uncaught Error: Class "ClyoNutri\Core\Database\ProfiledPdo" not found in /Users/moliveira/Nutri_II/src/Core/Database/Connection.php:53
+
+Resumo bin/run-tests [full]: 0 PASS, 0 FAIL, 1 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 1s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-190247.tsv

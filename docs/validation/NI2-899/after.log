@@ -1,0 +1,158 @@
+[código-fonte]
+  [PASS] Detector rejeita href executável
+  [PASS] Detector rejeita URL de ação com espaço e caixa mista
+  [PASS] Comentário descritivo não é link executável
+  [PASS] Nenhum atributo on*= nas telas (0)
+  [PASS] Nenhum link javascript: (0)
+  [PASS] Todo <script> inline tem nonce (0 sem)
+[HTTP: páginas]
+  [PASS] GET / (200): exatamente uma CSP efetiva
+  [PASS] GET /: frame-ancestors 'none'
+  [PASS] GET /: object-src 'none'
+  [PASS] GET /: base-uri 'self'
+  [PASS] GET /: form-action 'self'
+  [PASS] GET /: script-src-attr 'none'
+  [PASS] GET /: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /: Referrer-Policy e Permissions-Policy
+  [PASS] GET /: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] GET /: csp-actions.js carregado
+  [PASS] HEAD / (200): exatamente uma CSP efetiva
+  [PASS] HEAD /: frame-ancestors 'none'
+  [PASS] HEAD /: object-src 'none'
+  [PASS] HEAD /: base-uri 'self'
+  [PASS] HEAD /: form-action 'self'
+  [PASS] HEAD /: script-src-attr 'none'
+  [PASS] HEAD /: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /: Referrer-Policy e Permissions-Policy
+  [PASS] GET /login (200): exatamente uma CSP efetiva
+  [PASS] GET /login: frame-ancestors 'none'
+  [PASS] GET /login: object-src 'none'
+  [PASS] GET /login: base-uri 'self'
+  [PASS] GET /login: form-action 'self'
+  [PASS] GET /login: script-src-attr 'none'
+  [PASS] GET /login: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /login: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /login: Referrer-Policy e Permissions-Policy
+  [PASS] GET /login: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] GET /login: csp-actions.js carregado
+  [PASS] HEAD /login (200): exatamente uma CSP efetiva
+  [PASS] HEAD /login: frame-ancestors 'none'
+  [PASS] HEAD /login: object-src 'none'
+  [PASS] HEAD /login: base-uri 'self'
+  [PASS] HEAD /login: form-action 'self'
+  [PASS] HEAD /login: script-src-attr 'none'
+  [PASS] HEAD /login: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /login: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /login: Referrer-Policy e Permissions-Policy
+  [PASS] GET /recuperar-senha (200): exatamente uma CSP efetiva
+  [PASS] GET /recuperar-senha: frame-ancestors 'none'
+  [PASS] GET /recuperar-senha: object-src 'none'
+  [PASS] GET /recuperar-senha: base-uri 'self'
+  [PASS] GET /recuperar-senha: form-action 'self'
+  [PASS] GET /recuperar-senha: script-src-attr 'none'
+  [PASS] GET /recuperar-senha: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /recuperar-senha: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /recuperar-senha: Referrer-Policy e Permissions-Policy
+  [PASS] GET /recuperar-senha: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] GET /recuperar-senha: csp-actions.js carregado
+  [PASS] HEAD /recuperar-senha (200): exatamente uma CSP efetiva
+  [PASS] HEAD /recuperar-senha: frame-ancestors 'none'
+  [PASS] HEAD /recuperar-senha: object-src 'none'
+  [PASS] HEAD /recuperar-senha: base-uri 'self'
+  [PASS] HEAD /recuperar-senha: form-action 'self'
+  [PASS] HEAD /recuperar-senha: script-src-attr 'none'
+  [PASS] HEAD /recuperar-senha: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /recuperar-senha: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /recuperar-senha: Referrer-Policy e Permissions-Policy
+  [PASS] GET /cadastro (200): exatamente uma CSP efetiva
+  [PASS] GET /cadastro: frame-ancestors 'none'
+  [PASS] GET /cadastro: object-src 'none'
+  [PASS] GET /cadastro: base-uri 'self'
+  [PASS] GET /cadastro: form-action 'self'
+  [PASS] GET /cadastro: script-src-attr 'none'
+  [PASS] GET /cadastro: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /cadastro: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /cadastro: Referrer-Policy e Permissions-Policy
+  [PASS] GET /cadastro: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] GET /cadastro: csp-actions.js carregado
+  [PASS] HEAD /cadastro (200): exatamente uma CSP efetiva
+  [PASS] HEAD /cadastro: frame-ancestors 'none'
+  [PASS] HEAD /cadastro: object-src 'none'
+  [PASS] HEAD /cadastro: base-uri 'self'
+  [PASS] HEAD /cadastro: form-action 'self'
+  [PASS] HEAD /cadastro: script-src-attr 'none'
+  [PASS] HEAD /cadastro: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /cadastro: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /cadastro: Referrer-Policy e Permissions-Policy
+  [PASS] GET /paciente/app (200): exatamente uma CSP efetiva
+  [PASS] GET /paciente/app: frame-ancestors 'none'
+  [PASS] GET /paciente/app: object-src 'none'
+  [PASS] GET /paciente/app: base-uri 'self'
+  [PASS] GET /paciente/app: form-action 'self'
+  [PASS] GET /paciente/app: script-src-attr 'none'
+  [PASS] GET /paciente/app: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /paciente/app: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /paciente/app: Referrer-Policy e Permissions-Policy
+  [PASS] GET /paciente/app: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] GET /paciente/app: csp-actions.js carregado
+  [PASS] HEAD /paciente/app (200): exatamente uma CSP efetiva
+  [PASS] HEAD /paciente/app: frame-ancestors 'none'
+  [PASS] HEAD /paciente/app: object-src 'none'
+  [PASS] HEAD /paciente/app: base-uri 'self'
+  [PASS] HEAD /paciente/app: form-action 'self'
+  [PASS] HEAD /paciente/app: script-src-attr 'none'
+  [PASS] HEAD /paciente/app: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /paciente/app: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /paciente/app: Referrer-Policy e Permissions-Policy
+  [PASS] GET /nao-existe (404): exatamente uma CSP efetiva
+  [PASS] GET /nao-existe: frame-ancestors 'none'
+  [PASS] GET /nao-existe: object-src 'none'
+  [PASS] GET /nao-existe: base-uri 'self'
+  [PASS] GET /nao-existe: form-action 'self'
+  [PASS] GET /nao-existe: script-src-attr 'none'
+  [PASS] GET /nao-existe: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /nao-existe: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /nao-existe: Referrer-Policy e Permissions-Policy
+  [PASS] GET /nao-existe: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] HEAD /nao-existe (404): exatamente uma CSP efetiva
+  [PASS] HEAD /nao-existe: frame-ancestors 'none'
+  [PASS] HEAD /nao-existe: object-src 'none'
+  [PASS] HEAD /nao-existe: base-uri 'self'
+  [PASS] HEAD /nao-existe: form-action 'self'
+  [PASS] HEAD /nao-existe: script-src-attr 'none'
+  [PASS] HEAD /nao-existe: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /nao-existe: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /nao-existe: Referrer-Policy e Permissions-Policy
+  [PASS] GET /dashboard (302): exatamente uma CSP efetiva
+  [PASS] GET /dashboard: frame-ancestors 'none'
+  [PASS] GET /dashboard: object-src 'none'
+  [PASS] GET /dashboard: base-uri 'self'
+  [PASS] GET /dashboard: form-action 'self'
+  [PASS] GET /dashboard: script-src-attr 'none'
+  [PASS] GET /dashboard: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] GET /dashboard: X-Frame-Options DENY e nosniff únicos
+  [PASS] GET /dashboard: Referrer-Policy e Permissions-Policy
+  [PASS] GET /dashboard: todo <script> inline da resposta usa o nonce desta resposta
+  [PASS] HEAD /dashboard (302): exatamente uma CSP efetiva
+  [PASS] HEAD /dashboard: frame-ancestors 'none'
+  [PASS] HEAD /dashboard: object-src 'none'
+  [PASS] HEAD /dashboard: base-uri 'self'
+  [PASS] HEAD /dashboard: form-action 'self'
+  [PASS] HEAD /dashboard: script-src-attr 'none'
+  [PASS] HEAD /dashboard: script-src sem unsafe-inline/unsafe-eval/curinga
+  [PASS] HEAD /dashboard: X-Frame-Options DENY e nosniff únicos
+  [PASS] HEAD /dashboard: Referrer-Policy e Permissions-Policy
+  [PASS] Nonce muda a cada resposta (7 distintos)
+  [PASS] Redirect 302 /dashboard com CSP e HSTS
+[HTTP: API]
+  [PASS] API 401 continua JSON
+  [PASS] API: CSP default-src none
+  [PASS] API: nosniff; origem externa sem Allow-Origin (CORS inalterado)
+  [PASS] API: Content-Type JSON
+  [INFO] Preflight OPTIONS no php -S: 204 (no v6 original também não é 204 neste servidor; ver Apache)
+[CSP_MODE]
+  [PASS] report-only mantém anti-enquadramento efetivo
+
+Resultado: 151 passaram, 0 falharam

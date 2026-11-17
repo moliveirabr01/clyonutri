@@ -1,0 +1,18 @@
+PHP Fatal error:  Uncaught AssertionError: ingredientes usam o seletor de alimentos (food-picker.js) in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:22
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php(22): assert(false, 'ingredientes us...')
+#1 /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_xss_food_name_js_test.php(30): aud_check(false, 'ingredientes us...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php on line 22
+XSS — nome de alimento com crase e ${} no template JS
+  ✔ template literal com HTML de opções não existe mais
+  ✔ formulário de receita não embute lista de alimentos no script
+  ✔ nome do alimento não aparece no HTML do formulário (nem cru, nem escapado)
+  ✔ nenhum </script> injetado: aberturas e fechamentos de <script> batem
+
+Fatal error: Uncaught AssertionError: ingredientes usam o seletor de alimentos (food-picker.js) in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:22
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php(22): assert(false, 'ingredientes us...')
+#1 /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_xss_food_name_js_test.php(30): aud_check(false, 'ingredientes us...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php on line 22

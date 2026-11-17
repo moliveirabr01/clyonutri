@@ -1,0 +1,195 @@
+== ClyoNutri Migration Runner ==
+Migrações executadas com sucesso (99):
+ - 2026_10_07_000001_create_tenants_and_users_table
+ - 2026_10_07_000002_create_clinical_domain_tables
+ - 2026_10_07_000003_create_food_and_meal_plan_tables
+ - 2026_10_07_000004_create_operations_and_finance_tables
+ - 2026_10_07_000005_create_advanced_prescription_and_recipes_tables
+ - 2026_10_07_000006_create_food_diary_and_chat_tables
+ - 2026_10_07_000007_create_scale_and_integration_tables
+ - 2026_10_07_000008_create_clinical_safety_and_integrity_tables
+ - 2026_10_07_000009_create_privacy_and_lgpd_tables
+ - 2026_10_08_000010_create_personal_access_tokens_table
+ - 2026_10_08_000011_create_appointment_lifecycle_and_history_tables
+ - 2026_10_08_000012_enhance_anthropometry_and_sharing_tables
+ - 2026_10_08_000013_enhance_meal_plans_and_prescriptions_tables
+ - 2026_10_08_000014_create_patient_documents_and_files_tables
+ - 2026_10_08_000015_add_authentication_and_credentials_to_patients_table
+ - 2026_10_08_000016_enhance_anamnesis_structured_fields
+ - 2026_10_08_000017_create_teleconsultation_sessions_table
+ - 2026_10_08_000018_create_helpdesk_and_service_desk_tables
+ - 2026_10_08_000019_enhance_chat_secure_messaging_tables
+ - 2026_10_08_000020_enhance_culinary_recipes_and_prescriptions_tables
+ - 2026_10_08_000021_create_onboarding_and_activation_tables
+ - 2026_10_08_000022_create_patient_self_metrics_table
+ - 2026_10_09_000023_add_allergy_assessment_to_anamneses
+ - 2026_10_09_000024_add_professional_account_settings
+ - 2026_10_09_000025_create_patient_app_invitations
+ - 2026_10_09_000026_bind_access_tokens_to_clinic
+ - 2026_10_09_000027_version_clinical_record_integrity
+ - 2026_10_09_000028_add_idempotency_to_food_diary
+ - 2026_10_10_000029_enforce_food_diary_idempotency
+ - 2026_10_10_000030_create_saas_subscriptions_and_cancellation_tables
+ - 2026_10_10_000031_create_platform_settings_table
+ - 2026_10_14_000032_create_login_attempts_table
+ - 2026_10_15_000033_convert_login_attempts_to_bucket_key_primary
+ - 2026_10_15_000034_add_taco_code_to_foods
+ - 2026_10_15_000035_harden_teleconsultation_sessions
+ - 2026_10_15_000036_add_teleconsultation_webrtc_and_join_window
+ - 2026_10_15_000037_create_teleconsultation_note_drafts
+ - 2026_10_15_000038_link_legacy_teleconsultation_consents_to_terms
+ - 2026_10_15_000039_create_teleconsultation_ticket_redemptions
+ - 2026_10_15_000040_create_consultation_note_drafts
+ - 2026_10_16_000041_enhance_clinical_care_consent_and_clinic_branding
+ - 2026_10_16_000042_create_booking_holds_and_self_service_tables
+ - 2026_10_19_000043_harden_meal_plan_prescriptions
+ - 2026_10_19_000044_create_skinfold_measurements
+ - 2026_10_19_000045_create_preconsultation_tables
+ - 2026_10_21_000046_create_self_metric_permissions_and_goals
+ - 2026_10_21_000047_create_patient_appointment_actions
+ - 2026_10_22_000048_create_chat_links_and_retention
+ - 2026_10_22_000049_create_adherence_analytics
+ - 2026_10_23_000050_add_food_search_text
+ - 2026_10_24_000051_harden_hydration_logs
+ - 2026_10_24_000052_create_notification_domain
+ - 2026_10_24_000053_create_notification_checkin_settings
+ - 2026_10_24_000054_harden_food_diary_entries
+ - 2026_10_24_000055_update_help_center_copy_v21
+ - 2026_10_26_000056_create_user_legal_acceptances
+ - 2026_10_26_000057_add_trial_ends_at_to_clinic_subscriptions
+ - 2026_10_26_000058_create_patient_password_resets
+ - 2026_10_27_000059_add_last_login_at_to_users
+ - 2026_10_28_000060_create_plan_changes_and_account_deletion_requests
+ - 2026_10_29_000061_plan_energy_clinic_measures_and_planless_plans
+ - 2026_10_29_000062_plan_templates_food_search_and_patient_import
+ - 2026_10_29_000063_food_provenance_equivalence_and_template_targets
+ - 2026_10_29_000064_create_laboratory_exam_requests_and_catalog
+ - 2026_10_29_000065_exam_requests_pdf_and_review
+ - 2026_10_29_000066_exam_catalog_favorites_versions_and_links
+ - 2026_10_29_000067_exam_result_documents
+ - 2026_10_31_000068_ni2_514_phase3_anthropometry_allergens_and_agenda
+ - 2026_11_01_000069_create_booking_calendar_and_waitlist
+ - 2026_11_01_000070_bound_waitlist_processing
+ - 2026_11_01_000071_create_nutritional_prescriptions
+ - 2026_11_01_000072_complete_patient_self_service
+ - 2026_11_01_000073_add_structured_conditional_fields_to_anamneses
+ - 2026_11_01_000075_add_allergies_to_patients
+ - 2026_11_02_000077_add_booking_slug_and_public_address
+ - 2026_11_03_000078_create_clinical_protocols
+ - 2026_11_03_000079_extend_adaptive_consultation
+ - 2026_11_03_000080_create_workflow_receipts
+ - 2026_11_03_000081_create_care_progress_events
+ - 2026_11_03_000082_create_clyo_academy_tables
+ - 2026_11_03_000083_create_educational_materials
+ - 2026_11_03_000084_academy_platform_curation
+ - 2026_11_03_000085_create_academy_handouts
+ - 2026_11_03_000086_anamnesis_unanswered_state
+ - 2026_11_04_000087_create_dietary_confirmations
+ - 2026_11_04_000088_finance_entries_expenses
+ - 2026_11_05_000089_asaas_billing_checkout
+ - 2026_11_05_000090_asaas_receipt_url
+ - 2026_11_07_000091_create_production_events_table
+ - 2026_11_11_000092_create_realtime_transcription_tables
+ - 2026_11_13_000093_create_transcription_consent_requests
+ - 2026_11_15_000094_ni2_845_seed_common_household_measures
+ - 2026_11_15_000095_reteste_ux_catalog_cleanup
+ - 2026_11_15_000096_ni2_856_security_clinical_core
+ - 2026_11_16_000097_ni2_878_subscription_activation
+ - 2026_11_17_000098_ni2_885_patients_allergies_text
+ - 2026_11_17_000099_ni2_886_household_measure_review
+ - 2026_11_17_000100_ni2_891_exam_catalog_review
+ - 2026_11_17_000101_cr875_14_password_reset_purpose
+========================================================================
+   CLYONUTRI II — DATABASE SEED RUNNER
+========================================================================
+Modo Solicitado: CATÁLOGO DE REFERÊNCIA NUTRICIONAL (TACO)
+✓ Catálogo público: 6 receitas de exemplo adicionadas.
+✓ CatalogSeeder executado com sucesso: 594 alimentos inseridos/atualizados.
+========================================================================
+========================================================================
+   CLYONUTRI II — DATABASE SEED RUNNER
+========================================================================
+Modo Solicitado: SEED DE DEMONSTRAÇÃO (--demo)
+✓ DemoSeeder executado com sucesso no ambiente [testing].
+  Contas criadas: demo.local@clyonutri.local
+========================================================================
+base de teste: consultórios 1..3 prontos
+========================================================================
+  AUDITORIA NAVEGAÇÃO ASSISTIDA: SUITE DE VERIFICAÇÃO AUTOMATIZADA
+========================================================================
+
+--- [1] Migração 41 & Integridade Estrutural do Banco ---
+  [PASS] Termo de atendimento clínico (clinical_care) ativo existe na tabela consent_terms
+  [PASS] Versão do consent_terms é 2026.10-r1
+  [PASS] Conteúdo do consent_terms contém texto oficial de consentimento
+  [PASS] Tabela clinics possui coluna logo_path
+  [PASS] Tabela clinics possui coluna address_street
+  [PASS] Tabela clinics possui coluna document_header_text
+  [PASS] Tabela teleconsultation_sessions possui coluna device_check_mode
+  [PASS] food_household_measures possui medidas caseiras populadas (1594 registros)
+  [PASS] helpdesk_articles possui artigos sobre teleconsulta e app (3 artigos)
+
+--- [2] P01 + P07: Onboarding -> Disponibilidade da Agenda e Perfil ---
+  [PASS] weekly_availability sintetizada e salva no onboarding_progress no passo 3
+  [PASS] weekly_availability contém dias úteis configurados (seg a sex)
+  [PASS] Horários padrão de disponibilidade configurados (08:00 às 18:00)
+
+--- [3] P02: Teleconsulta Sala de Espera, Fallback Audio-Only e Bypass ---
+  [PASS] Modo audio_only resulta em device_check_passed = true
+  [PASS] device_check_mode retornado como 'audio_only'
+  [PASS] No banco, device_check_passed registrado como 2 (audio_only)
+  [PASS] Modo bypass_warning resulta em device_check_passed = true
+  [PASS] device_check_mode retornado como 'bypass_warning'
+  [PASS] No banco, device_check_passed registrado como 3 (bypass_warning)
+
+--- [4] P03: Convite do Paciente e Rota do Portal /app ---
+  [PASS] Convite gerado com token de 64 caracteres
+  [PASS] Token tem exatamente 64 caracteres hexadecimais
+  [PASS] Preview do convite carrega nome do paciente: Paciente Teste Audit
+  [PASS] Preview do convite carrega nome da clínica
+  [PASS] Primeiro acesso concluído gera token de autenticação
+  [PASS] Paciente associado ao token com sucesso
+
+--- [5] P04: Aceite Obrigatório dos Termos LGPD no Cadastro ---
+  [PASS] AuthController valida obrigatoriedade de terms_accepted
+  [PASS] Mensagem de erro amigável orientando o aceite da LGPD
+  [PASS] View views/auth/register.php possui checkbox terms_accepted
+  [PASS] View de cadastro contém links diretos para /termos e /privacidade
+
+--- [6] P08 + P09: Anamnese Atualização In-Place de Rascunhos (Sem Inflar Versões) ---
+  [PASS] Primeiro salvamento cria rascunho (is_draft = true)
+  [PASS] Versão inicial do rascunho é 1
+  [PASS] Segundo salvamento atualiza o rascunho existente in-place (mesmo ID)
+  [PASS] Versão permanece 1 sem inflação numérica de versões
+  [PASS] Existe apenas 1 registro no banco de anamnese para os salvamentos de rascunho
+  [PASS] Finalização marca rascunho como concluído (is_draft = false)
+
+--- [7] P10 + P12: Antropometria Normalização de Altura e Resumo Acessível ---
+  [PASS] recordAssessment normalizou altura de 1.75 m para 175.0 cm
+  [PASS] recordAssessment gravou peso de 70.5 kg
+  [PASS] recordAssessment preservou altura de 175 cm
+  [PASS] Resumo acessível formata peso com vírgula e kg: Evolução clínica de 10/10/2026 (70,50 kg) a 16/10/2026 (68,20 kg): redução total de 2,30 kg (-3,26%) ao longo de 2 avaliações.
+  [PASS] Resumo acessível formata IMC com unidade kg/m² e vírgula: Única medição registrada em 10/10/2026 com valor de 24,35 kg/m².
+  [PASS] Resumo acessível formata percentual com % e vírgula: Única medição registrada em 10/10/2026 com valor de 18,20%.
+
+--- [8] P11: Equivalência de Medidas Caseiras em Gramas ---
+  [PASS] Plano alimentar 1 carregado com sucesso
+PHP Warning:  Undefined array key "measure_grams_equivalent" in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php on line 299
+
+Warning: Undefined array key "measure_grams_equivalent" in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php on line 299
+  [FAIL] measure_grams_equivalent calculado via JOIN/subquery como 100.0 g
+
+NI2-895 diagnostic: {"measure_grams_equivalent":null,"weight_grams":null,"measure_unit":"unidade média","amount":2,"catalog":[{"measure_name":"fatia","grams_equivalent":40,"source":"Estimativa ClyoNutri (revisar)"},{"measure_name":"porção","grams_equivalent":100,"source":"Estimativa ClyoNutri (revisar)"},{"measure_name":"unidade","grams_equivalent":100,"source":"Estimativa ClyoNutri (revisar)"},{"measure_name":"unidade média","grams_equivalent":100,"source":null},{"measure_name":"xícara","grams_equivalent":140,"source":"Estimativa ClyoNutri (revisar)"}]}
+PHP Fatal error:  Uncaught RuntimeException: Falha no teste: measure_grams_equivalent calculado via JOIN/subquery como 100.0 g in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php:33
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php(299): assertTest(false, 'measure_grams_e...')
+#1 /private/tmp/ni2-895-wix7lxdq/reproduce.php(2): require('/Users/moliveir...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php on line 33
+
+Fatal error: Uncaught RuntimeException: Falha no teste: measure_grams_equivalent calculado via JOIN/subquery como 100.0 g in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php:33
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php(299): assertTest(false, 'measure_grams_e...')
+#1 /private/tmp/ni2-895-wix7lxdq/reproduce.php(2): require('/Users/moliveir...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/assisted_navigation_audit_test.php on line 33

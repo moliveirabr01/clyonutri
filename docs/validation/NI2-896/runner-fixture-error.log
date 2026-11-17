@@ -1,0 +1,12 @@
+
+Warning: session_start(): open(/var/tmp//sess_554c7d87cc7b59876c99c90610431052, O_RDWR) failed: Operation not permitted (1) in /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php on line 6
+
+Warning: session_start(): Failed to read session data: files (path: ) in /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php on line 6
+F02 — alimentos particulares de outra clínica
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000] [14] unable to open database file in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:34
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php(34): PDO->__construct('sqlite:/var/tmp...')
+#1 /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php(15): aud_fixture()
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php on line 34

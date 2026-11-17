@@ -1,0 +1,75 @@
+========================================================================
+  AUDITORIA NAVEGAÇÃO ASSISTIDA: SUITE DE VERIFICAÇÃO AUTOMATIZADA
+========================================================================
+
+--- [1] Migração 41 & Integridade Estrutural do Banco ---
+  [PASS] Termo de atendimento clínico (clinical_care) ativo existe na tabela consent_terms
+  [PASS] Versão do consent_terms é 2026.10-r1
+  [PASS] Conteúdo do consent_terms contém texto oficial de consentimento
+  [PASS] Tabela clinics possui coluna logo_path
+  [PASS] Tabela clinics possui coluna address_street
+  [PASS] Tabela clinics possui coluna document_header_text
+  [PASS] Tabela teleconsultation_sessions possui coluna device_check_mode
+  [PASS] food_household_measures possui medidas caseiras populadas (1594 registros)
+  [PASS] helpdesk_articles possui artigos sobre teleconsulta e app (3 artigos)
+
+--- [2] P01 + P07: Onboarding -> Disponibilidade da Agenda e Perfil ---
+  [PASS] weekly_availability sintetizada e salva no onboarding_progress no passo 3
+  [PASS] weekly_availability contém dias úteis configurados (seg a sex)
+  [PASS] Horários padrão de disponibilidade configurados (08:00 às 18:00)
+
+--- [3] P02: Teleconsulta Sala de Espera, Fallback Audio-Only e Bypass ---
+  [PASS] Modo audio_only resulta em device_check_passed = true
+  [PASS] device_check_mode retornado como 'audio_only'
+  [PASS] No banco, device_check_passed registrado como 2 (audio_only)
+  [PASS] Modo bypass_warning resulta em device_check_passed = true
+  [PASS] device_check_mode retornado como 'bypass_warning'
+  [PASS] No banco, device_check_passed registrado como 3 (bypass_warning)
+
+--- [4] P03: Convite do Paciente e Rota do Portal /app ---
+  [PASS] Convite gerado com token de 64 caracteres
+  [PASS] Token tem exatamente 64 caracteres hexadecimais
+  [PASS] Preview do convite carrega nome do paciente: Paciente Teste Audit
+  [PASS] Preview do convite carrega nome da clínica
+  [PASS] Primeiro acesso concluído gera token de autenticação
+  [PASS] Paciente associado ao token com sucesso
+
+--- [5] P04: Aceite Obrigatório dos Termos LGPD no Cadastro ---
+  [PASS] AuthController valida obrigatoriedade de terms_accepted
+  [PASS] Mensagem de erro amigável orientando o aceite da LGPD
+  [PASS] View views/auth/register.php possui checkbox terms_accepted
+  [PASS] View de cadastro contém links diretos para /termos e /privacidade
+
+--- [6] P08 + P09: Anamnese Atualização In-Place de Rascunhos (Sem Inflar Versões) ---
+  [PASS] Primeiro salvamento cria rascunho (is_draft = true)
+  [PASS] Versão inicial do rascunho é 1
+  [PASS] Segundo salvamento atualiza o rascunho existente in-place (mesmo ID)
+  [PASS] Versão permanece 1 sem inflação numérica de versões
+  [PASS] Existe apenas 1 registro no banco de anamnese para os salvamentos de rascunho
+  [PASS] Finalização marca rascunho como concluído (is_draft = false)
+
+--- [7] P10 + P12: Antropometria Normalização de Altura e Resumo Acessível ---
+  [PASS] recordAssessment normalizou altura de 1.75 m para 175.0 cm
+  [PASS] recordAssessment gravou peso de 70.5 kg
+  [PASS] recordAssessment preservou altura de 175 cm
+  [PASS] Resumo acessível formata peso com vírgula e kg: Evolução clínica de 10/10/2026 (70,50 kg) a 16/10/2026 (68,20 kg): redução total de 2,30 kg (-3,26%) ao longo de 2 avaliações.
+  [PASS] Resumo acessível formata IMC com unidade kg/m² e vírgula: Única medição registrada em 10/10/2026 com valor de 24,35 kg/m².
+  [PASS] Resumo acessível formata percentual com % e vírgula: Única medição registrada em 10/10/2026 com valor de 18,20%.
+
+--- [8] P11: Equivalência de Medidas Caseiras em Gramas ---
+  [PASS] Plano alimentar criado pelo serviço carregado com sucesso
+  NI2-895 obtido: {"amount":2,"weight_grams":200,"energy_kcal":196,"weight_is_estimated":0}
+  [PASS] 2 unidades de 100 g persistem weight_grams total de 200 g
+  [PASS] Calorias usam os mesmos 200 g persistidos (196 kcal)
+  [PASS] Medida verificada do alimento não é marcada como estimativa genérica
+  [PASS] Impressão entrega o peso total persistido de 200 g
+  [PASS] Alterar catálogo não muda o peso já prescrito
+  [PASS] Impressão permanece consistente após alteração do catálogo
+  [PASS] Medida desconhecida é rejeitada sem persistir um item
+  [PASS] Quantidade em gramas não duplica (~g)
+  [PASS] Medida caseira exibe equivalência total em gramas: 2 unidades (~200g)
+  [PASS] Medida com grama unitária calcula total para 2 unidades: 2 unidade média (100g) (~200g)
+
+========================================================================
+  ✓ RESULTADO: 51 DE 51 TESTES PASSARAM COM SUCESSO!
+========================================================================

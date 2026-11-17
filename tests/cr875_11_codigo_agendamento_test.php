@@ -36,6 +36,20 @@ try {
         'booking_min_advance_hours' => '2', 'booking_max_future_days' => '60', 'booking_hold_ttl_minutes' => '15', 'booking_cancel_min_advance_hours' => '4', 'booking_reschedule_min_advance_hours' => '4']);
     $on = (int)$pdo->query("SELECT COUNT(*) FROM booking_settings WHERE clinic_id = 1 AND is_enabled = 1")->fetchColumn();
     $ok(in_array($c, [200, 302, 303], true) && $on === 1, "dona liga o autoagendamento pela tela de configurações (HTTP $c, booking_settings ligado)");
+    // NI2-893 item 5: siga os links reais do menu do consultório com a sessão autenticada.
+    [$menuStatus, $menuHtml] = $owner('/dashboard');
+    $ok($menuStatus === 200, 'dashboard autenticado para verificar os links do menu');
+    preg_match('/<aside\b[^>]*class="app-sidebar"[^>]*>(.*?)<\/aside>/s', $menuHtml, $sidebar);
+    preg_match_all('/<a\b[^>]*href="([^"#]+)"/i', $sidebar[1] ?? '', $links);
+    $paths = array_values(array_unique(array_filter(array_map(
+        fn($href) => html_entity_decode($href, ENT_QUOTES, 'UTF-8'), $links[1] ?? []
+    ), fn($href) => str_starts_with($href, '/') && !str_starts_with($href, '//'))));
+    $ok(count($paths) >= 10, 'menu real contém links suficientes para a varredura');
+    $ok(!in_array('/relatorios', array_map(fn($href) => parse_url($href, PHP_URL_PATH), $paths), true), 'menu não aponta para /relatorios');
+    foreach ($paths as $path) {
+        [$linkStatus] = $owner($path);
+        $ok($linkStatus === 200, "link do menu $path responde 200 (HTTP $linkStatus)");
+    }
     $anon = $mk();
     $term = (int)$pdo->query("SELECT id FROM consent_terms WHERE purpose_code = 'clinical_care' AND is_active = 1 ORDER BY id DESC LIMIT 1")->fetchColumn();
     $d = new DateTime('now', new DateTimeZone('America/Sao_Paulo')); $d->modify('+3 days'); while ((int)$d->format('N') !== 3) $d->modify('+1 day');

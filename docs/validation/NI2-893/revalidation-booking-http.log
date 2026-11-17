@@ -1,0 +1,123 @@
+  PASS  fixture TESTE (clínicas A e B, Dra. Ana com jornada)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  dona liga o autoagendamento pela tela de configurações (HTTP 302, booking_settings ligado)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  dashboard autenticado para verificar os links do menu
+  PASS  menu real contém links suficientes para a varredura
+  PASS  menu não aponta para /relatorios
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /dashboard responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /agenda responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /pacientes responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /planos responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /chat responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /financeiro responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /avisos responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /configuracoes responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /alimentos responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /exames responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /receitas responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /materiais responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /modelos responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /academy responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /ajuda responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  link do menu /configuracoes/versao responde 200 (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  reserva do horário (HTTP 201)
+  PASS  duas confirmações seguidas pela API pública: 200 e 200
+  PASS  resposta pública sem appointment_id nem patient_id
+  PASS  códigos de 8 caracteres e diferentes: ZLAHJSP7 / GA6CSVAK
+  PASS  no banco as consultas são consecutivas (1,2); os códigos não são números nem seguem ordem
+  PASS  confirmação repetida do mesmo token: mesmo código, sem id
+  PASS  auditoria BOOKING_CONFIRMED guarda o código (suporte acha o agendamento), sem dado pessoal
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  o código não serve para liberar, confirmar ou abrir agendamento de outra pessoa (400/422/404)
+  PASS  as duas consultas continuam agendadas depois das tentativas com o código
+  PASS  comprovante da página pública mostra o código (sem id)
+
+CR875-11 código do agendamento: 31/31

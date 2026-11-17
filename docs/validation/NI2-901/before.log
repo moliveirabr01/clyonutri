@@ -1,0 +1,11 @@
+--- Envio para usuário ativo ---
+  [PASS] um e-mail enviado para usuário ativo
+  [PASS] destinatário é o e-mail do usuário
+
+Fatal error: Uncaught AssertionError: assunto em pt-BR in /Users/moliveira/Nutri_II/tests/password_reset_email_test.php:35
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/password_reset_email_test.php(35): assert(false, 'assunto em pt-B...')
+#1 /Users/moliveira/Nutri_II/tests/password_reset_email_test.php(79): ok(false, 'assunto em pt-B...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/password_reset_email_test.php on line 35
+ 35

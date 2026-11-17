@@ -81,6 +81,7 @@ case "$PROFILE" in
         FAILED_TESTS+=("$t (ausente)")
       fi
     done
+    run_step "tests/ni2_899_csp_handlers_test.cjs" node tests/ni2_899_csp_handlers_test.cjs
     ;;
   infra)
     run_step "tests/run_release_gate.sh --browser" bash tests/run_release_gate.sh --browser

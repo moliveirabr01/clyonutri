@@ -1,0 +1,6 @@
+PASS              0.6s  tests/assisted_navigation_audit_test.php
+PASS              0.2s  tests/meal_plan_and_prescription_lifecycle_test.php
+PASS              0.1s  tests/ni2_74_portion_conversion_test.php
+PASS              0.2s  tests/ni2_9_code_review_regression_test.php
+
+Resumo bin/run-tests [full]: 4 PASS, 0 FAIL, 0 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 2s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-190024.tsv

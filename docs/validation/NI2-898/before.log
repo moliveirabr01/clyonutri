@@ -1,0 +1,11 @@
+{"request_headers": {"X-Forwarded-Proto": "https"}, "status": 200, "location": null, "form": true, "secure": true}
+{"request_headers": {}, "status": 301, "location": "https://clyonutri.com/login", "form": false, "secure": false}
+LOG [Tue Nov 17 15:03:21 2026] PHP 8.5.11 Development Server (http://127.0.0.1:57968) started
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57972 Accepted
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57973 Accepted
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57972 Closed without sending a request; it was probably just an unused speculative preconnection
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57972 Closing
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57973 Closing
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57974 Accepted
+[Tue Nov 17 15:03:21 2026] 127.0.0.1:57974 Closing
+

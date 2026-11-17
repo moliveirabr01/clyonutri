@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/support/ni2_426_server.php';
+require_once __DIR__ . '/support/ni2_898_server.php';
 
 $passed = 0; $failed = 0;
 function check(bool $c, string $m): void { global $passed, $failed; echo ($c ? '  [PASS] ' : '  [FAIL] ') . $m . "\n"; $c ? $passed++ : $failed++; }
@@ -17,21 +18,26 @@ $root = realpath(__DIR__ . '/..');
 echo "[código-fonte]\n";
 $files = array_merge(glob("$root/views/*/*.php"), glob("$root/src/Application/Controllers/*.php"));
 $handlers = 0; $jsurl = 0; $noNonce = 0;
+// NI2-899: texto "Sem JavaScript:" em comentário não é URL executável.
+$jsUrlPattern = '~\b(?:href|src|action|formaction)\s*=\s*["\x27]\s*javascript\s*:~i';
+check(preg_match($jsUrlPattern, '<a href="javascript:alert(1)">') === 1, 'Detector rejeita href executável');
+check(preg_match($jsUrlPattern, "<button formaction=' JavaScript:alert(1)'>") === 1, 'Detector rejeita URL de ação com espaço e caixa mista');
+check(preg_match($jsUrlPattern, '/* Sem JavaScript: descrição do fallback */') === 0, 'Comentário descritivo não é link executável');
 foreach ($files as $f) {
     $s = file_get_contents($f);
     $handlers += preg_match_all('/\son[a-z]+\s*=\s*["\']/i', $s);
-    $jsurl += preg_match_all('/javascript:/i', $s);
+    $jsurl += preg_match_all($jsUrlPattern, $s);
     $noNonce += preg_match_all('/<script(?![^>]*(\bsrc=|\bnonce=|type="application\/json"))[^>]*>/i', $s);
 }
 check($handlers === 0, "Nenhum atributo on*= nas telas ($handlers)");
 check($jsurl === 0, "Nenhum link javascript: ($jsurl)");
 check($noNonce === 0, "Todo <script> inline tem nonce ($noNonce sem)");
 
-$s = ni2426_server(['APP_ENV' => 'production', 'APP_URL' => 'https://clyonutri.com', 'TRUSTED_PROXIES' => '127.0.0.1'], 18480);
+$s = ni2898_server(['APP_ENV' => 'production', 'APP_URL' => 'https://clyonutri.com', 'TRUSTED_PROXIES' => '127.0.0.1']);
 $https = ['X-Forwarded-Proto: https'];
 echo "[HTTP: páginas]\n";
 $nonces = [];
-foreach (['/', '/login', '/recuperar-senha', '/cadastro', '/nao-existe', '/dashboard'] as $p) {
+foreach (['/', '/login', '/recuperar-senha', '/cadastro', '/paciente/app', '/nao-existe', '/dashboard'] as $p) {
     foreach (['GET', 'HEAD'] as $m) {
         [$st, $h, $body] = ni2426_req($m, $s['base'] . $p, $https);
         $csp = $h['content-security-policy'] ?? [];
@@ -67,7 +73,7 @@ echo "  [INFO] Preflight OPTIONS no php -S: $st (no v6 original também não é 
 $s['stop']();
 
 echo "[CSP_MODE]\n";
-$s = ni2426_server(['APP_ENV' => 'production', 'APP_URL' => 'https://clyonutri.com', 'TRUSTED_PROXIES' => '127.0.0.1', 'CSP_MODE' => 'report-only'], 18481);
+$s = ni2898_server(['APP_ENV' => 'production', 'APP_URL' => 'https://clyonutri.com', 'TRUSTED_PROXIES' => '127.0.0.1', 'CSP_MODE' => 'report-only']);
 [, $h] = ni2426_req('GET', $s['base'] . '/login', $https);
 check(isset($h['content-security-policy-report-only']) && ($h['content-security-policy'][0] ?? '') === "frame-ancestors 'none'; object-src 'none'; base-uri 'self'", 'report-only mantém anti-enquadramento efetivo');
 $s['stop']();

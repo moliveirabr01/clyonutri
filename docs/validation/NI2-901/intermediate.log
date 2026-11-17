@@ -1,0 +1,57 @@
+--- Envio para usuário ativo ---
+  [PASS] um e-mail enviado para usuário ativo
+  [PASS] destinatário é o e-mail do usuário
+  Assunto efetivo: Crie uma nova senha no Clyo Nutri
+  [PASS] assunto atual em pt-BR, claro e sem dados do titular
+  [PASS] título HTML corresponde ao assunto enviado
+  [PASS] texto contém link APP_URL/recuperar-senha/{token} (sem barra dupla)
+  [PASS] HTML contém o mesmo link
+  [PASS] Host header ignorado
+  [PASS] validade de 30 minutos informada
+  [PASS] nota "se não foi você, ignore"
+  [PASS] cores do Design System (Forest/Clyo Green)
+  [PASS] resposta do serviço não contém o token
+  [PASS] email_sent=true
+--- Armazenamento com hash ---
+  [PASS] password_resets.token = SHA-256 do token
+  [PASS] token em claro não existe no banco
+  [PASS] auditoria não guarda prefixo do token
+  [PASS] auditoria registra expiração UTC
+--- Expiração em UTC ---
+  [PASS] expires_at em UTC = agora + 30 min (diff=1800s)
+  [PASS] token válido com PHP em Asia/Tokyo
+  [PASS] token válido com PHP em America/Sao_Paulo
+  [PASS] getActiveTokenForEmail devolve o hash ativo
+  [PASS] o próprio hash não funciona como token
+  [PASS] token aceita hex maiúsculo (normalizado)
+--- Token válido, reutilizado e expirado ---
+  [PASS] token válido redefine a senha
+  [PASS] nova senha gravada
+  [PASS] token reutilizado é rejeitado
+  [PASS] token expirado (1s no passado, UTC) é rejeitado
+  [PASS] token expirado é removido
+  [PASS] token com 2 min restantes (UTC) continua válido
+  [PASS] cleanExpiredTokens remove só expirados (UTC)
+--- Sem e-mail para desconhecido/inativo ---
+  [PASS] nenhum e-mail para e-mail inexistente ou conta inativa
+  [PASS] mesma mensagem genérica
+  [PASS] nenhum token para conta inativa
+--- Falha do mailer ---
+  [PASS] falha de envio mantém resposta genérica
+  [PASS] falha de envio não devolve token
+  [PASS] falha registrada na auditoria (PASSWORD_RESET_EMAIL_FAILED)
+--- APP_URL ausente não cai no Host ---
+  [PASS] sem APP_URL: não envia link com Host e mantém resposta genérica
+--- Controller e driver de log ---
+  [PASS] controller não usa token da resposta
+  [PASS] driver log grava em arquivo e não em stdout
+  [PASS] quebra de linha em cabeçalho é rejeitada
+--- Envio agendado para depois da resposta (timing) ---
+
+Fatal error: Uncaught AssertionError: envio agendado: nada sai antes da resposta; conta inexistente não agenda nada in /Users/moliveira/Nutri_II/tests/password_reset_email_test.php:38
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/password_reset_email_test.php(38): assert(false, 'envio agendado:...')
+#1 /Users/moliveira/Nutri_II/tests/password_reset_email_test.php(198): ok(false, 'envio agendado:...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/password_reset_email_test.php on line 38
+ 38

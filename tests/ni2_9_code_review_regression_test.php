@@ -7,6 +7,11 @@ declare(strict_types=1);
 // C1 alérgenos fail-closed · A1 autorização única de prescrição · A2 autoria/justificativa na auditoria
 // A3 peso persistido (sem subconsulta aproximada) · M1 paciente lê o snapshot · M2 só rascunho publica
 // M3 peso estimado sinalizado · M4 mutações com guarda de status · B1 quantidade finita e ≤ 5 kg.
+$fixtureDatabase = getenv('TEST_DB_DATABASE') ?: getenv('DB_DATABASE');
+if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite' || !is_string($fixtureDatabase) || $fixtureDatabase === '') {
+    throw new RuntimeException('Use o runner com APP_ENV=testing e banco SQLite isolado.');
+}
+session_save_path(dirname($fixtureDatabase));
 session_start();
 ob_start();
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -168,7 +173,20 @@ check(!str_contains($src, 'measure_grams_equivalent') && !str_contains($src, "'%
 $print = (new ClyoNutri\Domain\MealPlan\MealPlanPrintService($db))->build($pW, 951, true);
 $qty = $print['meals'][0]['items'][0]['quantity'] ?? '';
 $qtyCup = $print['meals'][0]['items'][2]['quantity'] ?? '';
-check($qty === '2 unidade (~100g)' && str_contains($qtyCup, '~150g, peso estimado'), "A3 impressão mostra o peso gravado: '{$qty}' / '{$qtyCup}'");
+check($qty === '2 unidades (~100g)' && str_contains($qtyCup, '~150g, peso estimado'), "A3 impressão mostra o peso gravado: '{$qty}' / '{$qtyCup}'");
+
+// NI2-900: texto da impressão é comparado ao peso TOTAL salvo no banco.
+check(str_contains($qty, '~' . (int)$row($iEgg)['weight_grams'] . 'g)')
+    && str_contains($qtyCup, '~' . (int)$row($iCup)['weight_grams'] . 'g, peso estimado'),
+    'NI2-900 impressão corresponde aos pesos persistidos de 100 g e 150 g');
+$db->prepare('UPDATE foods SET serving_size_g=80 WHERE id=?')->execute([$egg]);
+$changedPrint = (new ClyoNutri\Domain\MealPlan\MealPlanPrintService($db))->build($pW, 951, true);
+check($changedPrint['meals'][0]['items'][0]['quantity'] === $qty
+    && $changedPrint['meals'][0]['items'][2]['quantity'] === $qtyCup,
+    'NI2-900 alteração do catálogo não recalcula peso nem remove aviso de estimativa');
+$quantityMethod = new ReflectionMethod(ClyoNutri\Domain\MealPlan\MealPlanPrintService::class, 'quantity');
+$singular = $quantityMethod->invoke(new ClyoNutri\Domain\MealPlan\MealPlanPrintService($db), 1, 'unidade', 50.0, false);
+check($singular === '1 unidade (~50g)', 'NI2-900 uma unidade continua no singular e usa peso total de 50 g');
 
 // ---------- B1: quantidade finita e ≤ 5 kg ----------
 check(throws(fn() => $svc->addItem($mW, 9952, INF, 'g')), 'B1 quantidade infinita recusada');

@@ -18,6 +18,9 @@ use ClyoNutri\Domain\Onboarding\OnboardingService;
 use ClyoNutri\Domain\PatientPortal\PatientOnboardingService;
 use ClyoNutri\Domain\Telehealth\TeleconsultationService;
 
+if (getenv('APP_ENV') !== 'testing' || getenv('DB_CONNECTION') !== 'sqlite') {
+    throw new RuntimeException('Esta suíte exige APP_ENV=testing e SQLite isolado; use o runner full.');
+}
 $db = Connection::getInstance();
 $totalTests = 0;
 $passedTests = 0;
@@ -260,43 +263,43 @@ echo "\n--- [8] P11: Equivalência de Medidas Caseiras em Gramas ---\n";
 
 TenantContext::set(1, ['id' => 1, 'clinic_id' => 1, 'role' => 'nutritionist', 'name' => 'Nutricionista Teste']);
 
-$foodRow = $db->query("SELECT id, name FROM foods WHERE name LIKE '%Banana%' LIMIT 1")->fetch();
-if (!$foodRow) {
-    $db->exec("INSERT INTO foods (name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
-               VALUES ('Banana Prata', 'Frutas', 98, 1.3, 26, 0.1, 2)");
-    $foodId = (int)$db->lastInsertId();
-} else {
-    $foodId = (int)$foodRow['id'];
-}
-
-// Garante medida caseira
-$db->exec("INSERT OR IGNORE INTO food_household_measures (food_id, measure_name, grams_equivalent)
-           VALUES ({$foodId}, 'unidade média', 100.0)");
-
-// Cria plano
-$db->exec("DELETE FROM meal_plans WHERE id = 1");
-$db->exec("INSERT INTO meal_plans (id, clinic_id, patient_id, professional_id, title, version, status, created_at)
-           VALUES (1, 1, 1, 1, 'Plano de Teste Gramas', 1, 'draft', datetime('now'))");
-$planId = 1;
-
-// Cria refeição
-$db->exec("DELETE FROM meal_plan_meals WHERE meal_plan_id = 1");
-$db->exec("INSERT INTO meal_plan_meals (id, meal_plan_id, name, time_of_day, ordering)
-           VALUES (1, {$planId}, 'Café da Manhã', '08:00', 1)");
-
-// Cria item de refeição com medida caseira 'unidade média'
-$db->exec("DELETE FROM meal_plan_items WHERE meal_id = 1");
-$db->exec("INSERT INTO meal_plan_items (id, meal_id, food_id, amount, measure_unit, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g, ordering)
-           VALUES (1, 1, {$foodId}, 2.0, 'unidade média', 196, 2.6, 52, 0.2, 4, 1)");
+// NI2-895: alimento próprio torna a medida determinística, sem depender do seed do catálogo.
+$db->exec("INSERT INTO foods (name, category, energy_kcal, protein_g, carbohydrate_g, lipid_g, fiber_g)
+           VALUES ('Alimento NI2-895 TESTE', 'Frutas', 98, 1.3, 26, 0.1, 2)");
+$foodId = (int)$db->lastInsertId();
+$db->prepare("INSERT INTO food_household_measures (food_id, measure_name, grams_equivalent, source)
+              VALUES (?, 'unidade média', 100.0, 'Medida verificada TESTE NI2-895')")->execute([$foodId]);
 
 $mpService = new MealPlanService($db);
 $printService = new MealPlanPrintService($db);
+$plan = $mpService->createPlan(1, 1, 'Plano de Teste Gramas NI2-895');
+$planId = (int)$plan['plan_id'];
+$mealId = $mpService->addMeal($planId, 'Café da Manhã', '08:00');
+$itemId = $mpService->addItem($mealId, $foodId, 2.0, 'unidade média');
 
-// Obtém detalhes do plano e verifica se measure_grams_equivalent foi populado
-$planDetails = $mpService->getPlanWithDetails(1);
-assertTest(!empty($planDetails), "Plano alimentar 1 carregado com sucesso");
+$planDetails = $mpService->getPlanWithDetails($planId);
+assertTest(!empty($planDetails), "Plano alimentar criado pelo serviço carregado com sucesso");
 $firstItem = $planDetails['meals'][0]['items'][0];
-assertTest((float)$firstItem['measure_grams_equivalent'] === 100.0, "measure_grams_equivalent calculado via JOIN/subquery como 100.0 g");
+echo '  NI2-895 obtido: ' . json_encode([
+    'amount' => $firstItem['amount'], 'weight_grams' => $firstItem['weight_grams'],
+    'energy_kcal' => $firstItem['energy_kcal'], 'weight_is_estimated' => $firstItem['weight_is_estimated'],
+], JSON_UNESCAPED_UNICODE) . "\n";
+assertTest((float)$firstItem['weight_grams'] === 200.0, "2 unidades de 100 g persistem weight_grams total de 200 g");
+assertTest((float)$firstItem['energy_kcal'] === 196.0, "Calorias usam os mesmos 200 g persistidos (196 kcal)");
+assertTest((int)$firstItem['weight_is_estimated'] === 0, "Medida verificada do alimento não é marcada como estimativa genérica");
+$printed = $printService->build($planId, 1, true);
+assertTest($printed['meals'][0]['items'][0]['quantity'] === '2 unidade média (~200g)', "Impressão entrega o peso total persistido de 200 g");
+
+// A leitura não recalcula prescrições antigas a partir de um catálogo que mudou.
+$db->prepare("UPDATE food_household_measures SET grams_equivalent=150 WHERE food_id=? AND measure_name='unidade média'")->execute([$foodId]);
+$reloaded = (new MealPlanService($db))->getPlanWithDetails($planId);
+assertTest((float)$reloaded['meals'][0]['items'][0]['weight_grams'] === 200.0, "Alterar catálogo não muda o peso já prescrito");
+assertTest((new MealPlanPrintService($db))->build($planId, 1, true)['meals'][0]['items'][0]['quantity'] === '2 unidade média (~200g)', "Impressão permanece consistente após alteração do catálogo");
+$countBefore = (int)$db->query('SELECT COUNT(*) FROM meal_plan_items WHERE meal_id=' . $mealId)->fetchColumn();
+$rejected = false;
+try { $mpService->addItem($mealId, $foodId, 2.0, 'medida inexistente NI2-895'); }
+catch (InvalidArgumentException) { $rejected = true; }
+assertTest($rejected && (int)$db->query('SELECT COUNT(*) FROM meal_plan_items WHERE meal_id=' . $mealId)->fetchColumn() === $countBefore, "Medida desconhecida é rejeitada sem persistir um item");
 
 // Testa o método quantity do MealPlanPrintService via Reflection
 $printRefl = new ReflectionClass($printService);
@@ -305,7 +308,7 @@ $qtyMethod = $printRefl->getMethod('quantity');
 $qtySimple = $qtyMethod->invoke($printService, 100, 'g', null);
 assertTest($qtySimple === '100 g', "Quantidade em gramas não duplica (~g)");
 
-$qtyHousehold = $qtyMethod->invoke($printService, 2, 'unidades', 100.0);
+$qtyHousehold = $qtyMethod->invoke($printService, 2, 'unidades', 200.0);
 assertTest($qtyHousehold === '2 unidades (~200g)', "Medida caseira exibe equivalência total em gramas: {$qtyHousehold}");
 
 $qtyUnitWithParen = $qtyMethod->invoke($printService, 2, 'unidade média (100g)', null);

@@ -1,0 +1,47 @@
+[unidade] Transport
+  [PASS] Caminho "//host" não vira URL de outro host
+  [PASS] CR/LF e espaços removidos do Location
+  [PASS] CIDR IPv4
+  [PASS] CIDR IPv6
+[HTTP puro, produção]
+  [PASS] GET / -> 301 https://clyonutri.com/ (obtido 301 https://clyonutri.com/)
+  [PASS] GET / sem sessão nem HTML por HTTP
+  [PASS] HEAD / -> 301 https://clyonutri.com/ (obtido 301 https://clyonutri.com/)
+  [PASS] HEAD / sem sessão nem HTML por HTTP
+  [PASS] GET /login -> 301 https://clyonutri.com/login (obtido 301 https://clyonutri.com/login)
+  [PASS] GET /login sem sessão nem HTML por HTTP
+  [PASS] HEAD /login -> 301 https://clyonutri.com/login (obtido 301 https://clyonutri.com/login)
+  [PASS] HEAD /login sem sessão nem HTML por HTTP
+  [PASS] GET /login?teste=https -> 301 https://clyonutri.com/login?teste=https (obtido 301 https://clyonutri.com/login?teste=https)
+  [PASS] GET /login?teste=https sem sessão nem HTML por HTTP
+  [PASS] HEAD /login?teste=https -> 301 https://clyonutri.com/login?teste=https (obtido 301 https://clyonutri.com/login?teste=https)
+  [PASS] HEAD /login?teste=https sem sessão nem HTML por HTTP
+  [PASS] GET /api/v1/patient/home -> 301 https://clyonutri.com/api/v1/patient/home (obtido 301 https://clyonutri.com/api/v1/patient/home)
+  [PASS] GET /api/v1/patient/home sem sessão nem HTML por HTTP
+  [PASS] HEAD /api/v1/patient/home -> 301 https://clyonutri.com/api/v1/patient/home (obtido 301 https://clyonutri.com/api/v1/patient/home)
+  [PASS] HEAD /api/v1/patient/home sem sessão nem HTML por HTTP
+  [PASS] GET /assets/css/clinical-botanical.css -> 301 https://clyonutri.com/assets/css/clinical-botanical.css (obtido 301 https://clyonutri.com/assets/css/clinical-botanical.css)
+  [PASS] GET /assets/css/clinical-botanical.css sem sessão nem HTML por HTTP
+  [PASS] HEAD /assets/css/clinical-botanical.css -> 301 https://clyonutri.com/assets/css/clinical-botanical.css (obtido 301 https://clyonutri.com/assets/css/clinical-botanical.css)
+  [PASS] HEAD /assets/css/clinical-botanical.css sem sessão nem HTML por HTTP
+  [PASS] Host forjado ignorado: Location usa APP_URL
+  [PASS] X-Forwarded-Proto: https de cliente não confiável NÃO evita o redirect (sem downgrade)
+  [PASS] POST /login por HTTP -> 403 antes do CSRF/controller, sem sessão
+  [PASS] POST na API por HTTP -> 403 sem processar
+[proxy confiável]
+  [PASS] Com TRUSTED_PROXIES=127.0.0.1 e X-Forwarded-Proto https -> 200 (sem loop; obtido 200, Location=-, form=sim)
+  [PASS] Cookie de sessão com Secure via proxy confiável
+  [PASS] Mesmo proxy sem X-Forwarded-Proto https -> 301 (obtido 301)
+  [PASS] Proxy confiável declarando http -> 301 canônico (obtido 301)
+  [PASS] HTTPS reconhecido pelo proxy também recebe HSTS de seis meses
+  [PASS] HEAD /login -> 200 (antes 404)
+  [PASS] HEAD em rota inexistente continua 404
+[lista de proxies]
+  [PASS] CIDR confiável reconhece HTTPS sem redirect (obtido 200)
+  [PASS] Cliente fora da lista não pode forjar HTTPS nem abrir sessão (obtido 301)
+[desligado]
+  [PASS] FORCE_HTTPS=false (rollback) -> HTTP volta a responder 200
+  [PASS] APP_ENV=local sem FORCE_HTTPS -> padrão desligado
+  [PASS] APP_URL sem https em produção -> 403 (não monta Location inseguro)
+
+Resultado: 40 passaram, 0 falharam

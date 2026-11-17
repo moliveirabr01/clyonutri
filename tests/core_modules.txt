@@ -26,3 +26,25 @@ tests/patient_otp_concurrency_and_security_test.php
 # transporte (HSTS de 6 meses e rollback, NI2-885)
 tests/ni2_428_hsts_test.php
 tests/hsts_end_to_end_rollback_test.php
+
+# NI2-895: equivalência persistida e impressão, sem dependência do catálogo mutável.
+tests/assisted_navigation_audit_test.php
+
+# NI2-896: catálogo de alimentos e ingredientes de receita isolados por clínica.
+tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php
+
+# NI2-897: nomes maliciosos de alimento não entram no HTML/JS do formulário.
+tests/auditoria_2026_10_14_xss_food_name_js_test.php
+
+# NI2-898: proxy confiável, HTTPS, Secure e HSTS via HTTP real isolado.
+tests/ni2_427_https_transport_test.php
+
+# NI2-899: CSP e ausência de handlers inline, incluindo portal do paciente.
+tests/ni2_429_csp_headers_test.php
+
+# NI2-900: peso persistido/estimado e pluralização na impressão do plano.
+tests/ni2_9_code_review_regression_test.php
+
+# NI2-901/902: redefinição de senha e contratos atuais do portal via Composer.
+tests/password_reset_email_test.php
+tests/patient_portal_e2e_suite_test.php

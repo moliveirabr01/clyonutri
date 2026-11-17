@@ -1,0 +1,14 @@
+  PASS  Bloco de cancelamento somente para status cancelado: draft
+  PASS  Bloco de cancelamento somente para status cancelado: review
+  PASS  Bloco de cancelamento somente para status cancelado: issued
+  PASS  Bloco de cancelamento somente para status cancelado: cancelled
+  PASS  Cancelamento mostra data e motivo
+  PASS  Sala sem botão e sem campo de link
+  PASS  Controles de pedir aceite e revogação preservados
+  PASS  Rodapé renderiza a versão instalada registrada no JSON
+  PASS  Versão antiga fixa ausente do HTML
+  PASS  Comprovante público sem código sequencial e sem alvo de preenchimento
+  PASS  Comprovante preserva data, horário e modalidade
+  PASS  JavaScript renderizado do agendamento tem sintaxe válida
+
+12 PASS, 0 FAIL

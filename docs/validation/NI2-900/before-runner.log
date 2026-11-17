@@ -1,0 +1,4 @@
+KNOWN             0.7s  tests/ni2_9_code_review_regression_test.php
+               ↳ INVESTIGAR: impressão do plano não mostra o peso gravado da medida caseira · [FAIL] A3 impressão mostra o peso gravado: '2 unidades (~100g)' / '1 xícara (~150g, peso estimado)'
+
+Resumo bin/run-tests [full]: 0 PASS, 0 FAIL, 1 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 2s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-185847.tsv

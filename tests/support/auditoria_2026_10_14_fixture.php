@@ -23,9 +23,13 @@ function aud_check(bool $cond, string $label): void
     echo "  ✔ {$label}\n";
 }
 
-function aud_fixture(): array
+function aud_fixture(?string $temporaryDirectory = null): array
 {
-    $path = sys_get_temp_dir() . '/clyonutri_aud_' . bin2hex(random_bytes(6)) . '.sqlite';
+    $temporaryDirectory ??= sys_get_temp_dir();
+    if (!is_dir($temporaryDirectory) || !is_writable($temporaryDirectory)) {
+        throw new RuntimeException('Diretório temporário da fixture indisponível: ' . $temporaryDirectory);
+    }
+    $path = rtrim($temporaryDirectory, '/') . '/clyonutri_aud_' . bin2hex(random_bytes(6)) . '.sqlite';
     register_shutdown_function(static function () use ($path) {
         foreach ([$path, "{$path}-wal", "{$path}-shm"] as $f) {
             @unlink($f);

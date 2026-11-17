@@ -1,0 +1,15 @@
+PHP Fatal error:  Uncaught AssertionError: formulário create: ingredientes pela busca do catálogo, sem lista embutida in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:22
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php(22): assert(false, 'formul\xC3\xA1rio cre...')
+#1 /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php(39): aud_check(false, 'formul\xC3\xA1rio cre...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php on line 22
+F02 — alimentos particulares de outra clínica
+  ✔ formulário create: alimento particular da clínica B não aparece
+
+Fatal error: Uncaught AssertionError: formulário create: ingredientes pela busca do catálogo, sem lista embutida in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:22
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php(22): assert(false, 'formul\xC3\xA1rio cre...')
+#1 /Users/moliveira/Nutri_II/tests/auditoria_2026_10_14_f02_recipe_food_scope_test.php(39): aud_check(false, 'formul\xC3\xA1rio cre...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php on line 22

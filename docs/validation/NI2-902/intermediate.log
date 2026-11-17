@@ -1,0 +1,13 @@
+========================================================
+   CLYONUTRI PATIENT APP & PORTAL 360 SUITE (NI2-11)
+   Validação das Histórias NI2-131 a NI2-141
+========================================================
+
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000]: General error: 1 no such table: patient_invitations in /Users/moliveira/Nutri_II/src/Core/Database/ProfiledPdo.php:25
+Stack trace:
+#0 /Users/moliveira/Nutri_II/src/Core/Database/ProfiledPdo.php(25): PDO->exec('DELETE FROM pat...')
+#1 /Users/moliveira/Nutri_II/tests/patient_portal_e2e_suite_test.php(52): ClyoNutri\Core\Database\ProfiledPdo->exec('DELETE FROM pat...')
+#2 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Core/Database/ProfiledPdo.php on line 25
+ 25

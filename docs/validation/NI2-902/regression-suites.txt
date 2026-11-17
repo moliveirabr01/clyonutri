@@ -1,0 +1,4 @@
+tests/password_reset_email_test.php
+tests/patient_portal_e2e_suite_test.php
+tests/ni2_481_transactional_emails_e2e_test.php
+tests/patient_mobile_api_integration_test.php

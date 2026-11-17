@@ -1,0 +1,13 @@
+XSS — nome de alimento com crase e ${} no template JS
+  ✔ template literal com HTML de opções não existe mais
+  ✔ formulário de receita não embute lista de alimentos no script
+  ✔ nome do alimento não aparece no HTML do formulário (nem cru, nem escapado)
+  ✔ nenhum </script> injetado: aberturas e fechamentos de <script> batem
+  ✔ ingredientes usam o seletor de alimentos (inclusive src com versão de cache)
+  ✔ food-picker.js põe o nome via textContent/Option (sem innerHTML)
+  ✔ food-picker.js não usa innerHTML com dados do alimento
+  ✔ DashboardController sem htmlspecialchars(addslashes())
+  ✔ valor do atributo onclick não contém < > aspas cruas (crase fica dentro de string JSON)
+  ✔ após decodificação HTML vira literal JSON igual ao nome
+  ✔ nenhuma ocorrência de htmlspecialchars(addslashes()) em src/, views/ e public/
+XSS: OK

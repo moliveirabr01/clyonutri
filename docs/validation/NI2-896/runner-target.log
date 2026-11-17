@@ -1,0 +1,15 @@
+F02 — alimentos particulares de outra clínica
+  ✔ formulário create: alimento particular da clínica B não aparece
+  ✔ formulário create: ingredientes pela busca do catálogo, sem lista embutida
+  ✔ formulário edit: alimento particular da clínica B não aparece
+  ✔ listFoodsForClinic(A) não contém o ID de B
+  ✔ listFoodsForClinic(A) contém global e próprio
+  ✔ criação com alimento de B rejeitada sem criar receita
+  ✔ criação com alimento global + próprio funciona
+  ✔ edição com alimento de B rejeitada e receita inalterada
+  ✔ edição rejeitada preserva todos os campos e ingredientes existentes
+  ✔ nenhum ingrediente de B gravado na edição
+  ✔ duplicação com alimento de B rejeitada sem criar variante
+  ✔ duplicar receita pública de B não importa o alimento particular de B para A
+  ✔ duplicação de receita própria com alimento global funciona
+F02: OK

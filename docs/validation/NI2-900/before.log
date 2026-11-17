@@ -1,0 +1,52 @@
+
+Warning: session_start(): open(/var/tmp//sess_a4268167c1c2c90acae591e72de6be2e, O_RDWR) failed: Operation not permitted (1) in /Users/moliveira/Nutri_II/tests/ni2_9_code_review_regression_test.php on line 10
+
+Warning: session_start(): Failed to read session data: files (path: ) in /Users/moliveira/Nutri_II/tests/ni2_9_code_review_regression_test.php on line 10
+REGRESSÃO CODE REVIEW NI2-9
+  [PASS] C1 "doença celíaca" → glúten; "frutos do mar" → crustáceos e moluscos
+  [PASS] C1 cream cracker conflita com glúten (pelo nome do produto)
+  [PASS] C1 "Pão caseiro" de clínica sem alérgenos declarados conflita com glúten pelo nome
+  [PASS] C1 alimento verificado sem alérgenos ("nenhum") não exige confirmação
+  [PASS] C1 alimento sem informação de alérgenos fica "não verificado" e exige confirmação
+  [PASS] C1 alergia não reconhecida ("kiwi") exige confirmação
+  [PASS] C1 plano com cream cracker para paciente celíaca NÃO publica sem override
+  [PASS] C1 bloqueio desfaz a transação: plano continua rascunho
+  [PASS] A2 override sem justificativa é recusado
+  [PASS] A2 override com justificativa publica
+  [PASS] A2 auditoria da publicação grava usuário e IP
+  [PASS] A2 auditoria grava override e justificativa
+  [PASS] A2 versão publicada guarda autor e justificativa
+  [PASS] A2 snapshot registra status publicado (não "draft")
+  [PASS] M2 versão anterior vira superseded
+  [PASS] M2 plano superseded não é republicado
+  [PASS] M2 plano publicado não é publicado de novo
+  [PASS] M2 índice único (clinic_id, patient_id, version_number) existe
+  [PASS] M2 número de versão repetido é rejeitado pelo banco
+  [PASS] M4 addMeal em plano publicado é recusado
+  [PASS] M4 addItem em plano publicado é recusado
+  [PASS] M4 deleteItem em plano publicado é recusado
+  [PASS] M4 deleteMeal em plano publicado é recusado
+  [PASS] M4 itens do plano publicado continuam intactos
+  [PASS] M1 API do paciente mostra o alimento como publicado, mesmo após renomear no catálogo
+  [PASS] M1 energia do item na API é a da porção prescrita (50 g = 150 kcal), não por 100 g
+  [PASS] M1 contrato do app preservado (version, status, quantity, unit)
+  [PASS] NI2-74 xícara de arroz sem confirmação é recusada
+  [PASS] A3 + NI2-74 "2 unidade" de ovo grava 100 g pela porção do alimento (1 unidade = 50 g), exato
+  [PASS] M3 + NI2-74 "1 xícara" confirmada grava 150 g e marca peso estimado
+  [PASS] A3 item em gramas grava o peso exato
+  [PASS] M3 prévia lista os itens com peso estimado
+  [PASS] A3 subconsulta aproximada com || removida
+  [FAIL] A3 impressão mostra o peso gravado: '2 unidades (~100g)' / '1 xícara (~150g, peso estimado)'
+  [PASS] B1 quantidade infinita recusada
+  [PASS] B1 6 kg recusado
+  [PASS] B1 substituição infinita recusada
+  [FAIL] A1 usuário sem CRN não cria plano (403, nada gravado)
+  [FAIL] A1 usuário sem CRN não publica (403, plano segue rascunho)
+  [FAIL] A1 addMealToPlan pelo usuário sem CRN → 403
+  [FAIL] A1 addItemToPlanMeal pelo usuário sem CRN → 403
+  [FAIL] A1 deleteMealFromPlan pelo usuário sem CRN → 403
+  [PASS] A1 nenhuma alteração gravada pelo usuário sem CRN
+  [PASS] A1 plano criado pela nutricionista é assinado por ela mesma
+  PASSOU: 38
+  FALHOU: 6
+ntroller.php on line 3836

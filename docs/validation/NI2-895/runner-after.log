@@ -1,0 +1,3 @@
+PASS              1.2s  tests/assisted_navigation_audit_test.php
+
+Resumo bin/run-tests [full]: 1 PASS, 0 FAIL, 0 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 2s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-174530.tsv

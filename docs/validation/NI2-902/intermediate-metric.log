@@ -1,0 +1,22 @@
+PASS Composer resolve Connection/ProfiledPdo e dependências
+PASS convite canônico gerado
+PASS convite persiste somente hash
+PASS primeiro acesso persiste credencial e gera token
+PASS senha do primeiro acesso persistida com hash
+PASS aceite legal persistido
+PASS convite consumido não pode ser reutilizado
+PASS diário persiste refeição
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS diário rejeita entrada inválida
+PASS timeline contém refeição do paciente
+PASS sem plano publicado não inventa substituições ou receitas
+PASS métrica não liberada é recusada
+
+Fatal error: Uncaught InvalidArgumentException: Métrica não reconhecida: weight in /Users/moliveira/Nutri_II/src/Domain/Evolution/PatientEvolutionService.php:68
+Stack trace:
+#0 /Users/moliveira/Nutri_II/tests/patient_portal_e2e_suite_test.php(50): ClyoNutri\Domain\Evolution\PatientEvolutionService->setEnabledMetrics(1, Array, 4)
+#1 {main}
+  thrown in /Users/moliveira/Nutri_II/src/Domain/Evolution/PatientEvolutionService.php on line 68
+ 68

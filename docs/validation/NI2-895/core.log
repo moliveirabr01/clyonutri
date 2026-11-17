@@ -1,0 +1,1816 @@
+==> [core] tests/core_modules.txt (NI2-884, isoladas)
+FAIL              0.4s  tests/agenda_calendar_waitlist_test.php
+               ↳ [FAIL] Cron BookingWaitlistService::process() encontra vaga e gera oferta (status offered)
+PASS              0.2s  tests/agenda_operational_and_concurrency_test.php
+PASS              0.4s  tests/assisted_navigation_audit_test.php
+FAIL              0.1s  tests/auditoria_2026_10_14_f03_login_rate_limit_test.php
+               ↳ Fatal error: Uncaught PDOException: SQLSTATE[HY000] [14] unable to open database file in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:34
+PASS              0.7s  tests/clinical_safety_and_precision_test.php
+PASS              0.8s  tests/cross_tenant_end_to_end_security_test.php
+PASS              0.9s  tests/cross_tenant_offensive_test.php
+FAIL              0.1s  tests/hsts_end_to_end_rollback_test.php
+               ↳ [FAIL] activateRollback($tempStorageDir) cria o sinalizador com sucesso
+FAIL             47.3s  tests/ni2_428_hsts_test.php
+               ↳ [FAIL] HSTS_MAX_AGE='' GET / (0) -> ausente
+FAIL              0.2s  tests/ni2_439_skinfold_protocols_test.php
+               ↳ [FAIL] Usuário sem CRN não registra dobras (403)
+PASS              0.6s  tests/ni2_473_audit_authorization_isolation_test.php
+FAIL              0.1s  tests/ni2_476_audit_backups_restore_logs_test.php
+               ↳ [FAIL] Cifragem OpenSSL AES-256-CBC executada com sucesso
+PASS              0.4s  tests/ni2_514_phase1_test.php
+PASS              0.1s  tests/patient_mobile_api_integration_test.php
+FAIL              0.1s  tests/patient_otp_concurrency_and_security_test.php
+               ↳ Fatal error: Uncaught TypeError: file_put_contents(): Argument #1 ($filename) must be of type string, false given in /Users/moliveira/Nutri_II/tests/patient_otp_concurrency_and_security_test.php:74
+FAIL              0.1s  tests/reauditoria_v2_02_account_wide_rate_limit_test.php
+               ↳ Fatal error: Uncaught PDOException: SQLSTATE[HY000] [14] unable to open database file in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:34
+FAIL              0.1s  tests/reauditoria_varredura_tenant_test.php
+               ↳ Fatal error: Uncaught PDOException: SQLSTATE[HY000] [14] unable to open database file in /Users/moliveira/Nutri_II/tests/support/auditoria_2026_10_14_fixture.php:34
+PASS              0.1s  tests/subscription_trial_test.php
+PASS              2.0s  tests/trust_subscription_and_cancellation_e2e_test.php
+PASS              0.5s  tests/v47_ni2_537_prontuario_render_test.php
+FAIL              0.3s  tests/v5439_agenda_disponibilidade_test.php
+               ↳ FAIL  seed TESTE
+
+Resumo bin/run-tests [full]: 11 PASS, 10 FAIL, 0 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 56s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-174713.tsv
+==> [core] tests/v5472_ni2_890_onboarding_entry_test.php
+NI2-890 OK: portal em Entrar, convite /convite/{token} isolado e pós-agendamento sem beco validados.
+==> [core] tests/v5471_ni2_882_883_test.php
+NI2-882 + NI2-883 OK: minuta por locutor sem invenção e evolução unificada validados.
+==> [core] tests/ni2_882_transcricao_locutor_test.php
+=== NI2-882 transcrição por locutor ===
+  PASS  ia_draft: a pergunta não aparece em Conduta
+  PASS  ia_draft: a conduta aparece em Conduta
+  PASS  ia_draft: dor de cabeça em Sintomas ou Outros relatos
+  PASS  ia_draft: Objetivos = "Não mencionado na consulta"
+  PASS  ia_draft: chief_complaint sem fala não tem origem
+  PASS  ia_draft: nutritional_goals sem fala não tem origem
+  PASS  ia_draft: dietary_routine sem fala não tem origem
+  PASS  ia_draft: reported_anthropometry sem fala não tem origem
+  PASS  ia_draft: adherence_notes sem fala não tem origem
+  PASS  ia_draft: next_appointment_notes sem fala não tem origem
+  PASS  ia_draft: other_notes sem fala não tem origem
+  PASS  ia_draft: zero frases sem origem
+  PASS  CR875-08: pergunta/fala sem locutor não vira "Sintomas" do paciente
+  PASS  CR875-08: marcador técnico não entra na minuta
+  PASS  CR875-08: pergunta sem locutor fica fora da minuta
+  PASS  CR875-08: fala sem locutor não é atribuída ao profissional
+  PASS  CR875-08: fala sem locutor vai para Outros relatos (nunca é descartada)
+  PASS  CR875-08: chief_complaint sem fala não tem origem
+  PASS  CR875-08: nutritional_goals sem fala não tem origem
+  PASS  CR875-08: dietary_routine sem fala não tem origem
+  PASS  CR875-08: reported_anthropometry sem fala não tem origem
+  PASS  CR875-08: clinical_symptoms sem fala não tem origem
+  PASS  CR875-08: adherence_notes sem fala não tem origem
+  PASS  CR875-08: agreed_conduct sem fala não tem origem
+  PASS  CR875-08: next_appointment_notes sem fala não tem origem
+  PASS  CR875-08: zero frases sem origem
+  PASS  com locutor: a resposta do paciente vai literal para Sintomas, sem a pergunta
+  PASS  com locutor: "reduzir o açúcar e retornar" vai a Conduta e a Retorno
+  PASS  CR875-08 com locutor: chief_complaint sem fala não tem origem
+  PASS  CR875-08 com locutor: nutritional_goals sem fala não tem origem
+  PASS  CR875-08 com locutor: dietary_routine sem fala não tem origem
+  PASS  CR875-08 com locutor: reported_anthropometry sem fala não tem origem
+  PASS  CR875-08 com locutor: adherence_notes sem fala não tem origem
+  PASS  CR875-08 com locutor: other_notes sem fala não tem origem
+  PASS  CR875-08 com locutor: zero frases sem origem
+  PASS  sessão sem fala de conteúdo #0: minuta só com "Não mencionado na consulta"
+  PASS  sessão sem fala de conteúdo #1: minuta só com "Não mencionado na consulta"
+  PASS  sessão sem fala de conteúdo #2: minuta só com "Não mencionado na consulta"
+  PASS  sessão sem fala de conteúdo #3: minuta só com "Não mencionado na consulta"
+  PASS  diálogo 1: "Meu objetivo é ganhar massa muscular." (patient) → nutritional_goals
+  PASS  diálogo 1: chief_complaint sem fala não tem origem
+  PASS  diálogo 1: dietary_routine sem fala não tem origem
+  PASS  diálogo 1: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 1: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 1: adherence_notes sem fala não tem origem
+  PASS  diálogo 1: agreed_conduct sem fala não tem origem
+  PASS  diálogo 1: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 1: other_notes sem fala não tem origem
+  PASS  diálogo 1: zero frases sem origem
+  PASS  diálogo 2: "No café da manhã como pão com ovo." (patient) → dietary_routine
+  PASS  diálogo 2: chief_complaint sem fala não tem origem
+  PASS  diálogo 2: nutritional_goals sem fala não tem origem
+  PASS  diálogo 2: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 2: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 2: adherence_notes sem fala não tem origem
+  PASS  diálogo 2: agreed_conduct sem fala não tem origem
+  PASS  diálogo 2: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 2: other_notes sem fala não tem origem
+  PASS  diálogo 2: zero frases sem origem
+  PASS  diálogo 3: "Estou pesando 74kg na balança de casa." (patient) → reported_anthropometry
+  PASS  diálogo 3: chief_complaint sem fala não tem origem
+  PASS  diálogo 3: nutritional_goals sem fala não tem origem
+  PASS  diálogo 3: dietary_routine sem fala não tem origem
+  PASS  diálogo 3: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 3: adherence_notes sem fala não tem origem
+  PASS  diálogo 3: agreed_conduct sem fala não tem origem
+  PASS  diálogo 3: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 3: other_notes sem fala não tem origem
+  PASS  diálogo 3: zero frases sem origem
+  PASS  diálogo 4: "Sinto cansaço e tontura de manhã." (patient) → clinical_symptoms
+  PASS  diálogo 4: chief_complaint sem fala não tem origem
+  PASS  diálogo 4: nutritional_goals sem fala não tem origem
+  PASS  diálogo 4: dietary_routine sem fala não tem origem
+  PASS  diálogo 4: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 4: adherence_notes sem fala não tem origem
+  PASS  diálogo 4: agreed_conduct sem fala não tem origem
+  PASS  diálogo 4: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 4: other_notes sem fala não tem origem
+  PASS  diálogo 4: zero frases sem origem
+  PASS  diálogo 5: "Ando com dores nas pernas e náusea." (patient) → clinical_symptoms
+  PASS  diálogo 5: chief_complaint sem fala não tem origem
+  PASS  diálogo 5: nutritional_goals sem fala não tem origem
+  PASS  diálogo 5: dietary_routine sem fala não tem origem
+  PASS  diálogo 5: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 5: adherence_notes sem fala não tem origem
+  PASS  diálogo 5: agreed_conduct sem fala não tem origem
+  PASS  diálogo 5: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 5: other_notes sem fala não tem origem
+  PASS  diálogo 5: zero frases sem origem
+  PASS  diálogo 6: "Tive dificuldade nos finais de semana por ansiedade." (patient) → adherence_notes
+  PASS  diálogo 6: chief_complaint sem fala não tem origem
+  PASS  diálogo 6: nutritional_goals sem fala não tem origem
+  PASS  diálogo 6: dietary_routine sem fala não tem origem
+  PASS  diálogo 6: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 6: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 6: agreed_conduct sem fala não tem origem
+  PASS  diálogo 6: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 6: other_notes sem fala não tem origem
+  PASS  diálogo 6: zero frases sem origem
+  PASS  diálogo 7: "Marcaremos o retorno em 30 dias." (professional) → next_appointment_notes
+  PASS  diálogo 7: chief_complaint sem fala não tem origem
+  PASS  diálogo 7: nutritional_goals sem fala não tem origem
+  PASS  diálogo 7: dietary_routine sem fala não tem origem
+  PASS  diálogo 7: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 7: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 7: adherence_notes sem fala não tem origem
+  PASS  diálogo 7: agreed_conduct sem fala não tem origem
+  PASS  diálogo 7: other_notes sem fala não tem origem
+  PASS  diálogo 7: zero frases sem origem
+  PASS  diálogo 8: "Viajo a trabalho toda quinta-feira." (patient) → other_notes
+  PASS  diálogo 8: chief_complaint sem fala não tem origem
+  PASS  diálogo 8: nutritional_goals sem fala não tem origem
+  PASS  diálogo 8: dietary_routine sem fala não tem origem
+  PASS  diálogo 8: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 8: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 8: adherence_notes sem fala não tem origem
+  PASS  diálogo 8: agreed_conduct sem fala não tem origem
+  PASS  diálogo 8: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 8: zero frases sem origem
+  PASS  diálogo 9: "Adorei a receita de panqueca." (patient) → other_notes
+  PASS  diálogo 9: chief_complaint sem fala não tem origem
+  PASS  diálogo 9: nutritional_goals sem fala não tem origem
+  PASS  diálogo 9: dietary_routine sem fala não tem origem
+  PASS  diálogo 9: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 9: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 9: adherence_notes sem fala não tem origem
+  PASS  diálogo 9: agreed_conduct sem fala não tem origem
+  PASS  diálogo 9: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 9: zero frases sem origem
+  PASS  diálogo 10: "A minha queixa principal é falta de disposição." (patient) → chief_complaint
+  PASS  diálogo 10: nutritional_goals sem fala não tem origem
+  PASS  diálogo 10: dietary_routine sem fala não tem origem
+  PASS  diálogo 10: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 10: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 10: adherence_notes sem fala não tem origem
+  PASS  diálogo 10: agreed_conduct sem fala não tem origem
+  PASS  diálogo 10: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 10: other_notes sem fala não tem origem
+  PASS  diálogo 10: zero frases sem origem
+  PASS  diálogo 11: "Combinamos incluir duas frutas por dia." (professional) → agreed_conduct
+  PASS  diálogo 11: chief_complaint sem fala não tem origem
+  PASS  diálogo 11: nutritional_goals sem fala não tem origem
+  PASS  diálogo 11: dietary_routine sem fala não tem origem
+  PASS  diálogo 11: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 11: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 11: adherence_notes sem fala não tem origem
+  PASS  diálogo 11: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 11: other_notes sem fala não tem origem
+  PASS  diálogo 11: zero frases sem origem
+  PASS  diálogo 12: "Recomendo evitar refrigerante." (professional) → agreed_conduct
+  PASS  diálogo 12: chief_complaint sem fala não tem origem
+  PASS  diálogo 12: nutritional_goals sem fala não tem origem
+  PASS  diálogo 12: dietary_routine sem fala não tem origem
+  PASS  diálogo 12: reported_anthropometry sem fala não tem origem
+  PASS  diálogo 12: clinical_symptoms sem fala não tem origem
+  PASS  diálogo 12: adherence_notes sem fala não tem origem
+  PASS  diálogo 12: next_appointment_notes sem fala não tem origem
+  PASS  diálogo 12: other_notes sem fala não tem origem
+  PASS  diálogo 12: zero frases sem origem
+  PASS  pelo menos 10 diálogos sintéticos
+  PASS  sessão iniciada com aceite real do paciente
+  PASS  marcador técnico é recusado pelo servidor
+  PASS  trecho sem letras é recusado
+  PASS  trecho acima do limite é recusado
+  PASS  fala do paciente gravada com locutor "patient"
+  PASS  locutor fora da lista vira "speaker_uncertain"
+  PASS  banco só tem as 2 falas reconhecidas
+  PASS  minuta dos trechos gravados respeita o locutor
+  PASS  trechos gravados: chief_complaint sem fala não tem origem
+  PASS  trechos gravados: nutritional_goals sem fala não tem origem
+  PASS  trechos gravados: dietary_routine sem fala não tem origem
+  PASS  trechos gravados: reported_anthropometry sem fala não tem origem
+  PASS  trechos gravados: adherence_notes sem fala não tem origem
+  PASS  trechos gravados: agreed_conduct sem fala não tem origem
+  PASS  trechos gravados: next_appointment_notes sem fala não tem origem
+  PASS  trechos gravados: zero frases sem origem
+  PASS  origem aponta para o id real do trecho no banco
+
+177 PASS, 0 FAIL
+==> [core] tests/ni2_885_cifragem_legado_test.php
+  PASS  pré-condição: cadeia de hash íntegra com o prontuário em texto puro
+  PASS  dry-run sai 0 e avisa que não gravou (rc=0)
+  PASS  dry-run conta os 28 campos em texto puro (contou 28)
+  PASS  dry-run não alterou nenhum byte no banco
+  PASS  dry-run não cria ponto de retomada
+  PASS  verificação antes acusa pendências (rc=4)
+  PASS  sem CLINICAL_ENCRYPTION_KEY o script para (rc=1) e não grava nada
+  PASS  com outra execução em andamento sai 3 sem gravar (rc=3)
+  PASS  execução limitada a 1 lote para no meio e avisa PARCIAL (rc=6)
+  PASS  ponto de retomada salvo depois do lote (anamneses até o id 2)
+  PASS  só o primeiro lote foi cifrado (2 de 5 anamneses)
+  PASS  segunda execução retoma do ponto salvo
+  PASS  o registro que falhou vai para o resumo (patients #3.notes) e a execução sai 5 (rc=5)
+  PASS  os demais registros do mesmo lote foram cifrados (anamneses 5/5, pacientes antigos sem falha 4/4)
+  PASS  a outra coluna do registro com falha foi cifrada normalmente
+  PASS  valor já cifrado (v54.68+) ficou idêntico: sem dupla cifragem
+  PASS  depois de corrigir a causa, nova execução conclui (rc=0)
+  PASS  verificação: 0 em claro e 0 que não decifram nas colunas cobertas (rc=0)
+  PASS  segunda execução completa: 0 campos cifrados e nenhum byte alterado
+  PASS  todo valor antigo ficou cifrado e decifra exatamente no texto original (23 campos)
+  PASS  prontuário: cadeia de hash continua íntegra depois da cifragem
+  PASS  prontuário antigo abre pela linha do tempo com o texto original
+  PASS  exportação do prontuário (linha do tempo) sai com o texto original
+  PASS  exportação LGPD entrega o texto original (cadastro, anamnese e prontuário), sem envelope enc:v1
+  PASS  rascunho de evolução antigo continua legível
+  PASS  resumos em storage/logs não contêm nenhum conteúdo clínico
+
+26 PASS, 0 FAIL
+==> [core] tests/ni2_877_integration_check_test.php
+== 1. Produção sem SMTP e sem Asaas: FAIL/BLOCKED claros, nada inventado
+  PASS  MAIL_DRIVER=log em produção reprova (saída 1)
+  PASS  SMTP: FAIL quando nada sai do servidor
+  PASS  Asaas sem chave: BLOCKED (não READY)
+  PASS  Webhook sem token: BLOCKED
+  PASS  Sem TURN: WARNING (risco em 4G registrado)
+  PASS  Voz: MANUAL (só verificável no navegador)
+  PASS  Nenhum PASS sem verificação real
+== 2. Configuração coerente: READY sem expor segredos
+  PASS  Configuração completa: saída 0
+  PASS  SMTP: READY (falta a chegada, que é MANUAL)
+  PASS  Asaas: chave e token READY
+  PASS  Mostra a URL do webhook a cadastrar no painel
+  PASS  Nenhum segredo na saída
+== 3. Asaas incoerente e APP_URL local
+  PASS  Sandbox apontando para a URL de produção: FAIL
+  PASS  APP_URL http://localhost em produção: FAIL
+== 4. Servidor SMTP que aceita e para de responder (socket TCP real)
+  PASS  Envio para servidor travado: FAIL
+  PASS  Desiste em 4.2 s com MAIL_TIMEOUT=2 (antes: 300 s por resposta)
+  PASS  Senha do SMTP não aparece no erro
+
+17 PASS, 0 FAIL
+==> [core] tests/ni2_886_medidas_caseiras_revisao_test.php
+  PASS  migração 99 cria as colunas da revisão
+  PASS  migração 99 é idempotente
+== 1. Levantamento
+  PASS  contagem de estimadas a revisar (6)
+  PASS  contagem por grupo
+== 2. Plano publicado antes da revisão (usa a banana estimada)
+  PASS  medida não revisada: publicar sem confirmar continua recusado (fica fora do PDF/app)
+  PASS  com a confirmação do profissional o plano publica
+  PASS  uso em planos contado (banana/unidade = 1)
+  PASS  "mais usadas" primeiro
+== 3. Aprovar, corrigir, remover (com auditoria)
+  PASS  aprovar sem fonte é recusado
+  PASS  fonte = a própria estimativa é recusada
+  PASS  peso corrigido 0 é recusado
+  PASS  aprovada grava revisor, data e fonte; peso mantido
+  PASS  corrigir e aprovar: 100 g → 86 g, peso anterior guardado
+  PASS  audit_logs com antes/depois, fonte e revisor
+  PASS  medida já revisada não é revisada de novo
+  PASS  remover sem motivo é recusado
+  PASS  removida fica registrada (não apagada)
+== 4. Plano publicado não muda
+  PASS  versão publicada idêntica (payload e kcal)
+  PASS  item do plano com os mesmos valores (quantidade, medida, kcal, macros)
+== 5. O que o editor mostra
+  PASS  aprovada: peso novo, fonte e revisor, sem "estimativa"
+  PASS  removida não é mais oferecida
+  PASS  não revisada continua com o selo de estimativa no editor
+== 6. Lote
+  PASS  lote vazio é recusado
+  PASS  lote aprova a pendente e informa a já revisada
+== 7. CSV: exportação e importação (linha inválida rejeita só a linha)
+  PASS  CSV com cabeçalho, BOM e acentos
+  PASS  simulação: 1 válida, 3 rejeitadas, nada gravado
+  PASS  importação: só as linhas inválidas (2, 3, 6) rejeitadas, com motivo
+  PASS  linha válida aplicada (pão 50 → 55,5 g)
+  PASS  linha rejeitada não alterou a maçã
+  PASS  CSV sem as colunas exigidas é recusado
+== 8. SQL para produção (MySQL 5.7)
+  PASS  SQL com 1 UPDATE + 1 auditoria por medida revisada (5)
+  PASS  SQL só altera medida ainda pendente e guarda o peso anterior
+  PASS  UPDATE de tabela única (ordem das atribuições garantida no MySQL)
+
+33 PASS, 0 FAIL
+==> [core] tests/ni2_887_ficha_carga_cognitiva_test.php
+  PASS  seed TESTE
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  ficha abre (200)
+  PASS  detalhes fechados na carga
+  PASS  âncoras #secao-* abrem os detalhes (details-reveal.js)
+  PASS  conteúdo preservado: #secao-dados
+  PASS  conteúdo preservado: #secao-prontuario
+  PASS  conteúdo preservado: #secao-anamnese
+  PASS  conteúdo preservado: #secao-planos
+  PASS  conteúdo preservado: #secao-documentos
+  PASS  conteúdo preservado: #modal-new-plan-p360
+  PASS  resumo mostra última evolução
+  PASS  ações: plano + mensagem
+  PASS  no máximo 3 ações no resumo
+  PASS  cabeçalho mantém a ação de consulta
+  PASS  Mais ações preservado
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  timeline mostra 5 itens na carga (viu 5)
+  PASS  timeline tem "ver histórico completo"
+  PASS  filtros não aparecem no resumo curto
+  PASS  contagem do resumo com número e plural ("N registros no resumo")
+  PASS  última evolução = a mais recente gravada
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  histórico completo: 10 por página + filtros
+  PASS  paginação mantém o modo completo
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  página 2 do histórico abre (ou ajusta para a última)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  filtro por tipo continua funcionando
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_887_ficha_carga_cognitiva_test.php on line 18
+  PASS  ?detalhes abre os detalhes
+
+NI2-887 ficha: 25/25
+==> [core] tests/ni2_889_user_language_test.php
+  PASS  Duplicação persiste título, versão separada e origem
+  PASS  Origem preservada
+  PASS  Painel: 0 confirmadas
+  PASS  Painel: 0 realizadas
+  PASS  Painel: 1 confirmadas
+  PASS  Painel: 1 realizadas
+  PASS  Painel: 2 confirmadas
+  PASS  Painel: 2 realizadas
+  PASS  Comparação sem período anterior
+  PASS  Remove prefixos legados repetidos
+  PASS  Título legado vazio recebe nome legível
+  PASS  Publicação legada exige confirmação
+  PASS  Prefixo ainda presente é recusado
+  PASS  Demais validações seguem ativas após confirmar
+  PASS  Falha desfaz alteração do título e publicação
+  PASS  API: plano legado sem snapshot tem título limpo
+  PASS  API: snapshot legado tem título limpo
+  PASS  Snapshot histórico permanece imutável
+  PASS  API bloqueia paciente de outra clínica
+  PASS  Duplicação bloqueia plano de outra clínica
+  PASS  Publicação confirmada persiste título e versão 2
+  PASS  Novo snapshot entrega título confirmado ao paciente
+  PASS  Linha do tempo renderizada preserva ID só na referência de suporte
+
+23 PASS, 0 FAIL
+==> [core] tests/cr875_12_plurais_test.php
+  PASS  zero
+  PASS  um
+  PASS  dois
+  PASS  nenhum plural "(s)" em texto de usuário
+
+CR875-12 plurais: 4/4
+==> [core] tests/ni2_891_catalogo_exames_revisao_test.php
+  PASS  seed TESTE
+  PASS  migração 100 idempotente (rodou 2x)
+  PASS  catálogo geral: 22 exames, 22 aguardando (22/22)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+  PASS  dona vê o aviso com a contagem (22)
+  PASS  aviso sem o texto antigo
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+  PASS  nutricionista da equipe (não gestora) não vê o aviso
+  PASS  exportação: BOM + cabeçalho + 22 linhas
+  PASS  revisor sem CRN é recusado
+  PASS  simulação: 3 válidas, 4 rejeitadas, nada gravado
+  PASS  importação: linhas inválidas rejeitadas sozinhas, com motivo
+  PASS  revisor, data e fonte gravados
+  PASS  reimportar a mesma planilha não muda nada
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+  PASS  tela: contagem 19, código TUSS e justificativa
+  PASS  SQL de produção: 3 UPDATEs por código do catálogo geral
+  PASS  SQL de produção roda 2x: mesmo resultado, sem linha nova
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+  PASS  catálogo revisado: aviso não aparece
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_891_catalogo_exames_revisao_test.php on line 28
+  PASS  medidas: texto novo com link para cadastrar
+  PASS  estado "Emitido" sem "sem assinatura digital" (PHP e JS)
+
+NI2-891 catálogo: 18/18
+==> [core] tests/ni2_892_fatia1_test.php
+  PASS  seed TESTE (clínicas A e B)
+  PASS  paciente A (1) e paciente B (3)
+  PASS  CLI: checagem consulta o banco a cada chamada (troca de clínica recusada na hora)
+  PASS  clínica A não acessa paciente da clínica B
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  ficha (GET real): checagem do paciente roda 1 vez por requisição (1); total 106 consultas
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  nova requisição começa sem memória (checagem roda de novo)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  clínica A pede a ficha do paciente da clínica B: 302 http://127.0.0.1:57204/pacientes, sem o nome
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  paciente movido para a clínica B: a próxima requisição da clínica A é recusada (302 http://127.0.0.1:57204/pacientes)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  clínica B pede a ficha do paciente da clínica A: 302 http://127.0.0.1:57204/pacientes
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/ni2_892_fatia1_test.php on line 40
+  PASS  clínica B abre a própria paciente: 200
+  PASS  nenhum catch vazio em PHP (src, public, views, bin, routes, config)
+
+NI2-892 fatia 1: 11/11
+==> [core] tests/cr875_11_codigo_agendamento_test.php
+  PASS  fixture TESTE (clínicas A e B, Dra. Ana com jornada)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  dona liga o autoagendamento pela tela de configurações (HTTP 302, booking_settings ligado)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  reserva do horário (HTTP 201)
+  PASS  duas confirmações seguidas pela API pública: 200 e 200
+  PASS  resposta pública sem appointment_id nem patient_id
+  PASS  códigos de 8 caracteres e diferentes: A3G4YR3X / SVB7846C
+  PASS  no banco as consultas são consecutivas (1,2); os códigos não são números nem seguem ordem
+  PASS  confirmação repetida do mesmo token: mesmo código, sem id
+  PASS  auditoria BOOKING_CONFIRMED guarda o código (suporte acha o agendamento), sem dado pessoal
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_11_codigo_agendamento_test.php on line 25
+  PASS  o código não serve para liberar, confirmar ou abrir agendamento de outra pessoa (400/422/404)
+  PASS  as duas consultas continuam agendadas depois das tentativas com o código
+  PASS  comprovante da página pública mostra o código (sem id)
+
+CR875-11 código do agendamento: 12/12
+==> [core] tests/cr875_14_limite_convite_test.php
+  PASS  fixture TESTE (clínica A, Dra. Ana dona)
+  PASS  migração 101: password_resets.purpose existe
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  dona convida pela tela de equipe (HTTP 302) e vê o link /convite/ uma vez
+  PASS  link gravado com purpose=invite (invite)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  as 10 primeiras tentativas inválidas não são bloqueadas (200)
+  PASS  11ª tentativa inválida de convite: HTTP 429 com Retry-After e aviso em português
+  PASS  tela travada mostra só o aviso de espera (sem o texto de convite inválido abaixo)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  do mesmo IP travado, até o link válido espera (HTTP 429)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  contador guardado em login_attempts por chave sha256 (sem IP em claro)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  POST de aceite com IP travado não cria senha (HTTP 302 → tela com 429 e aviso)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  link inválido sem trava continua com o texto de link inválido (convite e nova senha)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  nova senha: 10 inválidos passam, 11º HTTP 429
+  PASS  nova senha travada: só o aviso de espera e o botão de pedir novo link (sem o cartão de link inválido)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  link de convite em /recuperar-senha não mostra o formulário de senha (HTTP 200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  pedido de nova senha pela tela grava purpose=reset ('reset')
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  link antigo sem tipo (purpose NULL) de conta ativa: /convite recusa, /recuperar-senha abre (200/200)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  convidada abre o próprio link (HTTP 200) quando o IP não está travado
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  aceite real: conta ativa, auditoria TEAM_INVITE_ACCEPTED=1, sem mensagem de erro (HTTP 302 → /login)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  convidada entra com a senha criada (HTTP 302)
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  link de convite já usado não abre de novo
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  console cria usuário interno (HTTP 200): link /convite/, purpose='invite'
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+PHP Deprecated:  Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+
+Deprecated: Function curl_close() is deprecated since 8.5, as it has no effect since PHP 8.0 in /Users/moliveira/Nutri_II/tests/cr875_14_limite_convite_test.php on line 24
+  PASS  usuário interno abre o link e cria a senha (HTTP 200/302, status active)
+  PASS  servidor sem erro fatal no log
+
+CR875-14 limite de links de convite/nova senha: 23/23
+==> [core] tests/cr875_15_sql_manual_registro_test.php
+PASS atualizacao-v54-52-ni2-767-production-events.sql existe
+PASS migração 2026_11_07_000091_create_production_events_table existe
+PASS atualizacao-v54-52-ni2-767-production-events.sql registra 2026_11_07_000091_create_production_events_table uma vez (INSERT … WHERE NOT EXISTS)
+PASS ni2_878_subscription_activation_mysql57.sql existe
+PASS migração 2026_11_16_000097_ni2_878_subscription_activation existe
+PASS ni2_878_subscription_activation_mysql57.sql registra 2026_11_16_000097_ni2_878_subscription_activation uma vez (INSERT … WHERE NOT EXISTS)
+PASS ni2_885_patients_allergies_text_mysql57.sql existe
+PASS migração 2026_11_17_000098_ni2_885_patients_allergies_text existe
+PASS ni2_885_patients_allergies_text_mysql57.sql registra 2026_11_17_000098_ni2_885_patients_allergies_text uma vez (INSERT … WHERE NOT EXISTS)
+PASS ni2_886_medidas_caseiras_revisao_mysql57.sql existe
+PASS migração 2026_11_17_000099_ni2_886_household_measure_review existe
+PASS ni2_886_medidas_caseiras_revisao_mysql57.sql registra 2026_11_17_000099_ni2_886_household_measure_review uma vez (INSERT … WHERE NOT EXISTS)
+PASS ni2_891_exames_revisao_mysql57.sql existe
+PASS migração 2026_11_17_000100_ni2_891_exam_catalog_review existe
+PASS ni2_891_exames_revisao_mysql57.sql registra 2026_11_17_000100_ni2_891_exam_catalog_review uma vez (INSERT … WHERE NOT EXISTS)
+PASS cr875_14_password_reset_purpose_mysql57.sql existe
+PASS migração 2026_11_17_000101_cr875_14_password_reset_purpose existe
+PASS cr875_14_password_reset_purpose_mysql57.sql registra 2026_11_17_000101_cr875_14_password_reset_purpose uma vez (INSERT … WHERE NOT EXISTS)
+PASS a última migração do repositório está na sequência de SQL manual da v54.76
+
+CR875-15 registro das migrações nos SQL manuais: 19 PASS, 0 FAIL
+==> [core] tests/v5475_reconciliation_test.php
+  PASS  política suspensa preservada inclusive para MFA já cadastrado
+  PASS  política explícita reativa MFA
+  PASS  MFA profissional permanece opcional
+  PASS  plataforma tem destino administrativo
+  PASS  profissional tem destino clínico
+  PASS  notas e alergias persistem cifradas
+[clinical-encryption] campo notes ilegível na listagem (paciente 1)
+  PASS  listagem suporta valor ilegível sem expor cifra
+  PASS  leitura clínica continua falhando fechada
+  PASS  alerta histórico com cifra embutida é legível
+  PASS  cifra embutida ilegível recebe marcador neutro
+  PASS  exportação LGPD devolve notas legíveis
+  PASS  exportação de outra clínica é bloqueada
+  PASS  onboarding lê primeiro paciente decifrado
+  PASS  MailerFactory recebe mensagem real com link e OTP
+  PASS  driver log não é anunciado como e-mail entregue
+[transcription-consent] envio de OTP falhou: ClyoNutri\Core\Mail\MailException
+  PASS  falha de transporte mantém aceite disponível no portal
+  PASS  telefone sem e-mail não anuncia SMS inexistente
+
+17 PASS, 0 FAIL
+==> [core] tests/ni2_894_aviso_agendamento_test.php
+=== 1. Agendar: um aviso, completo ===
+  PASS  Agendar gera exatamente 1 aviso ao paciente (1)
+  PASS  Aviso traz fuso e modalidade
+  PASS  Nenhum {marcador} no aviso de agendamento
+  PASS  Uma entrega por canal (e-mail e push)
+  PASS  Não existe mais o segundo aviso appt.N.scheduled
+=== 2. Confirmar pela clínica: um aviso ===
+  PASS  Confirmar gera exatamente 1 aviso (appointment.confirmed)
+  PASS  Sem o aviso duplicado appointment.confirmed_by_clinic
+  PASS  Nenhum {marcador} no aviso de confirmação
+=== 3. Remarcar pela clínica: um aviso ===
+  PASS  Remarcar gera exatamente 1 aviso (appointment.rescheduled)
+  PASS  Aviso de remarcação com o novo horário e sem marcador
+=== 4. Cancelar pela clínica: um aviso ===
+  PASS  Cancelar gera exatamente 1 aviso (appointment.cancelled_by_clinic)
+  PASS  Nenhum {marcador} no aviso de cancelamento
+=== 5. Paciente sem canal validado não recebe nada ===
+  PASS  Nenhuma entrega enviada para paciente sem e-mail nem app
+  PASS  Controle: o paciente com e-mail teve entrega processada
+=== 6. Trava: aviso com marcador sem valor não é enfileirado ===
+[ClyoNutri][notification] aviso bloqueado: marcador sem valor em appointment.scheduled (timezone,modality)
+  PASS  publish() devolve bloqueado quando sobra {timezone}/{modality}
+  PASS  Nenhum evento gravado
+  PASS  Bloqueio registrado na auditoria, sem dado do paciente
+  PASS  Aviso com todos os valores continua sendo enfileirado
+=== 7. Nenhum aviso ao paciente no banco com marcador ===
+  PASS  Nenhum evento gravado com {marcador} (0)
+
+19 PASS, 0 FAIL
+==> [core] tests/ni2_868_870_871_872_regression_test.php
+  PASS  868: retorno day preserva data e sucesso
+  PASS  868: erro também preserva contexto day
+  PASS  868: retorno week preserva data e sucesso
+  PASS  868: erro também preserva contexto week
+  PASS  868: retorno month preserva data e sucesso
+  PASS  868: erro também preserva contexto month
+  PASS  868: data inexistente e view externa não são aceitas
+  PASS  868: rejeita array e mês inválido
+  PASS  868: ações reais da agenda foram renderizadas
+  PASS  868: todos os formulários de status carregam view e data
+  PASS  870: prévia ativa continua idempotente
+  PASS  870: lote confirmado também permanece idempotente
+  PASS  870: rollback real remove 100% do lote
+  PASS  870: mesmo arquivo gera nova prévia após rollback
+  PASS  870: lote em processamento não é apagado
+  PASS  871: metadados persistidos de CLINICAL_RECORD_SAVED sem texto livre
+  PASS  871: metadados persistidos de ANAMNESIS_SAVED sem texto livre
+  PASS  871: metadados persistidos de ANTHROPOMETRY_SAVED sem texto livre
+  PASS  871: metadados persistidos de MEAL_PLAN_PUBLISHED sem texto livre
+  PASS  871: metadados persistidos de PRESCRIPTION_ISSUED sem texto livre
+  PASS  871: metadados persistidos de EXAM_REQUEST_ISSUED sem texto livre
+  PASS  871: metadados persistidos de PROTOCOL_SAVED sem texto livre
+  PASS  871: justificativa original permanece na auditoria clínica
+  PASS  872: alergia cifrada é decifrada na leitura clínica sem alterar armazenamento
+  PASS  872: falta de informação não é classificada como conflito
+  PASS  872: aviso nomeia alimento sem informação sem alegar conflito
+  PASS  872: aviso misto lista conflitos e alimentos sem informação
+  PASS  872: publicação ainda exige revisão clínica
+  PASS  871: versão publicada preserva justificativa clínica
+  PASS  871: publicação real emite somente indicador de override
+  PASS  872: status draft traduzido nas duas apresentações
+  PASS  872: status published traduzido nas duas apresentações
+  PASS  872: status superseded traduzido nas duas apresentações
+  PASS  872: status archived traduzido nas duas apresentações
+  PASS  872: salvar intervalo duas vezes é idempotente
+  PASS  872: intervalo não sobrescreve demais campos da política
+  PASS  872: ausência do campo não sobrescreve política existente
+  PASS  872: intervalo acima de 120 recusado
+  PASS  872: intervalo negativo recusado
+  PASS  872: consulta colada é bloqueada pelo intervalo efetivo
+  PASS  872: consulta após intervalo é aceita
+  PASS  872: profissional sem gestão não altera intervalo global
+
+42 PASS, 0 FAIL
+==> [core] tests/ni2_888_agenda_usability_test.php
+  PASS  day: exatamente um menu de configuração
+  PASS  day: atalho direto para ativação
+  PASS  day: botão usa componente e texto único
+  PASS  day: menu aponta para as três seções
+  PASS  week: exatamente um menu de configuração
+  PASS  week: atalho direto para ativação
+  PASS  week: botão usa componente e texto único
+  PASS  week: menu aponta para as três seções
+  PASS  month: exatamente um menu de configuração
+  PASS  month: atalho direto para ativação
+  PASS  month: botão usa componente e texto único
+  PASS  month: menu aponta para as três seções
+  PASS  Painel usa mesmo componente e classe
+  PASS  Ficha usa componente de nova consulta
+  PASS  Segundo clique envia ativação explícita pelo formulário existente
+  PASS  POST real do controller ativa e preserva parâmetros do formulário
+  PASS  Ativo oferece copiar link e configurar
+[agenda] próximo horário indisponível: ClyoNutri\Core\Security\TenantSecurityException
+  PASS  Sem permissão não vê controles: 2 ativo=não
+[agenda] próximo horário indisponível: ClyoNutri\Core\Security\TenantSecurityException
+  PASS  Sem permissão não vê controles: 2 ativo=sim
+  PASS  Sem permissão não vê controles: 3 ativo=não
+  PASS  Sem permissão não vê controles: 3 ativo=sim
+  PASS  Administrador ativo pode configurar
+  PASS  POST sem CSRF válido não muda configuração
+  PASS  Recepção não altera configuração pelo controller
+  PASS  Contraste da primária verde com branco atende AA: 5.64:1
+
+25 PASS, 0 FAIL
+==> [core] tests/ni2_881_prescription_availability_test.php
+  PASS  Clínica sem catálogo indisponível
+  PASS  Documentos oculta módulo e preserva orientação no prontuário
+  PASS  Portal oculta cartão quando indisponível
+  PASS  Prontuário não renderiza seção de manipulados vazia
+  PASS  URL direta: controller responde 200 e mensagem neutra
+  PASS  Indisponível sem botão inútil nem comando interno
+  PASS  Leitura usada pela API devolve [] mesmo com histórico quando módulo indisponível
+  PASS  API preserva vínculo do paciente com a clínica
+  PASS  Ingrediente sem regra validada não habilita módulo
+  PASS  Regra deny não habilita módulo
+  PASS  Ativo habilitado com regra allow vigente habilita catálogo
+  PASS  Catálogo de outra clínica não habilita módulo
+  PASS  Política expirada não habilita
+  PASS  Política futura não habilita
+  PASS  Política desativada não habilita
+  PASS  Ingrediente desativado não habilita
+  PASS  Documentos mantém link com catálogo validado
+  PASS  Portal mantém cartão com catálogo validado
+  PASS  Controller preserva editor com catálogo validado
+  PASS  API preserva lista com catálogo validado
+  PASS  URL direta não revela paciente de outra clínica
+  PASS  Ficha preserva visibilidade conforme catálogo: indisponível
+  PASS  Mais ações do plano segue catálogo: indisponível
+  PASS  Dados reais do portal usam checagem única: indisponível
+  PASS  Ficha preserva visibilidade conforme catálogo: disponível
+  PASS  Mais ações do plano segue catálogo: disponível
+  PASS  Dados reais do portal usam checagem única: disponível
+
+27 PASS, 0 FAIL
+==> [core] tests/ni2_892_query_metrics_test.php
+  PASS  Prepare não conta como execução
+  PASS  Cada execute de statement reutilizado é contado
+  PASS  query mantém modo de fetch e retorno
+  PASS  query contado uma única vez
+  PASS  Erro SQL preservado
+  PASS  Consulta com erro também é contada
+  PASS  Métricas sem SQL e parâmetros
+  PASS  Metadata informa colunas presentes e ausentes
+  PASS  Metadados das colunas carregados uma vez por tabela
+  PASS  Catálogo de tabelas preserva presença/ausência
+  PASS  Catálogo de tabelas carregado uma vez
+  PASS  Cache isolado por conexão
+  PASS  Reset após DDL atualiza schema
+  PASS  Produção nunca habilita perfil mesmo com flag 1
+  PASS  Flag desligada não perfila
+  PASS  Busca sem jornada e sem abertura excepcional retorna null
+  PASS  Abertura excepcional mantém primeiro horário canônico
+  PASS  Busca mantém bloqueio explícito dentro de abertura excepcional
+  PASS  Janelas com leitura em lote são idênticas à leitura canônica
+  PASS  Busca não aceita profissional de outra clínica
+
+20 PASS, 0 FAIL
+==> [core] tests/ni2_893_finishing_test.php
+  PASS  Bloco de cancelamento somente para status cancelado: draft
+  PASS  Bloco de cancelamento somente para status cancelado: review
+  PASS  Bloco de cancelamento somente para status cancelado: issued
+  PASS  Bloco de cancelamento somente para status cancelado: cancelled
+  PASS  Cancelamento mostra data e motivo
+  PASS  Sala sem botão e sem campo de link
+  PASS  Controles de pedir aceite e revogação preservados
+  PASS  Rodapé renderiza a versão instalada registrada no JSON
+  PASS  Versão antiga fixa ausente do HTML
+  PASS  Comprovante público sem código sequencial e sem alvo de preenchimento
+  PASS  Comprovante preserva data, horário e modalidade
+  PASS  JavaScript renderizado do agendamento tem sintaxe válida
+
+12 PASS, 0 FAIL
+==> [core] tests/v5470_ni2_880_food_diary_web_test.php
+NI2-880 OK: diário web, devolutiva, aviso, auditoria, escape HTML, estado vazio, RBAC 403 e isolamento multi-tenant validados.
+==> [core] tests/ni2_879_consulta_outro_dia_test.php
+=== 1. isDifferentDay com relógio injetado ===
+  PASS  Consulta de 16/12 vista em 16/11: outro dia
+  PASS  Consulta de ontem não iniciada: outro dia
+  PASS  Mesmo dia, mais tarde: não é outro dia
+  PASS  Mesmo dia, mais cedo: não é outro dia
+=== 2. CR879-02: conclusão direta de consulta de outro dia é recusada ===
+  PASS  Concluir direto consulta futura agendada lança erro
+  PASS  Consulta futura continua agendada após a recusa
+  PASS  Nenhum registro de prontuário criado na recusa
+=== 3. Opção 1: remarcar para agora ===
+  PASS  Remarcada e em andamento
+  PASS  Data da consulta passou a ser hoje
+  PASS  Histórico guarda a data original
+  PASS  Remarcação registrada na auditoria
+  PASS  Reenvio da remarcação não altera nada (idempotente)
+  PASS  Prontuário com a data de hoje (Evolução Clínica — Consulta #2 (17/11/2026))
+=== 4. CR879-05: remarcar para agora sobre horário ocupado ===
+  PASS  Sem confirmação, conflito com outra consulta é recusado
+  PASS  Erro informa a consulta que ocupa o horário
+  PASS  Recusada, a consulta fica como estava
+  PASS  Com confirmação, remarca como encaixe
+  PASS  Encaixe registrado na auditoria
+=== 5. Opção 2: atendimento de hoje mantendo o agendamento (CR879-03, CR879-04, CR879-06) ===
+  PASS  Atendimento de hoje criado e em andamento
+  PASS  Atendimento de hoje com a data de hoje
+  PASS  Agendamento futuro intacto
+  PASS  Segundo envio devolve o mesmo atendimento (sem duplicar)
+  PASS  Só um atendimento novo no banco
+  PASS  Nenhum aviso de agendamento enviado ao paciente
+  PASS  Atendimento de hoje aponta a consulta de origem
+  PASS  Prontuário do atendimento de hoje com a data de hoje (Evolução Clínica — Consulta #6 (17/11/2026))
+  PASS  Depois de concluir hoje, o agendamento futuro continua agendado
+  PASS  Controle: agendamento comum gera aviso ao paciente
+=== 6. Outra clínica não mexe na consulta ===
+  PASS  Clínica B não remarca consulta da clínica A
+  PASS  Clínica B não cria atendimento a partir da consulta da clínica A
+  PASS  Consulta da clínica A intacta
+=== 7. CR879-07: data efetiva para consultas antigas concluídas fora do dia ===
+  PASS  Linha do tempo usa o dia em que a consulta foi concluída
+  PASS  Linha do tempo indica a data agendada
+  PASS  Lista de consultas da ficha traz a data efetiva
+  PASS  "Última consulta concluída" não aponta para data futura
+=== 8. Regressão: mesmo dia segue sem a escolha ===
+  PASS  Consulta de hoje não pede a escolha
+
+36 PASS, 0 FAIL
+==> [core] tests/v5469_ni2_879_and_cr360_fixes_test.php
+NI2-879 + CR360 OK: decifragem no Perfil 360, agregação payments e data real no prontuário/linha do tempo validados.
+==> [core] tests/v5468_ni2_878_subscription_test.php
+NI2-878 OK: trialState, expiredNotice, pedir-ativacao, RBAC 403 e ativacao manual validados.
+==> [core] tests/v5467_ni2_856_aud360_test.php
+=== 1. NI2-857 (F-01 P1): Financeiro vírgula decimal ===
+  PASS  NI2-857: 320,50 -> 32050 centavos
+  PASS  NI2-857: 1.250,00 -> 125000 centavos
+  PASS  NI2-857: 250 -> 25000 centavos
+  PASS  NI2-857: 250.5 -> 25050 centavos
+  PASS  NI2-857 negativo: texto -> 0, negativo detectável
+=== 2. NI2-858 (SEC-001 P1): Transcrição com OTP e alerta mesmo IP ===
+  PASS  NI2-858: link sem OTP é recusado
+  PASS  NI2-858: OTP inválido é recusado
+  PASS  NI2-858: aceite por OTP grava mechanism=otp
+  PASS  NI2-858: alerta mesmo IP gravado quando decider IP == requester IP
+=== 3. NI2-859 (SEC-004 P1): MFA TOTP RFC 6238 + Códigos de Recuperação + Rate Limit ===
+  PASS  NI2-859: superadmin exige MFA
+  PASS  NI2-859: nutritionist tem MFA opcional
+  PASS  NI2-859: TotpService valida código RFC 6238
+  PASS  NI2-859: replay do mesmo time-step é bloqueado
+  PASS  NI2-859: gera 8 códigos de recuperação
+  PASS  NI2-859: código de recuperação autentica
+  PASS  NI2-859: código de recuperação usado não funciona 2x
+  PASS  NI2-859: rate limit bloqueia após 5 tentativas erradas
+=== 4. NI2-866 (SEC-003/005/007 P2): Chave APP_KEY, e-mail do token, hash dummy ===
+  PASS  NI2-866 (SEC-003): token emitido para e-mail X não verifica e-mail Y
+  PASS  NI2-866 (SEC-003): token válido verifica o próprio e-mail
+  PASS  NI2-866 (SEC-005): usuário inexistente retorna null executando bcrypt constante
+=== 5. NI2-861 (F-03 P2) & NI2-862 (F-04 P2): Prontuário com artefatos e Cifragem em Repouso ===
+  PASS  NI2-862: patients.notes e patients.allergies gravados cifrados (enc:v1:)
+  PASS  NI2-862: leitura do paciente decifra transparentemente
+  PASS  NI2-861: anamneses.appointment_id gravado
+  PASS  NI2-862: chief_complaint, pathologies e medications_details cifrados no banco
+  PASS  NI2-861: anthropometric_assessments.appointment_id gravado
+  PASS  NI2-862: consultation_note_drafts.evolution_summary cifrado no banco
+  PASS  NI2-862: rascunho decifrado na leitura
+  PASS  NI2-862: clinical_records.content_json cifrado no banco
+  PASS  NI2-861/862: cadeia SHA-256 do prontuário permanece íntegra com cifragem
+  PASS  NI2-861: prontuário referencia anamnese e avaliação do atendimento
+=== 6. NI2-863 (F-05 P2): Regra de acesso após fim do trial ===
+  PASS  NI2-863: assinatura expired > 3 dias entra em modo leitura
+  PASS  NI2-863: ativação restaura acesso imediatamente
+=== 7. NI2-864 (F-06 P2) & NI2-871 (F-12) & NI2-872 (F-13/14) & NI2-874 (F-18/F-20) ===
+  PASS  NI2-864 (F-06): publicação sem confirmar medida estimada (revisar) é recusada
+  PASS  NI2-864 (F-06): publicação com confirm_estimated_measures=true funciona
+  PASS  NI2-871 (F-12): telemetria remove texto livre clínico
+  PASS  NI2-872 (F-13): WorkflowState traduz superseded para Substituído
+  PASS  NI2-872 (F-14): intervalo do onboarding sincronizado em booking_calendar_policies.buffer_after_minutes
+  PASS  NI2-874 (F-18): encaixe registra nota em appointment_status_history
+  PASS  NI2-874 (F-20): PatientInviteEmail remove prefixo Dra.
+  PASS  NI2-874 (F-20): SecurityNoticeEmail remove prefixo Dr.
+=== 8. NI2-865 (F-07 P2): Contratos de módulos críticos ===
+  PASS  NI2-865: AsaasConfig::fromEnv + AsaasClient sandbox instanciados sem erro
+  PASS  NI2-865 negativo: chave de produção em ambiente sandbox é bloqueada
+  PASS  NI2-865: AccountActionRateLimiter permite primeira tentativa
+
+43 PASS, 0 FAIL
+==> [core] tests/v5462_ni2_844_ux360_test.php
+=== 1. NI2-847 (UX-003): Campos numéricos com vírgula/ponto decimal, normalização m/cm e limites ===
+  PASS  NI2-847: recordAssessment aceita "72,4" kg e "1,7" m -> 72.4 kg e 170.0 cm
+  PASS  NI2-847: IMC (~25.05) e RCQ (0.78) calculados corretamente com vírgula decimal
+  PASS  NI2-847: altura '1,70' grava 170 cm
+  PASS  NI2-847: altura '1.70' grava 170 cm
+  PASS  NI2-847: altura '170' grava 170 cm
+  PASS  NI2-847: altura '170,0' grava 170 cm
+  PASS  NI2-847: EnergyCalculator::compute normaliza 1,7m == 170cm (1455.5 kcal)
+  PASS  NI2-847 negativo: peso "abc" recusa com InvalidAnthropometricDataException
+  PASS  NI2-847 negativo: cintura "abc" recusa com InvalidAnthropometricDataException (sem TypeError)
+  PASS  NI2-847 limite: peso "500" kg recusa fora da faixa (0.5 a 350 kg)
+  PASS  NI2-847 limite: altura "0" recusa fora da faixa
+=== 2. NI2-846 (UX-002): Ranking de busca de alimentos por relevância clínica ===
+  PASS  NI2-846: "frango grelhado" traz peito de frango em 1º lugar (Peito de frango grelhado)
+  PASS  NI2-846: "coracao de frango" traz coração de frango em 1º lugar (Frango, coração, grelhado)
+  PASS  NI2-846: detectPartHighlight destaca "coração" para parte/corte
+  PASS  NI2-846: detectPartHighlight destaca "peito" para parte/corte
+  PASS  NI2-846: 100% (12/12) das buscas clínicas frequentes trazem o alimento esperado no top 3
+=== 3. NI2-845 (UX-001) & NI2-855 (UX-019): Medida caseira padrão e aviso de item duplicado com soma ===
+  PASS  NI2-845: 'Pão, trigo, francês' tem medida caseira padrão 'unidade' (50 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Mamão, Formosa, cru' tem medida caseira padrão 'fatia' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Banana prata crua' tem medida caseira padrão 'unidade' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Ovo de galinha cozido' tem medida caseira padrão 'unidade' (50 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Arroz integral cozido' tem medida caseira padrão 'colher de sopa' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Feijão carioca cozido' tem medida caseira padrão 'concha' (86 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Peito de frango grelhado' tem medida caseira padrão 'filé' (100 g) sem exigir confirmação manual
+  PASS  NI2-845: 'Azeite de oliva extravirgem' tem medida caseira padrão 'colher de sopa' (13 g) sem exigir confirmação manual
+  PASS  NI2-847: EnergyTargetService::save normaliza height_cm="1,7" para 170 cm no plano
+  PASS  NI2-845: editor do plano renderiza barra de busca inline dentro do card da refeição
+  PASS  NI2-855 (UX-019): editor do plano avisa alimento duplicado na mesma refeição com botão de somar em 1 clique
+  PASS  NI2-855 (UX-019): merge_duplicate soma as porções (50g + 50g = 100g, 2 unidades) e remove a linha duplicada
+  PASS  NI2-845/NI2-855 segurança: outra clínica não consegue fundir itens do plano
+=== 4. NI2-852 (UX-009) & NI2-855 (UX-013): Fuso horário unificado e português correto ===
+  PASS  NI2-852 (UX-009): meal_plans grava updated_at no fuso local America/Sao_Paulo (2026-11-17 14:47:57), sem +3h UTC
+  PASS  NI2-855 (UX-013): revisão de adequação usa português correto ("O plano tem 1 refeição", nunca "1 refeição(ões)")
+  PASS  NI2-855 (UX-013): faixa operacional traduz status "published" para "publicado" (nunca exibe "published" cru)
+=== 5. NI2-848 (UX-004), NI2-849 (UX-005), NI2-854 (UX-012) & NI2-855 (UX-016): Atendimento unificado e Fechamento ===
+  PASS  NI2-848 (UX-004): sala de atendimento exibe barra única de etapas (Anamnese, Avaliação, Plano, Evolução, Fechamento)
+  PASS  NI2-848 (UX-004): sala de atendimento inclui painel lateral recolhível "Histórico clínico"
+  PASS  NI2-855 (UX-016): sala de atendimento exibe resumo da última avaliação antropométrica e botão para Avaliação
+  PASS  NI2-854 (UX-012): texto longo de LGPD da transcrição fica recolhido em <details> abaixo da evolução
+  PASS  NI2-848 (UX-004): cabeçalho do paciente tem 1 CTA primário 'Continuar atendimento' e a barra de etapas (encontrado: 1)
+  PASS  NI2-849 (UX-005): concluir a consulta exibe o Painel de Fechamento com agendamento de retorno em 1 clique e entrega de PDF
+  PASS  NI2-849 (UX-005): suggestFollowUpSlot sugere horário livre em ~30 dias (2026-12-17T14:42)
+=== 6. NI2-850 (UX-006): Onboarding em 3 passos sem cobrança forçada, CRN pré-preenchido e contadores coerentes ===
+  PASS  NI2-850 (UX-006): wizardSummary inicia com 3 passos totais e 0%
+  PASS  NI2-850 (UX-006): concluir Passo 1 de 3 atualiza wizardSummary para 1 de 3 (33%)
+  PASS  NI2-850 (UX-006): contador do checklist (4 de 4) bate exatamente com os 4 itens visíveis na lista principal
+=== 7. NI2-851 (UX-008): Preservação e reenvio de rascunho ===
+  PASS  NI2-851 (UX-008): ConsultationDraftService persiste rascunho versionado
+  PASS  NI2-851 (UX-008): rascunho recuperado integralmente após reconexão/relogin
+  PASS  NI2-851 (UX-008): consulta-rascunho.js e workflow-drafts.js escutam evento online para reenvio automático em <=5s e exibem banner de recuperação
+=== 8. NI2-853 (UX-010) & NI2-855 (UX-011): Combobox único na agenda, próximo horário válido e Iniciar em 1 clique ===
+  PASS  NI2-853 (UX-010): modal da agenda unifica busca e seleção em um único combobox visível
+  PASS  NI2-853 (UX-010): nova consulta pré-preenche próximo horário comercial válido (2026-11-18T08:00) com aviso de sugestão
+  PASS  NI2-855 (UX-011): botão "Iniciar" na agenda dispara POST /agenda/{id}/status (in_progress) em 1 clique
+=== 9. NI2-854 (UX-014, UX-015) & NI2-855 (UX-007, UX-013, UX-017, UX-018): Dashboard, Menu 7 itens, Saudação, Cadastro e Busca ===
+  PASS  NI2-855 (UX-007): DashboardOverview::firstName remove prefixos "Dra."/"Dr." para evitar "Olá, Dra."
+  PASS  NI2-855 (UX-007): cabeçalho mostra "Olá, Helena" (sem "Olá, Dra.")
+  PASS  NI2-854 (UX-014): dashboard destaca card "Continuar de onde parou" para consulta em andamento
+  PASS  v54.65 (UX-015): grupos Biblioteca nutricional e Gestão fixos, sem recolher
+  PASS  v54.65 (UX-015): menu enxuto, sem links mortos nem itens de configuração soltos (14 itens)
+  PASS  v54.65: Central de ajuda no rodapé do menu e Modelos de plano em /modelos
+  PASS  NI2-855 (UX-018): busca sem resultado em /pacientes oferece botão "Cadastrar «Paciente Inexistente XYZ»" com nome pré-preenchido
+  PASS  NI2-855 (UX-013): página /financeiro tem apenas 1 botão '+ Novo lançamento financeiro' sem duplicidade (encontrado: 1)
+  PASS  NI2-855 (UX-017): tela /register mostra placeholder "Mínimo de 8 caracteres", região sem truncamento e CTA "Criar meu consultório" >= 48px
+
+57 PASS, 0 FAIL
+==> [core] tests/v5461_ni2_830_consentimento_test.php
+=== NI2-830 consentimento verificável ===
+  PASS  migration 93 roda duas vezes sem erro (idempotente)
+  PASS  índices do token (UNIQUE) e do atendimento existem
+  PASS  o serviço não tem mais grantConsent(): nenhum caminho de código concede aceite pelo profissional
+  PASS  sem aceite: isConsentActive=false
+  PASS  linha legada "granted" da tabela antiga NÃO conta como aceite
+  PASS  startSession sem aceite do paciente é negado
+  PASS  pedido pendente com token de 20 caracteres base32 (100 bits)
+  PASS  token guardado só como hash SHA-256 (não aparece em claro em nenhuma coluna)
+  PASS  pedido pendente não libera a captação
+  PASS  startSession com pedido pendente é negado
+  PASS  validade do link ~15 min (900s)
+  PASS  visão do profissional não expõe hashes nem dados do aparelho do paciente
+  PASS  aceite com texto desatualizado/diferente é recusado
+  PASS  decisão diferente de accept/reject é recusada
+  PASS  token inexistente é recusado
+  PASS  tentativas inválidas não criaram aceite
+  PASS  SEG360-SEC-001: aceite sem OTP é recusado
+  PASS  paciente aceita pelo link: estado accepted + código de revogação
+  PASS  evidência vinculada a clínica + atendimento + paciente
+  PASS  evidência: versão, SHA do texto, mecanismo, origem do pedido e timestamp
+  PASS  IP guardado só como hash HMAC (64 hex), nunca em claro
+  PASS  IP do paciente não aparece em claro na evidência
+  PASS  com aceite do paciente, isConsentActive=true para este atendimento
+  PASS  aceite com validade de 6 h (expiração garantida)
+  PASS  trilha de auditoria: pedido + aceite pelo paciente
+  PASS  auditoria do aceite sem nome do paciente nem token
+  PASS  replay do mesmo token (aceitar) é recusado
+  PASS  replay do mesmo token (recusar) é recusado
+  PASS  replay não alterou o aceite vigente
+  PASS  consulta A2 do MESMO paciente não herda o aceite da A1
+  PASS  paciente B não herda o aceite do paciente A
+  PASS  atendimento da A1 com paciente B (inconsistência) não vale
+  PASS  paciente de outra clínica é negado (tenant)
+  PASS  clínica B não enxerga pedido de aceite da clínica A (outro atendimento)
+  PASS  clínica B não consegue pedir aceite para atendimento/paciente da clínica A
+  PASS  com aceite válido o segmento é gravado
+  PASS  paciente revoga com o código: aceite deixa de valer
+  PASS  revogação pausa a sessão aberta na hora
+  PASS  novo segmento depois da revogação é negado
+  PASS  nenhum segmento novo foi gravado após a revogação
+  PASS  retomar sessão sem aceite vigente é negado
+  PASS  iniciar de novo após revogação é negado
+  PASS  código de revogação não revoga duas vezes
+  PASS  código de revogação malformado é recusado
+  PASS  token expirado não aceita
+  PASS  estado do pedido vencido é "expired"
+  PASS  pedido expirado não libera captação
+  PASS  novo pedido aceito volta a liberar (após revogação anterior)
+  PASS  aceite com validade vencida deixa de valer
+  PASS  segmento com aceite vencido é negado
+  PASS  paciente recusa: sem aceite e sem código de revogação
+  PASS  iniciar após recusa é negado
+  PASS  mesmo token não vira aceite depois da recusa
+  PASS  portal: paciente A não decide o pedido do paciente B
+  PASS  portal: clínica diferente não decide
+  PASS  portal lista o pedido só para o paciente dono
+  PASS  página do paciente mostra só o primeiro nome
+  PASS  portal: o próprio paciente aceita
+  PASS  mecanismo registrado: patient_portal
+  PASS  profissional registra a revogação a pedido do paciente e a captação para
+  PASS  revogação registra quem revogou (professional)
+  PASS  atendimento cancelado não recebe pedido de aceite
+
+62 PASS, 0 FAIL
+==> [core] tests/v545_ni2_609_test.php
+== Seletor
+  PASS  lista geral não oferece unidade nem fatia
+  PASS  lista geral oferece g e ml
+  PASS  bloco tem espaço para as medidas do alimento
+== Conversor
+  PASS  unidades de contagem reconhecidas
+  PASS  pão sem medida: unidade recusada
+  PASS  arroz sem medida: fatia recusada
+  PASS  colher (padrão com confirmação), gramas e porção do próprio alimento continuam aceitos
+== Plano
+  PASS  item: 1 unidade de pão sem medida recusado mesmo confirmado
+  PASS  item em gramas aceito
+  PASS  substituição: fatia sem medida recusada
+  PASS  1 unidade de pão = 50 g da medida da clínica, sem estimativa
+  PASS  conversão mostra a fonte da medida
+  PASS  medidas do alimento trazem a origem
+== Item antigo (legado)
+PHP Deprecated:  Method ReflectionMethod::setAccessible() is deprecated since 8.5, as it has no effect since PHP 8.1 in /Users/moliveira/Nutri_II/tests/v545_ni2_609_test.php on line 60
+
+Deprecated: Method ReflectionMethod::setAccessible() is deprecated since 8.5, as it has no effect since PHP 8.1 in /Users/moliveira/Nutri_II/tests/v545_ni2_609_test.php on line 60
+  PASS  item antigo em unidade pode mudar a quantidade sem trocar a unidade
+  PASS  trocar para fatia sem medida é recusado
+
+15 PASS, 0 FAIL
+==> [core] tests/v5412_ni2_625_activation_test.php
+== regra
+  PASS  tudo feito: pronto, 6 de 6, 100%
+  PASS  link ligado sem horários: não pronto, nunca 100% (66%)
+  PASS  próximo passo: confirmar horários
+  PASS  agenda cheia/bloqueada: configuração válida, com aviso (não é falta de configuração)
+  PASS  agendamento online desligado: horários e link não se aplicam
+  PASS  sem paciente, consulta e plano: pronto para atender (primeiros passos não bloqueiam)
+  PASS  obrigatório pendente vem antes: perfil primeiro
+== banco
+  PASS  sem CRN: perfil pendente, não pronto
+  PASS  CRN preenchido: pronto; paciente, consulta e plano a fazer
+  PASS  paciente e consulta de outra clínica não contam
+  PASS  paciente conta; consulta cancelada não conta
+  PASS  consulta marcada: 3 de 4 (link desligado)
+  PASS  liga o link sem horários: volta a não pronto, próximo = horários
+
+13 PASS, 0 FAIL
+==> [core] tests/onboarding_guided_and_activation_e2e_test.php
+
+========================================================================
+>>> CLYONUTRI II — SUÍTE DE TESTES E2E DE ONBOARDING & ATIVAÇÃO (NI2-282) <<<
+    UX 360, Stepper Clínico, Persistência Real, Resiliência & Multi-Tenant
+========================================================================
+
+--> [1/8] Provisionando Clínicas Alfa e Beta com Nutricionistas Reais...
+  [PASS] [SETUP] Tenants Alfa (#1) e Beta (#2) provisionados ➔ Usuários #1 e #2
+
+--> [2/8] Verificando Inicialização Automática e Estado Virgin do Onboarding...
+  [PASS] [INITIAL_STATE] Progresso de onboarding inicializado em 0% no Passo 1 ➔ DB record ID #1
+
+--> [3/8] Testando Execução e Persistência do Passo 1 (Objetivos Clínicos)...
+  [PASS] [STEP_1] Passo 1 salvo: foco clínico e metas registrados com sucesso ➔ Progresso: 20%, Próximo: Passo 2
+
+--> [4/8] Testando Execução do Passo 2 e Sincronização com Tabela `professionals`...
+  [PASS] [STEP_2] Passo 2 salvo e sincronizado na tabela `professionals` ➔ CRN: CRN3-98765 • Especialidade: Nutrição Clínica Funcional & Ortomolecular
+
+--> [5/8] Testando Execução do Passo 3 (Preferências de Atendimento e Preço)...
+  [PASS] [STEP_3] Passo 3 salvo: preferências, dias, teleconsulta e valor ➔ Valor: R$ 320,00 • Duração: 60 min • Intervalo: 15 min
+
+--> [6/8] Testando Capacidade de Retomada (Resume) Após Logout / Nova Sessão...
+  [PASS] [RESUME] Retomada perfeita no Passo 4 sem perda de dados ou estado prévio ➔ Concluídos: [1, 2, 3] • 60%
+
+--> [7/8] Testando Criação do Primeiro Paciente Real (Passo 4) e Ativação Final (Passo 5)...
+  [PASS] [STEP_4] Primeiro paciente real criado no banco com governança LGPD ➔ Paciente #1: Mariana Oliveira da Silva
+  [PASS] [IDEMPOTENCY] Reenvio do Passo 4 atualizou paciente existente sem duplicar registros ➔ Paciente #1
+  [PASS] [STEP_5] Onboarding 100% concluído e consultório ativado com sucesso ➔ completed_at: 2026-11-17 17:48:00
+
+--> [8/8] Testando Isolamento Multi-Tenant e Restrições de Acesso Ofensivo...
+  [PASS] [SECURITY] Isolamento multi-tenant comprovado: fail-closed em dados e pacientes ➔ Acesso cruzado bloqueado
+
+--> [9/9] Testando Controller Web, Proteção CSRF e Endpoint de Status JSON...
+  [PASS] [API_STATUS] Endpoint /api/v1/onboarding/status validado ➔ is_completed: true, progress_pct: 100%
+  [PASS] [CSRF_GUARD] submitStep bloqueia requisições com CSRF token inválido (Fail-closed) ➔ Rejeição 403 comprovada
+  [PASS] [WEB_VIEW] View do Onboarding renderizada em conformidade com o Design System ➔ Stepper, badges e shell presentes
+
+========================================================================
+>>> TODOS OS 9 GATES DE ONBOARDING & ATIVAÇÃO (NI2-282) FORAM APROVADOS! <<<
+========================================================================
+
+--> [CLEANUP] Executando teardown e limpeza rigorosa de fixtures...
+  [OK] Teardown concluído com sucesso.
+
+==> [core] tests/ni2_514_v42_units_test.php
+=== NI2-514 / NI2-523 v42 Units Test ===
+  [PASS] PlanTotalsBar sem meta não gera NaN e retorna status sem-meta
+  [PASS] PlanTotalsBar com meta zero trata como sem-meta sem divisão por zero
+  [PASS] PlanTotalsBar identifica abaixo (<95%) e ok (95%..105%)
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna null quando item principal tem 0 kcal
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna null quando substituto tem 0 kcal/100g
+  [PASS] SubstitutionComparison::sameEnergyGrams retorna 100 g para mesma densidade energética
+  [PASS] EnergyCalculator emite alerta para adolescente (<18 anos) mesmo em Cunningham
+  [PASS] EnergyCalculator emite alerta clínico para idosos (>=65 anos)
+  [PASS] EnergyCalculator emite alerta clínico para gestantes/lactantes
+  [PASS] FoodSearchIndex::normalize remove acentos e caixa alta
+  [PASS] FoodSearchIndex::preparation reconhece Grelhado
+  [PASS] FoodSearchIndex::preparation reconhece Cru
+  [PASS] PatientImportService::mapHeader mapeia sinônimos de colunas em CSV com vírgula
+  [PASS] Valida ano bissexto (29/02/2024) e normaliza gênero F -> Feminino
+  [PASS] Rejeita data calendário inexistente (31/02/1990)
+
+Resultado NI2-514 v42 Units: 15 PASS, 0 FAIL
+==> [core] tests/ni2_514_v42_phase2_http_test.php
+=== NI2-514 / NI2-523 v42 Phase 2 HTTP, Inline Edit, Multi-Tenant & Accessibility Test ===
+  [PASS] NI2-521: updateSubstitution atualiza quantidade, orientação e recalcula kcal/macros da substituição
+  [PASS] Isolamento multi-tenant: Clínica 2 não consegue editar substituição de plano da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê modelos da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não vê regras de equivalência da Clínica 1
+  [PASS] Isolamento multi-tenant: Clínica 2 não acessa lote de importação CSV da Clínica 1
+  [PASS] NI2-522: Reenviar mesmo CSV enquanto prévia está aberta reutiliza o mesmo lote
+  [PASS] NI2-522: Desfazer importação remove o paciente recém-criado
+  [PASS] NI2-522: Permite gerar nova prévia de arquivo cujo lote anterior foi 100% desfeito
+  [PASS] NI2-521: Editor possui região aria-live="polite" para anunciar atualizações sem recarregar
+  [PASS] NI2-521: Editor possui controles inline (<details>) para editar refeição, item e substituição
+  [PASS] NI2-521: plan-live.js atualiza apenas os blocos data-live-swap preservando foco e rolagem
+  [PASS] NI2-521: Seletor de alimentos suporta navegação completa por teclado (ArrowDown, ArrowUp, Enter, Escape)
+
+Resultado NI2-514 v42 Phase 2 HTTP & Accessibility: 12 PASS, 0 FAIL
+==> [core] tests/ni2_519_520_v44_test.php
+=== NI2-519 / NI2-520 v44 — Correspondência por Sinônimo, Intenção de Preparo e Rotas (B1) ===
+  [PASS] Exibe "aipim = mandioca" quando o nome do alimento traz Mandioca
+  [PASS] Não exibe aviso de sinônimo quando o próprio termo digitado já está no nome
+  [PASS] Exibe "jerimum = abóbora" com acentuação correta
+  [PASS] Exibe "bergamota = tangerina" para busca regional sulista
+  [PASS] Busca por "aipim" sem preparo posiciona "Mandioca, cozida" antes de "Mandioca, crua"
+  [PASS] Busca por "aipim cru" filtra estritamente a versão crua
+  [PASS] B1: Rota /pacientes/importar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/modelo.csv registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/previa registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id} registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/confirmar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/descartar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /pacientes/importar/{id}/desfazer registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /alimentos/equivalencias registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /alimentos/buscas registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras/modelo.csv registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /medidas-caseiras/importar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/energia registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/paciente registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/refeicoes/{mealId}/editar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /planos/{id}/salvar-como-modelo registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/usar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/arquivar registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/padrao registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/aprovacao registrada tanto em public/index.php quanto em routes/web.php
+  [PASS] B1: Rota /modelos/{id}/visibilidade registrada tanto em public/index.php quanto em routes/web.php
+
+Resultado NI2-519/520 v44: 28 PASS, 0 FAIL
+==> [core] tests/v5425_ni2_220_test.php
+== B1/I4 regra única de autoria clínica (ClinicalAuthor)
+  PASS  dona com CRN é autora com o próprio CRN
+  PASS  colega com CRN é autora com o próprio CRN
+  PASS  administradora sem CRN não é autora clínica
+  PASS  recepção não é autora clínica mesmo com CRN cadastrado (papel conta)
+  PASS  profissional de outra clínica não é autora nesta
+  PASS  CRN em branco não vale como CRN
+  PASS  controlador usa a mesma regra (I4)
+  PASS  rascunho automático da anamnese usa a mesma regra (I4)
+== B1 conclusão de consulta: autoria de quem conclui
+  PASS  gestora sem CRN não conclui consulta
+  PASS  nada gravado no prontuário na tentativa da gestora
+  PASS  consulta continua em andamento
+  PASS  autoria informada diferente de quem conclui é recusada
+  PASS  evolução gravada com o CRN de quem concluiu (A2), não do profissional agendado
+  PASS  profissional agendado fica registrado à parte (scheduled_professional_id)
+  PASS  vírgula decimal aceita (68,5 kg)
+  PASS  antropometria da conclusão gravada com o mesmo autor (quem concluiu)
+  PASS  conclusão não usa o resolvedor antigo (que caía no CRN de terceiros)
+== B3 dados fora da faixa recusados, sem corte
+  PASS  peso 1000 kg e cintura 3 cm recusados com erro por campo
+  PASS  mensagens em português com a faixa aceita
+  PASS  nada gravado no registro imutável com medida inválida
+  PASS  consulta segue aberta para corrigir
+  PASS  texto no peso é recusado
+  PASS  infinito no peso é recusado
+  PASS  medidas vazias = não aferidas (opcionais)
+  PASS  anamnese recusa água 99999 ml, sono 30 h e opção desconhecida, com erro por campo
+  PASS  mensagens da anamnese com a faixa (sem cortar para 10.000 ou 24)
+  PASS  frequência 9 dias/semana e duração 2 min recusadas por campo
+  PASS  água precisa ser inteira
+  PASS  nenhuma anamnese gravada com dado inválido
+  PASS  erros por campo da anamnese voltam para a tela
+== B2 pergunta não feita = Não avaliado (NULL)
+  PASS  sem resposta, as perguntas fechadas ficam NULL (has_surgeries, medication_usage, supplement_usage, intolerance_assessment, alcohol_consumption, smoking_status, physical_activity, sleep_quality)
+  PASS  NULL é exibido como "Não avaliado"
+  PASS  resposta marcada mantém o rótulo
+  PASS  "Não avaliado" explícito vira NULL; negativa marcada fica gravada
+  PASS  migração 86: as 7 colunas aceitam NULL e não têm resposta padrão
+  PASS  resumo para prescrição não presume "não fumante" nem "sedentário"
+  PASS  linha anterior ao formulário estruturado (negativas vindas só do DEFAULT da 73) volta para NULL
+  PASS  linha do formulário estruturado fica como está (não dá para saber o que foi marcado)
+  PASS  texto clínico da linha antiga preservado
+  PASS  migração 86 idempotente (segunda execução não muda nada)
+  PASS  SQLite íntegro depois da migração
+== I1 rascunho preserva autoria e início
+  PASS  salvar o rascunho de novo não troca autora nem data de início
+  PASS  última edição registrada à parte (updated_by / updated_at)
+  PASS  ao concluir, a versão é de quem concluiu
+  PASS  origem do rascunho (quem começou e quando) fica no JSON da versão
+== I2 conferência de concorrência obrigatória no servidor
+  PASS  sem revisão lida ou chave da gravação, nada é gravado
+  PASS  checagem não é mais opcional (antes omitir os campos pulava a conferência)
+== I3 origem real no resumo
+  PASS  sem anamnese, a origem é o cadastro, sem versão nem data inventadas
+  PASS  resumo não fala em "Anamnese v1" quando a fonte é o cadastro
+  PASS  com anamnese, a origem é a versão real
+  PASS  tela do prontuário mostra a origem conforme o tipo
+== I5/I6/I8 rotas clínicas
+  PASS  resumo para prescrição exige papel clínico com CRN (I5)
+  PASS  resumo para prescrição não devolve texto de exceção (I5)
+  PASS  exportação registra quem exportou, sem cair no id 1 (I6)
+  PASS  exportação não mostra texto técnico (I8)
+  PASS  conclusão de consulta: falha técnica vira mensagem amigável + código (I8)
+  PASS  sala de consulta só exibe o código de suporte validado (I8)
+  PASS  log da falha leva classe, arquivo e linha, sem texto que possa ter dado clínico
+== I7 trilha clínica guarda o usuário
+  PASS  audit_logs.user_id = usuária que agiu
+== retificação mantém os dados estruturados
+  PASS  retificação leva consulta de origem, peso e cintura da versão anterior
+  PASS  texto novo prevalece
+  PASS  cadeia de registros continua válida (hash não mudou de algoritmo)
+== I10 texto do selo condiz com o que o hash garante
+  PASS  selo fala em encadeamento conferido e avisa que não é assinatura digital
+  PASS  sem promessa de autenticidade ou inviolabilidade
+== I9 telas no design system
+  PASS  views/clinical/medical_record.php: sem style="" inline
+  PASS  views/clinical/medical_record.php: sem cor fixa em hexadecimal
+  PASS  views/anamnesis/form_page.php: sem style="" inline
+  PASS  views/anamnesis/form_page.php: sem cor fixa em hexadecimal
+  PASS  views/anamnesis/version.php: sem style="" inline
+  PASS  views/anamnesis/version.php: sem cor fixa em hexadecimal
+  PASS  views/consultation/room.php: sem style="" inline
+  PASS  views/consultation/room.php: sem cor fixa em hexadecimal
+  PASS  public/assets/css/clinical-record.css: sem style="" inline
+  PASS  public/assets/css/clinical-record.css: sem cor fixa em hexadecimal
+  PASS  patientMedicalRecord usa views/clinical/medical_record.php e não tem marcação inline
+  PASS  patientAnamnesis usa views/anamnesis/form_page.php e não tem marcação inline
+  PASS  consultationRoom usa views/consultation/room.php e não tem marcação inline
+  PASS  formulário abre com "Não avaliado" como primeira opção das perguntas fechadas
+  PASS  water_intake_ml: faixa 0–10000 também no navegador
+  PASS  sleep_hours: faixa 0–24 também no navegador
+  PASS  sala de consulta: faixa de peso e cintura vem da mesma constante do servidor
+  PASS  sala de consulta manteve os ganchos de teste e o script de rascunho
+
+82 PASS, 0 FAIL
+==> [core] tests/v5426_consulta_contexto_test.php
+== sem agenda
+  PASS  sem consulta: item "Consulta" presente e diz "Nenhuma consulta agendada"
+== próxima, hoje e em andamento (mesma regra do cabeçalho)
+  PASS  agendada para daqui a 5 dias: "Próxima" com data
+  PASS  observações da agenda não aparecem no painel
+  PASS  cabeçalho e painel com o mesmo estado (upcoming)
+  PASS  confirmada para hoje: "Hoje às 23:30"
+  PASS  em andamento: "Em andamento" e link "Abrir consulta"
+  PASS  cabeçalho e painel com o mesmo estado (continue)
+  PASS  na própria tela da consulta não repete o link para ela mesma
+== última concluída
+  PASS  mostra a última consulta concluída (01/10/2026), não a anterior
+== isolamento
+  PASS  consulta de outro paciente da mesma clínica não aparece
+  PASS  agendamento gravado com outra clínica para o mesmo id de paciente é ignorado
+  PASS  paciente de outra clínica: painel inteiro vazio (nada da agenda dele)
+  PASS  clínica B vê só a própria consulta
+== agenda indisponível
+CLINICAL_CONTEXT_APPOINTMENT_UNAVAILABLE PDOException
+  PASS  sem a tabela da agenda: painel continua com alergias e diz "Agenda indisponível"
+== design system
+  PASS  item sem style="" e sem cor fixa (classes do painel)
+  PASS  plano: painel nos diálogos de alimento, substituição e publicação; fora do diálogo de refeição
+
+16 PASS, 0 FAIL
+==> [core] tests/ux_workflows.php
+{
+    "build": "v54.32",
+    "suite_origin": "v54.18",
+    "driver": "sqlite",
+    "passed": 30,
+    "failed": 0,
+    "tests": [
+        {
+            "test": "repetição idempotente retorna o mesmo registro",
+            "pass": true
+        },
+        {
+            "test": "mesma chave não aceita outro conteúdo",
+            "pass": true
+        },
+        {
+            "test": "revisão antiga não sobrescreve plano",
+            "pass": true
+        },
+        {
+            "test": "operação falha reverte tudo",
+            "pass": true
+        },
+        {
+            "test": "rollback não altera a revisão",
+            "pass": true
+        },
+        {
+            "test": "rascunho canônico retomado sem trocar vigente",
+            "pass": true
+        },
+        {
+            "test": "rascunho antigo de anamnese gera conflito",
+            "pass": true
+        },
+        {
+            "test": "PDF com hash não recebe estado de assinatura",
+            "pass": true
+        },
+        {
+            "test": "assinatura exige verificação explícita",
+            "pass": true
+        },
+        {
+            "test": "clínica B não lê estado A",
+            "pass": true
+        },
+        {
+            "test": "clínica B não altera plano A",
+            "pass": true
+        },
+        {
+            "test": "terça 08–18 gera slots reais",
+            "pass": true
+        },
+        {
+            "test": "agenda prévia e portal usam mesmos horários",
+            "pass": true
+        },
+        {
+            "test": "horário ocupado não é oferecido",
+            "pass": true
+        },
+        {
+            "test": "bloqueio exclui horários no motor",
+            "pass": true
+        },
+        {
+            "test": "exame retoma o pedido canônico",
+            "pass": true
+        },
+        {
+            "test": "exame em outra aba gera conflito",
+            "pass": true
+        },
+        {
+            "test": "medida sem porção não inventa peso",
+            "pass": true
+        },
+        {
+            "test": "falha de medida mantém estado do plano",
+            "pass": true
+        },
+        {
+            "test": "API adiciona refeição no rascunho",
+            "pass": true
+        },
+        {
+            "test": "API adiciona alimento validado",
+            "pass": true
+        },
+        {
+            "test": "edição de item funciona dentro da transação",
+            "pass": true
+        },
+        {
+            "test": "substituição mantém validação canônica",
+            "pass": true
+        },
+        {
+            "test": "substituição pode ser editada com revisão",
+            "pass": true
+        },
+        {
+            "test": "cópia de refeição é transacional",
+            "pass": true
+        },
+        {
+            "test": "cópia preserva substituições revalidadas",
+            "pass": true
+        },
+        {
+            "test": "rota do plano recusa refeição de outro plano",
+            "pass": true
+        },
+        {
+            "test": "remoção de substituição usa a mesma revisão",
+            "pass": true
+        },
+        {
+            "test": "remoção de item usa a mesma revisão",
+            "pass": true
+        },
+        {
+            "test": "receipts não armazenam respostas clínicas",
+            "pass": true
+        }
+    ]
+}
+==> [core] tests/ni2_703.php
+{
+    "suite": "NI2-703",
+    "synthetic": true,
+    "clinical_approval": false,
+    "driver": "sqlite",
+    "checks": [
+        {
+            "name": "starter validates diabetes",
+            "pass": true
+        },
+        {
+            "name": "starter validates gastrite",
+            "pass": true
+        },
+        {
+            "name": "starter validates hipertensao",
+            "pass": true
+        },
+        {
+            "name": "starter validates celiaca",
+            "pass": true
+        },
+        {
+            "name": "starter validates renal",
+            "pass": true
+        },
+        {
+            "name": "unsafe source rejected",
+            "pass": true
+        },
+        {
+            "name": "HTML guidance rejected",
+            "pass": true
+        },
+        {
+            "name": "confirmed diabetes produces a proposal",
+            "pass": true
+        },
+        {
+            "name": "GET never changes plan",
+            "pass": true
+        },
+        {
+            "name": "confirmed source and version retained",
+            "pass": true
+        },
+        {
+            "name": "confirmation mandatory on server",
+            "pass": true
+        },
+        {
+            "name": "empty selection rejected",
+            "pass": true
+        },
+        {
+            "name": "explicit confirmation persists one decision",
+            "pass": true
+        },
+        {
+            "name": "only reviewed final text reaches notes",
+            "pass": true
+        },
+        {
+            "name": "same receipt replays without duplication",
+            "pass": true
+        },
+        {
+            "name": "retry does not duplicate notes",
+            "pass": true
+        },
+        {
+            "name": "stale tab cannot reapply",
+            "pass": true
+        },
+        {
+            "name": "condition change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "compatible comorbidities produce separate proposals",
+            "pass": true
+        },
+        {
+            "name": "suspected renal never generates guidance",
+            "pass": true
+        },
+        {
+            "name": "suspected renal blocks other generic guidance",
+            "pass": true
+        },
+        {
+            "name": "blocked combination cannot be forced",
+            "pass": true
+        },
+        {
+            "name": "renal is individual assessment only",
+            "pass": true
+        },
+        {
+            "name": "resolved condition stops affecting new proposals",
+            "pass": true
+        },
+        {
+            "name": "disabled module is excluded",
+            "pass": true
+        },
+        {
+            "name": "overdue clinical review excluded",
+            "pass": true
+        },
+        {
+            "name": "allergy change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "plan notes change invalidates proposal",
+            "pass": true
+        },
+        {
+            "name": "published plan proposals disabled",
+            "pass": true
+        },
+        {
+            "name": "published plan rejects apply",
+            "pass": true
+        },
+        {
+            "name": "cross clinic read denied",
+            "pass": true
+        },
+        {
+            "name": "actor without CRN denied",
+            "pass": true
+        },
+        {
+            "name": "global flag disables generation",
+            "pass": true
+        },
+        {
+            "name": "celiac restriction needs documentation",
+            "pass": true
+        },
+        {
+            "name": "documented celiac can be reviewed",
+            "pass": true
+        },
+        {
+            "name": "failed operations leave confirmation count unchanged",
+            "pass": true
+        },
+        {
+            "name": "decision retains author and source",
+            "pass": true
+        },
+        {
+            "name": "clinical confirmations exported for correct patient",
+            "pass": true
+        },
+        {
+            "name": "idempotency key omitted from export",
+            "pass": true
+        },
+        {
+            "name": "persistence fault rejected",
+            "pass": true
+        },
+        {
+            "name": "failed persistence rolls notes back",
+            "pass": true
+        },
+        {
+            "name": "failed persistence creates no decision",
+            "pass": true
+        },
+        {
+            "name": "publication remains a separate explicit action",
+            "pass": true
+        },
+        {
+            "name": "reviewed guidance survives immutable publication snapshot",
+            "pass": true
+        },
+        {
+            "name": "publication does not lose decision audit",
+            "pass": true
+        }
+    ]
+}
+==> [core] bin/compare_migrations_schema.php
+Tabelas no instalador: 172 | nas migrações: 172
+Só no instalador (0): 
+Só nas migrações (0): 
+
+Resumo bin/run-tests [core]: 39 suíte(s) OK, 1 falha(s).
+Falharam: tests/core_modules.txt (NI2-884, isoladas)

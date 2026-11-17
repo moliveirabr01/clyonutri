@@ -1,0 +1,4 @@
+BLOCKED Chromium launch: [1117/145737.022524:ERROR:base/power_monitor/thermal_state_observer_mac.mm:122] ThermalStateObserverMac unable to register to power notifications. Result: 9
+[1117/145737.039222:ERROR:net/dns/dns_config_service_posix.cc:139] DNS config watch failed to start.
+[1117/145737.048012:FATAL:base/apple/mach_port_rendezvous_mac.cc:159] Check failed: kr == KERN_SUCCESS. bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer.62205: Permission denied (1100)
+

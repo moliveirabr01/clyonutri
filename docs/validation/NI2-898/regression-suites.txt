@@ -1,0 +1,2 @@
+tests/ni2_427_https_transport_test.php
+tests/ni2_470_audit_https_cors_security_headers_test.php

@@ -1,0 +1,4 @@
+KNOWN             1.0s  tests/password_reset_email_test.php
+               ↳ INVESTIGAR: assunto do e-mail de redefinição não contém "Redefinição de senha" · Fatal error: Uncaught AssertionError: assunto em pt-BR in /Users/moliveira/Nutri_II/tests/password_reset_email_test.php:35
+
+Resumo bin/run-tests [full]: 0 PASS, 0 FAIL, 1 falha conhecida (triada em tests/known_failures_full.tsv), 0 não executado (infra/fixture/wrapper). Tempo total: 2s. Relatório: /Users/moliveira/Nutri_II/storage/test-reports/full-20261117-190246.tsv
