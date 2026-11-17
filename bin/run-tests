@@ -33,6 +33,7 @@ case "$PROFILE" in
       "tests/v5472_ni2_890_onboarding_entry_test.php"
       "tests/v5471_ni2_882_883_test.php"
       "tests/ni2_882_transcricao_locutor_test.php"
+      "tests/ni2_885_cifragem_legado_test.php"
       "tests/v5475_reconciliation_test.php"
       "tests/ni2_894_aviso_agendamento_test.php"
       "tests/ni2_868_870_871_872_regression_test.php"

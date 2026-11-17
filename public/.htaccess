@@ -90,8 +90,8 @@ DirectoryIndex index.php index.html
     Header always setifempty Referrer-Policy "strict-origin-when-cross-origin" "expr=-z resp('Referrer-Policy')"
     # NI2-811: Se o rollback estiver ativo (storage/hsts_rollback), força max-age=0 em absolutamente TODAS as respostas (inclusive assets estáticos, redirecionamentos e erros 403/404)
     Header always set Strict-Transport-Security "max-age=0" "expr=-f '%{DOCUMENT_ROOT}/../storage/hsts_rollback' || -f '%{DOCUMENT_ROOT}/storage/hsts_rollback' || -n reqenv('HSTS_ROLLBACK')"
-    # Se o rollback NÃO estiver ativo, aplica o baseline seguro de 86400 apenas quando o PHP não tiver emitido e o rollback não estiver ativo
-    Header always setifempty Strict-Transport-Security "max-age=86400" "expr=%{HTTPS} == 'on' && -z resp('Strict-Transport-Security') && ! -f '%{DOCUMENT_ROOT}/../storage/hsts_rollback' && ! -f '%{DOCUMENT_ROOT}/storage/hsts_rollback' && -z reqenv('HSTS_ROLLBACK')"
+    # Se o rollback NÃO estiver ativo, aplica o baseline de 15552000 (6 meses, NI2-885) apenas quando o PHP não tiver emitido e o rollback não estiver ativo
+    Header always setifempty Strict-Transport-Security "max-age=15552000" "expr=%{HTTPS} == 'on' && -z resp('Strict-Transport-Security') && ! -f '%{DOCUMENT_ROOT}/../storage/hsts_rollback' && ! -f '%{DOCUMENT_ROOT}/storage/hsts_rollback' && -z reqenv('HSTS_ROLLBACK')"
     # NI2-809 / ZAP-10038: Garante baseline CSP em todas as respostas nativas do Apache (erros 406, 403, 404, 500)
     Header always setifempty Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" "expr=-z resp('Content-Security-Policy')"
     # NI2-812 / ZAP-10063: Garante baseline Permissions-Policy em respostas nativas do Apache

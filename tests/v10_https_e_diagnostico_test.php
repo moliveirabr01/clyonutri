@@ -65,7 +65,9 @@ $get = function (string $url): array {
     return ['status' => (int)($m[1] ?? 0), 'body' => (string)$body, 'headers' => implode("\n", $h)];
 };
 $dbCopy = sys_get_temp_dir() . '/v10_health_' . bin2hex(random_bytes(3)) . '.sqlite';
-copy("{$root}/storage/testing.sqlite", $dbCopy);
+// NI2-884: usa o banco desta execução (bin/run-tests full); sem ele, o storage/testing.sqlite antigo. Falta de banco é falha explícita.
+$srcDb = (getenv('DB_DATABASE') && is_file((string)getenv('DB_DATABASE'))) ? (string)getenv('DB_DATABASE') : "{$root}/storage/testing.sqlite";
+if (!is_file($srcDb) || !copy($srcDb, $dbCopy)) { fwrite(STDERR, "FALHA: banco de teste ausente ({$srcDb}).\n"); exit(1); }
 $dbEnv = ['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => $dbCopy];
 $run($dbEnv + ['APP_ENV' => 'production', 'APP_DEBUG' => 'true', 'FORCE_HTTPS' => 'false', 'APP_URL' => 'https://clyonutri.com'], function ($base) use ($get, $ok) {
     $r = $get("{$base}/health");

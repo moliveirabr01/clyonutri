@@ -11,7 +11,7 @@ use ClyoNutri\Core\Security\Env;
  * Apache só fornece defaults quando ausentes nas duas tabelas de resposta, sem
  * duplicar os cabeçalhos PHP/FPM nem sobrescrever políticas de páginas sensíveis.
  *
- * HSTS_MAX_AGE (segundos; padrão inicial 86400 em produção, 0 = não enviar).
+ * HSTS_MAX_AGE (segundos; padrão 15552000 = 6 meses em produção desde a v54.76/NI2-885, 0 = não enviar).
  * Rollout explícito após validar HTTPS: 86400 -> 604800 -> 2592000 -> 31536000.
  * Valores explícitos existentes são respeitados; não há progressão automática.
  * HSTS_INCLUDE_SUBDOMAINS=false, HSTS_PRELOAD=false. Só é enviado por HTTPS.
@@ -50,10 +50,10 @@ final class SecurityHeaders
             return 'max-age=0';
         }
         $raw = Env::get('HSTS_MAX_AGE');
-        // Política de rollout seguro e gradual: padrão inicial de 86400 (1 dia) em produção.
-        // Progressão recomendada após validação HTTPS: 86400 -> 604800 -> 2592000 -> 31536000.
+        // NI2-885 (v54.76): padrão de 15552000 (6 meses) em produção, sem includeSubDomains/preload.
+        // Rollback: storage/hsts_rollback ou HSTS_MAX_AGE=0 (max-age=0). includeSubDomains/preload só depois de levantar os subdomínios.
         $isProd = strtolower((string)(Env::get('APP_ENV', '') ?? '')) === 'production';
-        $default = $isProd ? 86400 : 0;
+        $default = $isProd ? 15552000 : 0;
         $age = ($raw === null || $raw === '') ? $default : (int)$raw;
         // Se desabilitado expressamente (0), emite max-age=0 para limpar o navegador e impedir override do Apache
         if ($age === 0) {

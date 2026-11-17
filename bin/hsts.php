@@ -49,7 +49,7 @@ switch ($action) {
         $ok = SecurityHeaders::restoreNormalHsts($storageDir);
         if ($ok) {
             echo "  ✓ Flag de rollback removido com sucesso de: {$flagFile}\n";
-            echo "  ✓ Apache e PHP retornam ao baseline seguro normal (86400s / 1 dia).\n";
+            echo "  ✓ Apache e PHP retornam ao baseline seguro normal (15552000s / 6 meses).\n";
         } else {
             echo "  ✗ ERRO ao remover flag de rollback em: {$flagFile}\n";
             exit(1);
@@ -70,7 +70,7 @@ switch ($action) {
         echo "  • Sinalizador Manual do Operador   : " . ($manualRollbackActive ? "ATIVO ({$flagFile}) [PRECEDÊNCIA ABSOLUTA]" : "INATIVO") . "\n";
         echo "  • Status de Rollback Ativo         : " . ($activeRollback ? "SIM (max-age=0 forçado de ponta a ponta)" : "NÃO (Modo Gradual Normal)") . "\n";
         echo "  • Cabeçalho emitido pelo PHP       : " . ($hstsHeader ?? 'Nenhum') . "\n";
-        echo "  • Cabeçalho estático no Apache     : " . ($activeRollback ? 'max-age=0' : 'max-age=86400') . "\n\n";
+        echo "  • Cabeçalho estático no Apache     : " . ($activeRollback ? 'max-age=0' : 'max-age=15552000') . "\n\n";
         break;
 }
 

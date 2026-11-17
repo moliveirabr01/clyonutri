@@ -38,8 +38,8 @@ echo "========================================================================\n
 // -------------------------------------------------------------------------
 echo "[Controle 1] Imposição de HTTPS, Redirect Canônico e Bloqueio de Mutações Inseguras...\n";
 
-$_ENV['FORCE_HTTPS'] = 'true';
-$_ENV['APP_URL'] = 'https://app.clyonutri.com.br';
+$_ENV['FORCE_HTTPS'] = 'true'; putenv('FORCE_HTTPS=true');
+$_ENV['APP_URL'] = 'https://app.clyonutri.com.br'; putenv('APP_URL=https://app.clyonutri.com.br');
 
 // 1. Redirecionamento canônico 301 para GET/HEAD por HTTP
 $decisionGet = Transport::decide([
@@ -75,7 +75,7 @@ $decisionHttps = Transport::decide([
 check($decisionHttps === null, "Transport: Requisição sob HTTPS nativo segue normalmente sem interceptação (decide() === null)");
 
 // 4. Anti-spoofing em proxies reversos (X-Forwarded-Proto)
-$_ENV['TRUSTED_PROXIES'] = '10.0.0.1,10.0.0.2';
+$_ENV['TRUSTED_PROXIES'] = '10.0.0.1,10.0.0.2'; putenv('TRUSTED_PROXIES=10.0.0.1,10.0.0.2');
 
 $spoofedServer = [
     'REMOTE_ADDR' => '198.51.100.99', // IP externo não confiável
@@ -103,7 +103,7 @@ check(!str_contains($crlfCleaned, "\r") && !str_contains($crlfCleaned, "\n") && 
 echo "\n[Controle 2] CORS Allowlist Estrita e Restrições de API Móvel...\n";
 
 $_SERVER['HTTP_HOST'] = 'app.clyonutri.com.br';
-$_ENV['MOBILE_WEB_ORIGINS'] = 'https://mobile.clyonutri.com.br,https://paciente.clyonutri.com.br';
+$_ENV['MOBILE_WEB_ORIGINS'] = 'https://mobile.clyonutri.com.br,https://paciente.clyonutri.com.br'; putenv('MOBILE_WEB_ORIGINS=https://mobile.clyonutri.com.br,https://paciente.clyonutri.com.br');
 
 // 1. Validação de Mesma Origem (Host matching)
 check(MobileWebSession::allowedOrigin('https://app.clyonutri.com.br') === true, "MobileWebSession: Mesma origem (Host canônico) é autorizada");
@@ -152,10 +152,10 @@ $apiPolicy = SecurityHeaders::apiPolicy();
 check($apiPolicy === "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'", "CSP apiPolicy aplica isolamento máximo para endpoints JSON (default-src 'none')");
 
 // 4. Strict-Transport-Security (HSTS)
-$_ENV['APP_ENV'] = 'production';
-$_ENV['HSTS_MAX_AGE'] = '31536000';
-$_ENV['HSTS_INCLUDE_SUBDOMAINS'] = 'true';
-$_ENV['HSTS_PRELOAD'] = 'true';
+$_ENV['APP_ENV'] = 'production'; putenv('APP_ENV=production');
+$_ENV['HSTS_MAX_AGE'] = '31536000'; putenv('HSTS_MAX_AGE=31536000');
+$_ENV['HSTS_INCLUDE_SUBDOMAINS'] = 'true'; putenv('HSTS_INCLUDE_SUBDOMAINS=true');
+$_ENV['HSTS_PRELOAD'] = 'true'; putenv('HSTS_PRELOAD=true');
 
 $hstsVal = SecurityHeaders::hstsValue();
 check($hstsVal === 'max-age=31536000; includeSubDomains; preload', "SecurityHeaders::hstsValue gera diretiva completa com max-age, subdomínios e preload");

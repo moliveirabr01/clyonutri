@@ -114,7 +114,8 @@ class LgpdService
             }
             $stmt = $this->db->prepare("SELECT * FROM $table WHERE clinic_id = ? AND patient_id = ? ORDER BY id");
             $stmt->execute([$clinicId, $patientId]);
-            $related[$table] = array_map(fn(array $row) => array_diff_key($row, array_flip($omit)), $stmt->fetchAll(PDO::FETCH_ASSOC));
+            // NI2-885: colunas cifradas em repouso (ex.: clinical_records.content_json) saem em texto claro para o titular.
+            $related[$table] = array_map(fn(array $row) => self::decryptRowValues(array_diff_key($row, array_flip($omit))), $stmt->fetchAll(PDO::FETCH_ASSOC));
         }
         // Favoritos não têm clinic_id próprio: o vínculo com a clínica vem do paciente, já conferido acima.
         $fav = $this->db->prepare('SELECT id, recipe_id, created_at FROM recipe_patient_favorites WHERE patient_id = ? ORDER BY id');
@@ -281,5 +282,21 @@ class LgpdService
             }
             throw $e;
         }
+    }
+
+    /** NI2-885: decifra todo valor com envelope enc:v1 de uma linha exportada (portabilidade LGPD entrega texto claro). */
+    private static function decryptRowValues(array $row): array
+    {
+        foreach ($row as $k => $v) {
+            if (is_string($v) && ClinicalEncryptionService::isEncrypted($v)) {
+                try {
+                    $row[$k] = ClinicalEncryptionService::decrypt($v);
+                } catch (\Throwable) {
+                    $row[$k] = null; // ilegível com a chave atual: não entrega o envelope cifrado
+                    $row[$k . '_ilegivel'] = true;
+                }
+            }
+        }
+        return $row;
     }
 }

@@ -77,7 +77,7 @@ try {
     );
 
     assertHsts(
-        "public/.htaccess restringe o fallback 86400 para NÃO atuar quando rollback estiver ativo",
+        "public/.htaccess restringe o fallback de 6 meses para NÃO atuar quando rollback estiver ativo",
         str_contains($publicHt, "! -f '%{DOCUMENT_ROOT}/../storage/hsts_rollback'") ||
         str_contains($publicHt, "-z reqenv('HSTS_ROLLBACK')"),
         "Condição protege assets contra reativação indevida"
@@ -106,8 +106,8 @@ try {
     );
 
     assertHsts(
-        "hstsValue(\$tempStorageDir) em produção retorna baseline seguro de 86400",
-        SecurityHeaders::hstsValue($tempStorageDir) === 'max-age=86400',
+        "hstsValue(\$tempStorageDir) em produção retorna padrão de 6 meses (15552000, NI2-885)",
+        SecurityHeaders::hstsValue($tempStorageDir) === 'max-age=15552000',
         "Valor retornado: " . SecurityHeaders::hstsValue($tempStorageDir)
     );
 

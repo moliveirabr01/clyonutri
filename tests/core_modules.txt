@@ -23,3 +23,6 @@ tests/subscription_trial_test.php
 tests/auditoria_2026_10_14_f03_login_rate_limit_test.php
 tests/reauditoria_v2_02_account_wide_rate_limit_test.php
 tests/patient_otp_concurrency_and_security_test.php
+# transporte (HSTS de 6 meses e rollback, NI2-885)
+tests/ni2_428_hsts_test.php
+tests/hsts_end_to_end_rollback_test.php

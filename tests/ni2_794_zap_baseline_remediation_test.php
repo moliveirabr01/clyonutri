@@ -110,12 +110,12 @@ $publicHtaccess = file_get_contents(__DIR__ . '/../public/.htaccess');
 $rootHtaccess = file_get_contents(__DIR__ . '/../.htaccess');
 
 assertCondition(
-    str_contains($publicHtaccess, 'Header always setifempty Strict-Transport-Security "max-age=86400" "expr=%{HTTPS} == \'on\''),
-    "public/.htaccess define Strict-Transport-Security (baseline gradual 86400) para conexões HTTPS garantindo cobertura de assets"
+    str_contains($publicHtaccess, 'Header always setifempty Strict-Transport-Security "max-age=15552000" "expr=%{HTTPS} == \'on\''),
+    "public/.htaccess define Strict-Transport-Security (6 meses, NI2-885) para conexões HTTPS garantindo cobertura de assets"
 );
 assertCondition(
-    str_contains($rootHtaccess, 'Header always setifempty Strict-Transport-Security "max-age=86400" "expr=%{HTTPS} == \'on\''),
-    "Root .htaccess define Strict-Transport-Security (baseline gradual 86400) como primeira barreira de entrega HTTPS"
+    str_contains($rootHtaccess, 'Header always setifempty Strict-Transport-Security "max-age=15552000" "expr=%{HTTPS} == \'on\''),
+    "Root .htaccess define Strict-Transport-Security (6 meses, NI2-885) como primeira barreira de entrega HTTPS"
 );
 
 // -------------------------------------------------------------------------

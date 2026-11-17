@@ -163,9 +163,15 @@ check(in_array('crustaceos', $checkResult['patient_allergens'], true), "Taxonomi
 // -------------------------------------------------------------------------
 echo "\n[5/5] Teste de execução do script CLI de migração...\n";
 
-$cliOutput = shell_exec('php bin/encrypt_clinical_records.php --dry-run 2>&1');
-check(str_contains($cliOutput, 'CLYONUTRI II — MIGRAÇÃO DE CRIPTOGRAFIA EM REPOUSO'), "Script CLI bin/encrypt_clinical_records.php executado com sucesso");
-check(str_contains($cliOutput, 'SIMULAÇÃO (DRY-RUN'), "Modo de simulação --dry-run respeitado sem erros");
+// NI2-885: o script lê um .env explícito; aqui um .env de TESTE apontando para o banco desta execução.
+$tmpDir885 = sys_get_temp_dir() . '/ni2-480-cli-' . getmypid();
+@mkdir($tmpDir885, 0700, true);
+$dbPath480 = (string)(getenv('DB_DATABASE') ?: '');
+file_put_contents($tmpDir885 . '/teste.env', "APP_ENV=testing\nDB_CONNECTION=sqlite\nDB_DATABASE={$dbPath480}\nCLINICAL_ENCRYPTION_KEY=" . (getenv('CLINICAL_ENCRYPTION_KEY') ?: 'chave-teste-ni2-480') . "\n");
+$cliOutput = (string)shell_exec(escapeshellarg(PHP_BINARY) . ' bin/encrypt_clinical_records.php --dry-run --env-file=' . escapeshellarg($tmpDir885 . '/teste.env') . ' --log-dir=' . escapeshellarg($tmpDir885) . ' 2>&1');
+check(str_contains($cliOutput, 'cifragem em repouso dos dados clínicos antigos (NI2-885)') && str_contains($cliOutput, 'Concluído'), "Script CLI bin/encrypt_clinical_records.php executado com sucesso");
+check(str_contains($cliOutput, 'SIMULACAO (dry-run') && str_contains($cliOutput, 'nada foi gravado'), "Modo de simulação --dry-run respeitado sem erros");
+array_map('unlink', glob($tmpDir885 . '/*') ?: []); @rmdir($tmpDir885);
 
 // Limpar fixtures
 $db->prepare("DELETE FROM anamneses WHERE clinic_id = :c")->execute(['c' => $clinicId]);

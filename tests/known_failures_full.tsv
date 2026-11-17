@@ -20,17 +20,14 @@ tests/ni2_25_design_tokens_test.php	DESATUALIZADO-TESTE: tokens de cor declarado
 tests/ni2_347_admin_console_e2e_test.php	DESATUALIZADO-TESTE: casca visual do backoffice renomeada
 tests/ni2_412_ux_v3_test.php	DESATUALIZADO-TESTE: link Próxima semana mudou
 tests/ni2_427_https_transport_test.php	INVESTIGAR: proxy confiável + X-Forwarded-Proto; revisar junto com NI2-885 (HTTPS/HSTS)
-tests/ni2_428_hsts_test.php	NI2-885: HSTS_MAX_AGE vazio responde 500; tratado na história NI2-885
 tests/ni2_429_csp_headers_test.php	INVESTIGAR: 2 atributos on*= em telas (CSP)
 tests/ni2_437_preconsultation_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem
 tests/ni2_469_inventory_architecture_attack_surface_test.php	DECISAO-MAICON: política de 1 dependência de terceiros; composer.json cresceu
-tests/ni2_470_audit_https_cors_security_headers_test.php	NI2-885: valor HSTS (max-age/subdomínios/preload); tratado na NI2-885
 tests/ni2_471_audit_credentials_sessions_test.php	DESATUALIZADO-TESTE: procura texto antigo; Secure e timeout continuam no index.php (NI2-427/NI2-604); RegistrationRateLimiter::maxAttempts removido
 tests/ni2_472_audit_secrets_and_encryption_test.php	AMBIENTE: precisa do .git; no clone, git log -- "**.env" volta vazio (conferido)
 tests/ni2_475_audit_errors_supply_chain_test.php	DECISAO-MAICON: debug em produção bloqueado (PASS); falha só a política de dependências do composer.json
 tests/ni2_477_consolidated_security_audit_test.php	DESATUALIZADO-TESTE: timeout fixo 1800 virou configurável (PlatformSettings, NI2-604)
 tests/ni2_479_register_rate_limit_and_honeypot_test.php	DECISAO-MAICON: honeypot website_url saiu do register.php desde c039de5; rate limit PASS
-tests/ni2_480_clinical_encryption_test.php	NI2-885: script bin/encrypt_clinical_records.php; refeito na NI2-885
 tests/ni2_481_transactional_emails_e2e_test.php	FIXTURE: banco próprio sem a migração booking_holds (a migração existe)
 tests/ni2_584_587_execution_test.php	DESATUALIZADO-TESTE: rótulo do botão Manipulados mudou
 tests/ni2_588_590_execution_test.php	DESATUALIZADO-TESTE: navegação do perfil 360 mudou
@@ -56,7 +53,6 @@ tests/review_ni2_91_provas.php	FIXTURE: cria consultório com id já existente
 tests/runtime_platform_settings_and_commercial_metrics_test.php	FIXTURE: FK: presume dados do banco de desenvolvimento
 tests/shopping_list_ni2_116_verifiable_test.php	INVESTIGAR: arredondamento da lista de compras para 14 dias: 18,6 em vez de 18,7
 tests/teleconsultation_online_clinic_e2e_test.php	DESATUALIZADO-TESTE: sala exige teste de câmera/microfone antes da admissão
-tests/v10_https_e_diagnostico_test.php	NI2-885: HTTPS/diagnóstico; revisar na NI2-885
 tests/v14_ux_audit_test.php	DESATUALIZADO-TESTE: procura indicador de autosave no texto
 tests/v15_audit_remediation_test.php	AMBIENTE: pede banco MySQL acessível
 tests/v16_audit_remediation_test.php	AMBIENTE: pede banco MySQL acessível
