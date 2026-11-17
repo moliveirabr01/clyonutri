@@ -61,3 +61,4 @@ tests/plano_impressao/node_modules
 storage/*_last_run
 storage/cron_scheduler.lock
 storage/test-reports/
+storage/integration_validation/

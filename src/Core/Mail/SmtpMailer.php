@@ -45,6 +45,9 @@ final class SmtpMailer implements Mailer
                 $mail->Host = $this->host;
                 $mail->Port = $this->port;
                 $mail->Timeout = $this->timeoutSeconds;
+                // NI2-877: o PHPMailer espera cada resposta até Timelimit (padrão 300 s), não até Timeout.
+                // Sem isto, um servidor que aceita a conexão e para de responder prende a requisição por minutos.
+                $mail->getSMTPInstance()->Timelimit = $this->timeoutSeconds;
                 $mail->SMTPAuth = $this->username !== '';
                 $mail->Username = $this->username;
                 $mail->Password = $this->password;
