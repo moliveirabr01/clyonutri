@@ -50,6 +50,7 @@ try {
     $ok($items === 5, "timeline mostra 5 itens na carga (viu $items)");
     $ok(str_contains($tl, 'data-testid="timeline-ver-tudo"'), 'timeline tem "ver histórico completo"');
     $ok(!str_contains($tl, 'name="timeline_type"'), 'filtros não aparecem no resumo curto');
+    $ok(preg_match('/>\d+ registros no resumo\./', $tl) === 1, 'contagem do resumo com número e plural ("N registros no resumo")');
     $strip = $section($b, 'operational-strip');
     $ok(str_contains($strip, 'Evolução TESTE 887 #12'), 'última evolução = a mais recente gravada');
 
