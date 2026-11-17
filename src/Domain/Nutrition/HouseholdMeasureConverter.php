@@ -551,6 +551,7 @@ class HouseholdMeasureConverter
                     ];
                 }
             } catch (\Throwable) {
+                /* NI2-892: sem histórico da clínica a sugestão cai para a medida padrão. */
             }
         }
         $measures = $this->exactMeasuresForFood($foodId, $food);

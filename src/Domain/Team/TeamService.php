@@ -277,6 +277,7 @@ final class TeamService
             $c->execute([$clinicId]);
             $clinic = (string)$c->fetchColumn();
         } catch (\Throwable $e) {
+            /* NI2-892: sem o nome da clínica o convite sai com texto genérico. */
         }
         $delivery = 'manual';
         $note = 'O servidor de e-mail não está entregando mensagens: copie o link agora e envie à pessoa por um canal seguro.';

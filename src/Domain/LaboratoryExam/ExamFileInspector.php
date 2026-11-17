@@ -318,7 +318,7 @@ final class ExamFileInspector
                     StructuredLogger::error('EXAM_ANTIVIRUS_UNAVAILABLE_REJECTED', [
                         'mode' => $this->mode,
                     ]);
-                } catch (\Throwable) {}
+                } catch (\Throwable) { /* NI2-892: falha do log estruturado não muda a decisão do antivírus; o error_log acima já deixa o rastro. */ }
                 throw new InvalidArgumentException('Não foi possível verificar o arquivo agora. Tente de novo mais tarde.');
             }
             // v49: modo auto sem ClamAV continua aceitando, mas deixa rastro claro no log (sem nome de arquivo nem dado de paciente).
@@ -329,7 +329,7 @@ final class ExamFileInspector
                     'status' => 'unavailable',
                     'action' => 'accepted_uninspected',
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) { /* NI2-892: falha do log estruturado não muda a decisão do antivírus; o error_log acima já deixa o rastro. */ }
             return 'antivirus:indisponivel';
         }
         if ($r['clean'] === false) {
@@ -338,7 +338,7 @@ final class ExamFileInspector
                 StructuredLogger::error('EXAM_FILE_INFECTED', [
                     'engine' => $r['engine'],
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) { /* NI2-892: falha do log estruturado não muda a decisão do antivírus; o error_log acima já deixa o rastro. */ }
             throw new InvalidArgumentException('O arquivo foi recusado pela verificação de segurança.');
         }
         if ($r['clean'] === null) {
@@ -348,7 +348,7 @@ final class ExamFileInspector
                         'mode' => $this->mode,
                         'engine' => $r['engine'],
                     ]);
-                } catch (\Throwable) {}
+                } catch (\Throwable) { /* NI2-892: falha do log estruturado não muda a decisão do antivírus; o error_log acima já deixa o rastro. */ }
                 throw new InvalidArgumentException('Não foi possível verificar o arquivo agora. Tente de novo mais tarde.');
             }
             error_log('EXAM_RESULT_ANTIVIRUS_ERROR modo=auto: o antivírus não concluiu a verificação (' . $r['engine'] . '); laudo aceito.');
@@ -357,7 +357,7 @@ final class ExamFileInspector
                     'mode' => $this->mode,
                     'engine' => $r['engine'],
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable) { /* NI2-892: falha do log estruturado não muda a decisão do antivírus; o error_log acima já deixa o rastro. */ }
             return 'antivirus:erro-na-verificacao';
         }
         return 'antivirus:' . $r['engine'] . '-ok';

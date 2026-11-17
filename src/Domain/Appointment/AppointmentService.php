@@ -281,7 +281,7 @@ class AppointmentService
                     'scheduled_at' => $parsedDate,
                     'professional_id' => $professionalId,
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do encaixe autorizado não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
         }
         // NI2-138: consulta marcada com o profissional = acompanhamento ativo; o vínculo libera o chat.
         (new \ClyoNutri\Domain\Chat\PatientLinkService($this->db))->ensureFromCare($clinicId, $patientId, $professionalId, 'appointment');
@@ -887,6 +887,7 @@ class AppointmentService
                     $this->db->exec('ROLLBACK TO SAVEPOINT sp_complete_consult');
                     $this->db->exec('RELEASE SAVEPOINT sp_complete_consult');
                 } catch (\Throwable) {
+                    /* NI2-892: savepoint já desfeito pela falha original; a exceção original é relançada abaixo. */
                 }
             }
             throw $e;

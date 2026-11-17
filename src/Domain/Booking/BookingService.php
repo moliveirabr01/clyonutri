@@ -633,7 +633,8 @@ class BookingService
                     }
                     $contextualNotes = trim((string)($opRow['contextual_notes'] ?? ''));
                 }
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                error_log('[ClyoNutri][NI2-892] contexto opcional do agendamento indisponível: ' . get_class($e) . ' ' . (string)$e->getCode());
             }
 
             // v54.59: especialidade/temas só aparecem no diretório público após confirmação

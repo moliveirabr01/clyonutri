@@ -67,6 +67,7 @@ class AuthController
             try {
                 $minutes = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes();
             } catch (\Throwable $e) {
+                /* NI2-892: sem a configuração da plataforma vale o padrão de 120 min no aviso. */
             }
             $sessionNotice = match ($reason) {
                 'session_timeout' => "Sua sessão foi encerrada depois de {$minutes} minutos sem uso, para proteger os dados dos pacientes. Entre de novo para continuar de onde parou.",
@@ -919,7 +920,8 @@ class AuthController
                 VALUES (NULL, NULL, ?, 'auth', NULL, ?, ?, ?)")->execute([
                 $action, $ip, substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255), json_encode(['reason' => 'trap_field_filled']),
             ]);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            error_log('[ClyoNutri][NI2-892] auditoria do campo-armadilha do login não gravada: ' . get_class($e) . ' ' . (string)$e->getCode());
         }
     }
 }

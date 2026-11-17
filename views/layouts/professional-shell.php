@@ -28,7 +28,7 @@ if ($shellFirstName === '') {
   <?php if (!empty($dashboardV5456Styles)): ?><link rel="stylesheet" href="/assets/css/dashboard-v54-56.css?v=v54-56"><?php endif; ?>
   <link rel="stylesheet" href="/assets/css/workspace-v54-58.css?v=v54-66">
 </head>
-<?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) {} ?>
+<?php $shellSessionTtl = 7200; try { $shellSessionTtl = \ClyoNutri\Core\Settings\PlatformSettings::getSessionTimeoutMinutes() * 60; } catch (\Throwable $e) { /* NI2-892: sem a configuração da plataforma vale o padrão de 2 h. */ } ?>
 <body class="cn58" data-session-ttl="<?= (int)$shellSessionTtl ?>">
   <a class="skip-link skip-clinical-content" href="#clinical-main-content">Pular para o conteúdo principal</a>
   <div class="app-container">

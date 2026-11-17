@@ -198,7 +198,7 @@ class HelpdeskTicketService
                     'res' => (string)$ticketId,
                     'details' => json_encode(['protocol' => $protocol, 'category' => $category, 'type' => $type], JSON_UNESCAPED_UNICODE),
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do chamado (abertura) não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
 
             // Notificação in-app sem PII sensível
             $this->createNotification(
@@ -540,7 +540,7 @@ class HelpdeskTicketService
                     'res' => (string)$ticketId,
                     'details' => json_encode(['message_id' => $msgId, 'is_internal' => $isInternalNote], JSON_UNESCAPED_UNICODE),
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do chamado (mensagem) não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
 
             if ($startedTx && $this->db->inTransaction()) {
                 $this->db->commit();
@@ -646,7 +646,7 @@ class HelpdeskTicketService
                     'res' => (string)$ticketId,
                     'details' => json_encode(['from' => $oldStatus, 'to' => $newStatus], JSON_UNESCAPED_UNICODE),
                 ]);
-            } catch (\Throwable) {}
+            } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do chamado (status) não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
 
             if ($startedTx && $this->db->inTransaction()) {
                 $this->db->commit();

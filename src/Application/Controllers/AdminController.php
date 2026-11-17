@@ -399,7 +399,8 @@ final class AdminController
                 $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type = 'user' AND tokenable_id = :uid")->execute(['uid' => (int)$ownerId]);
                 try {
                     \ClyoNutri\Core\Auth\ProfessionalSecurityNotifier::make($this->db)->accountSuspended((int)$ownerId);
-                } catch (\Throwable) {
+                } catch (\Throwable $e) {
+                    error_log('[ClyoNutri][NI2-892] aviso de conta suspensa não enviado: ' . get_class($e) . ' ' . (string)$e->getCode());
                 }
             }
         }

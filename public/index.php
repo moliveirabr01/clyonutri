@@ -1183,7 +1183,7 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
                     if (!empty($stmt->queryString)) {
                         try {
                             $stmt = $db->prepare($stmt->queryString);
-                        } catch (\Throwable) {}
+                        } catch (\Throwable) { /* NI2-892: se o novo prepare falhar, a próxima tentativa usa o statement anterior e o erro aparece no fim. */ }
                     }
                     continue;
                 }
@@ -1386,7 +1386,7 @@ $router->post('/api/v1/auth/patient-login', function() use ($db, $getJsonInput) 
                 'details' => json_encode(['channel' => 'api_patient', 'actor_type' => 'patient']),
                 'ca' => date('Y-m-d H:i:s'),
             ]);
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do login da API do paciente não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
     echo json_encode([
         'token' => $token,
         'expires_at' => $expiresAt,
@@ -1417,7 +1417,7 @@ $router->post('/api/v1/auth/patient-logout', function() use ($authenticatePatien
                 'details' => json_encode(['channel' => 'api_patient', 'actor_type' => 'patient']),
                 'ca' => date('Y-m-d H:i:s'),
             ]);
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do logout da API do paciente não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
     \ClyoNutri\Core\Auth\MobileWebSession::clear();
     echo json_encode(['message' => 'Token revogado com sucesso.']);
 });
@@ -2275,7 +2275,7 @@ $router->post('/api/v1/auth/professional-login', function() use ($db, $getJsonIn
                 'details' => json_encode(['channel' => 'api_professional', 'role' => (string)$user['role']]),
                 'ca' => date('Y-m-d H:i:s'),
             ]);
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do login da API profissional não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
     echo json_encode([
         'token' => $token,
         'expires_at' => $expiresAt,
@@ -2308,7 +2308,7 @@ $router->post('/api/v1/auth/professional-logout', function() use ($authenticateP
                 'details' => json_encode(['channel' => 'api_professional', 'role' => (string)$auth['user_role']]),
                 'ca' => date('Y-m-d H:i:s'),
             ]);
-    } catch (\Throwable) {}
+    } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] auditoria do logout da API profissional não gravada: ' . get_class($e) . ' ' . (string)$e->getCode()); }
     \ClyoNutri\Core\Auth\MobileWebSession::clear();
     echo json_encode(['message' => 'Token profissional revogado com sucesso.']);
 });

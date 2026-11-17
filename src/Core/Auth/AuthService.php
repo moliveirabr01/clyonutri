@@ -287,7 +287,7 @@ class AuthService
 
         try {
             $this->db->prepare("DELETE FROM sessions WHERE user_id = :id")->execute(['id' => $userId]);
-        } catch (\Throwable) {}
+        } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] sessões do usuário não apagadas em bumpAuthVersion (auth_version já invalidou): ' . get_class($e) . ' ' . (string)$e->getCode()); }
 
         $stmt = $this->db->prepare("SELECT auth_version FROM users WHERE id = :id");
         $stmt->execute(['id' => $userId]);
@@ -304,12 +304,12 @@ class AuthService
 
         try {
             $this->db->prepare("DELETE FROM sessions WHERE user_id = :id")->execute(['id' => $userId]);
-        } catch (\Throwable) {}
+        } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] sessões do usuário não apagadas em revokeUserSessions (auth_version já invalidou): ' . get_class($e) . ' ' . (string)$e->getCode()); }
 
         try {
             $this->db->prepare("DELETE FROM personal_access_tokens WHERE tokenable_type IN ('user','professional') AND tokenable_id = :id")
                 ->execute(['id' => $userId]);
-        } catch (\Throwable) {}
+        } catch (\Throwable $e) { error_log('[ClyoNutri][NI2-892] tokens de API do usuário não apagados em revokeUserSessions: ' . get_class($e) . ' ' . (string)$e->getCode()); }
     }
 
     /**

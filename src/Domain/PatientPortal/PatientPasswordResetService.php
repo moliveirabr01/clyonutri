@@ -248,7 +248,8 @@ final class PatientPasswordResetService
             error_log('[ClyoNutri][patient-pwreset] falha ao enviar (patient_id=' . $patientId . '): ' . $e->getMessage());
             try {
                 $this->audit($clinicId, $patientId, 'PATIENT_PASSWORD_RESET_EMAIL_FAILED', (string)$patientId, $ip, $ua, ['email_hash' => hash('sha256', $email), 'error' => mb_substr($e->getMessage(), 0, 200)]);
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                /* NI2-892: a falha do envio já foi registrada no error_log acima; a auditoria da falha é complementar. */
             }
             return 'failed';
         }

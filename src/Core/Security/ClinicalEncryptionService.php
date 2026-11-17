@@ -108,7 +108,7 @@ final class ClinicalEncryptionService
     {
         $out = [];
         foreach (self::ANAMNESIS_ENCRYPTED_FIELDS as $f) {
-            try { $db->query("SELECT {$f} FROM anamneses LIMIT 0"); $out[] = $f; } catch (\Throwable $e) {}
+            try { $db->query("SELECT {$f} FROM anamneses LIMIT 0"); $out[] = $f; } catch (\Throwable $e) { /* NI2-892: coluna ausente nesta instalação (sondagem de esquema). */ }
         }
         return $out;
     }

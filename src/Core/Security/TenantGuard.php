@@ -21,7 +21,11 @@ class TenantGuard
      */
     public static function assertPatientBelongsToClinic(int $patientId, int $clinicId, PDO $db): array
     {
-        $patient = self::findScoped($db, 'patients', $patientId, $clinicId, 'id, clinic_id, name, email'); // CR-NI2-004: id+clinic_id no SQL
+        // NI2-892 (etapa 1): numa requisição GET da web a mesma ficha chamava esta checagem 18 vezes. Só o resultado POSITIVO
+        // fica em memória, só durante esta requisição, por conexão + clínica + paciente; a regra do ator paciente roda sempre.
+        $memoKey = self::memoEnabled() ? spl_object_id($db) . ':' . $clinicId . ':' . $patientId : null;
+        $patient = $memoKey !== null && isset(self::$patientMemo[$memoKey]) ? self::$patientMemo[$memoKey]
+            : self::findScoped($db, 'patients', $patientId, $clinicId, 'id, clinic_id, name, email'); // CR-NI2-004: id+clinic_id no SQL
 
         $actor = TenantContext::getUser();
         if (!$patient || (int)$patient['clinic_id'] !== $clinicId || (($actor['role']??'')==='patient' && (int)($actor['id']??0)!==$patientId)) {
@@ -29,7 +33,24 @@ class TenantGuard
             throw new TenantSecurityException("Acesso negado: registro não encontrado nesta clínica.", 403); // NI2-24 (M4): sem id nem jargão; o detalhe fica na auditoria
         }
 
+        if ($memoKey !== null) {
+            self::$patientMemo[$memoKey] = $patient;
+        }
         return $patient;
+    }
+
+    /** NI2-892: memória da checagem de paciente, válida só dentro de uma requisição GET servida pela web (nunca no CLI/testes de processo único). */
+    private static array $patientMemo = [];
+
+    private static function memoEnabled(): bool
+    {
+        return PHP_SAPI !== 'cli' && strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) === 'GET';
+    }
+
+    /** NI2-892: limpa a memória (testes e qualquer código que troque o paciente de clínica na mesma requisição). */
+    public static function resetMemo(): void
+    {
+        self::$patientMemo = [];
     }
 
     /**
