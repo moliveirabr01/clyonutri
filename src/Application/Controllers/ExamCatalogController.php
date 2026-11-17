@@ -39,6 +39,13 @@ class ExamCatalogController
         $userId = (int)TenantContext::getUserId();
         $eligibilityError = $this->eligibilityError($userId, $clinicId);
         $catalog = $this->catalog->search('', null, true, 500, $clinicId);
+        // NI2-891: justificativa "sem código" da revisão do RT; só lê a coluna se a migração 100 já rodou.
+        $review = new \ClyoNutri\Domain\LaboratoryExam\ExamCatalogReviewService($this->db);
+        if ($review->ready()) {
+            $notes = array_column($review->rows(), 'standard_code_note', 'id');
+            foreach ($catalog as &$row) { $row['standard_code_note'] = $notes[(int)$row['id']] ?? null; }
+            unset($row);
+        }
         $favoriteIds = $this->catalog->favoriteIds($clinicId, $userId);
         $custom = $this->catalog->listCustomExams($clinicId);
         $isManager = ExamCatalogService::isClinicManager($this->db, $userId, $clinicId);

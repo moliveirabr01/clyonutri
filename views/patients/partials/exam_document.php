@@ -85,6 +85,10 @@ $contact = array_filter([$c['phone'] !== '' ? 'Tel. ' . $c['phone'] : '', $c['em
     </tr>
   </table>
 
+  <?php if (($doc['status'] ?? '') === 'issued' && $doc['issued_date'] !== ''): // NI2-891: texto neutro, sem "sem assinatura digital" ?>
+  <div class="exd-small" data-testid="exam-issued-line">Documento emitido em <?= $e($doc['issued_date']) ?> por <?= $e($doc['professional']['name']) ?>, <?= $e($doc['professional']['crn']) ?>. Assinar e carimbar para uso em papel.</div>
+  <?php endif; ?>
+
   <?php if ($doc['coverage_notice'] !== ''): ?>
   <div class="exd-notice"><strong>Cobertura:</strong> <?= $e(preg_replace('/^\s*Atenção:\s*/u', '', $doc['coverage_notice'])) ?></div>
   <?php endif; ?>

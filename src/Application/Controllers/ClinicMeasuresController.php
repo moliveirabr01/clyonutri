@@ -82,6 +82,16 @@ class ClinicMeasuresController
         $clinicName = $_SESSION['clinic_name'] ?? 'Minha Clínica';
         $userName = $_SESSION['user_name'] ?? 'Profissional';
         $csrfToken = Csrf::token();
+        // NI2-891: estado da base Clyo Nutri revisada (NI2-886) para o texto do topo.
+        $measureBase = ['pending' => 0, 'approved' => 0, 'last_at' => null];
+        try {
+            $mdb = \ClyoNutri\Core\Database\Connection::getInstance();
+            if (\ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService::ready($mdb)) {
+                $st = (new \ClyoNutri\Domain\Nutrition\HouseholdMeasureReviewService($mdb))->stats();
+                $measureBase = ['pending' => $st['pending'], 'approved' => $st['approved'],
+                    'last_at' => $mdb->query("SELECT MAX(reviewed_at) FROM food_household_measures WHERE review_status IN ('approved','removed')")->fetchColumn() ?: null];
+            }
+        } catch (\Throwable) { /* sem a migração 99 o texto neutro abaixo vale */ }
 
         ob_start();
         require __DIR__ . '/../../../views/meal_plans/clinic_measures.php';

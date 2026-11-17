@@ -100,7 +100,7 @@ $ver = (int)($request['version_number'] ?? 1);
           <dt>PDF</dt><dd>Emitida antes da versão 46, sem PDF guardado. Use Imprimir; para ter o PDF, use "Corrigir (nova versão)" e emita.</dd>
         <?php endif; ?>
       </dl>
-      <p class="ex-muted">O documento sai com linha para assinatura e carimbo do nutricionista. Assinatura digital ainda não está disponível.</p>
+      <p class="ex-muted">O documento sai com linha para assinatura e carimbo do nutricionista, para uso em papel.</p>
     </section>
   <?php elseif ($st === 'cancelled'): ?>
     <div class="op-message op-message--info ex-msg ex-msg-error" role="status"><strong>Solicitação cancelada em <?= $e($doc['cancelled_at_local']) ?>.</strong> Motivo: <?= $e($request['cancellation_reason']) ?></div>

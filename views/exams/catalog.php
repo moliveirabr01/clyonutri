@@ -9,7 +9,8 @@ $fav = array_flip(array_map('intval', $favoriteIds));
 $valLabel = ['pending' => 'Aguardando validação', 'approved' => 'Validado', 'rejected' => 'Recusado'];
 $valBadge = ['pending' => 'badge-warning', 'approved' => 'badge-success', 'rejected' => 'badge-danger'];
 $fmt = static fn($v) => $v ? date('d/m/Y H:i', strtotime((string)$v)) : '';
-$pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_status'] ?? 'pending') !== 'reviewed'));
+// NI2-891: conta só o catálogo geral (os exames da clínica têm validação própria) e o aviso aparece só para dona/administradora.
+$pendingReview = !empty($isManager) ? count(array_filter($catalog, fn($x) => ($x['origin'] ?? 'curated') !== 'clinic_custom' && ($x['clinical_review_status'] ?? 'pending') !== 'reviewed')) : 0;
 ?>
 <link rel="stylesheet" href="/assets/css/exames.css?v=v54-68">
 <div class="clinical-journey ex-page">
@@ -25,7 +26,7 @@ $pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_sta
     <div class="ex-msg <?= $flash['type'] === 'error' ? 'ex-msg-error' : 'ex-msg-success' ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= $e($flash['message']) ?></div>
   <?php endif; ?>
   <?php if ($pendingReview > 0): ?>
-    <div class="ex-msg ex-msg-warning" role="note"><strong>Revisão clínica do catálogo pendente.</strong> <?= (int)$pendingReview ?> <?= \ClyoNutri\Application\View\UserText::count((int)$pendingReview, 'exame', 'exames') ?> ainda sem revisão registrada por nutricionista responsável técnico. Os códigos TUSS/LOINC ficam em branco até haver licença de uso.</div>
+    <div class="ex-msg ex-msg-info" role="note" data-testid="exam-catalog-review-notice"><?= $e(\ClyoNutri\Application\View\UserText::count((int)$pendingReview, '1 exame do catálogo geral aguarda', '{n} exames do catálogo geral aguardam')) ?> a revisão do nutricionista responsável técnico do Clyo Nutri. Até lá, a coluna Código fica em branco para esses exames. Aviso visível só para a dona ou administradora da clínica.</div>
   <?php endif; ?>
 
   <section class="card ex-card" aria-labelledby="cat-titulo">
@@ -39,7 +40,7 @@ $pendingReview = count(array_filter($catalog, fn($x) => ($x['clinical_review_sta
           <tr id="exame-<?= $id ?>">
             <td><strong><?= $e($x['canonical_name']) ?></strong><?php if (!empty($x['synonyms'])): ?><br><span class="ex-muted">Sinônimos: <?= $e($x['synonyms']) ?></span><?php endif; ?></td>
             <td><?= $e($x['category']) ?><br><span class="ex-muted"><?= $e($x['sample_type']) ?><?= !empty($x['fasting_hours']) ? ' · jejum ' . (int)$x['fasting_hours'] . 'h' : '' ?></span></td>
-            <td><?= !empty($x['standard_code']) ? $e($x['standard_code_system'] . ' ' . $x['standard_code']) : '<span class="ex-muted">—</span>' ?></td>
+            <td><?= !empty($x['standard_code']) ? $e($x['standard_code_system'] . ' ' . $x['standard_code']) : (!empty($x['standard_code_note']) ? '<span class="ex-muted">Sem código: ' . $e($x['standard_code_note']) . '</span>' : '<span class="ex-muted">—</span>') ?></td>
             <td><?= ($x['origin'] ?? 'curated') === 'clinic_custom' ? '<span class="badge badge-neutral">Da clínica</span>' : '<span class="ex-muted">Catálogo geral</span>' ?></td>
             <td class="text-right">
               <form method="POST" action="/exames/catalogo/favoritos/<?= $id ?>" data-no-dirty>

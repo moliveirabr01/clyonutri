@@ -12,9 +12,16 @@ $pct = $coverage['foods'] > 0 ? round(100 * $coverage['with_any'] / $coverage['f
   <div class="u-mb-4">
     <a href="/alimentos" class="u-text-compact u-link">← Tabela de alimentos</a>
     <h1 class="u-text-h2 u-font-bold u-color-botanical-forest-900 u-my-1 u-mx-0">Medidas caseiras da clínica</h1>
-    <p class="u-color-neutral-gray-600 u-m-0 u-text-body u-leading-body">
-      Aqui você cadastra quanto pesa, em gramas, a colher, a fatia ou a unidade de cada alimento. O Clyo Nutri não traz uma base de medidas caseiras pronta:
-      cada valor entra com a fonte que você informar (pesagem na clínica, rótulo, tabela publicada) e vale só para a sua clínica.
+    <?php $measureBase = $measureBase ?? ['pending' => 0, 'approved' => 0, 'last_at' => null]; ?>
+    <p class="u-color-neutral-gray-600 u-m-0 u-text-body u-leading-body" data-testid="measures-base-status">
+      <?php if ((int)$measureBase['approved'] > 0 && (int)$measureBase['pending'] === 0 && !empty($measureBase['last_at'])): ?>
+        Base Clyo Nutri revisada em <?= $e(date('d/m/Y', strtotime((string)$measureBase['last_at']))) ?>. Você pode cadastrar abaixo as medidas próprias da sua clínica; elas valem só para ela e têm prioridade no plano.
+      <?php elseif ((int)$measureBase['approved'] > 0): ?>
+        A base Clyo Nutri está em revisão: <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['approved'], '1 medida já revisada', '{n} medidas já revisadas')) ?> e <?= $e(\ClyoNutri\Application\View\UserText::count((int)$measureBase['pending'], '1 estimada aguarda revisão', '{n} estimadas aguardam revisão')) ?>.
+        Enquanto isso, <a href="#cm-add">cadastre as medidas que você usa</a> com a fonte (pesagem na clínica, rótulo, tabela publicada); elas valem só para a sua clínica.
+      <?php else: ?>
+        A base Clyo Nutri de medidas caseiras ainda está em revisão. Você já pode <a href="#cm-add">cadastrar as medidas que você usa</a> com a fonte (pesagem na clínica, rótulo, tabela publicada); elas valem só para a sua clínica.
+      <?php endif; ?>
       Sem medida cadastrada, o plano usa a tabela padrão estimada e pede a sua confirmação.
     </p>
   </div>

@@ -87,3 +87,4 @@
 /* NI2-630: catalog choices reflow at 320 CSS px without an internal horizontal scroll. */
 .ex-item > span{min-width:0;overflow-wrap:anywhere}
 .ex-item input{flex-shrink:0}
+.ex-msg-info{background:var(--botanical-cream-50, #FAF7F0);border-color:var(--botanical-sage-300);color:var(--botanical-forest-900)}

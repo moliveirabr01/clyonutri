@@ -22,7 +22,7 @@ uxcheck('rollback não altera a revisão',$state['revision']===$writes->state('p
 $an=$writes->state('anamnesis',$p1);$a=$writes->write('anamnesis',$p1,0,bin2hex(random_bytes(16)),$an['revision'],['notes'=>'TESTE retomada'],function()use($db,$p1,$professionals){$r=(new AnamnesisService($db))->saveAnamnesis($p1,$professionals[0],['notes'=>'TESTE retomada','allergy_assessment'=>'not_assessed'],true);return['resource_id'=>$p1,'record_id'=>$r['id']];});
 uxcheck('rascunho canônico retomado sem trocar vigente',(new AnamnesisService($db))->getLatestAnamnesis($p1)['notes']==='TESTE retomada' && (new AnamnesisService($db))->getClinicalSummaryForPrescription($p1)['source']['version']===1);
 uxdenied('rascunho antigo de anamnese gera conflito',fn()=>$writes->write('anamnesis',$p1,0,bin2hex(random_bytes(16)),$an['revision'],[],fn()=>[]));
-uxcheck('PDF com hash não recebe estado de assinatura',WorkflowState::label('signed')==='Emitido — sem assinatura digital');
+uxcheck('PDF com hash não recebe estado de assinatura',WorkflowState::label('signed')==='Emitido');
 uxcheck('assinatura exige verificação explícita',WorkflowState::label('signed',true)==='Assinado verificavelmente');
 TenantContext::set($c2,['id'=>$users[2],'role'=>'nutritionist']);uxdenied('clínica B não lê estado A',fn()=>$writes->state('plan',$plan));uxdenied('clínica B não altera plano A',fn()=>$writes->write('plan',$plan,0,bin2hex(random_bytes(16)),$state['revision'],[],fn()=>[]));
 TenantContext::set($c1,['id'=>$users[0],'role'=>'nutritionist']);
