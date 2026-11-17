@@ -222,6 +222,10 @@ final class BookingController
                 'terms_accepted' => $body['terms_accepted'] ?? false,
                 'consent_term_id' => $body['consent_term_id'] ?? 0,
             ]);
+            if (!$authenticated) {
+                // NI2-893 item 3 / CR875-11: o visitante sem login não recebe ids sequenciais (consulta e paciente).
+                unset($result['appointment_id'], $result['patient_id']);
+            }
             $this->respondJson(200, $result);
         } catch (BookingUnavailableException $e) {
             $this->respondJson(404, ['error' => $e->getMessage(), 'code' => 'BOOKING_NOT_AVAILABLE']);

@@ -428,6 +428,11 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             <div style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin-bottom: 4px;">Local de Atendimento</div>
             <div id="receipt-address" style="font-size: 0.95rem; color: var(--botanical-forest-900, #0F3E17); font-weight: 600;" data-testid="receipt-address"></div>
           </div>
+
+          <div id="receipt-code-box" style="margin-top: 10px;" hidden>
+            <div style="font-size: 0.85rem; color: var(--neutral-gray-600, #475467); margin-bottom: 4px;">Código do agendamento (para falar com o consultório)</div>
+            <div id="receipt-code" style="font-size: 1rem; color: var(--botanical-forest-900, #0F3E17); font-weight: 600; letter-spacing: 0.08em;" data-testid="booking-code"></div>
+          </div>
         </div>
 
         <div style="display: flex; gap: 12px; justify-content: center;">
@@ -749,6 +754,12 @@ $nonce = \ClyoNutri\Core\Http\SecurityHeaders::nonce();
             } else {
               recBox.style.display = 'none';
             }
+          }
+
+          var codeBox = document.getElementById('receipt-code-box');
+          if (codeBox && result && typeof result.booking_code === 'string' && /^[A-Z0-9]{8}$/.test(result.booking_code)) {
+            document.getElementById('receipt-code').textContent = result.booking_code;
+            codeBox.hidden = false;
           }
 
           document.getElementById('section-step-3').style.display = 'none';

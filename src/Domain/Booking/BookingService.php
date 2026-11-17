@@ -1036,6 +1036,7 @@ class BookingService
                 return [
                     'success' => true,
                     'already_confirmed' => true,
+                    'booking_code' => self::bookingCode((string)$hold['hold_token']),
                     'appointment_id' => (int)$hold['appointment_id'],
                     'scheduled_at' => (string)$hold['scheduled_at'],
                     'status' => 'scheduled',
@@ -1152,7 +1153,8 @@ class BookingService
             (new \ClyoNutri\Domain\Notification\AppointmentConfirmationPublisher($this->db))->publish($clinicId, $appointmentId);
 
             (new BookingFlowMetrics($this->db))->count($clinicId,'booking_confirmed');
-            $this->audit($clinicId, 'BOOKING_CONFIRMED', (string)$appointmentId, ['hold_id' => (int)$hold['id'], 'modality' => $modality, 'service_type' => $serviceType]);
+            $bookingCode = self::bookingCode((string)$hold['hold_token']);
+            $this->audit($clinicId, 'BOOKING_CONFIRMED', (string)$appointmentId, ['hold_id' => (int)$hold['id'], 'modality' => $modality, 'service_type' => $serviceType, 'booking_code' => $bookingCode]);
 
             if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->commit();
@@ -1160,6 +1162,7 @@ class BookingService
 
             return [
                 'success' => true,
+                'booking_code' => $bookingCode,
                 'appointment_id' => $appointmentId,
                 'patient_id' => $patientId,
                 'scheduled_at' => $scheduledAt,
@@ -1174,6 +1177,23 @@ class BookingService
             }
             throw $e;
         }
+    }
+
+    /**
+     * NI2-893 item 3 / CR875-11: código do agendamento mostrado ao visitante, no lugar do id sequencial.
+     * 8 caracteres (alfabeto sem 0/O/1/I) derivados do hold_token aleatório de 256 bits: não segue ordem, não revela
+     * volume e não serve para consultar nada (nenhuma rota aceita o código). O suporte acha o agendamento pela
+     * auditoria BOOKING_CONFIRMED, que guarda o mesmo código.
+     */
+    public static function bookingCode(string $holdToken): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $bytes = hash('sha256', 'clyo-booking-code|' . $holdToken, true);
+        $code = '';
+        for ($i = 0; $i < 8; $i++) {
+            $code .= $alphabet[ord($bytes[$i]) & 31];
+        }
+        return $code;
     }
 
     /** Termo vigente de assistência clínica (o mesmo do cadastro feito pelo consultório). */

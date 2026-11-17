@@ -41,6 +41,7 @@ case "$PROFILE" in
       "tests/cr875_12_plurais_test.php"
       "tests/ni2_891_catalogo_exames_revisao_test.php"
       "tests/ni2_892_fatia1_test.php"
+      "tests/cr875_11_codigo_agendamento_test.php"
       "tests/v5475_reconciliation_test.php"
       "tests/ni2_894_aviso_agendamento_test.php"
       "tests/ni2_868_870_871_872_regression_test.php"

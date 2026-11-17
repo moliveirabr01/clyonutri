@@ -173,7 +173,8 @@ function nextDate(isoWeekday, minDays = 3) {
     const at14 = ins.appointments.filter((a) => a.scheduled_at.startsWith(`${WED} 14:00`) && a.status !== 'cancelled');
     check('6 confirmações simultâneas do mesmo token: exatamente 1 consulta', at14.length === 1, { status: results.map((x) => x.status), consultas: at14.length });
     const okResults = results.filter((x) => x.status === 200);
-    check('Respostas 200 apontam para a mesma consulta', okResults.length >= 1 && okResults.every((x) => x.json.appointment_id === at14[0].id || +x.json.appointment_id === +at14[0].id), results.map((x) => [x.status, x.json && x.json.appointment_id]));
+    // NI2-893 item 3 / CR875-11: a resposta pública não traz ids; todas as 200 trazem o mesmo código não sequencial.
+    check('Respostas 200 trazem o mesmo código do agendamento e nenhum id', okResults.length >= 1 && okResults.every((x) => /^[A-Z0-9]{8}$/.test(x.json.booking_code || '') && x.json.booking_code === okResults[0].json.booking_code && !('appointment_id' in x.json) && !('patient_id' in x.json)), results.map((x) => [x.status, x.json && x.json.booking_code]));
     evidence.push({ cenario: 'confirmações simultâneas do mesmo token', status: results.map((x) => x.status), consultas_criadas: at14.length });
     const appt = at14[0];
     check('Consulta canônica em appointments (status scheduled, 60 min, clínica e profissional certos)', appt.status === 'scheduled' && +appt.duration_minutes === 60 && +appt.clinic_id === 1 && +appt.professional_id === 1);
@@ -192,10 +193,12 @@ function nextDate(isoWeekday, minDays = 3) {
     let h = (await hold({ scheduled_at: `${WED} 15:00`, idempotency_key: 'ana-falsa' })).json;
     r = await anon.json('/api/v1/booking/confirm', { hold_token: h.hold_token, name: 'Pessoa Qualquer', email: 'ana@paciente.test', terms_accepted: true, consent_term_id: consentTermId });
     ins = fixture('inspect');
-    check('E-mail de paciente existente com outro nome NÃO anexa à ficha dela', r.status === 200 && +r.json.patient_id !== 1);
+    const at15 = ins.appointments.find((a) => a.scheduled_at.startsWith(`${WED} 15:00`) && a.status !== 'cancelled');
+    check('E-mail de paciente existente com outro nome NÃO anexa à ficha dela', r.status === 200 && at15 && +at15.patient_id !== 1);
     h = (await hold({ scheduled_at: `${WED} 16:00`, idempotency_key: 'ana-real' })).json;
     r = await anon.json('/api/v1/booking/confirm', { hold_token: h.hold_token, name: 'ANA  LIMA', email: 'ANA@paciente.test', terms_accepted: true, consent_term_id: consentTermId });
-    check('Mesmo e-mail e mesmo nome: vincula à paciente existente', r.status === 200 && +r.json.patient_id === 1, r.json);
+    const at16 = fixture('inspect').appointments.find((a) => a.scheduled_at.startsWith(`${WED} 16:00`) && a.status !== 'cancelled');
+    check('Mesmo e-mail e mesmo nome: vincula à paciente existente', r.status === 200 && at16 && +at16.patient_id === 1, r.json);
 
     // ---------------------------------------------------------------- expiração e liberação
     h = (await hold({ scheduled_at: `${THU} 08:00`, idempotency_key: 'expira' })).json;
