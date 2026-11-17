@@ -362,27 +362,23 @@ class DashboardController
               $lc->execute([(int)\ClyoNutri\Core\Auth\TenantContext::getClinicId(), (int)$p['id']]);
               $lastCompleted = $lc->fetch(\PDO::FETCH_ASSOC) ?: null;
           } catch (\Throwable $e) { $lastCompleted = null; }
+          // NI2-887: o resumo mostra só 3 ações; iniciar/continuar a consulta fica no botão principal do cabeçalho.
           $priorityActions = [];
-          $st = (string)($careStep['state'] ?? 'none');
-          if ($st === 'continue' && !empty($careStep['appointment']['id'])) {
-              $priorityActions[] = ['label' => 'Continuar atendimento', 'href' => '/consulta/' . (int)$careStep['appointment']['id']];
-          } elseif ($st === 'upcoming' || $st === 'start_today') {
-              $priorityActions[] = ['label' => 'Preparar consulta', 'href' => '/pacientes/' . (int)$p['id'] . '/preparar'];
-          }
-          if (!empty($clinicalSummary['draft_in_progress'])) {
-              $priorityActions[] = ['label' => 'Continuar anamnese', 'href' => '/pacientes/' . (int)$p['id'] . '/anamnese'];
-          }
           if (($activePlan['status'] ?? '') === 'draft') {
-              $priorityActions[] = ['label' => 'Continuar plano', 'href' => '/planos/' . (int)$activePlan['id']];
-          } elseif (!$activePlan) {
-              $priorityActions[] = ['label' => 'Criar plano', 'href' => '/pacientes/' . (int)$p['id'] . '/plano'];
+              $priorityActions[] = ['label' => 'Continuar plano', 'href' => '/planos/' . (int)$activePlan['id'], 'testid' => 'acao-plano'];
+          } else {
+              $priorityActions[] = ['label' => 'Novo plano', 'href' => '/pacientes/' . (int)$p['id'] . '/plano', 'testid' => 'acao-plano'];
           }
+          $priorityActions[] = ['label' => 'Mensagem', 'href' => '/chat?patient_id=' . (int)$p['id'], 'testid' => 'acao-mensagem'];
           if (!empty($clinicalSummary['allergy_review'])) {
-              $priorityActions[] = ['label' => 'Revisar alergia', 'href' => '#alergia-revisao'];
+              $priorityActions[] = ['label' => 'Revisar alergia', 'href' => '#alergia-revisao', 'testid' => 'acao-pendencia'];
+          } elseif (!empty($clinicalSummary['draft_in_progress'])) {
+              $priorityActions[] = ['label' => 'Continuar anamnese', 'href' => '/pacientes/' . (int)$p['id'] . '/anamnese', 'testid' => 'acao-pendencia'];
           }
+          $lastEvolution = $clinicalRecords[0] ?? null;
+          $detailsOpen = isset($_GET['detalhes']);
         ?>
         <?= \ClyoNutri\Application\View\PatientHeader::render(Connection::getInstance(), (int)$p['id'], 'resumo', $p, $careStep, $clinicalSummary, $activePlan, true) // NI2-622/661 ?>
-        <?php require __DIR__ . '/../../../views/patients/timeline.php'; ?>
         <?php /* NI2-624: alergia de versão anterior (ou do cadastro) que a vigente não confirma: revisão clínica, sem descartar o risco. */ ?>
         <?php $allergyReview = $clinicalSummary['allergy_review'] ?? []; ?>
         <?php if (!empty($_GET['alergia_revisada'])): ?>
@@ -417,8 +413,10 @@ class DashboardController
 
 
         <?php require __DIR__ . '/../../../views/patients/_operational_strip.php'; ?>
-        <details class="profile-details" data-testid="profile-details" open>
-          <summary>Detalhes do prontuário, planos, avaliações e app</summary>
+        <?php require __DIR__ . '/../../../views/patients/timeline.php'; ?>
+        <?php /* NI2-887: detalhes fechados na carga; abrem pelo resumo, por ?detalhes ou por âncora (#secao-...). */ ?>
+        <details class="profile-details" data-testid="profile-details" id="detalhes"<?= $detailsOpen ? ' open' : '' ?>>
+          <summary>Mais detalhes: dados, prontuário, anamnese, planos, avaliações e app</summary>
           <div class="profile-details__body">
         <div class="cn-split">
           <!-- Coluna 1: Dados Cadastrais -->
@@ -700,6 +698,7 @@ class DashboardController
         <?php require __DIR__ . '/../../../views/patients/app-hydration.php'; ?>
           </div>
         </details>
+        <script src="/assets/js/details-reveal.js?v=v54-76" defer></script>
 
         <!-- Modal Nova Avaliação Antropométrica -->
         <div id="anthroModal" data-dialog="modal" class="modal-overlay" data-call-self="closeAnthroModal">
