@@ -22,10 +22,8 @@ tests/ni2_412_ux_v3_test.php	DESATUALIZADO-TESTE: link Próxima semana mudou
 tests/ni2_427_https_transport_test.php	INVESTIGAR: proxy confiável + X-Forwarded-Proto; revisar junto com NI2-885 (HTTPS/HSTS)
 tests/ni2_429_csp_headers_test.php	INVESTIGAR: 2 atributos on*= em telas (CSP)
 tests/ni2_437_preconsultation_test.php	DESATUALIZADO-TESTE: sai com erro sem mensagem
-tests/ni2_469_inventory_architecture_attack_surface_test.php	DECISAO-MAICON: política de 1 dependência de terceiros; composer.json cresceu
 tests/ni2_471_audit_credentials_sessions_test.php	DESATUALIZADO-TESTE: procura texto antigo; Secure e timeout continuam no index.php (NI2-427/NI2-604); RegistrationRateLimiter::maxAttempts removido
 tests/ni2_472_audit_secrets_and_encryption_test.php	AMBIENTE: precisa do .git; no clone, git log -- "**.env" volta vazio (conferido)
-tests/ni2_475_audit_errors_supply_chain_test.php	DECISAO-MAICON: debug em produção bloqueado (PASS); falha só a política de dependências do composer.json
 tests/ni2_477_consolidated_security_audit_test.php	DESATUALIZADO-TESTE: timeout fixo 1800 virou configurável (PlatformSettings, NI2-604)
 tests/ni2_479_register_rate_limit_and_honeypot_test.php	DECISAO-MAICON: honeypot website_url saiu do register.php desde c039de5; rate limit PASS
 tests/ni2_481_transactional_emails_e2e_test.php	FIXTURE: banco próprio sem a migração booking_holds (a migração existe)

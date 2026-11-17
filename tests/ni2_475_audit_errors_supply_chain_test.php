@@ -89,41 +89,13 @@ check(str_contains($indexSrc, "ApiErrorBoundary::register()"), "public/index.php
 // -------------------------------------------------------------------------
 echo "\n[Controle 18] Gestão de Dependências, Lockfiles e Supply Chain...\n";
 
-// 1. Inspeção do composer.json
-$composerJsonPath = __DIR__ . '/../composer.json';
-check(file_exists($composerJsonPath), "composer.json existe na raiz do projeto");
-$composerData = json_decode(file_get_contents($composerJsonPath), true);
-check(is_array($composerData), "composer.json é um JSON válido");
-check(isset($composerData['require']['phpmailer/phpmailer']), "composer.json declara phpmailer/phpmailer no runtime");
-check(count($composerData['require']) <= 2, "composer.json possui superfície mínima de dependências de terceiros (apenas php e phpmailer)");
-
-// 2. Inspeção e integridade do composer.lock
-$composerLockPath = __DIR__ . '/../composer.lock';
-check(file_exists($composerLockPath), "composer.lock existe e está sob controle de versão");
-$lockData = json_decode(file_get_contents($composerLockPath), true);
-check(is_array($lockData), "composer.lock é um JSON válido");
-check(isset($lockData['content-hash']) && strlen($lockData['content-hash']) > 0, "composer.lock contém content-hash de integridade");
-
-$packages = $lockData['packages'] ?? [];
-$packageNames = array_column($packages, 'name');
-check(in_array('phpmailer/phpmailer', $packageNames, true), "composer.lock contém pacote oficial phpmailer/phpmailer");
-
-$phpmailer = null;
-foreach ($packages as $pkg) {
-    if ($pkg['name'] === 'phpmailer/phpmailer') {
-        $phpmailer = $pkg;
-        break;
-    }
+// 1–2. composer.json e composer.lock — v54.77: política única de dependências (tests/_dependency_policy.php).
+// Antes: "count(require) <= 2 (apenas php e phpmailer)", escrito antes do dompdf (pacote v45) e falhando desde então.
+// Decisão do Maicon (17/11/2026): vale a política da NI2-475 — lista explícita de dependências aprovadas + lock íntegro.
+require_once __DIR__ . '/_dependency_policy.php';
+foreach (clyonutri_dependency_policy(dirname(__DIR__)) as [$cond, $label]) {
+    check($cond, $label);
 }
-
-check($phpmailer !== null, "Pacote phpmailer/phpmailer localizado no lockfile");
-if ($phpmailer) {
-    check(version_compare(ltrim($phpmailer['version'], 'v'), '6.9.0', '>='), "PHPMailer está na versão fixada segura ({$phpmailer['version']})");
-    $thirdPartyDeps = array_filter(array_keys($phpmailer['require'] ?? []), fn($k) => str_contains($k, '/'));
-    check(count($thirdPartyDeps) === 0, "PHPMailer não possui dependências transitivas de terceiros no PHP");
-}
-
-check(empty($lockData['packages-dev']), "composer.lock não inclui pacotes de desenvolvimento em pacotes de produção");
 
 // 3. Inspeção do ecossistema Mobile
 $mobilePkgPath = __DIR__ . '/../mobile/package.json';
