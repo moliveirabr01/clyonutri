@@ -14,6 +14,7 @@ $seq = [
     '2026_11_17_000099_ni2_886_household_measure_review' => 'ni2_886_medidas_caseiras_revisao_mysql57.sql',
     '2026_11_17_000100_ni2_891_exam_catalog_review' => 'ni2_891_exames_revisao_mysql57.sql',
     '2026_11_17_000101_cr875_14_password_reset_purpose' => 'cr875_14_password_reset_purpose_mysql57.sql',
+    '2026_11_17_000102_v5477_catalog_rt_reviewer' => 'v54_77_rt_catalogos_mysql57.sql', // v54.77: RT dos catálogos
 ];
 $pass = 0; $fail = 0;
 $ok = static function (bool $c, string $l) use (&$pass, &$fail) { echo ($c ? 'PASS ' : 'FAIL ') . $l . "\n"; $c ? $pass++ : $fail++; };
@@ -27,6 +28,6 @@ foreach ($seq as $mig => $file) {
 }
 // A última migração do repositório tem SQL manual nesta sequência (nada novo esquecido fora dela).
 $files = glob("$root/database/migrations/*.php"); sort($files);
-$ok(basename((string)end($files), '.php') === array_key_last($seq), 'a última migração do repositório está na sequência de SQL manual da v54.76');
+$ok(basename((string)end($files), '.php') === array_key_last($seq), 'a última migração do repositório está na sequência de SQL manual (v54.77)');
 echo "\nCR875-15 registro das migrações nos SQL manuais: $pass PASS, $fail FAIL\n";
 exit($fail ? 1 : 0);

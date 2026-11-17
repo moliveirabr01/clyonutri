@@ -26,7 +26,7 @@ $pendingReview = !empty($isManager) ? count(array_filter($catalog, fn($x) => ($x
     <div class="ex-msg <?= $flash['type'] === 'error' ? 'ex-msg-error' : 'ex-msg-success' ?>" role="<?= $flash['type'] === 'error' ? 'alert' : 'status' ?>"><?= $e($flash['message']) ?></div>
   <?php endif; ?>
   <?php if ($pendingReview > 0): ?>
-    <div class="ex-msg ex-msg-info" role="note" data-testid="exam-catalog-review-notice"><?= $e(\ClyoNutri\Application\View\UserText::count((int)$pendingReview, '1 exame do catálogo geral aguarda', '{n} exames do catálogo geral aguardam')) ?> a revisão do nutricionista responsável técnico do Clyo Nutri. Até lá, a coluna Código fica em branco para esses exames. Aviso visível só para a dona ou administradora da clínica.</div>
+    <div class="ex-msg ex-msg-info" role="note" data-testid="exam-catalog-review-notice"><?= $e(\ClyoNutri\Application\View\UserText::count((int)$pendingReview, '1 exame do catálogo geral aguarda', '{n} exames do catálogo geral aguardam')) ?> a revisão do nutricionista responsável técnico do Clyo Nutri<?= !empty($catalogRtName) ? ', <span data-testid="exam-catalog-rt">' . $e($catalogRtName) . '</span>' : '' ?>. Até lá, a coluna Código fica em branco para esses exames. Aviso visível só para a dona ou administradora da clínica.</div>
   <?php endif; ?>
 
   <section class="card ex-card" aria-labelledby="cat-titulo">
