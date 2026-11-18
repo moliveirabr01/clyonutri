@@ -5,8 +5,9 @@ declare(strict_types=1);
 /**
  * v8: public/.htaccess não pode acrescentar uma 2ª CSP às respostas do PHP.
  * Em PHP via FPM/CGI (HostGator) "Header setifempty" não enxerga os cabeçalhos do PHP; a CSP estática
- * (form-action 'none') ia junto e bloqueava o login. Agora CSP/X-Frame-Options do .htaccess só valem
- * dentro do FilesMatch de estáticos. Opcional: CSP_FPM_URL=http://127.0.0.1:8090 confere no Apache+FPM real.
+ * (form-action 'none') ia junto e bloqueava o login. O FilesMatch limita essa política
+ * aos estáticos, e a NI2-809 mantém um fallback condicionado à ausência da CSP.
+ * Opcional: CSP_FPM_URL=http://127.0.0.1:8090 confere no Apache+FPM real.
  */
 $passed = 0; $failed = 0;
 function check(bool $c, string $m): void { global $passed, $failed; echo ($c ? '  [PASS] ' : '  [FAIL] ') . $m . "\n"; $c ? $passed++ : $failed++; }
@@ -17,10 +18,29 @@ $block = $m[1] ?? '';
 check($block !== '', 'Bloco mod_headers presente');
 preg_match_all('/<FilesMatch "([^"]+)">(.*?)<\/FilesMatch>/s', $block, $fm, PREG_SET_ORDER);
 $outside = preg_replace('/<FilesMatch "[^"]+">.*?<\/FilesMatch>/s', '', $block);
-check(!preg_match('/Content-Security-Policy/i', $outside), 'Nenhuma CSP fora do FilesMatch de estáticos');
+function headerDirectives(string $config, string $name): array
+{
+    $pattern = '/^[ \t]*Header\h+(?:always\h+|onsuccess\h+)?\S+\h+' . preg_quote($name, '/') . '\b[^\r\n]*/mi';
+    preg_match_all($pattern, $config, $matches);
+    return array_map('trim', $matches[0]);
+}
+
+function hasGuardedFallback(string $config, string $name, string $valuePattern): bool
+{
+    $directives = headerDirectives($config, $name);
+    $prefix = preg_quote("Header always setifempty {$name} \"", '~');
+    $suffix = preg_quote("\" \"expr=-z resp('{$name}')\"", '~');
+    return count($directives) === 1
+        && preg_match('~^' . $prefix . $valuePattern . $suffix . '$~D', $directives[0]) === 1;
+}
+
+$rootHtaccess = file_get_contents(__DIR__ . '/../.htaccess');
+$cspFallback = "[^\"]*form-action 'self';[^\"]*";
+check(hasGuardedFallback($outside, 'Content-Security-Policy', $cspFallback), 'CSP global do public condicionada à ausência do cabeçalho');
+check(hasGuardedFallback($rootHtaccess, 'Content-Security-Policy', $cspFallback), 'CSP global da raiz condicionada à ausência do cabeçalho');
 check(!preg_match('/X-Frame-Options/i', $outside), 'Nenhum X-Frame-Options fora do FilesMatch');
-check(preg_match('/Header setifempty X-Content-Type-Options "nosniff"/', $outside) === 1, 'nosniff global (setifempty)');
-check(preg_match('/Header setifempty Referrer-Policy "strict-origin-when-cross-origin"/', $outside) === 1, 'Referrer-Policy global (setifempty)');
+check(hasGuardedFallback($outside, 'X-Content-Type-Options', 'nosniff'), 'nosniff global condicionado à ausência do cabeçalho');
+check(hasGuardedFallback($outside, 'Referrer-Policy', 'strict-origin-when-cross-origin'), 'Referrer-Policy global condicionada à ausência do cabeçalho');
 check(count($fm) === 1, 'Um FilesMatch de estáticos');
 $re = '/' . ($fm[0][1] ?? 'x^') . '/';
 foreach (['app.css', 'a.js', 'logo.svg', 'f.woff2', 'site.webmanifest'] as $f) { check(preg_match($re, $f) === 1, "Estático coberto: $f"); }

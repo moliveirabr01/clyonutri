@@ -330,15 +330,16 @@ $planoAlergenico = $mealPlanService->createPlan(
             'time_of_day' => '16:00',
             'items' => [
                 ['food_id' => $aveia['id'], 'amount' => 50, 'measure_unit' => 'g'],
-                ['food_id' => $banana['id'], 'amount' => 1.333, 'measure_unit' => 'unidade'], // Teste de arredondamento
+                ['food_id' => $banana['id'], 'amount' => 1.333, 'measure_unit' => 'unidade'],
             ]
         ]
     ]
 );
 $mealPlanService->publishPlan($planoAlergenico['plan_id'], true, false, 'Aprovação justificada para teste de alérgeno', true, 'Estrutura e metas do plano de teste conferidas (TESTE, NI2-884).', true);
 
-// Validar multiplicadores de dias e arredondamento (1, 7, 14, 30 dias)
-foreach ([1 => 1.3, 7 => 9.3, 14 => 18.7, 30 => 40.0] as $dias => $esperadoBanana) {
+// NI2-903: normalizeAmount() converte 1,333 para 1,33 antes de persistir.
+// Multiplicar 1,33 pelo período antes de arredondar o total para uma casa.
+foreach ([1 => 1.3, 7 => 9.3, 14 => 18.6, 30 => 39.9] as $dias => $esperadoBanana) {
     $listaPeriodo = $shoppingService->generateForPlan($planoAlergenico['plan_id'], $dias);
     assert($listaPeriodo['days'] === $dias, "Multiplicador de dias deve bater");
 
@@ -360,7 +361,7 @@ assert(!empty($listaFinal['allergens_and_restrictions']['allergies_recorded']), 
 assert(!empty($listaFinal['allergens_and_restrictions']['restrictions_recorded']), "Restrições devem constar no topo");
 assert($listaFinal['allergens_and_restrictions']['has_conflicts'] === true, "Deve acusar conflito de alérgeno");
 
-echo "  [PASS] [AC4_AC5_ALLERGENS_ROUNDING] Alerta de glúten e arredondamento (1d: 1.3, 7d: 9.3, 14d: 18.7, 30d: 40.0) validados.\n\n";
+echo "  [PASS] [AC4_AC5_ALLERGENS_ROUNDING] Alerta de glúten e arredondamento (1d: 1.3, 7d: 9.3, 14d: 18.6, 30d: 39.9) validados.\n\n";
 $step++;
 
 // -------------------------------------------------------------------------
